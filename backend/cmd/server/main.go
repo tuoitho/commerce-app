@@ -15,6 +15,7 @@ import (
 	"commerce-backend/internal/security"
 	"commerce-backend/internal/security/jwt"
 	authuc "commerce-backend/internal/usecase/auth"
+	cataloguc "commerce-backend/internal/usecase/catalog"
 )
 
 func main() {
@@ -40,24 +41,28 @@ func main() {
 
 	userRepo := repository.NewUserRepository(pool)
 	sessionRepo := repository.NewSessionRepository(pool)
+	catalogRepo := repository.NewCatalogRepository(pool)
 
 	jwtManager := jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 
 	authUC := authuc.New(authuc.Dependencies{
-		Repos:        authuc.Repositories{Users: userRepo, Sessions: sessionRepo},
-		JWT:          jwtManager,
-		AccessTTL:    cfg.AccessTokenTTL,
-		RefreshTTL:   cfg.RefreshTokenTTL,
-		HashPassword: security.HashPassword,
-		CheckPassword: security.CheckPassword,
+		Repos:                authuc.Repositories{Users: userRepo, Sessions: sessionRepo},
+		JWT:                  jwtManager,
+		AccessTTL:            cfg.AccessTokenTTL,
+		RefreshTTL:           cfg.RefreshTokenTTL,
+		HashPassword:         security.HashPassword,
+		CheckPassword:        security.CheckPassword,
 		GenerateRefreshToken: security.GenerateRefreshToken,
 	})
+
+	catalogUC := cataloguc.New(cataloguc.Dependencies{Catalog: catalogRepo})
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
 	delivery.NewRouter(router, delivery.Dependencies{
 		UseCase:      authUC,
+		Catalog:      catalogUC,
 		JWT:          jwtManager,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,

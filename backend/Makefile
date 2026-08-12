@@ -1,7 +1,10 @@
 DB_URL ?= postgres://commerce:commerce@localhost:5432/commerce?sslmode=disable
+-include .env
+export APP_ENV HTTP_PORT DB_URL JWT_ACCESS_SECRET ACCESS_TOKEN_TTL REFRESH_TOKEN_TTL COOKIE_SECURE
+
 MIGRATE = migrate -source "file://db/migrations" -database "$(DB_URL)"
 
-.PHONY: db-up db-down db-drop gen run test vet
+.PHONY: db-up db-down db-drop seed gen run test vet
 
 db-up:
 	$(MIGRATE) up
@@ -11,6 +14,9 @@ db-down:
 
 db-drop:
 	$(MIGRATE) drop
+
+seed:
+	psql "$(DB_URL)" -f db/seed/catalog.sql
 
 gen:
 	sqlc generate

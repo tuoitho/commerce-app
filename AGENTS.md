@@ -138,3 +138,27 @@ then broader checks when appropriate. For an OpenSpec change, map evidence to
 its requirements and completed tasks and identify anything not verified.
 
 Do not archive a change solely because implementation code exists.
+
+
+## Long-running processes
+
+Do not run long-lived servers or watch commands in the foreground.
+
+Commands such as:
+- `npm run dev`
+- `mvn spring-boot:run`
+- `docker compose up`
+- `tail -f`
+- watch-mode test runners
+
+must either:
+1. be started using the environment's supported background/session mechanism, or
+2. be bounded with an explicit timeout.
+
+After starting a background service:
+- verify readiness with a health check or bounded polling,
+- capture logs to a known location,
+- record the PID/session when applicable,
+- stop the process when it is no longer needed.
+
+Never wait indefinitely for a command whose expected behavior is to remain running.

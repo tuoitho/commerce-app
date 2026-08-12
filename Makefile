@@ -1,8 +1,12 @@
-.PHONY: backend frontend db-up run test build
+.PHONY: backend frontend db-up seed run test build
 
 ## Apply database migrations against the local backend DB.
 db-up:
 	$(MAKE) -C backend db-up
+
+## Load idempotent sample catalog data after migrations.
+seed:
+	$(MAKE) -C backend seed
 
 ## Start both servers for local development (backend on :8080, frontend on :5173).
 run:

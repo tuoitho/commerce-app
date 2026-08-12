@@ -15,6 +15,8 @@ import (
 	"commerce-backend/internal/security/jwt"
 	"commerce-backend/internal/usecase/auth"
 	fakerepos "commerce-backend/internal/usecase/auth/fakerepos"
+	catalogfakerepos "commerce-backend/internal/usecase/catalog/fakerepos"
+	cataloguc "commerce-backend/internal/usecase/catalog"
 )
 
 const testSecret = "a-secret-that-is-at-least-thirty-two-characters"
@@ -39,6 +41,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *fakerepos.Users) {
 	router := gin.New()
 	NewRouter(router, Dependencies{
 		UseCase:      uc,
+		Catalog:      cataloguc.New(cataloguc.Dependencies{Catalog: catalogfakerepos.NewCatalog()}),
 		JWT:          manager,
 		RefreshTTL:   24 * time.Hour,
 		CookieSecure: false,

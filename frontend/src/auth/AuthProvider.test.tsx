@@ -29,7 +29,7 @@ describe('AuthProvider session restore', () => {
   })
 
   it('restores a session from the refresh endpoint when no access token is held', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({ user: { id: '1', email: 'user@example.com' }, accessToken: 'abc' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -46,6 +46,10 @@ describe('AuthProvider session restore', () => {
     expect(screen.getByTestId('user').textContent).toBe('user@example.com')
     expect(screen.getByTestId('token').textContent).toBe('abc')
     expect(window.localStorage.getItem('access_token')).toBe('abc')
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+    })
   })
 
   it('stays signed out when refresh endpoint rejects', async () => {

@@ -10,6 +10,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Category struct {
+	ID        string
+	Name      string
+	CreatedAt time.Time
+}
+
+type Product struct {
+	ID            string
+	CategoryID    string
+	Name          string
+	Description   string
+	Price         pgtype.Numeric
+	Currency      string
+	StockQuantity int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type ProductImage struct {
+	ID        string
+	ProductID string
+	Url       string
+	Position  int32
+	CreatedAt time.Time
+}
+
 type RefreshToken struct {
 	ID        string
 	UserID    string

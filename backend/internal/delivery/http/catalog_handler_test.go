@@ -1,0 +1,319 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"commerce-backend/internal/domain"
+	"commerce-backend/internal/security"
+	"commerce-backend/internal/security/jwt"
+	authuc "commerce-backend/internal/usecase/auth"
+	fakerepos "commerce-backend/internal/usecase/auth/fakerepos"
+	cataloguc "commerce-backend/internal/usecase/catalog"
+	catalogfakerepos "commerce-backend/internal/usecase/catalog/fakerepos"
+)
+
+const (
+	catElectronics  = "11111111-1111-1111-1111-111111111111"
+	catBooks        = "22222222-2222-2222-2222-222222222222"
+	productMouse    = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	productKeyboard = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	productBook     = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+)
+
+func newCatalogTestRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	users := fakerepos.NewUsers()
+	sessions := fakerepos.NewSessions(users)
+	manager := jwt.NewManager(testSecret, "commerce-backend")
+	authUC := authuc.New(authuc.Dependencies{
+		Repos:                authuc.Repositories{Users: users, Sessions: sessions},
+		JWT:                  manager,
+		AccessTTL:            15 * time.Minute,
+		RefreshTTL:           24 * time.Hour,
+		HashPassword:         security.HashPassword,
+		CheckPassword:        security.CheckPassword,
+		GenerateRefreshToken: func() (security.RefreshTokenPair, error) { return security.GenerateRefreshToken() },
+	})
+
+	catalog := catalogfakerepos.NewCatalog()
+	catalog.AddCategory(domain.Category{ID: catElectronics, Name: "Electronics"})
+	catalog.AddCategory(domain.Category{ID: catBooks, Name: "Books"})
+	catalog.AddProduct(domain.Product{
+		ID:            productMouse,
+		Name:          "Wireless Mouse",
+		Description:   "A mouse without wires.",
+		Category:      domain.Category{ID: catElectronics, Name: "Electronics"},
+		Price:         "24.99",
+		Currency:      "USD",
+		ImageURLs:     []string{"https://example.com/mouse.jpg"},
+		StockQuantity: 10,
+	})
+	catalog.AddProduct(domain.Product{
+		ID:            productKeyboard,
+		Name:          "Wireless Keyboard",
+		Description:   "Types without wires.",
+		Category:      domain.Category{ID: catElectronics, Name: "Electronics"},
+		Price:         "59.90",
+		Currency:      "USD",
+		ImageURLs:     []string{"https://example.com/keyboard.jpg"},
+		StockQuantity: 0,
+	})
+	catalog.AddProduct(domain.Product{
+		ID:            productBook,
+		Name:          "Go Programming",
+		Description:   "A book about Go.",
+		Category:      domain.Category{ID: catBooks, Name: "Books"},
+		Price:         "39.00",
+		Currency:      "USD",
+		ImageURLs:     []string{"https://example.com/go.jpg"},
+		StockQuantity: 3,
+	})
+
+	router := gin.New()
+	NewRouter(router, Dependencies{
+		UseCase:      authUC,
+		Catalog:      cataloguc.New(cataloguc.Dependencies{Catalog: catalog}),
+		JWT:          manager,
+		RefreshTTL:   24 * time.Hour,
+		CookieSecure: false,
+	})
+	return router
+}
+
+func decodeProducts(t *testing.T, w *httptest.ResponseRecorder) []productSummaryResponse {
+	t.Helper()
+	var body struct {
+		Products []productSummaryResponse `json:"products"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Products
+}
+
+func assertErrorEnvelope(t *testing.T, w *httptest.ResponseRecorder, status int, code string, field string) {
+	t.Helper()
+	if w.Code != status {
+		t.Fatalf("status = %d, want %d, body = %s", w.Code, status, w.Body.String())
+	}
+	var eb errorBody
+	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
+		t.Fatal(err)
+	}
+	if eb.Error.Code != code {
+		t.Fatalf("code = %q, want %q", eb.Error.Code, code)
+	}
+	if field != "" && eb.Error.Fields[field] == "" {
+		t.Fatalf("expected field %q in error, got %+v", field, eb.Error)
+	}
+}
+
+func TestCatalog_ListProductsWithoutAuth(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	products := decodeProducts(t, w)
+	if len(products) != 3 {
+		t.Fatalf("len = %d", len(products))
+	}
+	if products[0].Name != "Go Programming" || products[1].Name != "Wireless Keyboard" || products[2].Name != "Wireless Mouse" {
+		t.Fatalf("unexpected stable order: %q, %q, %q", products[0].Name, products[1].Name, products[2].Name)
+	}
+	first := products[2]
+	if first.Price != "24.99" || first.Currency != "USD" || !first.InStock || first.PrimaryImageURL != "https://example.com/mouse.jpg" {
+		t.Fatalf("unexpected summary: %+v", first)
+	}
+	if first.Category.ID != catElectronics || first.Category.Name != "Electronics" {
+		t.Fatalf("unexpected category: %+v", first.Category)
+	}
+}
+
+func TestCatalog_ListProductsNameSearch(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?q=WIRELESS", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	products := decodeProducts(t, w)
+	if len(products) != 2 {
+		t.Fatalf("len = %d, body = %s", len(products), w.Body.String())
+	}
+}
+
+func TestCatalog_ListProductsBlankQuery(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?q=%20%20", nil)
+	products := decodeProducts(t, w)
+	if len(products) != 3 {
+		t.Fatalf("blank query should return all, got %d", len(products))
+	}
+}
+
+func TestCatalog_ListProductsFilterByCategory(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?category_id="+catBooks, nil)
+	products := decodeProducts(t, w)
+	if len(products) != 1 || products[0].ID != productBook {
+		t.Fatalf("unexpected products: %+v", products)
+	}
+}
+
+func TestCatalog_ListProductsPriceRange(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=30.00&max_price=60.00", nil)
+	products := decodeProducts(t, w)
+	ids := map[string]bool{}
+	for _, p := range products {
+		ids[p.ID] = true
+	}
+	if !ids[productKeyboard] || !ids[productBook] || ids[productMouse] {
+		t.Fatalf("unexpected price-filtered products: %v", ids)
+	}
+}
+
+func TestCatalog_ListProductsStockFilters(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?in_stock=true", nil)
+	products := decodeProducts(t, w)
+	if len(products) != 2 {
+		t.Fatalf("in_stock=true len = %d", len(products))
+	}
+	for _, p := range products {
+		if !p.InStock {
+			t.Fatalf("expected only in-stock products, got %+v", p)
+		}
+	}
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?in_stock=false", nil)
+	out := decodeProducts(t, w2)
+	if len(out) != 1 || out[0].ID != productKeyboard {
+		t.Fatalf("in_stock=false unexpected: %+v", out)
+	}
+}
+
+func TestCatalog_ListProductsCombinedCriteria(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?q=wireless&category_id="+catElectronics+"&in_stock=true&min_price=20", nil)
+	products := decodeProducts(t, w)
+	if len(products) != 1 || products[0].ID != productMouse {
+		t.Fatalf("unexpected combined results: %+v", products)
+	}
+}
+
+func TestCatalog_ListProductsNoMatch(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?q=nope", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if products := decodeProducts(t, w); len(products) != 0 {
+		t.Fatalf("expected empty array, got %d", len(products))
+	}
+}
+
+func TestCatalog_ListProductsInvalidCategory(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?category_id=not-a-uuid", nil)
+	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "category_id")
+}
+
+func TestCatalog_ListProductsInvalidPrice(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=-5", nil)
+	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "min_price")
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?max_price=abc", nil)
+	assertErrorEnvelope(t, w2, http.StatusBadRequest, "invalid_filter", "max_price")
+}
+
+func TestCatalog_ListProductsReversedRange(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=50&max_price=10", nil)
+	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "min_price")
+	var eb errorBody
+	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
+		t.Fatal(err)
+	}
+	if eb.Error.Fields["max_price"] == "" {
+		t.Fatalf("expected max_price field too: %+v", eb.Error)
+	}
+}
+
+func TestCatalog_ListProductsInvalidStock(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?in_stock=maybe", nil)
+	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "in_stock")
+}
+
+func TestCatalog_ListCategories(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/categories", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var body struct {
+		Categories []categoryResponse `json:"categories"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Categories) != 2 {
+		t.Fatalf("len = %d", len(body.Categories))
+	}
+	if body.Categories[0].Name != "Books" || body.Categories[1].Name != "Electronics" {
+		t.Fatalf("unexpected order: %+v", body.Categories)
+	}
+}
+
+func TestCatalog_GetProductDetail(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/"+productMouse, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var detail productDetailResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Name != "Wireless Mouse" || detail.Description == "" || detail.Price != "24.99" || detail.Currency != "USD" {
+		t.Fatalf("unexpected detail: %+v", detail)
+	}
+	if len(detail.ImageURLs) != 1 || detail.StockQuantity != 10 || !detail.InStock {
+		t.Fatalf("unexpected detail: %+v", detail)
+	}
+	if detail.CreatedAt.IsZero() || detail.UpdatedAt.IsZero() {
+		t.Fatal("expected timestamps")
+	}
+}
+
+func TestCatalog_GetProductOutOfStock(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/"+productKeyboard, nil)
+	var detail productDetailResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.StockQuantity != 0 || detail.InStock {
+		t.Fatalf("expected out-of-stock detail: %+v", detail)
+	}
+}
+
+func TestCatalog_GetProductMalformedID(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/junk", nil)
+	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_product_id", "")
+}
+
+func TestCatalog_GetProductNotFound(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/99999999-9999-9999-9999-999999999999", nil)
+	assertErrorEnvelope(t, w, http.StatusNotFound, "product_not_found", "")
+}
