@@ -15,18 +15,19 @@ Write the test first. Watch it fail. Write minimal code to pass.
 
 ## Specification source
 
-When an active OpenSpec change governs the work, derive test behavior and
-acceptance criteria from its specifications and design decisions. Tests prove
-the specified behavior; they do not silently redefine it.
+When a `.kiro/specs/<feature>/` specification governs the work, derive test
+behavior and acceptance criteria from `requirements.md`, `design.md`, and the
+canonical task. Tests prove specified behavior; they do not silently redefine
+it.
 
 Before writing a failing test:
 
-1. Identify the OpenSpec requirement and scenario it covers.
+1. Identify the requirement and acceptance-criterion IDs it covers.
 2. Confirm the expected result, failure behavior, and compatibility constraints.
 3. Keep the test traceable to that requirement in its name or surrounding task.
 
 If a test, existing behavior, and the active specification contradict one
-another, stop implementation. Resolve the conflict in the OpenSpec artifacts
+another, stop implementation. Resolve and approve the conflict in the governing artifacts
 before continuing the RED-GREEN-REFACTOR cycle. Do not change a test or
 implementation merely to hide a specification conflict.
 

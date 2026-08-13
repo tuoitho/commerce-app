@@ -4,7 +4,7 @@
 # through the controller's context.
 #
 # Usage: task-brief PLAN_FILE TASK_NUMBER [OUTFILE]
-# Default OUTFILE: <repo-root>/.superpowers/sdd/<plan-basename>/task-<N>-brief.md
+# Default OUTFILE: <repo-root>/.superpowers/sdd/<parent>-<plan-basename>/task-<N>-brief.md
 # (per plan and per worktree; concurrent runs of the SAME plan in the same
 # working tree share it).
 set -euo pipefail
@@ -28,13 +28,24 @@ fi
 awk -v n="$n" '
   /^```/ { infence = !infence }
   !infence && /^#+[ \t]+Task[ \t]+[0-9]+/ {
-    intask = ($0 ~ ("^#+[ \t]+Task[ \t]+" n "([^0-9]|$)"))
+    if (found) exit
+    intask = ($0 ~ ("^#+[ \t]+Task[ \t]+" n "([^0-9.]|$)"))
+    if (intask) found = 1
+  }
+  !infence && /^[ \t]*-[ \t]*\[[ xX]\][ \t]+[0-9]+(\.[0-9]+)?[. ]/ {
+    if (found) exit
+    line = $0
+    sub(/^[ \t]*-[ \t]*\[[ xX]\][ \t]+/, "", line)
+    match(line, /^[0-9]+(\.[0-9]+)?/)
+    id = substr(line, RSTART, RLENGTH)
+    intask = (id == n)
+    if (intask) found = 1
   }
   intask { print }
 ' "$plan" > "$out"
 
 if [ ! -s "$out" ]; then
-  echo "task ${n} not found in ${plan} (no heading matching 'Task ${n}')" >&2
+  echo "task ${n} not found in ${plan}" >&2
   exit 3
 fi
 

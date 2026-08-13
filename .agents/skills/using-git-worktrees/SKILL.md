@@ -73,7 +73,10 @@ Follow this priority order. Explicit user preference always beats observed files
    ```
    If found, use it. If both exist, `.worktrees` wins.
 
-3. **If there is no other guidance available**, default to `.worktrees/` at the project root.
+3. **If there is no other guidance available**, default to an external
+   temporary worktree directory. On Windows use
+   `C:\Users\TuoiTho\AppData\Local\Temp\opencode\worktrees\<repo>\`; on other
+   platforms use the environment's approved temporary directory.
 
 #### Safety Verification (project-local directories only)
 
@@ -83,7 +86,8 @@ Follow this priority order. Explicit user preference always beats observed files
 git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
 ```
 
-**If NOT ignored:** Add to .gitignore, commit the change, then proceed.
+**If NOT ignored:** Do not modify `.gitignore` or create a commit. Use the
+external temporary worktree directory instead.
 
 **Why critical:** Prevents accidentally committing worktree contents to repository.
 
@@ -150,8 +154,8 @@ Ready to implement <feature-name>
 | `.worktrees/` exists | Use it (verify ignored) |
 | `worktrees/` exists | Use it (verify ignored) |
 | Both exist | Use `.worktrees/` |
-| Neither exists | Check instruction file, then default `.worktrees/` |
-| Directory not ignored | Add to .gitignore + commit |
+| Neither exists | Check instructions, then use the approved external temp directory |
+| Directory not ignored | Use the external temp directory; do not edit or commit `.gitignore` |
 | Permission error on create | Sandbox fallback, work in place |
 | Tests fail during baseline | Report failures + ask |
 | No package.json/Cargo.toml | Skip dependency install |

@@ -7,47 +7,47 @@ description: Use when building or changing behavior whose requirements, scope, a
 
 ## Purpose
 
-Turn an insufficiently defined change into an approved, implementable design.
-In repositories using OpenSpec, OpenSpec owns the durable specification. Do not
-create a parallel Superpowers design document for an OpenSpec-backed change.
+Turn an insufficiently defined change into approved decisions that a governed
+feature specification can capture.
 
 <HARD-GATE>
 Do not invoke implementation skills or modify implementation code until the
-design is sufficiently clear, recorded in OpenSpec, and approved where the
-workflow requires approval.
+design is sufficiently clear and the governing workflow's approvals are met.
 </HARD-GATE>
 
 ## Checklist
 
 Complete these in order:
 
-1. Explore repository context and active OpenSpec changes.
+1. Explore repository context and active `.kiro/specs/` features.
 2. Decide whether the behavior is already sufficiently specified.
 3. Ask material clarifying questions one logical decision at a time.
 4. Present two or three viable approaches with trade-offs and a recommendation.
 5. Present the design in sections appropriate to its complexity.
 6. Obtain approval for material decisions.
-7. Create or update OpenSpec proposal, specs, design, and tasks as applicable.
-8. Self-review the artifacts for placeholders, contradictions, ambiguity, and scope.
-9. Ask for artifact review when the active workflow requires a user gate.
-10. Hand off to planning or implementation using the OpenSpec artifacts.
+7. Hand approved decisions back to the `spec-driven-development` workflow.
+
+For initial Kiro spec creation, do not run this checklist before the first
+requirements draft. `requirements-engineering` drafts from the rough idea
+first; use brainstorming only afterward when targeted clarification or design
+trade-offs remain.
 
 ## Explore first
 
 Inspect only relevant context:
 
 - root and local repository instructions
-- active OpenSpec changes and existing specifications
+- active `.kiro/specs/` features and existing specifications
 - affected contracts, code, and tests
 - relevant architecture or steering documents
 
-If an active OpenSpec change already resolves the necessary product and design
-decisions, stop brainstorming. Use its artifacts as the source of truth and
+If an active feature specification already resolves the necessary product and
+design decisions, stop brainstorming. Use its artifacts as the source of truth and
 continue with the applicable execution workflow.
 
 If the request contains multiple independent subsystems, decompose it before
 refining details. Each independently deliverable change should have a focused
-OpenSpec lifecycle.
+feature specification.
 
 ## Clarify material decisions
 
@@ -95,45 +95,39 @@ Each unit should have a clear responsibility, interface, and dependency set.
 Ask for approval after a coherent design section when proceeding without that
 approval would risk rework.
 
-## OpenSpec handoff
+## Specification handoff
 
-Record the durable result in the applicable OpenSpec change:
+Return the clarified scope, observable behavior, alternatives, approved
+decisions, compatibility constraints, and unresolved non-material assumptions
+to `spec-driven-development`. That workflow records the durable result in:
 
-- `proposal.md` for motivation, scope, affected areas, and compatibility
-- `specs/` for observable requirements and scenarios
-- `design.md` for material architecture and migration decisions
-- `tasks.md` for dependency-ordered, independently verifiable work
+- `.kiro/specs/<feature>/requirements.md`
+- `.kiro/specs/<feature>/design.md`
+- `.kiro/specs/<feature>/tasks.md`
 
-Do not additionally create `docs/superpowers/specs/*` for a change governed by
-OpenSpec. If no OpenSpec change governs the work, follow the repository's
-documented fallback workflow.
+Do not create a parallel document under `docs/superpowers/`.
 
 ## Self-review
 
 Before handoff:
 
-1. Remove `TBD`, `TODO`, and incomplete sections.
-2. Resolve contradictions between proposal, specs, design, and tasks.
-3. Make ambiguous requirements explicit.
-4. Ensure the scope is small enough for one implementation lifecycle.
-5. Confirm every material requirement has a verification path.
-
-Fix issues directly in the OpenSpec artifacts.
+1. Resolve contradictions between approved decisions.
+2. Make ambiguous behavior explicit.
+3. Ensure the scope is small enough for one implementation lifecycle.
+4. Confirm each material behavior can become a testable requirement.
 
 ## Terminal state
 
-Brainstorming succeeds when OpenSpec artifacts sufficiently define the change
-without requiring an implementation agent to invent product requirements.
-
-If implementation tasks are not ready, use writing-plans to improve the active
-change's `tasks.md`. If they are ready, proceed with the applicable execution
-skills.
+Brainstorming succeeds when the decisions are clear enough for
+`requirements-engineering` to write testable requirements without inventing
+product behavior. Return control to `spec-driven-development`; do not begin
+implementation.
 
 ## Red flags
 
-- brainstorming despite a sufficient active OpenSpec change
-- creating `docs/superpowers/specs/*` beside an OpenSpec change
+- brainstorming despite a sufficient active feature specification
+- creating `docs/superpowers/specs/*` beside `.kiro/specs/`
 - asking questions whose answers are discoverable from the repository
 - using prose for a blocking question instead of the `question` tool
 - implementing before material decisions are recorded
-- allowing tests or tasks to invent requirements absent from the specification
+- implementing before requirements and design approvals

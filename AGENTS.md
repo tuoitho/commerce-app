@@ -1,7 +1,7 @@
 # Repository Agent Instructions
 
-This repository uses OpenSpec for change specification and Superpowers for
-engineering execution.
+This repository uses Kiro-style feature specifications for governed changes
+and Superpowers for engineering execution.
 
 ## Instruction priority
 
@@ -9,7 +9,7 @@ Follow instructions in this order:
 
 1. Direct user instructions
 2. This `AGENTS.md`
-3. Active OpenSpec artifacts
+3. Active `.kiro/specs/<feature>/` artifacts
 4. Applicable skills
 5. Default agent behavior
 
@@ -21,18 +21,18 @@ Classify the request before implementation.
 
 ### READ_ONLY
 
-Explanation, inspection, and review without file changes do not require an
-OpenSpec change. Use relevant reasoning and review skills when applicable.
+Explanation, inspection, and review without file changes do not require a
+feature specification. Use relevant reasoning and review skills when applicable.
 
 ### TRIVIAL_CHANGE
 
 Typos, comments, formatting, and obvious local configuration corrections with
-no behavior change do not require OpenSpec. Keep the change focused and run
+no behavior change do not require a feature specification. Keep the change focused and run
 proportional verification.
 
 ### LOCAL_CHANGE
 
-A small, isolated behavior change may proceed without OpenSpec only when all
+A small, isolated behavior change may proceed without a feature specification only when all
 of the following are true:
 
 - intended behavior is explicit and unambiguous
@@ -44,29 +44,35 @@ of the following are true:
 
 Use applicable Superpowers implementation and verification skills, including
 test-driven development for behavior changes. If any condition stops being
-true during implementation, stop and route the work through OpenSpec.
+true during implementation, stop and create a governed feature specification.
 
 ### LOCAL_BUGFIX
 
 When intended behavior is already established and the fix does not change a
-public contract or cross-boundary behavior, do not create OpenSpec solely to
+public contract or cross-boundary behavior, do not create a feature specification solely to
 restate that behavior. Use systematic debugging, then test-driven development.
 
 If investigation reveals a new product decision, public contract change, or
-cross-boundary behavior change, stop implementation and route through
-OpenSpec.
+cross-boundary behavior change, stop implementation and create a governed
+feature specification.
 
 ### GOVERNED_CHANGE
 
-Behavior changes that do not qualify as `LOCAL_CHANGE` require OpenSpec before
-implementation. OpenSpec owns proposal, requirements, change design, tasks,
-specification-compliance review, and archival. If the change is insufficiently
-defined, use brainstorming to clarify it and record the durable result in
-OpenSpec.
+Behavior changes that do not qualify as `LOCAL_CHANGE` require an approved
+feature specification before implementation. Store its canonical artifacts at:
+
+- `.kiro/specs/<feature>/requirements.md`
+- `.kiro/specs/<feature>/design.md`
+- `.kiro/specs/<feature>/tasks.md`
+
+Use `requirements-engineering`, `design-documentation`, and `task-breakdown`
+through the `spec-driven-development` workflow. Requirements, design, and tasks
+each require explicit approval. The complete artifact set requires independent
+review before implementation.
 
 ### CONTRACT_OR_CROSS_BOUNDARY_CHANGE
 
-OpenSpec is mandatory for changes involving APIs, schemas, events,
+An approved feature specification is mandatory for changes involving APIs, schemas, events,
 compatibility guarantees, security boundaries, persistence ownership, or more
 than one independently owned or externally consumed boundary. A boundary is a
 service, bounded context, independently deployed application or module,
@@ -77,15 +83,13 @@ Layers such as controller, service, and repository inside one bounded context
 do not constitute separate boundaries. Stabilize shared contracts before
 delegating dependent implementation work.
 
-## OpenSpec and Superpowers responsibilities
+## Specification and execution responsibilities
 
-OpenSpec answers:
+Kiro-style artifacts answer:
 
-- What behavior changes?
-- Why is the change needed?
-- Which boundaries and contracts are affected?
-- Which acceptance criteria and compatibility guarantees must hold?
-- Which tasks belong to the change?
+- `requirements.md`: what behavior is required and how it is accepted
+- `design.md`: how the approved requirements will be implemented
+- `tasks.md`: which dependency-ordered implementation units deliver the design
 
 Superpowers answers:
 
@@ -95,17 +99,15 @@ Superpowers answers:
 - How should the change be reviewed and verified?
 
 Superpowers owns deterministic implementation verification such as tests,
-builds, linters, and runtime checks. OpenSpec verify reviews completeness,
-correctness, and coherence against the governing change artifacts before
-archive.
+builds, linters, runtime checks, task review, and final implementation review.
 
-OpenSpec is the source of truth for a governed change. Do not create a second
-Superpowers specification or implementation plan when an active OpenSpec
-change already provides one. Use `openspec/changes/<change>/tasks.md` as the
-canonical implementation plan.
+The three files under `.kiro/specs/<feature>/` are the source of truth for a
+governed change. Use `tasks.md` as the canonical implementation plan. Do not
+create a parallel specification or plan under `docs/superpowers/`.
 
-If implementation exposes a material gap or contradiction, update the OpenSpec
-artifacts before continuing.
+If implementation exposes a material gap or contradiction, update and approve
+the affected specification artifact before continuing. Existing files under
+`openspec/` are legacy records and do not govern new work.
 
 ## User interaction
 
@@ -120,7 +122,8 @@ Use the `question` tool for:
 - approval gates required by the active workflow
 - choices with materially different behavior or compatibility impact
 
-Do not ask when the answer can be discovered safely from code, tests, OpenSpec,
+Do not ask when the answer can be discovered safely from code, tests, active
+feature specifications,
 repository instructions, or established conventions. Ordinary prose questions
 are acceptable when they do not block execution.
 
@@ -134,10 +137,10 @@ error semantics.
 ## Verification
 
 Completion requires fresh deterministic evidence. Run focused checks first,
-then broader checks when appropriate. For an OpenSpec change, map evidence to
-its requirements and completed tasks and identify anything not verified.
-
-Do not archive a change solely because implementation code exists.
+then broader checks when appropriate. For a governed change, map evidence to
+its requirement IDs, acceptance criteria, and completed tasks and identify
+anything not verified. Keep completed specifications in `.kiro/specs/` as
+durable feature documentation.
 
 
 ## Long-running processes

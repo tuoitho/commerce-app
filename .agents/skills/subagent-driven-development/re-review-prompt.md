@@ -1,21 +1,19 @@
 # Scoped Re-Review Prompt Template
 
 Use this template when dispatching a re-review after a fix round. The
-re-reviewer verifies the findings were addressed and checks the fix diff for
-new breakage. It is not a fresh review — the full review already happened.
+re-reviewer verifies the findings were addressed and checks reported fix files
+for new breakage. It is not a fresh review; the full review already happened.
 
 **Purpose:** Verify each finding from the previous review was addressed, and
 that the fix itself broke nothing.
 
 ```
-Subagent (general-purpose):
+Subagent:
   description: "Re-review Task N fix round R"
-  model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
-         model silently inherits the session's most expensive one]
   prompt: |
     You are re-reviewing one task's fix round. A previous review produced
     findings; an implementer has attempted to fix them. Your job is to
-    verdict each finding and inspect the fix diff — nothing else.
+    verdict each finding and inspect the reported fix files — nothing else.
 
     ## The Task
 
@@ -30,25 +28,26 @@ Subagent (general-purpose):
     Read the implementer's report (fix reports are appended at the end):
     [REPORT_FILE]
 
-    **Fix base:** [FIX_BASE_SHA] (the head the previous review saw)
+    **Execution base:** [BASE_SHA]
     **Head:** [HEAD_SHA]
-    **Diff file:** [DIFF_FILE]
+    **Before fix:** [BEFORE_DIFF_FILE]
+    **After fix:** [DIFF_FILE]
 
-    Read the diff file once — it contains the fix commits, a stat summary,
-    and the fix diff with surrounding context. Do not re-run git commands.
-    If the diff file is missing, fetch the diff yourself:
-    `git diff --stat [FIX_BASE_SHA]..[HEAD_SHA]` and
-    `git diff [FIX_BASE_SHA]..[HEAD_SHA]`.
+    Read both cumulative packages and compare them to isolate the fix, including
+    any modified or untracked file omitted from the implementer report. Use the
+    findings and appended fix report as context, not as the source of changed
+    files. Do not re-run git commands. If either package is missing, report that
+    the review input is incomplete.
 
     Your review is read-only on this checkout. Do not mutate the working
     tree, the index, HEAD, or branch state in any way.
 
     ## Scope
 
-    Your scope is the findings list and the fix diff. Verdict every finding.
-    Inspect the fix diff for new problems the fix itself introduced. Do NOT
-    re-review code the fix did not touch: if you notice an issue entirely
-    outside the fix diff, report it under Out-of-Scope Observations — it
+    Your scope is the findings list and reported fix files. Verdict every
+    finding. Inspect those files for new problems the fix itself introduced.
+    Do NOT re-review code outside the reported fix: if you notice an issue
+    entirely outside it, report it under Out-of-Scope Observations — it
     does not block this task and does not extend the loop. A broad
     whole-branch review happens after all tasks are complete.
 
@@ -82,7 +81,7 @@ Subagent (general-purpose):
 
     ### Out-of-Scope Observations
 
-    Issues you noticed entirely outside the fix diff. Non-blocking; the
+    Issues you noticed entirely outside the reported fix files. Non-blocking; the
     controller ledgers these for the final review. "None" if none.
 
     ### Verdict
@@ -92,15 +91,14 @@ Subagent (general-purpose):
 ```
 
 **Placeholders:**
-- `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection; scoped
-  re-reviews of small fix diffs take a cheap-to-mid tier
 - `[BRIEF_FILE]` — the task brief file (same file the implementer worked from)
 - `[FINDINGS]` — the Critical/Important findings and spec gaps from the
   previous review, copied verbatim, one per bullet
 - `[REPORT_FILE]` — the implementer's report file (fix reports appended)
-- `[FIX_BASE_SHA]` — the head the previous review saw
-- `[HEAD_SHA]` — current commit
-- `[DIFF_FILE]` — the path `scripts/review-package PLAN_FILE FIX_BASE HEAD` printed
+- `[BASE_SHA]` — plan execution base commit
+- `[HEAD_SHA]` — current HEAD, supplied for package metadata
+- `[BEFORE_DIFF_FILE]` — cumulative package captured immediately before the fix
+- `[DIFF_FILE]` — cumulative package captured immediately after the fix
 
 **Re-reviewer returns:** per-finding verdicts (ADDRESSED / NOT ADDRESSED),
-new breakage in the fix diff, out-of-scope observations, and a round verdict.
+new breakage in reported fix files, out-of-scope observations, and a round verdict.

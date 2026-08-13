@@ -3,10 +3,8 @@
 Use this template when dispatching an implementer subagent.
 
 ```
-Subagent (general-purpose):
+Subagent:
   description: "Implement Task N: [task name]"
-  model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
-         model silently inherits the session's most expensive one]
   prompt: |
     You are implementing Task N: [task name]
 
@@ -14,6 +12,11 @@ Subagent (general-purpose):
 
     Read your task brief first: [BRIEF_FILE]
     It contains the full task text from the plan.
+
+    Read the governing feature documents before implementation:
+    - Requirements: [REQUIREMENTS_FILE]
+    - Design: [DESIGN_FILE]
+    - Tasks: [TASKS_FILE]
 
     ## Context
 
@@ -33,11 +36,10 @@ Subagent (general-purpose):
 
     Once you're clear on requirements:
     1. Implement exactly what the task specifies
-    2. Write tests (following TDD if task says to)
+    2. For behavior changes, load and follow `test-driven-development`
     3. Verify implementation works
-    4. Commit your work
-    5. Self-review (see below)
-    6. Report back
+    4. Self-review (see below)
+    5. Report back
 
     Work from: [directory]
 
@@ -45,7 +47,7 @@ Subagent (general-purpose):
     It's always OK to pause and clarify. Don't guess or make assumptions.
 
     While iterating, run the focused test for what you're changing; run the
-    full suite once before committing, not after every edit.
+    broader affected suite once before reporting, not after every edit.
 
     ## Code Organization
 
@@ -98,7 +100,7 @@ Subagent (general-purpose):
 
     **Testing:**
     - Do tests actually verify behavior (not just mock behavior)?
-    - Did I follow TDD if required?
+    - Did I follow TDD for every behavior change?
     - Are tests comprehensive?
     - Is the test output pristine (no stray warnings or noise)?
 
@@ -118,7 +120,7 @@ Subagent (general-purpose):
     Write your full report to [REPORT_FILE]:
     - What you implemented (or what you attempted, if blocked)
     - What you tested and test results
-    - **TDD Evidence** (if TDD was required for this task):
+    - **TDD Evidence** (required for behavior changes):
       - RED: command run, relevant failing output before implementation, and why the failure was expected
       - GREEN: command run and relevant passing output after implementation
     - Files changed
@@ -128,7 +130,7 @@ Subagent (general-purpose):
     Then report back with ONLY (under 15 lines — the detail lives in the
     report file):
     - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
-    - Commits created (short SHA + subject)
+    - Files changed
     - One-line test summary (e.g. "14/14 passing, output pristine")
     - Your concerns, if any
     - The report file path

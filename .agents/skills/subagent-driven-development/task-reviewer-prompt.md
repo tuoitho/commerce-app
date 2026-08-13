@@ -8,10 +8,8 @@ code quality.
 more, nothing less) and is well-built (clean, tested, maintainable)
 
 ```
-Subagent (general-purpose):
+Subagent:
   description: "Review Task N (spec + quality)"
-  model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
-         model silently inherits the session's most expensive one]
   prompt: |
     You are reviewing one task's implementation: first whether it matches its
     requirements, then whether it is well-built. This is a task-scoped gate,
@@ -21,6 +19,11 @@ Subagent (general-purpose):
     ## What Was Requested
 
     Read the task brief: [BRIEF_FILE]
+
+    Read the governing feature documents:
+    - Requirements: [REQUIREMENTS_FILE]
+    - Design: [DESIGN_FILE]
+    - Tasks: [TASKS_FILE]
 
     Global constraints from the spec/design that bind this task:
     [GLOBAL_CONSTRAINTS]
@@ -33,15 +36,16 @@ Subagent (general-purpose):
 
     **Base:** [BASE_SHA]
     **Head:** [HEAD_SHA]
-    **Diff file:** [DIFF_FILE]
+    **Before task:** [BEFORE_DIFF_FILE]
+    **After task:** [DIFF_FILE]
 
-    Read the diff file once — it contains the commit list, a stat summary,
-    and the full diff with surrounding context, and it is your view of the
-    change. The diff's context lines ARE the changed files: do not Read a
+    Read both cumulative packages and compare them to isolate the current task,
+    including untracked files. Review only the current task described by the
+    brief; treat the implementer report as untrusted. Prior-task changes are
+    context. The packages' context lines ARE the changed files: do not Read a
     changed file separately unless a hunk you must judge is cut off
     mid-function — and say so in your report. Do not re-run git commands.
-    If the diff file is missing, fetch the diff yourself:
-    `git diff --stat [BASE_SHA]..[HEAD_SHA]` and `git diff [BASE_SHA]..[HEAD_SHA]`.
+    If either package is missing, report that the review input is incomplete.
     Do not crawl the broader codebase. Inspect code outside the diff only
     to evaluate a concrete risk you can name — one focused check per named
     risk, and name both the risk and what you checked in your report.
@@ -74,6 +78,11 @@ Subagent (general-purpose):
 
     Warnings or other noise in the implementer's reported test output are
     findings — test output should be pristine.
+
+    For a behavior-changing task, missing RED/GREEN evidence, a RED run that
+    did not fail for the expected behavioral reason, or a GREEN run that does
+    not cover the requested behavior is an Important issue and the task quality
+    verdict must be `Needs fixes`.
 
     ## Part 1: Spec Compliance
 
@@ -166,8 +175,7 @@ Subagent (general-purpose):
 ```
 
 **Placeholders:**
-- `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection
-- `[BRIEF_FILE]` — REQUIRED: the task brief file (`scripts/task-brief PLAN N`
+- `[BRIEF_FILE]` — REQUIRED: the task brief file (`bash scripts/task-brief PLAN N`
   prints the path; same file the implementer worked from)
 - `[GLOBAL_CONSTRAINTS]` — the binding requirements copied verbatim from
   the plan's Global Constraints section or the spec: exact values, formats,
@@ -175,11 +183,12 @@ Subagent (general-purpose):
   are already in this template)
 - `[REPORT_FILE]` — REQUIRED: the file the implementer wrote its detailed
   report to
-- `[BASE_SHA]` — commit before this task
-- `[HEAD_SHA]` — current commit
+- `[BASE_SHA]` — plan execution base commit
+- `[HEAD_SHA]` — current HEAD, supplied for package metadata
+- `[BEFORE_DIFF_FILE]` — REQUIRED: cumulative package captured immediately
+  before task implementation
 - `[DIFF_FILE]` — REQUIRED: the path the controller wrote the review
-  package to (`scripts/review-package PLAN_FILE BASE HEAD` prints the unique
-  path it wrote; the package never enters the controller's context)
+  package to immediately after implementation
 
 **Reviewer returns:** Spec Compliance verdict (✅/❌/⚠️), Strengths, Issues
 (Critical/Important/Minor), Task quality verdict
