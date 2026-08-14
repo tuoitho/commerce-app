@@ -39,15 +39,30 @@ reconciling them.
 6. Present material design decisions through the `question` tool and request
    explicit user approval. Stop and wait.
 7. After approval, load `task-breakdown` and create or revise `tasks.md`.
-8. Dispatch a fresh reviewer subagent. Tell it to load
-   `reviewing-feature-spec`, pass all three artifact paths, and perform a
-   read-only independent review.
-9. Fix blocking findings in the appropriate artifact. If a fix changes approved
-   requirements or a material design decision, obtain approval again before
-   continuing. Dispatch a fresh reviewer after fixes.
+8. Dispatch one fresh reviewer subagent. Tell it to load
+   `reviewing-feature-spec`, pass all three artifact paths, and perform the
+   single broad independent specification review.
+9. If the review reports blocking findings, enter the bounded specification
+   repair loop. Allow at most three review rounds total, including the initial
+   broad review. For each repair round:
+   - preserve the previous blocking findings,
+   - fix only accepted blocking findings,
+   - obtain approval again if the fix changes approved requirements or a
+     material design decision, and
+   - dispatch a fresh reviewer in Re-review Mode.
+
+   A re-review verifies previous blockers and contradictions directly
+   introduced by the artifact edits. It is not another broad specification
+   audit. Advisory findings never enter the repair loop. After each review,
+   record `Spec review: round <R>/3 (<X> resolved, <Y> open)`. If blocking
+   findings remain after round 3, stop autonomous repair and present the
+   remaining findings, conflicting artifact text, and repair history to the
+   user for adjudication.
 10. After independent review is approved, present `tasks.md` through the
-    `question` tool and request explicit user approval. Revise and repeat
-    independent review after feedback.
+    `question` tool and request explicit user approval. If user feedback
+    materially changes approved scope or behavior, treat it as a new
+    specification revision and run one new independent review cycle.
+    Automated reviewer fixes do not reset the three-round budget.
 11. Stop when the user approves `tasks.md`. Report the artifact paths and that
     implementation is a separate workflow.
 
@@ -64,7 +79,6 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
 - Requirements define what; design defines how; tasks define execution order.
 - Do not skip requirements or design approval for governed changes.
 - Do not skip tasks approval or combine two artifact phases in one interaction.
-- Do not create parallel files under `docs/superpowers/`.
 - Do not implement code in the same response that creates or completes the
   specification.
 - Do not proceed through a material user decision without using the `question`

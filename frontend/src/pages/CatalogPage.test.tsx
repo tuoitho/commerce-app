@@ -9,23 +9,29 @@ import type { ProductSummary } from '../api/catalog'
 vi.mock('../api/catalog', () => ({
   fetchCategories: vi.fn(),
   fetchProducts: vi.fn(),
+  isCanonicalCategoryId: (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
 }))
 
 const mockFetchCategories = vi.mocked(fetchCategories)
 const mockFetchProducts = vi.mocked(fetchProducts)
 
+const APPLE_ID = '00000000-0000-4000-8000-000000000001'
+const XIAOMI_ID = '00000000-0000-4000-8000-000000000002'
+const UNKNOWN_ID = '33333333-3333-3333-3333-333333333333'
+
 const CATEGORIES = [
-  { id: 'c1', name: 'Electronics' },
-  { id: 'c2', name: 'Books' },
+  { id: APPLE_ID, name: 'Apple' },
+  { id: XIAOMI_ID, name: 'Xiaomi' },
 ]
 
 function makeProduct(id: string, name: string, opts: Partial<ProductSummary> = {}): ProductSummary {
   return {
     id,
     name,
-    category: { id: 'c1', name: 'Electronics' },
-    price: '24.99',
-    currency: 'USD',
+    model: 'M1',
+    brand: { id: APPLE_ID, name: 'Apple' },
+    minPriceVnd: '24990000',
+    maxPriceVnd: '24990000',
     primaryImageUrl: 'https://example.com/img.jpg',
     inStock: true,
     ...opts,
@@ -42,9 +48,10 @@ function DetailStub() {
   return <div>DETAIL {id}</div>
 }
 
-function renderCatalog(initialEntries = ['/products']) {
+function renderCatalog(initialEntries: string | string[] = ['/products']) {
+  const entries = typeof initialEntries === 'string' ? [initialEntries] : initialEntries
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
+    <MemoryRouter initialEntries={entries}>
       <Routes>
         <Route path="/products" element={<CatalogPage />} />
         <Route path="/products/:id" element={<DetailStub />} />
@@ -88,7 +95,8 @@ describe('CatalogPage', () => {
     await flushDebounce()
     expect(screen.getByText('Wireless Mouse')).toBeInTheDocument()
     expect(screen.getByText('Keyboard')).toBeInTheDocument()
-    expect(screen.getAllByText('$24.99')).toHaveLength(2)
+    expect(screen.getAllByText(/24\.990\.000/)).toHaveLength(2)
+    expect(screen.getByText(/2 results/i)).toBeInTheDocument()
   })
 
   it('shows a no-results state that preserves the active criteria', async () => {
@@ -120,8 +128,61 @@ describe('CatalogPage', () => {
     )
   })
 
+  it('restores direct multi-brand, price, stock and search criteria', async () => {
+    renderCatalog(`/products?q=iphone&category_id=${APPLE_ID}&category_id=${XIAOMI_ID}&min_price=100&max_price=500&in_stock=true`)
+    await flushDebounce()
+
+    expect(screen.getByDisplayValue('iphone')).toBeInTheDocument()
+    expect(screen.getByLabelText('Apple')).toBeChecked()
+    expect(screen.getByLabelText('Xiaomi')).toBeChecked()
+    expect(screen.getByDisplayValue('100')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('500')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'In stock' })).toBeChecked()
+    expect(mockFetchProducts).toHaveBeenLastCalledWith({
+      q: 'iphone', categoryIds: [APPLE_ID, XIAOMI_ID], minPrice: '100', maxPrice: '500', inStock: true,
+    })
+  })
+
+  it('updates repeated brand IDs without losing the combined search criteria', async () => {
+    renderCatalog(['/products?q=phone&min_price=100'])
+    await flushDebounce()
+
+    fireEvent.click(screen.getByLabelText('Apple'))
+    fireEvent.click(screen.getByLabelText('Xiaomi'))
+    expect(screen.getByTestId('location').textContent).toContain('q=phone')
+    expect(screen.getByTestId('location').textContent).toContain('min_price=100')
+    expect(screen.getByTestId('location').textContent).toContain(`category_id=${APPLE_ID}`)
+    expect(screen.getByTestId('location').textContent).toContain(`category_id=${XIAOMI_ID}`)
+  })
+
+  it('offers any, in-stock and out-of-stock filters and restores false from the URL', async () => {
+    renderCatalog(['/products?in_stock=false'])
+    await flushDebounce()
+
+    expect(screen.getByRole('radio', { name: 'Any stock status' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'In stock' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Out of stock' })).toBeChecked()
+    expect(mockFetchProducts).toHaveBeenLastCalledWith(expect.objectContaining({ inStock: false }))
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Any stock status' }))
+    expect(screen.getByTestId('location').textContent).not.toContain('in_stock=')
+    await flushDebounce()
+    expect(mockFetchProducts).toHaveBeenLastCalledWith(expect.objectContaining({ inStock: undefined }))
+  })
+
+  it('filters malformed category IDs but keeps valid nonexistent IDs shareable', async () => {
+    renderCatalog(`/products?category_id=malformed&category_id=${UNKNOWN_ID}`)
+    await flushDebounce()
+
+    expect(screen.getByTestId('location').textContent).toContain('category_id=malformed')
+    expect(screen.getByTestId('location').textContent).toContain(`category_id=${UNKNOWN_ID}`)
+    expect(mockFetchProducts).toHaveBeenLastCalledWith({ categoryIds: [UNKNOWN_ID], q: undefined, minPrice: undefined, maxPrice: undefined, inStock: undefined })
+    expect(screen.getByText(/0 results/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('resets all filters from the URL and refetches with no criteria', async () => {
-    renderCatalog(['/products?q=mouse&category_id=c1&min_price=10&in_stock=true'])
+    renderCatalog(`/products?q=mouse&category_id=${APPLE_ID}&min_price=10&in_stock=true`)
     await flushDebounce()
     const reset = screen.getByRole('button', { name: /reset filters/i })
     fireEvent.click(reset)
@@ -129,7 +190,7 @@ describe('CatalogPage', () => {
     await flushDebounce()
     expect(mockFetchProducts).toHaveBeenLastCalledWith({
       q: undefined,
-      categoryId: undefined,
+      categoryIds: [],
       minPrice: undefined,
       maxPrice: undefined,
       inStock: undefined,

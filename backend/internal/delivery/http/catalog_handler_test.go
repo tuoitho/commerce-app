@@ -24,9 +24,16 @@ const (
 	productMouse    = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 	productKeyboard = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	productBook     = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+	productPhone    = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+	variantPhone    = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+	optionStorage   = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 )
 
 func newCatalogTestRouter(t *testing.T) *gin.Engine {
+	return newCatalogTestRouterWithPhone(t, false)
+}
+
+func newCatalogTestRouterWithPhone(t *testing.T, includePhone bool) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -76,6 +83,22 @@ func newCatalogTestRouter(t *testing.T) *gin.Engine {
 		ImageURLs:     []string{"https://example.com/go.jpg"},
 		StockQuantity: 3,
 	})
+	if includePhone {
+		catalog.AddProductWithActiveState(domain.Product{
+			ID:           productPhone,
+			Name:         "Phone Pro",
+			Model:        "P-1",
+			Brand:        domain.Category{ID: catElectronics, Name: "Apple"},
+			Category:     domain.Category{ID: catElectronics, Name: "Apple"},
+			Featured:     true,
+			MinPriceVND:  "10000000000000000000000000000000000001",
+			MaxPriceVND:  "10000000000000000000000000000000000099",
+			Description:  "A featured phone.",
+			ImageURLs:    []string{"https://example.com/phone.jpg"},
+			OptionGroups: []domain.OptionGroup{{ID: "group-storage", Label: "Storage", Position: 1, Values: []domain.OptionValue{{ID: optionStorage, Label: "256 GB"}}}},
+			Variants:     []domain.ProductVariant{{ID: variantPhone, OptionValueIDs: map[string]string{"group-storage": optionStorage}, PriceVND: "10000000000000000000000000000000000001", StockQuantity: 2, Active: true}},
+		}, true)
+	}
 
 	router := gin.New()
 	NewRouter(router, Dependencies{
@@ -170,7 +193,7 @@ func TestCatalog_ListProductsFilterByCategory(t *testing.T) {
 
 func TestCatalog_ListProductsPriceRange(t *testing.T) {
 	router := newCatalogTestRouter(t)
-	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=30.00&max_price=60.00", nil)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=30&max_price=60", nil)
 	products := decodeProducts(t, w)
 	ids := map[string]bool{}
 	for _, p := range products {
@@ -228,10 +251,29 @@ func TestCatalog_ListProductsInvalidCategory(t *testing.T) {
 
 func TestCatalog_ListProductsInvalidPrice(t *testing.T) {
 	router := newCatalogTestRouter(t)
+	for _, value := range []string{"1.0", "+1", "01", "1,000", "-5"} {
+		w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price="+value, nil)
+		assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "min_price")
+	}
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=-5", nil)
 	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "min_price")
 	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?max_price=abc", nil)
 	assertErrorEnvelope(t, w2, http.StatusBadRequest, "invalid_filter", "max_price")
+}
+
+func TestCatalog_ListProductsEmptyPrice(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	for _, test := range []struct {
+		query string
+		field string
+	}{
+		{query: "min_price=", field: "min_price"},
+		{query: "max_price=", field: "max_price"},
+		{query: "min_price=&max_price=", field: "min_price"},
+	} {
+		w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?"+test.query, nil)
+		assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", test.field)
+	}
 }
 
 func TestCatalog_ListProductsReversedRange(t *testing.T) {
@@ -251,6 +293,51 @@ func TestCatalog_ListProductsInvalidStock(t *testing.T) {
 	router := newCatalogTestRouter(t)
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?in_stock=maybe", nil)
 	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "in_stock")
+}
+
+func TestCatalog_ListProductsRepeatedCategoriesAndVNDContract(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?category_id="+catBooks+"&category_id="+catElectronics+"&min_price=10000000000000000000000000000000000000", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	products := decodeProducts(t, w)
+	if len(products) != 1 || products[0].ID != productPhone {
+		t.Fatalf("unexpected products: %+v", products)
+	}
+	if products[0].Model != "P-1" || products[0].Brand.Name != "Apple" || products[0].MinPriceVND != "10000000000000000000000000000000000001" || products[0].MaxPriceVND != "10000000000000000000000000000000000099" {
+		t.Fatalf("unexpected VND summary: %+v", products[0])
+	}
+}
+
+func TestCatalog_ListFeaturedWithoutAuth(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/featured", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	products := decodeProducts(t, w)
+	if len(products) != 1 || products[0].ID != productPhone {
+		t.Fatalf("unexpected featured products: %+v", products)
+	}
+}
+
+func TestCatalog_GetProductDetailVariants(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/"+productPhone, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var detail productDetailResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if !detail.Featured || detail.Model != "P-1" || detail.MinPriceVND == "" || len(detail.OptionGroups) != 1 || len(detail.Variants) != 1 {
+		t.Fatalf("unexpected phone detail: %+v", detail)
+	}
+	if detail.Variants[0].ID != variantPhone || detail.Variants[0].PriceVND != "10000000000000000000000000000000000001" || detail.Variants[0].OptionValueIDs["group-storage"] != optionStorage {
+		t.Fatalf("unexpected variant: %+v", detail.Variants[0])
+	}
 }
 
 func TestCatalog_ListCategories(t *testing.T) {
@@ -303,6 +390,17 @@ func TestCatalog_GetProductOutOfStock(t *testing.T) {
 	}
 	if detail.StockQuantity != 0 || detail.InStock {
 		t.Fatalf("expected out-of-stock detail: %+v", detail)
+	}
+}
+
+func TestCatalogStockQuantityUsesNumericJSONAtMaxInt64(t *testing.T) {
+	response := toVariantResponses([]domain.ProductVariant{{ID: "variant", PriceVND: "100", StockQuantity: 9223372036854775807}})
+	body, err := json.Marshal(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `[{"id":"variant","optionValueIds":null,"priceVnd":"100","stockQuantity":9223372036854775807}]` {
+		t.Fatalf("unexpected numeric stock wire: %s", body)
 	}
 }
 

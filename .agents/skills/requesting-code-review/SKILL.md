@@ -7,7 +7,8 @@ description: Use when completing tasks, implementing major features, or before m
 
 Dispatch a code reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history.
 
-**Core principle:** Review early, review often.
+**Core principle:** One broad review per boundary; fixes receive scoped
+re-review, not another broad audit.
 
 ## When to Request Review
 
@@ -58,3 +59,17 @@ prompt: |
 - Address P2 issues before merge, or track them if not blocking
 - P3 issues can be noted for later
 - Push back if reviewer is wrong (with reasoning)
+
+## Re-review Rule
+
+Do not request another broad review of the same change solely because findings
+were fixed.
+
+After a repair:
+
+- preserve the original findings,
+- review only the repair delta,
+- verdict the original findings, and
+- admit new blockers only when introduced by the repair.
+
+A P3 finding never triggers a repair round by itself.

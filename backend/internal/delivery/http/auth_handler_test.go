@@ -15,8 +15,8 @@ import (
 	"commerce-backend/internal/security/jwt"
 	"commerce-backend/internal/usecase/auth"
 	fakerepos "commerce-backend/internal/usecase/auth/fakerepos"
-	catalogfakerepos "commerce-backend/internal/usecase/catalog/fakerepos"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	catalogfakerepos "commerce-backend/internal/usecase/catalog/fakerepos"
 )
 
 const testSecret = "a-secret-that-is-at-least-thirty-two-characters"
@@ -28,11 +28,11 @@ func newTestRouter(t *testing.T) (*gin.Engine, *fakerepos.Users) {
 	sessions := fakerepos.NewSessions(users)
 	manager := jwt.NewManager(testSecret, "commerce-backend")
 	uc := auth.New(auth.Dependencies{
-		Repos:        auth.Repositories{Users: users, Sessions: sessions},
-		JWT:          manager,
-		AccessTTL:    15 * time.Minute,
-		RefreshTTL:   24 * time.Hour,
-		HashPassword: security.HashPassword,
+		Repos:         auth.Repositories{Users: users, Sessions: sessions},
+		JWT:           manager,
+		AccessTTL:     15 * time.Minute,
+		RefreshTTL:    24 * time.Hour,
+		HashPassword:  security.HashPassword,
 		CheckPassword: security.CheckPassword,
 		GenerateRefreshToken: func() (security.RefreshTokenPair, error) {
 			return security.GenerateRefreshToken()

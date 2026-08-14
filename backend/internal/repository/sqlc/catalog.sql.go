@@ -15,30 +15,32 @@ import (
 const getProductByID = `-- name: GetProductByID :one
 SELECT p.id,
        p.name,
+       p.model,
        p.description,
-       c.id   AS category_id,
+       c.id AS category_id,
        c.name AS category_name,
-       p.price::text AS price,
-       p.currency,
-       p.stock_quantity,
+       p.featured,
+       p.active,
        p.created_at,
        p.updated_at
 FROM products p
 JOIN categories c ON c.id = p.category_id
 WHERE p.id = $1
+  AND p.active
+  AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
 `
 
 type GetProductByIDRow struct {
-	ID            string
-	Name          string
-	Description   string
-	CategoryID    string
-	CategoryName  string
-	Price         string
-	Currency      string
-	StockQuantity int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID           string
+	Name         string
+	Model        string
+	Description  string
+	CategoryID   string
+	CategoryName string
+	Featured     bool
+	Active       bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByIDRow, error) {
@@ -47,22 +49,69 @@ func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByID
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Model,
 		&i.Description,
 		&i.CategoryID,
 		&i.CategoryName,
-		&i.Price,
-		&i.Currency,
-		&i.StockQuantity,
+		&i.Featured,
+		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const listActiveProductVariants = `-- name: ListActiveProductVariants :many
+SELECT id, price_vnd::text AS price_vnd, stock_quantity, active
+FROM product_variants
+WHERE product_id = $1 AND active
+ORDER BY price_vnd ASC, id ASC
+`
+
+type ListActiveProductVariantsRow struct {
+	ID            string
+	PriceVnd      string
+	StockQuantity int64
+	Active        bool
+}
+
+func (q *Queries) ListActiveProductVariants(ctx context.Context, productID string) ([]ListActiveProductVariantsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveProductVariants, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveProductVariantsRow
+	for rows.Next() {
+		var i ListActiveProductVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceVnd,
+			&i.StockQuantity,
+			&i.Active,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCategories = `-- name: ListCategories :many
-SELECT id, name
-FROM categories
-ORDER BY name ASC
+SELECT c.id, c.name
+FROM categories c
+WHERE EXISTS (
+    SELECT 1
+    FROM products p
+    JOIN product_variants v ON v.product_id = p.id
+    WHERE p.category_id = c.id
+      AND p.active
+      AND v.active
+)
+ORDER BY c.name ASC, c.id ASC
 `
 
 type ListCategoriesRow struct {
@@ -117,15 +166,87 @@ func (q *Queries) ListProductImages(ctx context.Context, productID string) ([]st
 	return items, nil
 }
 
+const listProductOptionGroups = `-- name: ListProductOptionGroups :many
+SELECT id, label, position
+FROM product_option_groups
+WHERE product_id = $1
+ORDER BY position ASC, id ASC
+`
+
+type ListProductOptionGroupsRow struct {
+	ID       string
+	Label    string
+	Position int32
+}
+
+func (q *Queries) ListProductOptionGroups(ctx context.Context, productID string) ([]ListProductOptionGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listProductOptionGroups, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProductOptionGroupsRow
+	for rows.Next() {
+		var i ListProductOptionGroupsRow
+		if err := rows.Scan(&i.ID, &i.Label, &i.Position); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProductOptionValues = `-- name: ListProductOptionValues :many
+SELECT id, group_id, label, position
+FROM product_option_values
+WHERE product_id = $1
+ORDER BY group_id ASC, position ASC, id ASC
+`
+
+type ListProductOptionValuesRow struct {
+	ID       string
+	GroupID  string
+	Label    string
+	Position int32
+}
+
+func (q *Queries) ListProductOptionValues(ctx context.Context, productID string) ([]ListProductOptionValuesRow, error) {
+	rows, err := q.db.Query(ctx, listProductOptionValues, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProductOptionValuesRow
+	for rows.Next() {
+		var i ListProductOptionValuesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.Label,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProducts = `-- name: ListProducts :many
 SELECT p.id,
        p.name,
+       p.model,
        p.description,
-       c.id   AS category_id,
+       c.id AS category_id,
        c.name AS category_name,
-       p.price::text AS price,
-       p.currency,
-       p.stock_quantity,
+       p.featured,
+       p.active,
        p.created_at,
        p.updated_at,
        COALESCE((SELECT pi.url
@@ -135,31 +256,49 @@ SELECT p.id,
         LIMIT 1), '')::text AS primary_image_url
 FROM products p
 JOIN categories c ON c.id = p.category_id
-WHERE ($1::text IS NULL OR lower(p.name) LIKE '%' || lower($1::text) || '%')
-  AND ($2::uuid IS NULL OR p.category_id = $2::uuid)
-  AND ($3::numeric IS NULL OR p.price >= $3::numeric)
-  AND ($4::numeric IS NULL OR p.price <= $4::numeric)
-  AND ($5::boolean IS NULL OR (p.stock_quantity > 0) = $5::boolean)
-ORDER BY p.name ASC, p.id ASC
+WHERE p.active
+  AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+  AND ($1::text IS NULL OR lower(c.name) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.name) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.model) LIKE '%' || lower($1::text) || '%')
+  AND ($2::uuid[] IS NULL
+       OR NOT EXISTS (SELECT 1 FROM categories fc WHERE fc.id = ANY($2::uuid[]))
+       OR p.category_id = ANY($2::uuid[]))
+  AND ($3::numeric IS NULL AND $4::numeric IS NULL OR EXISTS (
+       SELECT 1 FROM product_variants v
+       WHERE v.product_id = p.id AND v.active
+         AND ($3::numeric IS NULL OR v.price_vnd >= $3::numeric)
+         AND ($4::numeric IS NULL OR v.price_vnd <= $4::numeric)
+  ))
+  AND ($5::boolean IS NULL
+       OR ($5::boolean AND EXISTS (
+           SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active AND v.stock_quantity > 0
+       ))
+       OR (NOT $5::boolean AND NOT EXISTS (
+           SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active AND v.stock_quantity > 0
+       )))
+  AND ($6::boolean IS NULL OR p.featured = $6::boolean)
+ORDER BY p.name ASC, p.model ASC, p.id ASC
 `
 
 type ListProductsParams struct {
-	Q          pgtype.Text
-	CategoryID pgtype.UUID
-	MinPrice   pgtype.Numeric
-	MaxPrice   pgtype.Numeric
-	InStock    pgtype.Bool
+	Q           pgtype.Text
+	CategoryIds []string
+	MinPriceVnd pgtype.Numeric
+	MaxPriceVnd pgtype.Numeric
+	InStock     pgtype.Bool
+	Featured    pgtype.Bool
 }
 
 type ListProductsRow struct {
 	ID              string
 	Name            string
+	Model           string
 	Description     string
 	CategoryID      string
 	CategoryName    string
-	Price           string
-	Currency        string
-	StockQuantity   int32
+	Featured        bool
+	Active          bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	PrimaryImageUrl string
@@ -168,10 +307,11 @@ type ListProductsRow struct {
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]ListProductsRow, error) {
 	rows, err := q.db.Query(ctx, listProducts,
 		arg.Q,
-		arg.CategoryID,
-		arg.MinPrice,
-		arg.MaxPrice,
+		arg.CategoryIds,
+		arg.MinPriceVnd,
+		arg.MaxPriceVnd,
 		arg.InStock,
+		arg.Featured,
 	)
 	if err != nil {
 		return nil, err
@@ -183,16 +323,49 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.Model,
 			&i.Description,
 			&i.CategoryID,
 			&i.CategoryName,
-			&i.Price,
-			&i.Currency,
-			&i.StockQuantity,
+			&i.Featured,
+			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.PrimaryImageUrl,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVariantOptionValues = `-- name: ListVariantOptionValues :many
+SELECT variant_id, group_id, option_value_id
+FROM variant_option_values
+WHERE product_id = $1
+ORDER BY variant_id ASC, group_id ASC
+`
+
+type ListVariantOptionValuesRow struct {
+	VariantID     string
+	GroupID       string
+	OptionValueID string
+}
+
+func (q *Queries) ListVariantOptionValues(ctx context.Context, productID string) ([]ListVariantOptionValuesRow, error) {
+	rows, err := q.db.Query(ctx, listVariantOptionValues, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListVariantOptionValuesRow
+	for rows.Next() {
+		var i ListVariantOptionValuesRow
+		if err := rows.Scan(&i.VariantID, &i.GroupID, &i.OptionValueID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

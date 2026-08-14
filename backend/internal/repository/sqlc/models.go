@@ -10,6 +10,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type CartItem struct {
+	ID                  string
+	UserID              string
+	VariantID           string
+	Quantity            int64
+	Selected            bool
+	SnapshotBrandName   string
+	SnapshotProductName string
+	SnapshotModel       string
+	SnapshotImageUrl    string
+	SnapshotOptions     []byte
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
 type Category struct {
 	ID        string
 	Name      string
@@ -23,9 +38,12 @@ type Product struct {
 	Description   string
 	Price         pgtype.Numeric
 	Currency      string
-	StockQuantity int32
+	StockQuantity int64
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Model         string
+	Featured      bool
+	Active        bool
 }
 
 type ProductImage struct {
@@ -34,6 +52,31 @@ type ProductImage struct {
 	Url       string
 	Position  int32
 	CreatedAt time.Time
+}
+
+type ProductOptionGroup struct {
+	ID        string
+	ProductID string
+	Label     string
+	Position  int32
+}
+
+type ProductOptionValue struct {
+	ID        string
+	ProductID string
+	GroupID   string
+	Label     string
+	Position  int32
+}
+
+type ProductVariant struct {
+	ID            string
+	ProductID     string
+	PriceVnd      pgtype.Numeric
+	StockQuantity int64
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type RefreshToken struct {
@@ -51,4 +94,11 @@ type User struct {
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type VariantOptionValue struct {
+	VariantID     string
+	ProductID     string
+	GroupID       string
+	OptionValueID string
 }

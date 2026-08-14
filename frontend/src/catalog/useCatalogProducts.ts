@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { fetchProducts, type CatalogFilters, type ProductSummary } from '../api/catalog'
+import { fetchProducts, isCanonicalCategoryId, type CatalogFilters, type ProductSummary } from '../api/catalog'
 
 export function useCatalogProducts(filters: CatalogFilters, debounceMs = 300) {
   const [products, setProducts] = useState<ProductSummary[]>([])
@@ -12,8 +12,12 @@ export function useCatalogProducts(filters: CatalogFilters, debounceMs = 300) {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setProducts((current) => current.length === 0 ? current : [])
     const load = () => {
-      fetchProducts(filters)
+      fetchProducts({
+        ...filters,
+        categoryIds: filters.categoryIds?.filter(isCanonicalCategoryId),
+      })
         .then((list) => {
           if (!cancelled) {
             setProducts(list)

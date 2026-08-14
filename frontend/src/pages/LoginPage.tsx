@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthProvider'
 import { validateCredentials } from '../auth/validation'
 import { ApiError } from '../api/client'
+import { getInternalReturnPath } from '../auth/returnLocation'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
@@ -23,7 +25,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(email, password)
-      navigate('/')
+      navigate(getInternalReturnPath(location.state))
     } catch (err) {
       setError(err instanceof ApiError ? err.detail.message : 'Something went wrong. Try again.')
     } finally {
@@ -61,7 +63,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p>
-        Don&apos;t have an account? <Link to="/register">Register</Link>
+        Don&apos;t have an account? <Link to="/register" state={location.state}>Register</Link>
       </p>
     </main>
   )

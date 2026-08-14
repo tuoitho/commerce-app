@@ -31,7 +31,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     if (tokenStore.get()) {
-      setLoading(false)
+      authApi
+        .fetchMe()
+        .then((restoredUser) => {
+          if (!cancelled) setUser(restoredUser)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            tokenStore.set(null)
+            setAccessToken(null)
+            setUser(null)
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
       return
     }
     client

@@ -13,6 +13,11 @@ Subagent:
     Read your task brief first: [BRIEF_FILE]
     It contains the full task text from the plan.
 
+    The controller obtained these artifact paths directly from `task-brief`.
+    Use them exactly as provided; do not shorten or relocate them:
+    - Brief: [BRIEF_FILE]
+    - Report: [REPORT_FILE]
+
     Read the governing feature documents before implementation:
     - Requirements: [REQUIREMENTS_FILE]
     - Design: [DESIGN_FILE]

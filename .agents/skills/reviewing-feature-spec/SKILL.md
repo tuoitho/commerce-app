@@ -7,13 +7,30 @@ description: Use for an independent read-only review of completed .kiro requirem
 
 Perform a read-only review of one `.kiro/specs/<feature>/` artifact set. Read
 `requirements.md`, `design.md`, and `tasks.md` together. Inspect relevant code
-and tests only as needed to validate buildability and repository fit.
+and tests only to verify a concrete claim, dependency, or compatibility concern
+identified while reading the artifacts. Do not perform open-ended repository
+inspection to discover additional risks.
+
+## Review Discipline
+
+Diagnose specification gaps; do not solve them.
+
+Do not design algorithms, locking strategies, schemas, migrations, retry
+mechanisms, rollback mechanisms, or architecture alternatives unless needed
+only to demonstrate that a documented design is impossible.
+
+A finding should identify:
+1. what the artifacts say,
+2. what concrete ambiguity or contradiction exists,
+3. why implementation is blocked or may be incorrect.
+
+Stop there.
 
 ## Review Criteria
 
 Report actionable issues that could cause implementation to build the wrong
-behavior, miss required behavior, violate a material design decision, or get
-blocked.
+behavior, miss required behavior, rely on an unstated mutable assumption,
+violate a material design decision, or get blocked.
 
 Check:
 
@@ -25,12 +42,104 @@ Check:
    verification.
 4. Task order respects dependencies and stabilizes contracts before dependent
    work.
-5. Paths, interfaces, commands, and expected outcomes are internally
-   consistent and plausible for the repository.
-6. The artifacts contain no contradictions, placeholders, or decisions that an
-   implementer would have to invent.
+5. Explicitly referenced paths, interfaces, commands, and expected outcomes are
+   internally consistent and compatible with the repository.
+6. The artifacts contain no contradictions, placeholders, or unresolved
+   product, contract, architecture, or cross-boundary decisions required for
+   correct implementation.
+
+   Do not require the specification to decide ordinary local implementation
+   details when multiple choices would satisfy the documented behavior.
+7. Behavioral completeness for realistic state changes.
+
+   Consider concurrency, stale state, retries, partial failure, expiration, or
+   dependency changes only when they are clearly relevant to the feature as
+   described or to an existing repository behavior that the feature relies on.
+
+   Do not systematically enumerate hypothetical race conditions, failure modes,
+   distributed-systems scenarios, browser quirks, numeric extremes, or recovery
+   mechanisms merely because they are theoretically possible.
+
+   Flag an issue only when:
+   - the scenario is reasonably likely in normal supported use,
+   - the repository or specification provides evidence that the scenario matters,
+   - different plausible implementations would produce materially different
+     user-visible or contract-visible behavior, and
+   - the implementer cannot resolve it from existing requirements, design,
+     repository conventions, or established behavior.
+
+   Do not design a solution during review. State only the missing behavioral
+   decision.
+8. Cross-phase behavioral consistency.
+
+   Verify that requirements, design, and tasks preserve the same behavioral
+   assumptions and do not silently weaken, reinterpret, or omit behavior across
+   phases.
 
 Do not flag wording preferences, formatting, or optional enhancements.
+
+## Finding Gate
+
+Before reporting a blocking finding, verify all of the following:
+
+1. It originates from a concrete statement, omission, or contradiction in the
+   specification artifacts.
+2. It affects required behavior or a documented repository contract.
+3. The issue cannot be resolved by an ordinary implementation choice.
+4. Resolving it requires changing or clarifying the specification.
+
+If any condition is false, it is not a blocking finding.
+
+Advisory notes must still be concrete and specification-relevant. Do not use
+them for speculative risks, optional hardening, or ordinary implementation
+choices.
+
+## Stop Condition
+
+Once the artifacts have been checked against their directly relevant repository
+dependencies and all candidate blocking findings have passed the Finding Gate,
+stop the review.
+
+Do not continue searching for additional edge cases, hardening opportunities,
+implementation risks, or alternative designs.
+
+## Re-review Mode
+
+When the caller supplies previous blocking findings and identifies artifact
+changes made to address them, perform a scoped re-review instead of another
+broad review.
+
+For each previous blocking finding, return:
+
+- `ADDRESSED` when the concrete ambiguity or contradiction no longer exists.
+- `NOT ADDRESSED` when the original blocking condition still exists.
+
+Inspect changed sections and their directly linked requirements, design
+decisions, and tasks for contradictions introduced by the repair. Do not
+reopen previously reviewed untouched sections.
+
+Admit a new blocking finding only when it was introduced by the current
+specification repair, passes the normal Finding Gate, and materially prevents
+correct implementation. Unrelated observations and optional improvements are
+non-blocking and do not extend the repair loop.
+
+Use this output in Re-review Mode:
+
+```markdown
+## Feature Specification Re-review
+
+### Previous Findings
+- [finding]: ADDRESSED | NOT ADDRESSED — evidence
+
+### New Blocking Regressions From Repair
+- [artifact:section]: Issue
+- None
+
+### Advisory Notes
+- Non-blocking observation
+
+**Status:** Approved | Issues Remain
+```
 
 ## Output
 

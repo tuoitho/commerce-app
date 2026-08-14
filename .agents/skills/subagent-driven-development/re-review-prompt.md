@@ -1,8 +1,8 @@
 # Scoped Re-Review Prompt Template
 
 Use this template when dispatching a re-review after a fix round. The
-re-reviewer verifies the findings were addressed and checks reported fix files
-for new breakage. It is not a fresh review; the full review already happened.
+re-reviewer verifies the findings and checks the exact fix delta for new
+breakage. It is not a fresh review; the full review already happened.
 
 **Purpose:** Verify each finding from the previous review was addressed, and
 that the fix itself broke nothing.
@@ -13,7 +13,7 @@ Subagent:
   prompt: |
     You are re-reviewing one task's fix round. A previous review produced
     findings; an implementer has attempted to fix them. Your job is to
-    verdict each finding and inspect the reported fix files — nothing else.
+    verdict each finding and inspect the exact fix delta — nothing else.
 
     ## The Task
 
@@ -44,12 +44,39 @@ Subagent:
 
     ## Scope
 
-    Your scope is the findings list and reported fix files. Verdict every
-    finding. Inspect those files for new problems the fix itself introduced.
-    Do NOT re-review code outside the reported fix: if you notice an issue
-    entirely outside it, report it under Out-of-Scope Observations — it
-    does not block this task and does not extend the loop. A broad
-    whole-branch review happens after all tasks are complete.
+    Your scope is:
+
+    1. the findings under verification, and
+    2. the exact fix delta obtained by comparing BEFORE_DIFF_FILE with
+       DIFF_FILE.
+
+    The before/after packages, not the implementer's reported file list,
+    define what changed. Verdict every previous finding. Inspect the fix delta
+    only for concrete regressions introduced by that delta.
+
+    Do NOT re-review unchanged implementation. If you notice an issue whose
+    relevant defective code was not changed by this fix, report it under
+    Out-of-Scope Observations. It does not block this round and does not extend
+    the loop.
+
+    ### New-finding admission gate
+
+    Report new Critical or Important breakage only when all are true:
+
+    1. The defect was introduced by the fix delta.
+    2. A concrete affected call path or supported scenario can be demonstrated.
+    3. It changes correctness, security, data integrity, required behavior, or
+       a binding interface or contract.
+    4. The task cannot safely be considered complete without correcting it.
+
+    If any condition is false, do not add it to the open-findings list.
+
+    Optional refactoring, style improvements, speculative hardening,
+    pre-existing problems, and unrelated observations never extend the loop.
+
+    If every previous finding is ADDRESSED and no new Critical or Important
+    finding passes this gate, the round is clean even when Minor or
+    Out-of-Scope observations exist.
 
     ## Tests
 
@@ -81,7 +108,7 @@ Subagent:
 
     ### Out-of-Scope Observations
 
-    Issues you noticed entirely outside the reported fix files. Non-blocking; the
+    Issues you noticed entirely outside the fix delta. Non-blocking; the
     controller ledgers these for the final review. "None" if none.
 
     ### Verdict
@@ -101,4 +128,4 @@ Subagent:
 - `[DIFF_FILE]` — cumulative package captured immediately after the fix
 
 **Re-reviewer returns:** per-finding verdicts (ADDRESSED / NOT ADDRESSED),
-new breakage in reported fix files, out-of-scope observations, and a round verdict.
+new breakage in the fix delta, out-of-scope observations, and a round verdict.

@@ -8,9 +8,13 @@ db-up:
 seed:
 	$(MAKE) -C backend seed
 
-## Start both servers for local development (backend on :8080, frontend on :5173).
-run:
+## Start backend server for local development (backend on :8080).
+backend:
 	$(MAKE) -C backend run
+
+## Start frontend server for local development (frontend on :5173).
+frontend:
+	$(MAKE) -C frontend run
 
 ## Run backend and frontend tests.
 test:

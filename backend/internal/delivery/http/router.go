@@ -7,12 +7,14 @@ import (
 
 	"commerce-backend/internal/security/jwt"
 	authuc "commerce-backend/internal/usecase/auth"
+	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
 )
 
 type Dependencies struct {
 	UseCase      *authuc.UseCase
 	Catalog      *cataloguc.UseCase
+	Cart         *cartuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -38,6 +40,19 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	products := api.Group("/products")
 	{
 		products.GET("", catalogHandler.ListProducts)
+		products.GET("/featured", catalogHandler.ListFeaturedProducts)
 		products.GET("/:id", catalogHandler.GetProduct)
+	}
+
+	cartHandler := newCartHandler(deps.Cart)
+	cart := api.Group("/cart")
+	cart.Use(guard.AuthRequired)
+	{
+		cart.GET("", cartHandler.Get)
+		cart.POST("/items", cartHandler.AddItem)
+		cart.PUT("/items/:itemId", cartHandler.SetQuantity)
+		cart.PATCH("/items/:itemId/selection", cartHandler.SetSelection)
+		cart.PUT("/selection", cartHandler.SetAllSelection)
+		cart.DELETE("/items/:itemId", cartHandler.RemoveItem)
 	}
 }

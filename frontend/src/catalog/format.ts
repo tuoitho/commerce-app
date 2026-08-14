@@ -1,9 +1,11 @@
-export function formatPrice(price: string, currency: string): string {
-  const value = Number(price)
-  if (!Number.isFinite(value)) return `${price} ${currency}`
+export function formatPrice(price: string): string {
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value)
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    }).format(BigInt(price))
   } catch {
-    return `${price} ${currency}`
+    return `${price} ₫`
   }
 }

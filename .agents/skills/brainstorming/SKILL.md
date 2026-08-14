@@ -62,13 +62,6 @@ When work cannot continue without the answer, invoke OpenCode's `question`
 tool so the session is explicitly waiting. A non-blocking conversational
 question may remain ordinary prose.
 
-## Offer a visual companion only when useful
-
-The first time a real mockup, layout comparison, or architecture diagram would
-be materially clearer than prose, offer the browser-based visual companion in
-its own message. Do not offer it for textual requirements or conceptual
-choices. If accepted, read `visual-companion.md` before starting it.
-
 ## Explore alternatives
 
 For a non-trivial decision:
@@ -105,8 +98,6 @@ to `spec-driven-development`. That workflow records the durable result in:
 - `.kiro/specs/<feature>/design.md`
 - `.kiro/specs/<feature>/tasks.md`
 
-Do not create a parallel document under `docs/superpowers/`.
-
 ## Self-review
 
 Before handoff:
@@ -126,7 +117,6 @@ implementation.
 ## Red flags
 
 - brainstorming despite a sufficient active feature specification
-- creating `docs/superpowers/specs/*` beside `.kiro/specs/`
 - asking questions whose answers are discoverable from the repository
 - using prose for a blocking question instead of the `question` tool
 - implementing before material decisions are recorded

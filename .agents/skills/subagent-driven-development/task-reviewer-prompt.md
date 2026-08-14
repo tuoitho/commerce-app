@@ -76,13 +76,24 @@ Subagent:
     running it. If you cannot run commands in this environment, name the
     test you would run.
 
-    Warnings or other noise in the implementer's reported test output are
-    findings — test output should be pristine.
+    Warnings are findings only when introduced by this task and they indicate a
+    real correctness problem, unsupported or deprecated behavior that affects
+    the task, an unstable test, or a build or runtime contract violation.
+    Pre-existing warnings and harmless tool noise are not task-blocking
+    findings. Record them as Minor or out-of-scope when useful.
 
-    For a behavior-changing task, missing RED/GREEN evidence, a RED run that
-    did not fail for the expected behavioral reason, or a GREEN run that does
-    not cover the requested behavior is an Important issue and the task quality
-    verdict must be `Needs fixes`.
+    For a behavior-changing task, validate the reported RED/GREEN evidence.
+    Missing, incomplete, or invalid historical TDD evidence is an Evidence Gap,
+    not by itself an implementation defect. Do not classify an Evidence Gap as
+    Critical or Important unless inspection also reveals a concrete
+    implementation or test defect. Do not ask an implementer to modify
+    otherwise-correct production code solely to manufacture historical RED
+    evidence.
+
+    If the current tests do not cover required behavior, report that concrete
+    test defect under Issues when it passes the Finding Admission Gate. That is
+    distinct from being unable to prove the historical order of RED and GREEN
+    runs.
 
     ## Part 1: Spec Compliance
 
@@ -129,6 +140,30 @@ Subagent:
     file:line, or a check you ran — no preamble, no process narration,
     no closing summary.
 
+    ## Finding Admission Gate
+
+    Before reporting a Critical or Important issue, verify all of the
+    following:
+
+    1. The issue was introduced by the current task delta.
+    2. You can cite the concrete changed code responsible for it.
+    3. You can demonstrate a reachable supported scenario, violated
+       requirement, binding repository contract, or concrete maintainability
+       failure.
+    4. The impact is material enough that downstream work should not rely on
+       the task as implemented.
+    5. The issue requires a code or test correction rather than merely
+       representing an alternative implementation or preference.
+
+    If any condition is false, it is not Critical or Important. Do not promote
+    an issue merely because more robust, cleaner, more generic, or more
+    defensive code could be written.
+
+    Maintainability is Important only when the current change creates a
+    concrete risk such as duplicated mutable business rules, ambiguous
+    ownership, or code that cannot be safely changed or tested. Ordinary
+    cleanup is Minor.
+
     ## Calibration
 
     Categorize issues by actual severity. Not everything is Critical.
@@ -167,6 +202,10 @@ Subagent:
     For each issue: file:line, what's wrong, why it matters, how to fix
     (if not obvious).
 
+    ### Evidence Gaps
+
+    - [behavior]: missing or invalid evidence and what cannot be established.
+
     ### Assessment
 
     **Task quality:** [Approved | Needs fixes]
@@ -191,4 +230,4 @@ Subagent:
   package to immediately after implementation
 
 **Reviewer returns:** Spec Compliance verdict (✅/❌/⚠️), Strengths, Issues
-(Critical/Important/Minor), Task quality verdict
+(Critical/Important/Minor), Evidence Gaps, Task quality verdict

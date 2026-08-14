@@ -14,7 +14,7 @@ import (
 const testSecret = "a-secret-that-is-at-least-thirty-two-characters"
 
 func hashPassword(s string) (string, error) { return s + "_hash", nil }
-func checkPassword(p, h string) bool         { return h == p+"_hash" }
+func checkPassword(p, h string) bool        { return h == p+"_hash" }
 
 func newTestEnv(t *testing.T) (*UseCase, *fakerepos.Users) {
 	t.Helper()
@@ -22,12 +22,12 @@ func newTestEnv(t *testing.T) (*UseCase, *fakerepos.Users) {
 	sessions := fakerepos.NewSessions(users)
 	manager := jwt.NewManager(testSecret, "commerce-backend")
 	uc := New(Dependencies{
-		Repos:          Repositories{Users: users, Sessions: sessions},
-		JWT:            manager,
-		AccessTTL:      15 * time.Minute,
-		RefreshTTL:     24 * time.Hour,
-		HashPassword:   hashPassword,
-		CheckPassword:  checkPassword,
+		Repos:         Repositories{Users: users, Sessions: sessions},
+		JWT:           manager,
+		AccessTTL:     15 * time.Minute,
+		RefreshTTL:    24 * time.Hour,
+		HashPassword:  hashPassword,
+		CheckPassword: checkPassword,
 		GenerateRefreshToken: func() (security.RefreshTokenPair, error) {
 			return security.GenerateRefreshToken()
 		},

@@ -23,33 +23,33 @@ type Repositories struct {
 }
 
 type UseCase struct {
-	repos        Repositories
-	jwt          *jwt.Manager
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
-	hashPassword func(string) (string, error)
-	checkPassword func(string, string) bool
+	repos                Repositories
+	jwt                  *jwt.Manager
+	accessTTL            time.Duration
+	refreshTTL           time.Duration
+	hashPassword         func(string) (string, error)
+	checkPassword        func(string, string) bool
 	generateRefreshToken func() (security.RefreshTokenPair, error)
 }
 
 type Dependencies struct {
-	Repos        Repositories
-	JWT          *jwt.Manager
-	AccessTTL    time.Duration
-	RefreshTTL   time.Duration
-	HashPassword func(string) (string, error)
-	CheckPassword func(string, string) bool
+	Repos                Repositories
+	JWT                  *jwt.Manager
+	AccessTTL            time.Duration
+	RefreshTTL           time.Duration
+	HashPassword         func(string) (string, error)
+	CheckPassword        func(string, string) bool
 	GenerateRefreshToken func() (security.RefreshTokenPair, error)
 }
 
 func New(deps Dependencies) *UseCase {
 	return &UseCase{
-		repos:        deps.Repos,
-		jwt:          deps.JWT,
-		accessTTL:    deps.AccessTTL,
-		refreshTTL:   deps.RefreshTTL,
-		hashPassword: deps.HashPassword,
-		checkPassword: deps.CheckPassword,
+		repos:                deps.Repos,
+		jwt:                  deps.JWT,
+		accessTTL:            deps.AccessTTL,
+		refreshTTL:           deps.RefreshTTL,
+		hashPassword:         deps.HashPassword,
+		checkPassword:        deps.CheckPassword,
 		generateRefreshToken: deps.GenerateRefreshToken,
 	}
 }

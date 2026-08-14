@@ -11,11 +11,16 @@ Execute plan by dispatching a fresh implementer subagent per task, a task review
 
 **Core principle:** Fresh subagent per task + task review (spec + quality) + broad final review = high quality, fast iteration
 
+**Review invariant:** A broad review occurs once per lifecycle boundary.
+Automated reviewer-requested fixes receive scoped re-review only. Start a new
+broad review cycle only when a human materially changes the approved scope or
+specification.
+
 ## Specification-aware delegation
 
 When a `.kiro/specs/<feature>/` specification governs the work,
 `requirements.md`, `design.md`, and `tasks.md` are the source of truth. Use
-`tasks.md` as `PLAN_FILE`; do not create or execute a parallel Superpowers plan.
+`tasks.md` as `PLAN_FILE`
 
 Before dispatching dependent implementation work, confirm shared contracts are
 stable, including:
@@ -92,8 +97,9 @@ For `.kiro/specs/<feature>/tasks.md`:
    of a parent epic completes, mark the parent complete too.
 6. Continue automatically through all remaining leaf tasks.
 7. Run the final whole-branch code review and fix/re-review gate.
-8. Run `verifying-feature-implementation`; fix, review, and repeat verification
-   until status is `Verified` or a blocker requires user input.
+8. Run the single broad `verifying-feature-implementation` pass, then handle
+   `Verified`, `Needs Fix`, or `Blocked` through the bounded verification gate
+   defined below.
 9. Preserve the verified implementation worktree and report completion. Use
    `finishing-a-development-branch` only after an explicit user request to
    commit or integrate.
@@ -114,10 +120,10 @@ digraph process {
         "Spec ✅ and quality approved?" [shape=diamond];
         "Finding conflicts with plan text?" [shape=diamond];
         "Ask human partner which governs" [shape=box];
-        "Fix round R of 5: R≤3 resume implementer; R≥4 fresh implementer, more capable model" [shape=box];
+        "Fix round R of 3: R≤2 resume implementer; R=3 fresh implementer, more capable model" [shape=box];
         "Dispatch scoped re-review (./re-review-prompt.md)" [shape=box];
         "All findings addressed?" [shape=diamond];
-        "R = 5?" [shape=diamond];
+        "R = 3?" [shape=diamond];
         "Adjudicate each open finding" [shape=box];
         "Any load-bearing finding?" [shape=diamond];
         "STOP: report BLOCKED to human partner" [shape=box];
@@ -128,10 +134,14 @@ digraph process {
     "Setup: worktree, ledger check, read plan, pre-flight review" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer (../requesting-code-review/SKILL.md)" [shape=box];
-    "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals" [shape=box];
-    "Verify all feature requirements" [shape=box];
-    "Verification status Verified?" [shape=diamond];
-    "Fix, review, and re-verify" [shape=box];
+    "Triage final findings; admitted blockers?" [shape=diamond];
+    "ONE final fix wave and scoped re-review" [shape=box];
+    "Broad feature verification" [shape=box];
+    "Initial verification status" [shape=diamond];
+    "Fix round R/2, scoped review, scoped re-verification" [shape=box];
+    "Re-verification status" [shape=diamond];
+    "R = 2?" [shape=diamond];
+    "Adjudicate or STOP BLOCKED" [shape=box];
     "Delete this plan's workspace" [shape=box];
     "Use finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
@@ -145,14 +155,14 @@ digraph process {
     "Spec ✅ and quality approved?" -> "Update tasks.md, append ledger completion, mark todo complete" [label="yes"];
     "Spec ✅ and quality approved?" -> "Finding conflicts with plan text?" [label="no"];
     "Finding conflicts with plan text?" -> "Ask human partner which governs" [label="yes"];
-    "Ask human partner which governs" -> "Fix round R of 5: R≤3 resume implementer; R≥4 fresh implementer, more capable model";
-    "Finding conflicts with plan text?" -> "Fix round R of 5: R≤3 resume implementer; R≥4 fresh implementer, more capable model" [label="no"];
-    "Fix round R of 5: R≤3 resume implementer; R≥4 fresh implementer, more capable model" -> "Dispatch scoped re-review (./re-review-prompt.md)";
+    "Ask human partner which governs" -> "Fix round R of 3: R≤2 resume implementer; R=3 fresh implementer, more capable model";
+    "Finding conflicts with plan text?" -> "Fix round R of 3: R≤2 resume implementer; R=3 fresh implementer, more capable model" [label="no"];
+    "Fix round R of 3: R≤2 resume implementer; R=3 fresh implementer, more capable model" -> "Dispatch scoped re-review (./re-review-prompt.md)";
     "Dispatch scoped re-review (./re-review-prompt.md)" -> "All findings addressed?";
     "All findings addressed?" -> "Update tasks.md, append ledger completion, mark todo complete" [label="yes"];
-    "All findings addressed?" -> "R = 5?" [label="no"];
-    "R = 5?" -> "Fix round R of 5: R≤3 resume implementer; R≥4 fresh implementer, more capable model" [label="no - next round"];
-    "R = 5?" -> "Adjudicate each open finding" [label="yes - breaker trips"];
+    "All findings addressed?" -> "R = 3?" [label="no"];
+    "R = 3?" -> "Fix round R of 3: R≤2 resume implementer; R=3 fresh implementer, more capable model" [label="no - next round"];
+    "R = 3?" -> "Adjudicate each open finding" [label="yes - breaker trips"];
     "Adjudicate each open finding" -> "Any load-bearing finding?";
     "Any load-bearing finding?" -> "STOP: report BLOCKED to human partner" [label="yes"];
     "Any load-bearing finding?" -> "Park findings in ledger with rulings" [label="no"];
@@ -160,12 +170,20 @@ digraph process {
     "Update tasks.md, append ledger completion, mark todo complete" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (./implementer-prompt.md)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer (../requesting-code-review/SKILL.md)" [label="no"];
-    "Dispatch final code reviewer (../requesting-code-review/SKILL.md)" -> "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals";
-    "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals" -> "Verify all feature requirements";
-    "Verify all feature requirements" -> "Verification status Verified?";
-    "Verification status Verified?" -> "Delete this plan's workspace" [label="yes"];
-    "Verification status Verified?" -> "Fix, review, and re-verify" [label="no"];
-    "Fix, review, and re-verify" -> "Verify all feature requirements";
+    "Dispatch final code reviewer (../requesting-code-review/SKILL.md)" -> "Triage final findings; admitted blockers?";
+    "Triage final findings; admitted blockers?" -> "ONE final fix wave and scoped re-review" [label="yes"];
+    "Triage final findings; admitted blockers?" -> "Broad feature verification" [label="no"];
+    "ONE final fix wave and scoped re-review" -> "Broad feature verification";
+    "Broad feature verification" -> "Initial verification status";
+    "Initial verification status" -> "Delete this plan's workspace" [label="Verified"];
+    "Initial verification status" -> "STOP: report BLOCKED to human partner" [label="Blocked"];
+    "Initial verification status" -> "Fix round R/2, scoped review, scoped re-verification" [label="Needs Fix"];
+    "Fix round R/2, scoped review, scoped re-verification" -> "Re-verification status";
+    "Re-verification status" -> "Delete this plan's workspace" [label="Verified"];
+    "Re-verification status" -> "STOP: report BLOCKED to human partner" [label="Blocked"];
+    "Re-verification status" -> "R = 2?" [label="Needs Fix"];
+    "R = 2?" -> "Fix round R/2, scoped review, scoped re-verification" [label="no - next round"];
+    "R = 2?" -> "Adjudicate or STOP BLOCKED" [label="yes"];
     "Delete this plan's workspace" -> "Report verified worktree";
 }
 ```
@@ -183,7 +201,7 @@ sequences — the single most expensive failure observed. Track progress in
 a ledger file, not only in todos.
 
 - Each plan owns a workspace: at skill start, run this skill's
-  `bash scripts/sdd-workspace PLAN_FILE` — it prints the plan's git-ignored
+  ` scripts/sdd-workspace PLAN_FILE` — it prints the plan's git-ignored
   directory (`<repo-root>/.superpowers/sdd/<parent>-<plan-basename>/`), home to
   every artifact for THIS plan: ledger, briefs, reports, review packages.
   Another plan's directory is never yours to read or write.
@@ -239,7 +257,7 @@ diff's size, complexity, and risk. A small mechanical diff does not need the
 most capable model; a subtle concurrency change does. Scoped re-reviews of
 small fix scopes take a cheap-to-mid tier.
 
-**Fix-loop escalation (rounds 4-5)**: use a model at least one tier above
+**Fix-loop escalation (round 3)**: use a model at least one tier above
 the implementer that got stuck.
 
 **Always specify the model explicitly when dispatching a subagent.** An
@@ -272,12 +290,14 @@ packages compare that base with the current working tree, including untracked
 files, so implementation does not require per-task commits.
 
 - **Before snapshot:** immediately before dispatching each task or fix, run
-  `bash scripts/review-package PLAN_FILE BASE HEAD <unique-before-path>`. The
+  ` scripts/review-package PLAN_FILE BASE HEAD <unique-before-path>`. The
   path must include the task ID and review round. Never reuse or overwrite it.
 
-- **Task brief:** before dispatching an implementer, run this skill's
-  `bash scripts/task-brief PLAN_FILE N` — it extracts the task's full text to a
-  uniquely named file and prints the path. Compose the dispatch so the
+- **Task artifacts:** before dispatching an implementer, run this skill's
+  `scripts/task-brief PLAN_FILE N`. It extracts the task's full text and prints
+  absolute `BRIEF_FILE=...` and `REPORT_FILE=...` values. Copy both printed
+  values verbatim into the dispatch; never construct, shorten, or relocate the
+  report path. Compose the dispatch so the
   brief stays the single source of
   requirements. Your dispatch should contain: (1) one line on where this
   task fits in the project; (2) the brief path, introduced as "read this
@@ -287,9 +307,8 @@ files, so implementation does not require per-task commits.
   (5) the report-file path and report contract. Exact values (numbers,
   magic strings, signatures, test cases) appear only in the brief. Never
   make a subagent read the whole plan file.
-- **Report file:** name the implementer's report file after the brief
-  (brief `…/task-N-brief.md` → report `…/task-N-report.md`) and put it in
-  the dispatch prompt. The implementer writes the full report there and
+- **Report file:** use the exact `REPORT_FILE` printed by `task-brief` in the
+  dispatch prompt. The implementer writes the full report there and
   returns only status, changed files, a one-line test summary, and concerns.
 - A dispatch prompt describes one task, not the session's history. Do not
   paste accumulated prior-task summaries ("state after Tasks 1-3") into
@@ -299,7 +318,7 @@ files, so implementation does not require per-task commits.
 - If an earlier task parked a finding in the area this task touches, carry
   a pointer to that ledger entry in the dispatch.
 - Record the implementer's agent identity from the dispatch result —
-  fix-loop rounds 1-3 resume this agent.
+  fix-loop rounds 1-2 resume this agent.
 - Never dispatch multiple implementation subagents in parallel (conflicts).
 
 Template: [implementer-prompt.md](implementer-prompt.md)
@@ -309,7 +328,7 @@ Template: [implementer-prompt.md](implementer-prompt.md)
 Implementer subagents report one of four statuses. Handle each appropriately:
 
 **DONE:** Generate the immutable `after` package with
-`bash scripts/review-package PLAN_FILE BASE HEAD <unique-after-path>`. Dispatch
+` scripts/review-package PLAN_FILE BASE HEAD <unique-after-path>`. Dispatch
 the task reviewer with the matching `before` and `after` paths.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
@@ -337,7 +356,7 @@ required. Implementer self-review never replaces the task review; both are
 needed.
 
 - Hand the reviewer the cumulative `before` and `after` package files generated
-  with `bash scripts/review-package PLAN_FILE BASE HEAD OUTFILE`. Comparing the
+  with ` scripts/review-package PLAN_FILE BASE HEAD OUTFILE`. Comparing the
   snapshots isolates the current task and catches unreported changed files.
   Never dispatch a task reviewer without both files.
 - **Reviewer inputs:** the task reviewer gets four paths — the same brief file,
@@ -371,6 +390,16 @@ Template: [task-reviewer-prompt.md](task-reviewer-prompt.md)
 
 ### 4. The fix loop
 
+Evidence Gaps do not enter the implementation fix loop by themselves. Perform
+at most one evidence-recovery action:
+
+- obtain existing evidence from the implementer or report, or
+- run focused verification sufficient to establish current behavior.
+
+If historical process evidence still cannot be established, record that fact
+in the ledger and adjudicate it according to repository policy. Do not cycle
+implementation and review solely to recreate historical evidence.
+
 The loop triggers when the review reports spec ❌, any Critical or Important
 finding, or a ⚠️ item you confirmed as a real gap.
 
@@ -387,19 +416,19 @@ Before the loop starts, two routes leave it immediately:
   Do not dismiss the finding because the plan mandates it, and do not
   dispatch a fix that contradicts the plan without asking.
 Everything else enters the loop. A fix round is one fix dispatch plus one
-scoped re-review. Five rounds maximum per task:
+scoped re-review. Three rounds maximum per task:
 
-**Rounds 1-3 — resume the original implementer.** Send it the open findings
+**Rounds 1-2 — resume the original implementer.** Send it the open findings
 verbatim. Its context is intact: it knows the task, the code, and its own
 choices. If your harness cannot send another message to a live subagent,
 dispatch a fresh implementer carrying the brief path, the report-file path,
 and the findings — the report file is the persistent memory either way.
 
-**Rounds 4-5 — dispatch a fresh implementer on a more capable model** (per
+**Round 3 — dispatch a fresh implementer on a more capable model** (per
 Model Selection), with the brief path, the report-file path, the open
 findings, and this framing: "A prior implementer attempted this task
 [N] times; you own it now. Read the report file for what was tried." A loop
-that survives three resumes usually means the implementer cannot see its
+that survives two resumes usually means the implementer cannot see its
 own problem — fresh eyes and a capability bump in one move.
 
 **Every round, either way:** the implementer fixes, re-runs the tests
@@ -415,17 +444,18 @@ package and dispatch
 [re-review-prompt.md](re-review-prompt.md) with the findings list, the
 brief, the report file, and the printed diff path. The re-reviewer verdicts
 each finding ADDRESSED or NOT ADDRESSED and flags new breakage caused by the
-reported fix files. New Critical/Important breakage joins the open
+fix delta. New Critical/Important breakage that passes the prompt's admission
+gate joins the open
 findings list. Out-of-scope observations go to the ledger as deferred
 minors — they never extend the loop.
 
 **After each round,** append to the ledger:
-`Task <N>: fix round <R>/5 (<X> addressed, <Y> open — <finding one-liners>)`
+`Task <N>: fix round <R>/3 (<X> addressed, <Y> open — <finding one-liners>)`
 
 Never fix findings yourself in the controller session — your context stays
 clean for coordination, and controller fixes skip review.
 
-**The breaker.** When round 5's re-review still leaves findings open, stop
+**The breaker.** When round 3's re-review still leaves findings open, stop
 dispatching. Adjudicate each open finding yourself — you hold the plan and
 the cross-task context the reviewer lacks:
 
@@ -465,7 +495,7 @@ parked-with-ruling at the cap.
 ## Final Review
 
 The final whole-branch review gets a package too: run
-`bash scripts/review-package PLAN_FILE MERGE_BASE HEAD OUTFILE` (MERGE_BASE = the commit the
+` scripts/review-package PLAN_FILE MERGE_BASE HEAD OUTFILE` (MERGE_BASE = the commit the
 branch started from, e.g. `git merge-base main HEAD`) and include the
 printed path in the final review dispatch, so the final reviewer reads
 one file instead of re-deriving the branch diff with git commands. Dispatch
@@ -475,30 +505,70 @@ on the most capable available model (see Model Selection), using
 the ledger's deferred-minor and parked lines so it can triage which must be
 fixed before merge.
 
-If the final whole-branch review returns findings, dispatch ONE fix subagent
-with the complete findings list — not one fixer per finding.
-Per-finding fixers each rebuild context and re-run suites; a real
-session's final-review fix wave cost more than all its tasks combined.
-Then run exactly one scoped re-review of the fix wave
-(`bash scripts/review-package PLAN_FILE BASE HEAD OUTFILE` regenerated after the fix,
-[re-review-prompt.md](re-review-prompt.md)).
-Adjudicate any residual findings as in the task loop's breaker: park with
-  rulings, or stop on load-bearing ones. There is no second fix wave. Any
-  residual load-bearing finding is a blocker and must not reach verification or
-  integration choices.
+Before dispatching a final fix wave, triage findings:
 
-After the final code review is clean, dispatch a fresh verifier subagent and
-tell it to load `verifying-feature-implementation`. Pass the feature's three
+- P0 is blocking; include it in the fix wave.
+- P1 is blocking; include it in the fix wave.
+- P2 enters the fix wave only when it violates an approved requirement or
+  contract, or represents a concrete correctness, security, data-integrity,
+  compatibility, or merge-safety defect. Otherwise defer it with a ledger
+  ruling.
+- P3 is non-blocking. Record it for later; it never triggers a fix wave by
+  itself.
+
+Dispatch the single final fix wave only when at least one admitted blocking
+finding remains. Include every admitted blocking finding in that one dispatch,
+then run exactly one scoped re-review of the fix wave using a before/after
+review package and [re-review-prompt.md](re-review-prompt.md). There is no
+second final fix wave.
+
+Adjudicate residual findings as in the task loop's breaker: park false,
+contestable, or non-required findings with written rulings; stop on a real
+load-bearing finding. A residual load-bearing finding must not reach feature
+verification or integration choices.
+
+## Feature Verification Gate
+
+After the final code review gate, dispatch one fresh verifier subagent and tell
+it to load `verifying-feature-implementation`. Pass the feature's three
 artifact paths, the cumulative working-tree review package, and the repository
-verification context. If verification reports blocking issues, dispatch one
-fix subagent, review its diff, and repeat feature verification. Do not finish
-the branch until status is `Verified` or a blocker requires a user decision.
+verification context. This is the only broad feature verification.
+
+Handle its status as follows:
+
+- `Verified` — finish the verification gate.
+- `Blocked` — stop and report the blocking evidence or decision to the human
+  partner. Do not dispatch an implementation fixer.
+- `Needs Fix` — enter the bounded verification repair loop.
+
+Allow at most two verification repair rounds. Each round consists of exactly:
+
+1. one fix dispatch containing the complete open verification findings,
+2. one scoped code re-review of that repair diff, and
+3. one feature re-verification in Re-verification Mode.
+
+Pass the previous verification report, still-open requirement IDs, repair
+diff, and repair test evidence to the re-verifier. Do not perform another broad
+feature audit. After each round append:
+
+`Feature verification: round <R>/2 (<X> resolved, <Y> open)`
+
+If round 2 still returns `Needs Fix`, stop dispatching and adjudicate the
+remaining findings:
+
+- Park a false or contestable finding with a written ruling.
+- Defer a real but non-required or non-blocking issue with a written ruling.
+- Stop and report `BLOCKED` to the human partner for a real requirement
+  failure.
+
+There is no third verification repair round.
 
 ## Finish
 
-When the final whole-branch review is clean and feature verification status is
-`Verified`, delete this plan's scratch workspace. Preserve the implementation
-worktree and report that the full plan is complete with uncommitted changes.
+When the final whole-branch review gate passes and feature verification status
+is `Verified`, delete this plan's scratch workspace. Preserve the
+implementation worktree and report that the full plan is complete with
+uncommitted changes.
 
 Do not commit, merge, push, create a PR, or clean the implementation worktree
 unless the user explicitly asks. If the implementation is already committed or
@@ -524,12 +594,12 @@ You: I'm using Subagent-Driven Development to execute this plan.
 
 [Setup: worktree verified]
 [Read canonical plan file once: PLAN_FILE]
-[Resolve workspace: bash scripts/sdd-workspace PLAN_FILE — no ledger inside, fresh start]
+[Resolve workspace: scripts/sdd-workspace PLAN_FILE — no ledger inside, fresh start]
 [Create todos for all tasks]
 
 Task 1: Hook installation script
 
-[Run task-brief for Task 1; dispatch implementer with brief + report paths + context]
+[Run task-brief for Task 1; copy its BRIEF_FILE and REPORT_FILE values verbatim into the implementer dispatch]
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
@@ -549,7 +619,7 @@ Task reviewer: Spec ✅ - all requirements met, nothing extra.
 
 Task 2: Recovery modes
 
-[Run task-brief for Task 2; dispatch implementer with brief + report paths + context]
+[Run task-brief for Task 2; copy its BRIEF_FILE and REPORT_FILE values verbatim into the implementer dispatch]
 
 Implementer: [No questions]
   - Added verify/repair modes
@@ -570,7 +640,7 @@ Re-reviewer: Missing progress reporting — ADDRESSED (src/recovery.js:41).
   Magic number — ADDRESSED (src/recovery.js:7). New breakage: none.
   Verdict: all findings addressed.
 
-[Ledger: Task 2: fix round 1/5 (2 addressed, 0 open)]
+[Ledger: Task 2: fix round 1/3 (2 addressed, 0 open)]
 [Ledger: Task 2: complete (review clean)]
 
 ...
