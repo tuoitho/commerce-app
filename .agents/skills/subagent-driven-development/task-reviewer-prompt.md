@@ -159,6 +159,12 @@ Subagent:
     an issue merely because more robust, cleaner, more generic, or more
     defensive code could be written.
 
+    Do not treat states reachable only by bypassing established application
+    validation, ad hoc direct database manipulation, unsupported callers, or
+    fabricated invalid internal values as supported scenarios unless the path
+    is supported or a binding requirement or design contract explicitly
+    assigns rejection of that state to the affected boundary.
+
     Maintainability is Important only when the current change creates a
     concrete risk such as duplicated mutable business rules, ambiguous
     ownership, or code that cannot be safely changed or tested. Ordinary

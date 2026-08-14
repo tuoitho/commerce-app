@@ -71,6 +71,12 @@ Subagent:
 
     If any condition is false, do not add it to the open-findings list.
 
+    Do not treat states reachable only by bypassing established application
+    validation, ad hoc direct database manipulation, unsupported callers, or
+    fabricated invalid internal values as supported scenarios unless the path
+    is supported or a binding requirement or design contract explicitly
+    assigns rejection of that state to the affected boundary.
+
     Optional refactoring, style improvements, speculative hardening,
     pre-existing problems, and unrelated observations never extend the loop.
 

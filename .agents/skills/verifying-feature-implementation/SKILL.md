@@ -42,7 +42,9 @@ Before reporting a Blocking Implementation Issue, verify all of the following:
 
 1. It maps to a specific approved requirement or acceptance criterion.
 2. Implementation or test evidence demonstrates a concrete failure.
-3. The affected scenario is required or supported behavior.
+3. The affected scenario is reachable through an approved or supported system
+   path, or the approved design explicitly requires the violated invariant at
+   that boundary.
 4. The defect is present in the implementation under verification.
 5. Correcting it does not require inventing new product or design behavior.
 
@@ -51,6 +53,12 @@ issue.
 
 Do not report optional hardening, speculative risks, unrelated pre-existing
 problems, style preferences, or alternative implementations as blockers.
+
+Do not treat states reachable only by bypassing established application
+validation, ad hoc direct database manipulation, unsupported callers, or
+fabricated invalid internal states as blocking unless the path is supported or
+the approved specification or design explicitly requires that boundary to
+reject them.
 
 ## Re-verification Mode
 
@@ -79,6 +87,25 @@ regression introduced by the repair or is necessary to evaluate an open
 requirement ID. Treat out-of-scope observations as non-blocking; they never
 extend the verification repair loop.
 
+## Repair Loop Limit
+
+Feature verification has one bounded repair cycle:
+
+1. Perform one broad verification of the completed feature.
+2. If the result is `Needs Fix`, allow one implementation repair wave.
+3. After that repair, perform one scoped re-verification using the rules above.
+4. Do not start another autonomous repair and re-verification cycle.
+
+If blocking implementation issues remain after scoped re-verification, return
+control to the caller with the remaining evidence:
+
+- report `Needs Fix` for concrete defects within the approved specification;
+- report `Blocked` when resolution requires a specification, architecture,
+  environment, dependency, or user decision.
+
+Do not continue repairing until clean merely because a verifier can still
+identify findings.
+
 ## Output
 
 ```markdown
@@ -105,8 +132,9 @@ extend the verification repair loop.
 - Non-blocking observations not required to establish feature correctness.
 ```
 
-Use `Verified` only when every requirement and acceptance criterion has
-deterministic evidence and no blocking issue remains.
+Use `Verified` only when every approved requirement and acceptance criterion
+has sufficient deterministic evidence for the verification level defined by
+the approved design and testing strategy, and no blocking issue remains.
 
 Use `Needs Fix` only when at least one concrete implementation or test defect
 prevents an approved requirement from being satisfied and that defect can be

@@ -60,6 +60,12 @@ Check:
    distributed-systems scenarios, browser quirks, numeric extremes, or recovery
    mechanisms merely because they are theoretically possible.
 
+   Treat a scenario as supported only when it is reachable through a documented
+   system path or the specification explicitly requires the relevant invariant
+   at that boundary. Do not escalate states obtainable only through ad hoc
+   direct database manipulation, bypassed application validation, unsupported
+   callers, or fabricated invalid internals.
+
    Flag an issue only when:
    - the scenario is reasonably likely in normal supported use,
    - the repository or specification provides evidence that the scenario matters,
@@ -77,6 +83,9 @@ Check:
    phases.
 
 Do not flag wording preferences, formatting, or optional enhancements.
+
+An implementation or schema domain that is broader than approved product
+behavior does not expand the specification by itself.
 
 ## Finding Gate
 

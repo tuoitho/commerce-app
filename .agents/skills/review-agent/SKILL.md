@@ -36,6 +36,11 @@ Flag an issue only when all of these are true:
 Do not flag speculative concerns, pre-existing problems, intentional behavior changes, or style
 nits that do not obscure the code.
 
+Do not treat a state reachable only by bypassing established application validation, ad hoc direct
+database manipulation, an unsupported caller, or a fabricated invalid internal value as a
+supported call path unless the path is supported or a binding requirement or design contract
+explicitly assigns rejection of that state to the affected boundary.
+
 ## Write the result
 
 Present findings first, ordered by severity. Use one entry per issue in this form:

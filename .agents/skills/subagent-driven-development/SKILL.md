@@ -138,10 +138,9 @@ digraph process {
     "ONE final fix wave and scoped re-review" [shape=box];
     "Broad feature verification" [shape=box];
     "Initial verification status" [shape=diamond];
-    "Fix round R/2, scoped review, scoped re-verification" [shape=box];
+    "ONE verification repair wave, scoped review, scoped re-verification" [shape=box];
     "Re-verification status" [shape=diamond];
-    "R = 2?" [shape=diamond];
-    "Adjudicate or STOP BLOCKED" [shape=box];
+    "Return residual Needs Fix or Blocked to human partner" [shape=box];
     "Delete this plan's workspace" [shape=box];
     "Use finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
@@ -177,13 +176,10 @@ digraph process {
     "Broad feature verification" -> "Initial verification status";
     "Initial verification status" -> "Delete this plan's workspace" [label="Verified"];
     "Initial verification status" -> "STOP: report BLOCKED to human partner" [label="Blocked"];
-    "Initial verification status" -> "Fix round R/2, scoped review, scoped re-verification" [label="Needs Fix"];
-    "Fix round R/2, scoped review, scoped re-verification" -> "Re-verification status";
+    "Initial verification status" -> "ONE verification repair wave, scoped review, scoped re-verification" [label="Needs Fix"];
+    "ONE verification repair wave, scoped review, scoped re-verification" -> "Re-verification status";
     "Re-verification status" -> "Delete this plan's workspace" [label="Verified"];
-    "Re-verification status" -> "STOP: report BLOCKED to human partner" [label="Blocked"];
-    "Re-verification status" -> "R = 2?" [label="Needs Fix"];
-    "R = 2?" -> "Fix round R/2, scoped review, scoped re-verification" [label="no - next round"];
-    "R = 2?" -> "Adjudicate or STOP BLOCKED" [label="yes"];
+    "Re-verification status" -> "Return residual Needs Fix or Blocked to human partner" [label="Needs Fix or Blocked"];
     "Delete this plan's workspace" -> "Report verified worktree";
 }
 ```
@@ -541,7 +537,8 @@ Handle its status as follows:
   partner. Do not dispatch an implementation fixer.
 - `Needs Fix` — enter the bounded verification repair loop.
 
-Allow at most two verification repair rounds. Each round consists of exactly:
+Allow exactly one verification repair wave when the broad verification returns
+`Needs Fix`. The wave consists of:
 
 1. one fix dispatch containing the complete open verification findings,
 2. one scoped code re-review of that repair diff, and
@@ -549,19 +546,20 @@ Allow at most two verification repair rounds. Each round consists of exactly:
 
 Pass the previous verification report, still-open requirement IDs, repair
 diff, and repair test evidence to the re-verifier. Do not perform another broad
-feature audit. After each round append:
+feature audit. After the wave append:
 
-`Feature verification: round <R>/2 (<X> resolved, <Y> open)`
+`Feature verification: repair wave 1/1 (<X> resolved, <Y> open)`
 
-If round 2 still returns `Needs Fix`, stop dispatching and adjudicate the
-remaining findings:
+After scoped re-verification:
 
-- Park a false or contestable finding with a written ruling.
-- Defer a real but non-required or non-blocking issue with a written ruling.
-- Stop and report `BLOCKED` to the human partner for a real requirement
-  failure.
+- `Verified` — finish the verification gate.
+- `Needs Fix` — stop autonomous repair, report the remaining concrete defects
+  and evidence, and return control to the human partner.
+- `Blocked` — stop and report the specification, architecture, environment,
+  dependency, or user decision required.
 
-There is no third verification repair round.
+Do not dispatch a second verification repair wave. The final verification gate
+detects residual defects; it is not an unbounded implementation engine.
 
 ## Finish
 
