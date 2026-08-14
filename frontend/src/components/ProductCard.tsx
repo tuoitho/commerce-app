@@ -15,16 +15,18 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <article className="product-card">
-      <ProductImage src={product.primaryImageUrl} alt={product.name} className="product-image" />
+      <div className="product-card-media">
+        <ProductImage src={product.primaryImageUrl} alt={product.name} className="product-image" />
+      </div>
       <div className="product-info">
-        <p className="product-category">{product.brand.name}</p>
+        <p className="product-category technical-label">{product.brand.name}</p>
         <h2><Link to={`/products/${product.id}`}>{product.name}</Link></h2>
-        <p className="product-model">{product.model}</p>
+        <p className="product-model technical-label">{product.model}</p>
         <p className="product-price">{price}</p>
-        <p className={product.inStock ? 'stock-in' : 'stock-out'}>
+        <p className={`product-stock ${product.inStock ? 'stock-in' : 'stock-out'}`}>
           {product.inStock ? 'In stock' : 'Out of stock'}
         </p>
-        <Link to={`/products/${product.id}`} className="product-card-action">
+        <Link to={`/products/${product.id}`} className="product-card-action secondary-action">
           View options for {product.name}
         </Link>
       </div>

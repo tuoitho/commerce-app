@@ -43,7 +43,7 @@ function renderPage(value: Partial<ReturnType<typeof useCart>> = {}) {
   return render(<MemoryRouter><CartPage /></MemoryRouter>)
 }
 
-describe('CartPage task 7.1', () => {
+describe('CartPage task 3.1', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('shows loading and retryable error states', () => {
@@ -59,6 +59,8 @@ describe('CartPage task 7.1', () => {
 
   it('shows an empty cart with a continue shopping link', () => {
     renderPage({ cart: makeCart([]) })
+    expect(screen.getByRole('main')).toHaveClass('cart-page')
+    expect(screen.getByRole('region', { name: 'Empty cart' })).toHaveClass('cart-empty')
     expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /continue shopping/i })).toHaveAttribute('href', '/products')
   })
@@ -69,6 +71,14 @@ describe('CartPage task 7.1', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Network unavailable')
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(reload).toHaveBeenCalledOnce()
+  })
+
+  it('keeps pending mutation controls disabled and the cart feedback visible', () => {
+    renderPage({ pending: true, error: 'Cart update failed' })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Cart update failed')
+    expect(screen.getByRole('checkbox', { name: /select iPhone 16/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /remove item/i })).toBeDisabled()
   })
 
   it('renders product identity, options, live prices, image fallback and stock details', () => {
@@ -132,7 +142,7 @@ describe('CartPage task 7.1', () => {
   })
 })
 
-describe('CartPage task 7.2', () => {
+describe('CartPage selection and recovery', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('shows selected line count and valid-only BigInt total', () => {

@@ -85,6 +85,7 @@ describe('CatalogPage', () => {
     mockFetchProducts.mockReturnValue(new Promise(() => {}))
     renderCatalog()
     expect(screen.getByText(/loading products/i)).toBeInTheDocument()
+    expect(screen.getByText(/loading products/i)).toHaveClass('loading-state')
     await flushDebounce()
     expect(screen.getByText(/loading products/i)).toBeInTheDocument()
   })
@@ -111,6 +112,7 @@ describe('CatalogPage', () => {
     renderCatalog()
     await flushDebounce()
     expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('error-state')
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     await flushDebounce()
     expect(screen.getByText('Mouse')).toBeInTheDocument()
@@ -133,6 +135,7 @@ describe('CatalogPage', () => {
     await flushDebounce()
 
     expect(screen.getByDisplayValue('iphone')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('iphone').closest('.catalog-filter-panel')).toBeInTheDocument()
     expect(screen.getByLabelText('Apple')).toBeChecked()
     expect(screen.getByLabelText('Xiaomi')).toBeChecked()
     expect(screen.getByDisplayValue('100')).toBeInTheDocument()
@@ -178,6 +181,7 @@ describe('CatalogPage', () => {
     expect(screen.getByTestId('location').textContent).toContain(`category_id=${UNKNOWN_ID}`)
     expect(mockFetchProducts).toHaveBeenLastCalledWith({ categoryIds: [UNKNOWN_ID], q: undefined, minPrice: undefined, maxPrice: undefined, inStock: undefined })
     expect(screen.getByText(/0 results/i)).toBeInTheDocument()
+    expect(screen.getByText(/0 results/i)).toHaveClass('catalog-result-count')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

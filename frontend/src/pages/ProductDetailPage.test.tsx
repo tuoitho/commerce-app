@@ -83,12 +83,16 @@ describe('ProductDetailPage', () => {
     expect(screen.getByText(/24\.990\.000/)).toBeInTheDocument()
     expect(screen.getByText(/in stock/i)).toBeInTheDocument()
     expect(screen.getByText(/Apple M1/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /purchase details/i })).toHaveClass('purchase-panel')
+    expect(screen.getByText('Apple M1')).toHaveClass('technical-label')
+    expect(screen.getByRole('button', { name: /add to cart/i })).toHaveClass('primary-action')
   })
 
   it('renders out-of-stock state', async () => {
     mockFetchProduct.mockResolvedValue(makeDetail({ variants: [{ id: 'v1', optionValueIds: {}, priceVnd: '24990000', stockQuantity: 0n }] }))
     renderDetail()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/out of stock/i))
+    expect(screen.getByRole('alert')).toHaveClass('catalog-status', 'error')
   })
 
   it('shows a generic error state for failed requests', async () => {
@@ -178,6 +182,7 @@ describe('ProductDetailPage', () => {
     await waitFor(() => fireEvent.click(screen.getByRole('button', { name: /add to cart/i })))
     await waitFor(() => expect(addVariant).toHaveBeenCalledWith('v1'))
     expect(screen.getByRole('status')).toHaveTextContent(/added to cart/i)
+    expect(screen.getByRole('status')).toHaveClass('catalog-status', 'success')
     addVariant.mockRejectedValue(new ApiError(409, { code: 'stock_limit', message: 'Not enough stock' }))
     fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/not enough stock/i))

@@ -33,13 +33,14 @@ export default function VariantSelector({ optionGroups, variants, selection, onC
           <div className="variant-values">
             {group.values.map((value) => {
               const selected = selection[group.id] === value.id
+              const enabled = isValueEnabled(group.id, value.id, variants, selection)
               return (
                 <button
                   key={value.id}
                   type="button"
-                  className={selected ? 'variant-value selected' : 'variant-value'}
+                  className={`variant-value${selected ? ' selected' : ''}${enabled ? '' : ' variant-value-unavailable'}`}
                   aria-pressed={selected}
-                  disabled={!isValueEnabled(group.id, value.id, variants, selection)}
+                  disabled={!enabled}
                   onClick={() => onChange(group.id, selected ? '' : value.id)}
                 >
                   {value.label}

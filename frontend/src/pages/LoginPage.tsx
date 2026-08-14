@@ -34,11 +34,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <h1>Sign in</h1>
+    <main className="auth-page auth-surface">
+      <header className="auth-heading">
+        <p className="technical-label">Account access</p>
+        <h1>Sign in</h1>
+      </header>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <form onSubmit={handleSubmit} noValidate>
-        <label>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <label className="form-field">
           Email
           <input
             type="email"
@@ -48,7 +51,7 @@ export default function LoginPage() {
           />
           {fields.email && <span className="field-error">{fields.email}</span>}
         </label>
-        <label>
+        <label className="form-field">
           Password
           <input
             type="password"
@@ -58,11 +61,11 @@ export default function LoginPage() {
           />
           {fields.password && <span className="field-error">{fields.password}</span>}
         </label>
-        <button type="submit" disabled={submitting}>
+        <button className="primary-action" type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <p>
+      <p className="auth-recovery">
         Don&apos;t have an account? <Link to="/register" state={location.state}>Register</Link>
       </p>
     </main>

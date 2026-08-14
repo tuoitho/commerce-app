@@ -19,7 +19,8 @@ export default defineConfig({
   projects: [
     { name: 'chromium-320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 720 } } },
     { name: 'chromium-600', use: { ...devices['Desktop Chrome'], viewport: { width: 600, height: 800 } } },
+    { name: 'chromium-767', use: { ...devices['Desktop Chrome'], viewport: { width: 767, height: 900 } } },
     { name: 'chromium-900', use: { ...devices['Desktop Chrome'], viewport: { width: 900, height: 900 } } },
-    { name: 'chromium-1180', use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 900 } } },
+    { name: 'chromium-1440', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
   ],
 })

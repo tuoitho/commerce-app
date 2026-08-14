@@ -45,12 +45,15 @@ export default function CatalogPage() {
 
   return (
     <main className="catalog-page">
-      <h1>Catalog</h1>
-      <div className="catalog-filters">
-        <label>Search
+      <header className="catalog-heading">
+        <p className="eyebrow technical-label">Precision catalogue</p>
+        <h1>Catalog</h1>
+      </header>
+      <div className="catalog-filters catalog-filter-panel">
+        <label className="catalog-filter-search">Search
           <input type="search" placeholder="Search products..." value={searchParams.get('q') ?? ''} onChange={(event) => updateParam('q', event.target.value)} />
         </label>
-        <fieldset>
+        <fieldset className="catalog-filter-group">
           <legend>Brands</legend>
           {categories.map((category) => (
             <label key={category.id}>
@@ -63,13 +66,13 @@ export default function CatalogPage() {
             </label>
           ))}
         </fieldset>
-        <label>Min price
+        <label className="catalog-filter-field">Min price
           <input inputMode="decimal" value={searchParams.get('min_price') ?? ''} onChange={(event) => updateParam('min_price', event.target.value)} />
         </label>
-        <label>Max price
+        <label className="catalog-filter-field">Max price
           <input inputMode="decimal" value={searchParams.get('max_price') ?? ''} onChange={(event) => updateParam('max_price', event.target.value)} />
         </label>
-        <fieldset>
+        <fieldset className="catalog-filter-group">
           <legend>Stock status</legend>
           <label>
             <input
@@ -99,22 +102,24 @@ export default function CatalogPage() {
             Out of stock
           </label>
         </fieldset>
-        <button type="button" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })} disabled={!hasFilters}>Reset filters</button>
+        <button className="secondary-action" type="button" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })} disabled={!hasFilters}>Reset filters</button>
       </div>
 
-      {error && <div className="catalog-status error" role="alert"><p>{error}</p><button type="button" onClick={retry}>Try again</button></div>}
-      {loading && !error && <p className="catalog-status" role="status" aria-live="polite">Loading products...</p>}
-      {!loading && !error && <p className="catalog-result-count" role="status">{products.length} results</p>}
-      {!loading && !error && products.length === 0 && <p className="catalog-status">No products match your criteria.</p>}
-      {!loading && !error && products.length > 0 && (
-        <ul className="product-grid">
-          {products.map((product) => (
-            <li key={product.id}>
-              <ProductCard product={product} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <section className="catalog-results" aria-label="Product results">
+        {error && <div className="catalog-status error error-state" role="alert"><p>{error}</p><button type="button" onClick={retry}>Try again</button></div>}
+        {loading && !error && <p className="catalog-status loading-state" role="status" aria-live="polite">Loading products...</p>}
+        {!loading && !error && <p className="catalog-result-count" role="status">{products.length} results</p>}
+        {!loading && !error && products.length === 0 && <p className="catalog-status empty-state">No products match your criteria.</p>}
+        {!loading && !error && products.length > 0 && (
+          <ul className="product-grid">
+            {products.map((product) => (
+              <li key={product.id}>
+                <ProductCard product={product} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   )
 }

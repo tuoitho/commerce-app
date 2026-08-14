@@ -49,6 +49,8 @@ describe('HomePage', () => {
     expect(screen.getByText(/phone store, made simple/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /explore phones/i })).toHaveAttribute('href', '/products')
     expect(screen.getByRole('status')).toHaveTextContent(/loading featured phones/i)
+    expect(screen.getByText(/your next phone starts here/i)).toHaveClass('technical-label')
+    expect(screen.getByRole('link', { name: /explore phones/i })).toHaveClass('primary-action')
   })
 
   it('renders featured products after loading', async () => {
@@ -64,6 +66,7 @@ describe('HomePage', () => {
     renderHome()
 
     expect(await screen.findByText(/no featured phones/i)).toBeInTheDocument()
+    expect(screen.getByText(/no featured phones/i).closest('.catalog-status')).toHaveClass('empty-state')
     expect(screen.getByRole('link', { name: /browse all phones/i })).toHaveAttribute('href', '/products')
   })
 
@@ -72,6 +75,7 @@ describe('HomePage', () => {
     renderHome()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not load featured phones/i)
+    expect(screen.getByRole('alert')).toHaveClass('error-state')
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(await screen.findByText('iPhone 16 Pro')).toBeInTheDocument()
     expect(mockFetchFeaturedProducts).toHaveBeenCalledTimes(2)

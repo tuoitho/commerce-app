@@ -76,15 +76,15 @@ export default function CartPage() {
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null)
 
   if (loading && !cart) {
-    return <main className="cart-page"><h1>Cart</h1><p className="cart-status" aria-live="polite">Loading cart...</p></main>
+    return <main className="cart-page"><h1>Cart</h1><p className="cart-status loading-state" aria-live="polite">Loading cart...</p></main>
   }
 
   if (error && !cart) {
-    return <main className="cart-page"><h1>Cart</h1><div className="cart-status error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div></main>
+    return <main className="cart-page"><h1>Cart</h1><div className="cart-status error error-state" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div></main>
   }
 
   if (!cart || cart.items.length === 0) {
-    return <main className="cart-page"><h1>Cart</h1>{error && <div className="cart-status error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div>}<section className="cart-empty"><h2>Your cart is empty</h2><p>Find a phone to get started.</p><Link to="/products">Continue shopping</Link></section></main>
+    return <main className="cart-page"><h1>Cart</h1>{error && <div className="cart-status error error-state" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div>}<section className="cart-empty" aria-label="Empty cart"><p className="technical-label">No items selected</p><h2>Your cart is empty</h2><p>Find a phone to get started.</p><Link className="primary-action" to="/products">Continue shopping</Link></section></main>
   }
 
   const selectableItems = cart.items.filter((item) => item.availability === 'available')
@@ -109,8 +109,8 @@ export default function CartPage() {
   return (
     <main className="cart-page">
       <h1>Cart</h1>
-      {loading && <p className="cart-status" aria-live="polite">Refreshing cart...</p>}
-      {error && <div className="cart-status error" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div>}
+      {loading && <p className="cart-status loading-state" aria-live="polite">Refreshing cart...</p>}
+      {error && <div className="cart-status error error-state" role="alert"><p>{error}</p><button type="button" onClick={() => void reload()}>Try again</button></div>}
       <section className="cart-summary" aria-label="Cart summary">
         <label>
           <input
@@ -123,7 +123,7 @@ export default function CartPage() {
           Select all available items
         </label>
         <p>{selectedLabel}</p>
-        <p>Total: <strong>{formatPrice(cart.selectedTotalVnd)}</strong></p>
+        <p className="cart-summary-total">Total: <strong>{formatPrice(cart.selectedTotalVnd)}</strong></p>
         <button
           type="button"
           disabled={pending || cart.selectedLineCount === 0}

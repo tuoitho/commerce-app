@@ -51,9 +51,9 @@ export default function ProductDetailPage() {
     if (product) setSelection(parseVariantSelection(location.search, product.optionGroups))
   }, [location.search, product])
 
-  if (loading) return <main className="catalog-page"><p className="catalog-status">Loading product...</p></main>
+  if (loading) return <main className="catalog-page product-detail-state"><p className="catalog-status loading-state">Loading product...</p></main>
   if (failed) {
-    return <main className="catalog-page"><h1>{notFound ? 'Product not found' : 'Something went wrong'}</h1><p>{notFound ? 'The product you are looking for does not exist.' : 'Could not load this product.'}</p><Link to="/products">Back to catalog</Link></main>
+    return <main className="catalog-page product-detail-state"><section className="catalog-status error" role="alert"><h1>{notFound ? 'Product not found' : 'Something went wrong'}</h1><p>{notFound ? 'The product you are looking for does not exist.' : 'Could not load this product.'}</p><Link to="/products">Back to catalog</Link></section></main>
   }
   if (!product) return null
 
@@ -97,19 +97,21 @@ export default function ProductDetailPage() {
         <div className="detail-images">
           <ProductImage src={product.imageUrls[0] ?? ''} alt={product.name} className="detail-image" />
         </div>
-        <div className="detail-info">
-           <p className="product-category">{product.brand.name} {product.model}</p>
-          <h1>{product.name}</h1>
-           <p className="product-price">{priceLabel}</p>
-            <p className={selectedVariant && selectedVariant.stockQuantity > 0n || productInStock ? 'stock-in' : 'stock-out'}>{selectedVariant ? (selectedVariant.stockQuantity > 0n ? `${selectedVariant.stockQuantity} in stock` : 'Out of stock') : (productInStock ? 'In stock' : 'Out of stock')}</p>
-           <p className="product-description">{product.description}</p>
-           {product.optionGroups.length > 0 && <VariantSelector optionGroups={product.optionGroups} variants={product.variants} selection={selection} onChange={handleSelectionChange} />}
-           {hasMissingGroups && <p role="status">Select {missingGroupLabels.join(' and ')}.</p>}
-           {hasInvalidCombination && <p role="alert">This combination is not available.</p>}
-            {selectedVariant && selectedVariant.stockQuantity <= 0n && <p role="alert">This variant is out of stock.</p>}
-           {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} aria-live="polite">{feedback.message}</p>}
-            {selectedVariant && <button type="button" onClick={() => void handleAdd()} disabled={authLoading || selectedVariant.stockQuantity <= 0n}>Add to cart</button>}
-         </div>
+        <section className="detail-info purchase-panel" aria-label="Purchase details">
+           <p className="product-category technical-label">{product.brand.name} {product.model}</p>
+           <h1>{product.name}</h1>
+            <div className="purchase-summary">
+              <p className="product-price">{priceLabel}</p>
+              <p className={selectedVariant && selectedVariant.stockQuantity > 0n || productInStock ? 'stock-in' : 'stock-out'}>{selectedVariant ? (selectedVariant.stockQuantity > 0n ? `${selectedVariant.stockQuantity} in stock` : 'Out of stock') : (productInStock ? 'In stock' : 'Out of stock')}</p>
+            </div>
+            <p className="product-description">{product.description}</p>
+            {product.optionGroups.length > 0 && <VariantSelector optionGroups={product.optionGroups} variants={product.variants} selection={selection} onChange={handleSelectionChange} />}
+            {hasMissingGroups && <p className="catalog-status" role="status">Select {missingGroupLabels.join(' and ')}.</p>}
+            {hasInvalidCombination && <p className="catalog-status error" role="alert">This combination is not available.</p>}
+             {selectedVariant && selectedVariant.stockQuantity <= 0n && <p className="catalog-status error" role="alert">This variant is out of stock.</p>}
+            {feedback && <p className={`catalog-status ${feedback.type}`} role={feedback.type === 'error' ? 'alert' : 'status'} aria-live="polite">{feedback.message}</p>}
+             {selectedVariant && <button className="primary-action" type="button" onClick={() => void handleAdd()} disabled={authLoading || selectedVariant.stockQuantity <= 0n}>Add to cart</button>}
+          </section>
       </div>
     </main>
   )

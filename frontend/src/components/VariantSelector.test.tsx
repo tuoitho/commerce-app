@@ -65,6 +65,7 @@ describe('VariantSelector', () => {
 
     expect(screen.getByRole('button', { name: '128 GB' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '256 GB' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '256 GB' })).toHaveClass('variant-value-unavailable')
   })
 
   it('keeps the selected value enabled and clears it when clicked again', () => {
@@ -80,6 +81,7 @@ describe('VariantSelector', () => {
 
     const selected = screen.getByRole('button', { name: 'Black' })
     expect(selected).toBeEnabled()
+    expect(selected).toHaveClass('selected')
     fireEvent.click(selected)
     expect(onChange).toHaveBeenCalledWith(groups[0].id, '')
   })

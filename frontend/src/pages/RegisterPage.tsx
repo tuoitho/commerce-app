@@ -34,11 +34,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="auth-page">
-      <h1>Create account</h1>
+    <main className="auth-page auth-surface">
+      <header className="auth-heading">
+        <p className="technical-label">New customer</p>
+        <h1>Create account</h1>
+      </header>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <form onSubmit={handleSubmit} noValidate>
-        <label>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <label className="form-field">
           Email
           <input
             type="email"
@@ -48,7 +51,7 @@ export default function RegisterPage() {
           />
           {fields.email && <span className="field-error">{fields.email}</span>}
         </label>
-        <label>
+        <label className="form-field">
           Password
           <input
             type="password"
@@ -58,11 +61,11 @@ export default function RegisterPage() {
           />
           {fields.password && <span className="field-error">{fields.password}</span>}
         </label>
-        <button type="submit" disabled={submitting}>
+        <button className="primary-action" type="submit" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
-      <p>
+      <p className="auth-recovery">
         Already have an account? <Link to="/login" state={location.state}>Sign in</Link>
       </p>
     </main>
