@@ -1,95 +1,50 @@
-import { api } from './client'
+import { apiClient } from './client'
+import type { CategoriesResponse, ProductsResponse, ProductDetail, ProductFilterParams } from './types'
 
-export interface Brand {
-  id: string
-  name: string
-}
+export const catalogApi = {
+  async listCategories(): Promise<CategoriesResponse> {
+    return apiClient<CategoriesResponse>('/categories')
+  },
 
-export interface ProductSummary {
-  id: string
-  name: string
-  model: string
-  brand: Brand
-  minPriceVnd: string
-  maxPriceVnd: string
-  primaryImageUrl: string
-  inStock: boolean
-}
+  async listProducts(filter: ProductFilterParams = {}): Promise<ProductsResponse> {
+    const params = new URLSearchParams()
 
-export interface OptionValue {
-  id: string
-  label: string
-}
+    if (filter.q) {
+      params.set('q', filter.q)
+    }
 
-export interface OptionGroup {
-  id: string
-  label: string
-  position: number
-  values: OptionValue[]
-}
+    if (filter.category_id) {
+      if (Array.isArray(filter.category_id)) {
+        for (const catId of filter.category_id) {
+          if (catId) params.append('category_id', catId)
+        }
+      } else {
+        params.set('category_id', filter.category_id)
+      }
+    }
 
-export interface ProductVariant {
-  id: string
-  optionValueIds: Record<string, string>
-  priceVnd: string
-  stockQuantity: bigint
-}
+    if (filter.min_price) {
+      params.set('min_price', filter.min_price)
+    }
 
-export interface ProductDetail {
-  id: string
-  name: string
-  model: string
-  description: string
-  brand: Brand
-  imageUrls: string[]
-  minPriceVnd: string
-  maxPriceVnd: string
-  featured: boolean
-  optionGroups: OptionGroup[]
-  variants: ProductVariant[]
-  createdAt: string
-  updatedAt: string
-}
+    if (filter.max_price) {
+      params.set('max_price', filter.max_price)
+    }
 
-export interface CatalogFilters {
-  q?: string
-  categoryIds?: string[]
-  minPrice?: string
-  maxPrice?: string
-  inStock?: boolean
-}
+    if (filter.in_stock !== undefined) {
+      params.set('in_stock', String(filter.in_stock))
+    }
 
-const canonicalUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const queryString = params.toString()
+    const endpoint = queryString ? `/products?${queryString}` : '/products'
+    return apiClient<ProductsResponse>(endpoint)
+  },
 
-export function isCanonicalCategoryId(value: string): boolean {
-  return canonicalUuidPattern.test(value)
-}
+  async listFeaturedProducts(): Promise<ProductsResponse> {
+    return apiClient<ProductsResponse>('/products/featured')
+  },
 
-export async function fetchCategories(): Promise<Brand[]> {
-  const body = await api.get<{ categories: Brand[] }>('/categories')
-  return body.categories
-}
-
-export async function fetchProducts(filters: CatalogFilters = {}): Promise<ProductSummary[]> {
-  const params = new URLSearchParams()
-  const q = filters.q?.trim()
-  if (q) params.set('q', q)
-  for (const categoryId of filters.categoryIds?.filter(isCanonicalCategoryId) ?? []) {
-    if (categoryId) params.append('category_id', categoryId)
-  }
-  if (filters.minPrice) params.set('min_price', filters.minPrice)
-  if (filters.maxPrice) params.set('max_price', filters.maxPrice)
-  if (filters.inStock !== undefined) params.set('in_stock', String(filters.inStock))
-  const query = params.toString()
-  const body = await api.get<{ products: ProductSummary[] }>(`/products${query ? `?${query}` : ''}`)
-  return body.products
-}
-
-export async function fetchFeaturedProducts(): Promise<ProductSummary[]> {
-  const body = await api.get<{ products: ProductSummary[] }>('/products/featured')
-  return body.products
-}
-
-export function fetchProduct(id: string): Promise<ProductDetail> {
-  return api.get<ProductDetail>(`/products/${encodeURIComponent(id)}`)
+  async getProduct(id: string): Promise<ProductDetail> {
+    return apiClient<ProductDetail>(`/products/${id}`)
+  },
 }

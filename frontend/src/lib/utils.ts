@@ -1,0 +1,24 @@
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs))
+}
+
+/**
+ * Format raw VND integer string/number to Vietnamese standard currency format (e.g. "25.990.000 ₫")
+ */
+export function formatVND(amount: string | number | null | undefined): string {
+  if (amount === null || amount === undefined || amount === '') {
+    return '0 ₫'
+  }
+  const numeric = typeof amount === 'number' ? amount : Number(amount)
+  if (isNaN(numeric)) {
+    return `${amount} ₫`
+  }
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(numeric)
+}

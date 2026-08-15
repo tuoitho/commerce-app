@@ -1,32 +1,36 @@
-import { api } from './client'
+import { apiClient } from './client'
+import type { SessionResponse, AuthMeResponse } from './types'
 
-export interface User {
-  id: string
-  email: string
-}
+export const authApi = {
+  async register(email: string, password: string): Promise<SessionResponse> {
+    return apiClient<SessionResponse>('/auth/register', {
+      method: 'POST',
+      body: { email, password },
+    })
+  },
 
-export interface Session {
-  user: User
-  accessToken: string
-}
+  async login(email: string, password: string): Promise<SessionResponse> {
+    return apiClient<SessionResponse>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    })
+  },
 
-export async function register(email: string, password: string): Promise<Session> {
-  return api.post<Session>('/auth/register', { email, password })
-}
+  async refresh(): Promise<SessionResponse> {
+    return apiClient<SessionResponse>('/auth/refresh', {
+      method: 'POST',
+      skipAuthRefresh: true,
+    })
+  },
 
-export async function login(email: string, password: string): Promise<Session> {
-  return api.post<Session>('/auth/login', { email, password })
-}
+  async logout(): Promise<void> {
+    return apiClient<void>('/auth/logout', {
+      method: 'POST',
+      skipAuthRefresh: true,
+    })
+  },
 
-export async function logout(): Promise<void> {
-  await api.post<void>('/auth/logout')
-}
-
-export async function fetchMe(): Promise<User> {
-  const body = await api.get<{ user: User }>('/auth/me')
-  return body.user
-}
-
-export async function refresh(): Promise<Session> {
-  return api.post<Session>('/auth/refresh')
+  async getMe(): Promise<AuthMeResponse> {
+    return apiClient<AuthMeResponse>('/auth/me')
+  },
 }

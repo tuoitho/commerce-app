@@ -1,78 +1,42 @@
-import { api } from './client'
+import { apiClient } from './client'
+import type { CartResponse } from './types'
 
-export type CartAvailability = 'available' | 'unavailable' | 'out_of_stock' | 'insufficient_stock'
+export const cartApi = {
+  async getCart(): Promise<CartResponse> {
+    return apiClient<CartResponse>('/cart')
+  },
 
-export interface CartOption {
-  groupLabel: string
-  valueLabel: string
-}
+  async addItem(variantId: string): Promise<CartResponse> {
+    return apiClient<CartResponse>('/cart/items', {
+      method: 'POST',
+      body: { variantId },
+    })
+  },
 
-export interface CartItem {
-  id: string
-  variantId: string
-  productId: string
-  brandName: string
-  productName: string
-  model: string
-  imageUrl: string
-  options: CartOption[]
-  unitPriceVnd: string | null
-  lineTotalVnd: string | null
-  stockQuantity: bigint
-  quantity: bigint
-  selected: boolean
-  availability: CartAvailability
-}
+  async setQuantity(itemId: string, quantity: number): Promise<CartResponse> {
+    return apiClient<CartResponse>(`/cart/items/${itemId}`, {
+      method: 'PUT',
+      body: { quantity },
+    })
+  },
 
-export interface Cart {
-  items: CartItem[]
-  totalUnits: bigint
-  selectedLineCount: number
-  selectedTotalVnd: string
-}
+  async setSelection(itemId: string, selected: boolean): Promise<CartResponse> {
+    return apiClient<CartResponse>(`/cart/items/${itemId}/selection`, {
+      method: 'PATCH',
+      body: { selected },
+    })
+  },
 
-export interface CartApi {
-  fetchCart(): Promise<Cart>
-  addVariant(variantId: string): Promise<Cart>
-  setQuantity(itemId: string, quantity: bigint): Promise<Cart>
-  setSelected(itemId: string, selected: boolean): Promise<Cart>
-  setAllSelected(selected: boolean): Promise<Cart>
-  remove(itemId: string): Promise<Cart>
-}
+  async setAllSelection(selected: boolean): Promise<CartResponse> {
+    return apiClient<CartResponse>('/cart/selection', {
+      method: 'PUT',
+      body: { selected },
+    })
+  },
 
-const unwrap = (body: { cart: Cart }) => body.cart
-
-export function createCartApi(request = api): CartApi {
-  return {
-    fetchCart: () => request.get<{ cart: Cart }>('/cart').then(unwrap),
-    addVariant: (variantId) => request.post<{ cart: Cart }>('/cart/items', { variantId }).then(unwrap),
-    setQuantity: (itemId, quantity) => request.put<{ cart: Cart }>(`/cart/items/${encodeURIComponent(itemId)}`, { quantity }).then(unwrap),
-    setSelected: (itemId, selected) => request.patch<{ cart: Cart }>(`/cart/items/${encodeURIComponent(itemId)}/selection`, { selected }).then(unwrap),
-    setAllSelected: (selected) => request.put<{ cart: Cart }>('/cart/selection', { selected }).then(unwrap),
-    remove: (itemId) => request.delete<{ cart: Cart }>(`/cart/items/${encodeURIComponent(itemId)}`).then(unwrap),
-  }
-}
-
-export function fetchCart(): Promise<Cart> {
-  return createCartApi().fetchCart()
-}
-
-export function addVariant(variantId: string): Promise<Cart> {
-  return createCartApi().addVariant(variantId)
-}
-
-export function setQuantity(itemId: string, quantity: bigint): Promise<Cart> {
-  return createCartApi().setQuantity(itemId, quantity)
-}
-
-export function setSelected(itemId: string, selected: boolean): Promise<Cart> {
-  return createCartApi().setSelected(itemId, selected)
-}
-
-export function setAllSelected(selected: boolean): Promise<Cart> {
-  return createCartApi().setAllSelected(selected)
-}
-
-export function remove(itemId: string): Promise<Cart> {
-  return createCartApi().remove(itemId)
+  async removeItem(itemId: string): Promise<CartResponse> {
+    return apiClient<CartResponse>(`/cart/items/${itemId}`, {
+      method: 'DELETE',
+    })
+  },
 }

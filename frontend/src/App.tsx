@@ -1,43 +1,48 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { ToastProvider } from '@/context/ToastContext'
+import { AuthProvider } from '@/context/AuthContext'
+import { CartProvider } from '@/context/CartContext'
+import { Header } from '@/components/Header'
+import { Footer } from '@/components/Footer'
+import { HomePage } from '@/pages/HomePage'
+import { CatalogPage } from '@/pages/CatalogPage'
+import { ProductDetailPage } from '@/pages/ProductDetailPage'
+import { CartPage } from '@/pages/CartPage'
+import { LoginPage } from '@/pages/LoginPage'
+import { RegisterPage } from '@/pages/RegisterPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 
-import { AuthProvider } from './auth/AuthProvider'
-import { CartProvider } from './cart/CartProvider'
-import ProtectedRoute from './components/ProtectedRoute'
-import SiteHeader from './components/SiteHeader'
-import CatalogPage from './pages/CatalogPage'
-import CartPage from './pages/CartPage'
-import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
-import NotFoundPage from './pages/NotFoundPage'
-import ProductDetailPage from './pages/ProductDetailPage'
-import RegisterPage from './pages/RegisterPage'
-
-export function AppRoutes() {
+export function AppContent() {
   return (
-    <>
-      <SiteHeader />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/products" element={<CatalogPage />} />
-        <Route path="/products/:id" element={<ProductDetailPage />} />
-        <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </>
+    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 selection:bg-emerald-600 selection:text-white">
+      <Header />
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products" element={<CatalogPage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
   )
 }
 
-function App() {
+export function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <CartProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </CartProvider>
+      </AuthProvider>
+    </ToastProvider>
   )
 }
 
