@@ -40,8 +40,13 @@ Check:
    material boundaries, interfaces, data, error, and migration decisions.
 3. Tasks cover every requirement and acceptance criterion with deterministic
    verification.
-4. Task order respects dependencies and stabilizes contracts before dependent
-   work.
+4. Task dependencies correctly distinguish shared-contract dependencies from
+   implementation dependencies.
+
+   Shared contracts required across independently implemented boundaries are
+   stabilized before dependent work is dispatched. Once stable, producers and
+   consumers do not depend on one another merely to discover or negotiate the
+   contract through implementation.
 5. Explicitly referenced paths, interfaces, commands, and expected outcomes are
    internally consistent and compatible with the repository.
 6. The artifacts contain no contradictions, placeholders, or unresolved
@@ -81,6 +86,31 @@ Check:
    Verify that requirements, design, and tasks preserve the same behavioral
    assumptions and do not silently weaken, reinterpret, or omit behavior across
    phases.
+9. Shared contract and dependency integrity.
+
+   When independently implemented work units rely on a shared boundary, verify
+   that:
+
+   - the specification identifies one canonical source for each material shared
+     contract;
+   - all relevant producers and consumers derive their behavior from that
+     canonical contract;
+   - no implementation task is treated as the source of truth for another when
+     both should consume the approved contract;
+   - the contract fixes all decisions required for independent implementation
+     without further negotiation; and
+   - task-to-task dependencies represent genuine implementation prerequisites,
+     not accidental execution order.
+
+   A shared contract may be an HTTP, GraphQL, or RPC contract; gRPC/protobuf
+   schema; event or command schema; public module, package, service, or function
+   interface; persisted cross-boundary format; migration contract; or another
+   binding interface, invariant, or compatibility guarantee.
+
+   Do not require a standalone or machine-readable contract artifact when the
+   approved specification already defines the boundary precisely enough. Do not
+   require a shared contract when the work is confined to one implementation
+   boundary and no independently implemented consumer relies on it.
 
 Do not flag wording preferences, formatting, or optional enhancements.
 

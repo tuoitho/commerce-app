@@ -40,7 +40,7 @@ reconciling them.
    explicit user approval. Stop and wait.
 7. After approval, load `task-breakdown` and create or revise `tasks.md`.
 8. Dispatch one fresh reviewer subagent. Tell it to load
-   `reviewing-feature-spec`, pass all three artifact paths, and perform the
+   `reviewing-feature-spec` skill, pass all three artifact paths, and perform the
    single broad independent specification review.
 9. If the review reports blocking findings, enter the bounded specification
    repair loop. Allow at most three review rounds total, including the initial
@@ -83,6 +83,11 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
   specification.
 - Do not proceed through a material user decision without using the `question`
   tool.
+- When independently implemented work crosses a shared boundary, require the
+  design to stabilize every material shared contract before tasks treat those
+  work units as independently executable.
+- Do not require a separate shared-contract artifact for single-boundary work
+  or when the approved design already defines the boundary precisely enough.
 - Keep each feature focused enough for one implementation lifecycle.
 - Write requirements, design, and user-facing spec responses in the user's
   language when possible.

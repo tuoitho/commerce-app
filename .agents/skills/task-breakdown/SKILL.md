@@ -101,15 +101,15 @@ Cohesion and reviewability govern task size.
 
 - Map every granular acceptance criterion to at least one leaf task using
   `_Requirements: 1.1, 2.3_`.
-- Order tasks by dependency and stabilize shared contracts before dependent
-  consumers.
+- Order tasks by genuine implementation dependency. Stabilize material shared
+  contracts before work units that consume them are dispatched.
 - Prefer incremental vertical slices that leave the repository in a coherent,
   testable state.
 - Include concrete files, components, or bounded areas when known, but treat
   them as scope guidance rather than mandatory line-level edits unless the
   approved design requires exact placement.
-- State important `Consumes` and `Produces` contracts when neighboring tasks
-  depend on one another.
+- State important `Consumes` and `Produces` contracts and implementation
+  prerequisites.
 - Include enough implementation direction to execute without inventing
   architecture, but do not duplicate design detail.
 - Do not prescribe private helper structure, local algorithms, exact line
@@ -125,6 +125,39 @@ Cohesion and reviewability govern task size.
 - Do not invent behavior or architecture absent from approved artifacts.
 - Do not leave placeholders, vague instructions, unresolved interfaces, or
   open design decisions.
+
+## Shared Contracts And Task Dependencies
+
+A task dependency must represent a real execution dependency, not merely an
+implementation order.
+
+When independently implemented work units communicate through or rely on a
+shared boundary, identify the canonical contract that governs that boundary.
+Shared contracts may include, when applicable:
+
+- HTTP, GraphQL, or RPC request/response contracts;
+- gRPC/protobuf services and messages;
+- events, commands, schemas, and delivery semantics;
+- public module, package, service, or function interfaces;
+- persisted formats, schemas, or migration contracts relied on across
+  independently implemented boundaries;
+- other cross-boundary formats, invariants, or compatibility guarantees.
+
+When the approved design already fixes a shared contract:
+
+- make producer and consumer tasks consume that canonical contract;
+- do not make one implementation task the source of truth for another merely
+  because it executes first;
+- do not serialize otherwise independent work solely so a later task can
+  discover the contract from earlier implementation.
+
+Use a task-to-task dependency only when the earlier task produces concrete
+implementation state required by the later task, such as generated bindings,
+schema migrations, reusable infrastructure, or an implemented internal
+component that the later task genuinely requires.
+
+Do not invent shared contracts for work confined to one implementation
+boundary with no independently implemented consumer.
 
 ## Quality Gate
 

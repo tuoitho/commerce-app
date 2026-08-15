@@ -61,6 +61,30 @@ The six sections `Overview`, `Architecture`, `Components And Interfaces`,
 Add diagrams, compatibility, migration, alternatives, and traceability sections
 when applicable.
 
+## Shared Boundaries
+
+When multiple independently implemented components communicate through a
+boundary, define the material contract at that boundary before specifying their
+independent implementation.
+
+Specify only what compatible implementation requires, such as:
+
+- operations or messages;
+- field names and types;
+- required, optional, nullable, and empty semantics;
+- accepted values and defaults;
+- validation and error behavior;
+- delivery, ordering, and idempotency semantics when materially applicable;
+- versioning or compatibility guarantees when required.
+
+Choose the representation appropriate to the system. Document a contract
+directly in the design or reference an approved canonical artifact such as
+OpenAPI, protobuf, GraphQL schema, event schema, or another binding interface
+definition.
+
+Do not introduce a shared contract where no cross-boundary agreement between
+independently implemented work units is needed.
+
 ## Rules
 
 - Design only what approved requirements need; apply YAGNI.

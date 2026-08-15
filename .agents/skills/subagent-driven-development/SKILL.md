@@ -22,8 +22,9 @@ When a `.kiro/specs/<feature>/` specification governs the work,
 `requirements.md`, `design.md`, and `tasks.md` are the source of truth. Use
 `tasks.md` as `PLAN_FILE`
 
-Before dispatching dependent implementation work, confirm shared contracts are
-stable, including:
+Before dispatching work across independently implemented boundaries, confirm
+that every material shared contract required by those work units is stable,
+including, when applicable:
 
 - API and message schemas
 - function or service interfaces
@@ -31,9 +32,12 @@ stable, including:
 - error semantics
 - compatibility and migration decisions
 
-Do not parallelize producers and consumers while they still need to negotiate
-these contracts. Stabilize the contract task first, then dispatch only work
-units that are independently executable.
+A stable contract lets the work units be implemented correctly without
+discovering or negotiating additional boundary behavior from one another's
+implementation. Do not dispatch producer and consumer work independently while
+the boundary still requires negotiation. Once the contract is stable, treat
+producer and consumer implementation as independent unless a genuine
+implementation dependency exists.
 
 Each implementer brief contains only:
 
@@ -42,6 +46,12 @@ Each implementer brief contains only:
 - applicable repository instructions
 - stable interfaces and contract references
 - exact report and verification expectations
+
+When a task consumes a stable shared contract, point the implementer to its
+canonical source. Do not tell an implementer to infer that contract from
+another task's implementation or from current implementation state when the
+approved specification governs it. Current repository state remains
+authoritative for implementation details that the specification does not fix.
 
 Do not send unrelated change history or the entire feature specification when a
 scoped artifact reference is sufficient. If implementation uncovers a material
