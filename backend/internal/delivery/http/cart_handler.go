@@ -49,7 +49,7 @@ type selectionRequest struct {
 
 func (h *cartHandler) Get(c *gin.Context) {
 	cart, err := h.uc.Get(c, callerUserID(c))
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "")
 }
 
 func (h *cartHandler) AddItem(c *gin.Context) {
@@ -58,7 +58,7 @@ func (h *cartHandler) AddItem(c *gin.Context) {
 		return
 	}
 	cart, err := h.uc.AddVariant(c, callerUserID(c), req.VariantID)
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "Đã thêm sản phẩm vào giỏ hàng")
 }
 
 func (h *cartHandler) SetQuantity(c *gin.Context) {
@@ -67,7 +67,7 @@ func (h *cartHandler) SetQuantity(c *gin.Context) {
 		return
 	}
 	cart, err := h.uc.SetQuantity(c, callerUserID(c), c.Param("itemId"), req.Quantity)
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "Đã cập nhật số lượng")
 }
 
 func (h *cartHandler) SetSelection(c *gin.Context) {
@@ -76,7 +76,7 @@ func (h *cartHandler) SetSelection(c *gin.Context) {
 		return
 	}
 	cart, err := h.uc.SetSelected(c, callerUserID(c), c.Param("itemId"), req.Selected)
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "Đã cập nhật lựa chọn")
 }
 
 func (h *cartHandler) SetAllSelection(c *gin.Context) {
@@ -85,12 +85,12 @@ func (h *cartHandler) SetAllSelection(c *gin.Context) {
 		return
 	}
 	cart, err := h.uc.SetAllSelected(c, callerUserID(c), req.Selected)
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "Đã cập nhật tất cả lựa chọn")
 }
 
 func (h *cartHandler) RemoveItem(c *gin.Context) {
 	cart, err := h.uc.Remove(c, callerUserID(c), c.Param("itemId"))
-	h.respond(c, cart, err)
+	h.respond(c, cart, err, "Đã xóa sản phẩm khỏi giỏ hàng")
 }
 
 func bindCartJSON(c *gin.Context, value any) bool {
@@ -101,12 +101,12 @@ func bindCartJSON(c *gin.Context, value any) bool {
 	return true
 }
 
-func (h *cartHandler) respond(c *gin.Context, cart *domain.Cart, err error) {
+func (h *cartHandler) respond(c *gin.Context, cart *domain.Cart, err error, message string) {
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"cart": toCartResponse(cart)})
+	writeSuccess(c, http.StatusOK, message, toCartResponse(cart))
 }
 
 func toCartResponse(cart *domain.Cart) cartResponse {

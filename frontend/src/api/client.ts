@@ -1,11 +1,17 @@
-import { ApiError, type ApiErrorResponse } from './types'
+import { ApiError, type ApiResponseEnvelope, type ApiResponseMeta, type ApiErrorDetail } from './types'
 import { tokenStore } from './tokenStore'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
-interface RequestOptions extends Omit<RequestInit, 'body'> {
+export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
   skipAuthRefresh?: boolean
+}
+
+export interface ApiResponseWithMeta<T> {
+  data: T
+  meta: ApiResponseMeta
+  message: string
 }
 
 let isRefreshing = false
@@ -28,9 +34,10 @@ async function refreshAccessToken(): Promise<string | null> {
         return null
       }
       const data = await res.json()
-      if (data.accessToken) {
-        tokenStore.setToken(data.accessToken)
-        return data.accessToken
+      const token = data?.data?.accessToken || data?.accessToken
+      if (token) {
+        tokenStore.setToken(token)
+        return token
       }
       tokenStore.clearToken()
       return null
@@ -45,7 +52,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise
 }
 
-export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function fetchEnvelope<T>(path: string, options: RequestOptions = {}): Promise<ApiResponseEnvelope<T>> {
   const { body, headers = {}, skipAuthRefresh = false, ...rest } = options
 
   const formattedPath = path.startsWith('/') ? path : `/${path}`
@@ -87,22 +94,63 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     }
   }
 
-  if (!response.ok) {
-    let errorDetail = { code: 'unknown_error', message: `Request failed with status ${response.status}` }
-    try {
-      const errorJson: ApiErrorResponse = await response.json()
-      if (errorJson?.error) {
-        errorDetail = errorJson.error
-      }
-    } catch {
-      // Body not JSON
-    }
-    throw new ApiError(response.status, errorDetail)
-  }
-
   if (response.status === 204) {
-    return {} as T
+    return {
+      success: true,
+      message: '',
+      data: {} as T,
+      error: null,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 
-  return response.json() as Promise<T>
+  let json: ApiResponseEnvelope<T> | null = null
+  try {
+    json = await response.json()
+  } catch {
+    // Body not JSON
+  }
+
+  if (!response.ok || (json && json.success === false)) {
+    let errorDetail: ApiErrorDetail = {
+      code: 'unknown_error',
+      message: `Request failed with status ${response.status}`,
+    }
+    let message: string | undefined
+
+    if (json?.error) {
+      errorDetail = json.error
+      message = json.message || json.error.message
+    } else if (json?.message) {
+      errorDetail = { code: 'unknown_error', message: json.message }
+      message = json.message
+    }
+
+    throw new ApiError(response.status, errorDetail, message)
+  }
+
+  if (!json) {
+    throw new ApiError(response.status, {
+      code: 'invalid_response',
+      message: 'Invalid JSON response from server',
+    })
+  }
+
+  return json
+}
+
+export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const envelope = await fetchEnvelope<T>(path, options)
+  return envelope.data as T
+}
+
+export async function apiClientWithMeta<T>(path: string, options: RequestOptions = {}): Promise<ApiResponseWithMeta<T>> {
+  const envelope = await fetchEnvelope<T>(path, options)
+  return {
+    data: envelope.data as T,
+    meta: envelope.meta,
+    message: envelope.message,
+  }
 }

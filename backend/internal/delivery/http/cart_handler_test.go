@@ -109,14 +109,19 @@ func TestCartHTTP_AllRoutesReturnFullCart(t *testing.T) {
 			t.Fatalf("%s %s: status=%d body=%s", route.method, route.path, w.Code, w.Body.String())
 		}
 		var body struct {
-			Cart cartResponse `json:"cart"`
+			Success bool         `json:"success"`
+			Message string       `json:"message"`
+			Data    cartResponse `json:"data"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Cart.Items) != 1 || body.Cart.SelectedTotalVND != "2400000" {
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Data.Items) != 1 || body.Data.SelectedTotalVND != "2400000" {
 			t.Fatalf("bad cart response: %s", w.Body.String())
 		}
-		item := body.Cart.Items[0]
-		if item.BrandName != "Brand" || item.Options[0].GroupLabel != "Color" || item.UnitPriceVND == nil || *item.UnitPriceVND != "1200000" || item.LineTotalVND == nil || *item.LineTotalVND != "2400000" || item.Availability != string(domain.CartAvailable) || body.Cart.TotalUnits != 2 || body.Cart.SelectedLineCount != 1 {
-			t.Fatalf("incomplete cart wire response: %+v", body.Cart)
+		if !body.Success {
+			t.Fatalf("expected success: true, got false")
+		}
+		item := body.Data.Items[0]
+		if item.BrandName != "Brand" || item.Options[0].GroupLabel != "Color" || item.UnitPriceVND == nil || *item.UnitPriceVND != "1200000" || item.LineTotalVND == nil || *item.LineTotalVND != "2400000" || item.Availability != string(domain.CartAvailable) || body.Data.TotalUnits != 2 || body.Data.SelectedLineCount != 1 {
+			t.Fatalf("incomplete cart wire response: %+v", body.Data)
 		}
 	}
 	if repo.user != cartTestUser {
@@ -159,13 +164,13 @@ func TestCartHTTP_MapsEveryAvailabilityValue(t *testing.T) {
 		router, token := newCartTestRouter(&httpCartRepo{cart: cart})
 		w := cartRequest(router, token, http.MethodGet, "/api/v1/cart", "")
 		var body struct {
-			Cart cartResponse `json:"cart"`
+			Data cartResponse `json:"data"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Cart.Items) != 1 || body.Cart.Items[0].Availability != string(availability) {
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Data.Items) != 1 || body.Data.Items[0].Availability != string(availability) {
 			t.Fatalf("availability=%s body=%s", availability, w.Body.String())
 		}
-		if (body.Cart.Items[0].UnitPriceVND == nil) != (availability == domain.CartOutOfStock || availability == domain.CartUnavailable) {
-			t.Fatalf("availability=%s price=%v", availability, body.Cart.Items[0].UnitPriceVND)
+		if (body.Data.Items[0].UnitPriceVND == nil) != (availability == domain.CartOutOfStock || availability == domain.CartUnavailable) {
+			t.Fatalf("availability=%s price=%v", availability, body.Data.Items[0].UnitPriceVND)
 		}
 	}
 }
@@ -185,9 +190,7 @@ func TestCartHTTP_ValidationAuthIsolationAndStableErrors(t *testing.T) {
 	}
 	for _, tc := range checks {
 		w := cartRequest(router, tc.token, tc.method, tc.path, tc.body)
-		var body struct {
-			Error errorBodyDetail `json:"error"`
-		}
+		var body ResponseEnvelope
 		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 			t.Fatal(err)
 		}
@@ -223,7 +226,7 @@ func TestCartHTTP_StableRouteErrors(t *testing.T) {
 		router := gin.New()
 		NewRouter(router, Dependencies{Cart: cartuc.New(cartuc.Dependencies{Cart: repo}), JWT: manager})
 		w := cartRequest(router, cartToken(manager, cartTestUser), tc.method, tc.path, tc.body)
-		var body errorBody
+		var body ResponseEnvelope
 		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || w.Code != tc.status || body.Error.Code != tc.code {
 			t.Fatalf("%s: status=%d code=%s body=%s", tc.name, w.Code, body.Error.Code, w.Body.String())
 		}
@@ -240,7 +243,7 @@ func TestCartHTTP_RejectsMalformedBodiesAcrossMutations(t *testing.T) {
 	router, token := newCartTestRouter(&httpCartRepo{})
 	for _, tc := range cases {
 		w := cartRequest(router, token, tc.method, tc.path, tc.body)
-		var body errorBody
+		var body ResponseEnvelope
 		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || w.Code != http.StatusBadRequest || body.Error.Code != "validation_error" {
 			t.Fatalf("%s %s: status=%d code=%s body=%s", tc.method, tc.path, w.Code, body.Error.Code, w.Body.String())
 		}
@@ -257,7 +260,7 @@ func TestCartHTTP_RejectsInvalidUUIDsAcrossItemRoutes(t *testing.T) {
 	router, token := newCartTestRouter(&httpCartRepo{})
 	for _, tc := range cases {
 		w := cartRequest(router, token, tc.method, tc.path, tc.body)
-		var body errorBody
+		var body ResponseEnvelope
 		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || w.Code != http.StatusBadRequest || body.Error.Code != "validation_error" {
 			t.Fatalf("%s %s: status=%d code=%s body=%s", tc.method, tc.path, w.Code, body.Error.Code, w.Body.String())
 		}

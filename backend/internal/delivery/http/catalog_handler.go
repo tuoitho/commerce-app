@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -87,23 +88,55 @@ func (h *catalogHandler) ListCategories(c *gin.Context) {
 	for _, cat := range categories {
 		out = append(out, categoryResponse{ID: cat.ID, Name: cat.Name})
 	}
-	c.JSON(http.StatusOK, gin.H{"categories": out})
+	writeSuccess(c, http.StatusOK, "", out)
 }
 
 func (h *catalogHandler) ListProducts(c *gin.Context) {
 	minPrice, minPriceSet := c.GetQuery("min_price")
 	maxPrice, maxPriceSet := c.GetQuery("max_price")
-	if (minPriceSet && minPrice == "") || (maxPriceSet && maxPrice == "") {
-		fields := map[string]string{}
-		if minPriceSet && minPrice == "" {
-			fields["min_price"] = "must not be empty"
+	pageStr, pageSet := c.GetQuery("page")
+	limitStr, limitSet := c.GetQuery("limit")
+
+	fields := map[string]string{}
+	if minPriceSet && minPrice == "" {
+		fields["min_price"] = "must not be empty"
+	}
+	if maxPriceSet && maxPrice == "" {
+		fields["max_price"] = "must not be empty"
+	}
+
+	var page, limit int
+	if pageSet {
+		if pageStr == "" {
+			fields["page"] = "must not be empty"
+		} else {
+			p, err := strconv.Atoi(pageStr)
+			if err != nil || p < 1 {
+				fields["page"] = "must be a positive integer"
+			} else {
+				page = p
+			}
 		}
-		if maxPriceSet && maxPrice == "" {
-			fields["max_price"] = "must not be empty"
+	}
+
+	if limitSet {
+		if limitStr == "" {
+			fields["limit"] = "must not be empty"
+		} else {
+			l, err := strconv.Atoi(limitStr)
+			if err != nil || l < 1 || l > 100 {
+				fields["limit"] = "must be a positive integer between 1 and 100"
+			} else {
+				limit = l
+			}
 		}
+	}
+
+	if len(fields) > 0 {
 		writeError(c, domain.NewFilterValidationError(fields))
 		return
 	}
+
 	filter := domain.ProductFilter{
 		Query:       c.Query("q"),
 		CategoryIDs: c.QueryArray("category_id"),
@@ -133,7 +166,44 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 	for _, p := range products {
 		out = append(out, toSummaryResponse(p))
 	}
-	c.JSON(http.StatusOK, gin.H{"products": out})
+
+	if pageSet || limitSet {
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 {
+			limit = 6
+		}
+		total := len(out)
+		totalPages := 0
+		if total > 0 {
+			totalPages = (total + limit - 1) / limit
+		}
+		offset := (page - 1) * limit
+		var pageItems []productSummaryResponse
+		if offset < total {
+			end := offset + limit
+			if end > total {
+				end = total
+			}
+			pageItems = out[offset:end]
+		} else {
+			pageItems = []productSummaryResponse{}
+		}
+
+		pagination := PaginationMeta{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: totalPages,
+			HasNext:    page < totalPages,
+			HasPrev:    page > 1,
+		}
+		writePaginatedSuccess(c, http.StatusOK, "", pageItems, pagination)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "", out)
 }
 
 func moneyQuery(value string) *domain.MoneyVND {
@@ -154,7 +224,7 @@ func (h *catalogHandler) ListFeaturedProducts(c *gin.Context) {
 	for _, p := range products {
 		out = append(out, toSummaryResponse(p))
 	}
-	c.JSON(http.StatusOK, gin.H{"products": out})
+	writeSuccess(c, http.StatusOK, "", out)
 }
 
 func (h *catalogHandler) GetProduct(c *gin.Context) {
@@ -163,7 +233,7 @@ func (h *catalogHandler) GetProduct(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toDetailResponse(*product))
+	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product))
 }
 
 func toSummaryResponse(p domain.Product) productSummaryResponse {

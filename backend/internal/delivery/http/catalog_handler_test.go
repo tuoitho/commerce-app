@@ -114,12 +114,13 @@ func newCatalogTestRouterWithPhone(t *testing.T, includePhone bool) *gin.Engine 
 func decodeProducts(t *testing.T, w *httptest.ResponseRecorder) []productSummaryResponse {
 	t.Helper()
 	var body struct {
-		Products []productSummaryResponse `json:"products"`
+		Success bool                     `json:"success"`
+		Data    []productSummaryResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	return body.Products
+	return body.Data
 }
 
 func assertErrorEnvelope(t *testing.T, w *httptest.ResponseRecorder, status int, code string, field string) {
@@ -127,14 +128,17 @@ func assertErrorEnvelope(t *testing.T, w *httptest.ResponseRecorder, status int,
 	if w.Code != status {
 		t.Fatalf("status = %d, want %d, body = %s", w.Code, status, w.Body.String())
 	}
-	var eb errorBody
+	var eb ResponseEnvelope
 	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
 		t.Fatal(err)
 	}
-	if eb.Error.Code != code {
-		t.Fatalf("code = %q, want %q", eb.Error.Code, code)
+	if eb.Success {
+		t.Fatalf("expected success = false, got true")
 	}
-	if field != "" && eb.Error.Fields[field] == "" {
+	if eb.Error == nil || eb.Error.Code != code {
+		t.Fatalf("code = %v, want %q", eb.Error, code)
+	}
+	if field != "" && (eb.Error.Fields == nil || eb.Error.Fields[field] == "") {
 		t.Fatalf("expected field %q in error, got %+v", field, eb.Error)
 	}
 }
@@ -280,7 +284,7 @@ func TestCatalog_ListProductsReversedRange(t *testing.T) {
 	router := newCatalogTestRouter(t)
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?min_price=50&max_price=10", nil)
 	assertErrorEnvelope(t, w, http.StatusBadRequest, "invalid_filter", "min_price")
-	var eb errorBody
+	var eb ResponseEnvelope
 	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
 		t.Fatal(err)
 	}
@@ -310,6 +314,61 @@ func TestCatalog_ListProductsRepeatedCategoriesAndVNDContract(t *testing.T) {
 	}
 }
 
+func TestCatalog_ListProductsPagination(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?page=1&limit=2", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Success bool                     `json:"success"`
+		Data    []productSummaryResponse `json:"data"`
+		Meta    ResponseMeta             `json:"meta"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Success || len(resp.Data) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(resp.Data))
+	}
+	if resp.Meta.Pagination == nil {
+		t.Fatalf("expected pagination meta, got nil")
+	}
+	p := resp.Meta.Pagination
+	if p.Page != 1 || p.Limit != 2 || p.Total != 3 || p.TotalPages != 2 || !p.HasNext || p.HasPrev {
+		t.Fatalf("unexpected pagination meta: %+v", p)
+	}
+
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?page=2&limit=2", nil)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("status = %d", w2.Code)
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 item on page 2, got %d", len(resp.Data))
+	}
+	if resp.Meta.Pagination.HasNext || !resp.Meta.Pagination.HasPrev {
+		t.Fatalf("unexpected page 2 pagination flags: %+v", resp.Meta.Pagination)
+	}
+}
+
+func TestCatalog_ListProductsInvalidPagination(t *testing.T) {
+	router := newCatalogTestRouter(t)
+	w1, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?page=0", nil)
+	assertErrorEnvelope(t, w1, http.StatusBadRequest, "invalid_filter", "page")
+
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?page=abc", nil)
+	assertErrorEnvelope(t, w2, http.StatusBadRequest, "invalid_filter", "page")
+
+	w3, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?limit=-1", nil)
+	assertErrorEnvelope(t, w3, http.StatusBadRequest, "invalid_filter", "limit")
+
+	w4, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?limit=200", nil)
+	assertErrorEnvelope(t, w4, http.StatusBadRequest, "invalid_filter", "limit")
+}
+
 func TestCatalog_ListFeaturedWithoutAuth(t *testing.T) {
 	router := newCatalogTestRouterWithPhone(t, true)
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/featured", nil)
@@ -328,10 +387,13 @@ func TestCatalog_GetProductDetailVariants(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
-	var detail productDetailResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+	var env struct {
+		Data productDetailResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
+	detail := env.Data
 	if !detail.Featured || detail.Model != "P-1" || detail.MinPriceVND == "" || len(detail.OptionGroups) != 1 || len(detail.Variants) != 1 {
 		t.Fatalf("unexpected phone detail: %+v", detail)
 	}
@@ -347,16 +409,16 @@ func TestCatalog_ListCategories(t *testing.T) {
 		t.Fatalf("status = %d", w.Code)
 	}
 	var body struct {
-		Categories []categoryResponse `json:"categories"`
+		Data []categoryResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Categories) != 2 {
-		t.Fatalf("len = %d", len(body.Categories))
+	if len(body.Data) != 2 {
+		t.Fatalf("len = %d", len(body.Data))
 	}
-	if body.Categories[0].Name != "Books" || body.Categories[1].Name != "Electronics" {
-		t.Fatalf("unexpected order: %+v", body.Categories)
+	if body.Data[0].Name != "Books" || body.Data[1].Name != "Electronics" {
+		t.Fatalf("unexpected order: %+v", body.Data)
 	}
 }
 
@@ -366,10 +428,13 @@ func TestCatalog_GetProductDetail(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
-	var detail productDetailResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+	var env struct {
+		Data productDetailResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
+	detail := env.Data
 	if detail.Name != "Wireless Mouse" || detail.Description == "" || detail.Price != "24.99" || detail.Currency != "USD" {
 		t.Fatalf("unexpected detail: %+v", detail)
 	}
@@ -384,10 +449,13 @@ func TestCatalog_GetProductDetail(t *testing.T) {
 func TestCatalog_GetProductOutOfStock(t *testing.T) {
 	router := newCatalogTestRouter(t)
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/"+productKeyboard, nil)
-	var detail productDetailResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+	var env struct {
+		Data productDetailResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
+	detail := env.Data
 	if detail.StockQuantity != 0 || detail.InStock {
 		t.Fatalf("expected out-of-stock detail: %+v", detail)
 	}

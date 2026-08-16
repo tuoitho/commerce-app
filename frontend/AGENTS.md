@@ -3,8 +3,9 @@
 ## Architecture
 
 * `src/main.tsx` mounts `App.tsx`; `App.tsx` owns the router, `AuthProvider`, shared header, and route table.
-* Keep endpoint-specific calls and wire types in `src/api/`.
-* All requests must go through `src/api/client.ts` so credentials, bearer tokens, one-time 401 refresh, and `ApiError` handling remain consistent.
+* Keep endpoint-specific calls and wire types in `src/api/`. Domain API service modules (`src/api/catalog.ts`, `auth.ts`, `cart.ts`) return direct payloads (`Promise<Category[]>`, `Promise<ProductSummary[]>`, `Promise<ProductDetail>`, `Promise<Cart>`, `Promise<User>`).
+* All requests must go through `src/api/client.ts` (`apiClient` for auto-unwrapped direct data `T`, or `apiClientWithMeta` for `{ data, meta, message }`) so credentials, bearer tokens, one-time 401 refresh, and `ApiError` handling remain consistent.
+* Handle errors via `ApiError`: use `err.isValidationError()` to bind `err.fields` to form inputs, and `err.isBusinessError()` / `err.message` for user-facing `sonner` toasts or alerts.
 * The access token is persisted by `src/api/tokenStore.ts`; session restoration uses the httpOnly refresh cookie through `AuthProvider`.
 * Styling is centralized in `src/index.css`; preserve its existing responsive breakpoints when changing layouts.
 

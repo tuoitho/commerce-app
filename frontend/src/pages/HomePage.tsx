@@ -56,8 +56,8 @@ export function HomePage() {
         catalogApi.listFeaturedProducts(),
         catalogApi.listCategories(),
       ])
-      setFeaturedProducts(featRes.products || [])
-      setCategories(catRes.categories || [])
+      setFeaturedProducts(featRes || [])
+      setCategories(catRes || [])
     } catch (err) {
       console.error(err)
       setError('Không thể tải dữ liệu sản phẩm nổi bật. Vui lòng thử lại.')

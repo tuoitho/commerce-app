@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { SessionResponse, AuthMeResponse } from './types'
+import type { SessionResponse, User } from './types'
 
 export const authApi = {
   async register(email: string, password: string): Promise<SessionResponse> {
@@ -30,7 +30,7 @@ export const authApi = {
     })
   },
 
-  async getMe(): Promise<AuthMeResponse> {
-    return apiClient<AuthMeResponse>('/auth/me')
+  async getMe(): Promise<User> {
+    return apiClient<User>('/auth/me')
   },
 }

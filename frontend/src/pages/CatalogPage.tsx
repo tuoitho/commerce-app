@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback, useMemo, type FormEvent } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Search, SlidersHorizontal, RefreshCw, X, PackageSearch, Smartphone, ChevronRight, Zap } from 'lucide-react'
+import { Search, SlidersHorizontal, RefreshCw, X, PackageSearch, Smartphone, ChevronRight, ChevronLeft, Zap } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
-import type { ProductSummary, Category } from '@/api/types'
+import type { ProductSummary, Category, PaginationMeta } from '@/api/types'
 import { ProductCard } from '@/components/ProductCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from '@/components/EmptyState'
+
+const PAGE_SIZE = 6
 
 const PRICE_PRESETS = [
   { label: 'Dưới 5 triệu', min: '', max: '5000000' },
@@ -17,11 +19,39 @@ const PRICE_PRESETS = [
   { label: 'Trên 20 triệu', min: '20000000', max: '' },
 ]
 
+function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1)
+  }
+  const pages: (number | 'ellipsis')[] = [1]
+  if (currentPage > 3) {
+    pages.push('ellipsis')
+  }
+  const start = Math.max(2, currentPage - 1)
+  const end = Math.min(totalPages - 1, currentPage + 1)
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  if (currentPage < totalPages - 2) {
+    pages.push('ellipsis')
+  }
+  pages.push(totalPages)
+  return pages
+}
+
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [products, setProducts] = useState<ProductSummary[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -33,6 +63,10 @@ export function CatalogPage() {
   const queryMinPrice = searchParams.get('min_price') || ''
   const queryMaxPrice = searchParams.get('max_price') || ''
   const queryInStock = searchParams.get('in_stock') === 'true'
+
+  // Current page derived from URL
+  const pageParam = parseInt(searchParams.get('page') || '1', 10)
+  const currentPage = Number.isInteger(pageParam) && pageParam >= 1 ? pageParam : 1
 
   // Local inputs
   const [searchInput, setSearchInput] = useState(querySearch)
@@ -56,30 +90,45 @@ export function CatalogPage() {
   useEffect(() => {
     catalogApi
       .listCategories()
-      .then((res) => setCategories(res.categories || []))
+      .then((res) => setCategories(res || []))
       .catch((err) => console.error('Failed to load categories', err))
   }, [])
 
-  // Fetch Products based on URL query
+  // Fetch Products based on URL query and backend pagination
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await catalogApi.listProducts({
+      const res = await catalogApi.listProductsWithMeta({
         q: querySearch || undefined,
         category_id: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
         min_price: queryMinPrice || undefined,
         max_price: queryMaxPrice || undefined,
         in_stock: queryInStock ? 'true' : undefined,
+        page: currentPage,
+        limit: PAGE_SIZE,
       })
-      setProducts(res.products || [])
+      setProducts(res.data || [])
+      if (res.meta?.pagination) {
+        setPagination(res.meta.pagination)
+      } else {
+        const list = res.data || []
+        setPagination({
+          page: currentPage,
+          limit: PAGE_SIZE,
+          total: list.length,
+          totalPages: Math.max(1, Math.ceil(list.length / PAGE_SIZE)),
+          hasNext: false,
+          hasPrev: false,
+        })
+      }
     } catch (err: unknown) {
       console.error(err)
       setError('Không thể tải danh sách sản phẩm. Vui lòng kiểm tra lại bộ lọc.')
     } finally {
       setIsLoading(false)
     }
-  }, [querySearch, selectedCategoryIds, queryMinPrice, queryMaxPrice, queryInStock])
+  }, [querySearch, selectedCategoryIds, queryMinPrice, queryMaxPrice, queryInStock, currentPage])
 
   useEffect(() => {
     fetchProducts()
@@ -89,6 +138,7 @@ export function CatalogPage() {
   const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault()
     const newParams = new URLSearchParams(searchParams)
+    newParams.delete('page')
     if (searchInput.trim()) {
       newParams.set('q', searchInput.trim())
     } else {
@@ -99,6 +149,7 @@ export function CatalogPage() {
 
   const handleCategoryToggle = (catId: string) => {
     const newParams = new URLSearchParams(searchParams)
+    newParams.delete('page')
     const currentCats = newParams.getAll('category_id')
     newParams.delete('category_id')
 
@@ -112,6 +163,7 @@ export function CatalogPage() {
 
   const handleInStockToggle = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams)
+    newParams.delete('page')
     if (checked) {
       newParams.set('in_stock', 'true')
     } else {
@@ -122,6 +174,7 @@ export function CatalogPage() {
 
   const handlePricePreset = (min: string, max: string) => {
     const newParams = new URLSearchParams(searchParams)
+    newParams.delete('page')
     if (min) {
       newParams.set('min_price', min)
     } else {
@@ -138,7 +191,8 @@ export function CatalogPage() {
   const handlePriceApply = (e: FormEvent) => {
     e.preventDefault()
     const newParams = new URLSearchParams(searchParams)
-    
+    newParams.delete('page')
+
     // Validate canonical integers
     const cleanMin = minPriceInput.trim().replace(/\D/g, '')
     const cleanMax = maxPriceInput.trim().replace(/\D/g, '')
@@ -165,6 +219,18 @@ export function CatalogPage() {
     setSearchParams(new URLSearchParams())
   }
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page) return
+    const newParams = new URLSearchParams(searchParams)
+    if (newPage === 1) {
+      newParams.delete('page')
+    } else {
+      newParams.set('page', String(newPage))
+    }
+    setSearchParams(newParams)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const hasActiveFilters =
     Boolean(querySearch) ||
     selectedCategoryIds.length > 0 ||
@@ -172,7 +238,7 @@ export function CatalogPage() {
     Boolean(queryMaxPrice) ||
     queryInStock
 
-  // Sorted product list
+  // Sorted product list for currently loaded page
   const sortedProducts = useMemo(() => {
     const list = [...products]
     if (sortBy === 'price-asc') {
@@ -200,7 +266,7 @@ export function CatalogPage() {
                 Danh Mục Điện Thoại
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Lựa chọn smartphone chính hãng VNA từ Apple iPhone, Xiaomi với nhiều phân khúc giá và ưu đãi trả góp 0%.
+                Lựa chọn smartphone chính hãng VNA từ Apple iPhone, Samsung, Xiaomi với nhiều phân khúc giá và ưu đãi trả góp 0%.
               </p>
             </div>
 
@@ -222,6 +288,7 @@ export function CatalogPage() {
                       setSearchInput('')
                       const newParams = new URLSearchParams(searchParams)
                       newParams.delete('q')
+                      newParams.delete('page')
                       setSearchParams(newParams)
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
@@ -242,7 +309,7 @@ export function CatalogPage() {
         {/* Mobile Filter Toggle & Results Count */}
         <div className="lg:hidden flex items-center justify-between gap-4 mb-6">
           <div className="text-sm font-bold text-slate-700">
-            {isLoading ? 'Đang tải...' : `${products.length} sản phẩm`}
+            {isLoading ? 'Đang tải...' : `${pagination.total} sản phẩm`}
           </div>
           <Button
             variant="outline"
@@ -289,6 +356,7 @@ export function CatalogPage() {
                     onClick={() => {
                       const newParams = new URLSearchParams(searchParams)
                       newParams.delete('category_id')
+                      newParams.delete('page')
                       setSearchParams(newParams)
                     }}
                     className="text-xs font-bold text-emerald-600 hover:underline"
@@ -414,7 +482,7 @@ export function CatalogPage() {
                 className="w-full rounded-2xl lg:hidden mt-6 font-bold bg-emerald-600 hover:bg-emerald-700"
                 onClick={() => setShowMobileFilters(false)}
               >
-                Xem kết quả ({products.length})
+                Xem kết quả ({pagination.total})
               </Button>
             )}
           </aside>
@@ -424,7 +492,13 @@ export function CatalogPage() {
             {/* Desktop Results Header & Sort Bar */}
             <div className="hidden lg:flex items-center justify-between pb-2">
               <span className="text-sm font-bold text-slate-700">
-                {isLoading ? 'Đang tìm kiếm...' : `Hiển thị ${products.length} sản phẩm`}
+                {isLoading ? (
+                  'Đang tìm kiếm...'
+                ) : pagination.totalPages > 1 ? (
+                  `Hiển thị ${(pagination.page - 1) * pagination.limit + 1} - ${Math.min(pagination.page * pagination.limit, pagination.total)} trên ${pagination.total} sản phẩm (Trang ${pagination.page}/${pagination.totalPages})`
+                ) : (
+                  `Hiển thị ${pagination.total} sản phẩm`
+                )}
               </span>
 
               {/* Sorting Bar */}
@@ -485,7 +559,7 @@ export function CatalogPage() {
             )}
 
             {/* Empty State */}
-            {!isLoading && !error && products.length === 0 && (
+            {!isLoading && !error && sortedProducts.length === 0 && (
               <EmptyState
                 icon={<PackageSearch className="h-8 w-8 text-slate-400" />}
                 title="Không tìm thấy sản phẩm"
@@ -495,12 +569,84 @@ export function CatalogPage() {
               />
             )}
 
-            {/* Products List */}
+            {/* Products List & Pagination */}
             {!isLoading && !error && sortedProducts.length > 0 && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {sortedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  {sortedProducts.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {pagination.totalPages > 1 && (
+                  <nav
+                    aria-label="Phân trang danh sách sản phẩm"
+                    className="pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80"
+                  >
+                    <div className="text-xs font-semibold text-slate-500 order-2 sm:order-1">
+                      Hiển thị <span className="font-bold text-slate-900">{(pagination.page - 1) * pagination.limit + 1}</span> -{' '}
+                      <span className="font-bold text-slate-900">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trên{' '}
+                      <span className="font-bold text-slate-900">{pagination.total}</span> sản phẩm
+                    </div>
+
+                    <div className="flex items-center gap-1.5 order-1 sm:order-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(pagination.page - 1)}
+                        disabled={!pagination.hasPrev || pagination.page <= 1}
+                        aria-label="Trang trước"
+                        className="h-9 px-3 rounded-xl text-xs font-bold gap-1 border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="hidden sm:inline">Trước</span>
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {getPageNumbers(pagination.page, pagination.totalPages).map((item, idx) => {
+                          if (item === 'ellipsis') {
+                            return (
+                              <span key={`ellipsis-${idx}`} className="w-8 text-center text-xs font-bold text-slate-400 select-none">
+                                ...
+                              </span>
+                            )
+                          }
+                          const isCurrent = item === pagination.page
+                          return (
+                            <Button
+                              key={item}
+                              variant={isCurrent ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => handlePageChange(item)}
+                              aria-label={`Trang ${item}`}
+                              aria-current={isCurrent ? 'page' : undefined}
+                              className={`h-9 min-w-9 px-3 rounded-xl text-xs font-bold transition ${
+                                isCurrent
+                                  ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-xs'
+                                  : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              {item}
+                            </Button>
+                          )
+                        })}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(pagination.page + 1)}
+                        disabled={!pagination.hasNext || pagination.page >= pagination.totalPages}
+                        aria-label="Trang sau"
+                        className="h-9 px-3 rounded-xl text-xs font-bold gap-1 border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        <span className="hidden sm:inline">Sau</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </nav>
+                )}
               </div>
             )}
           </main>

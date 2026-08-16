@@ -25,12 +25,14 @@ func newGuard(manager *jwt.Manager) *guard {
 func (g *guard) AuthRequired(c *gin.Context) {
 	tokenStr, ok := strings.CutPrefix(c.GetHeader("Authorization"), bearerPrefix)
 	if !ok || tokenStr == "" {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, errorBody{Error: errorBodyDetail{Code: "unauthorized", Message: "missing or malformed authorization header"}})
+		respondError(c, http.StatusUnauthorized, "unauthorized", "missing or malformed authorization header", nil)
+		c.Abort()
 		return
 	}
 	userID, err := g.manager.ParseAccessToken(tokenStr)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, errorBody{Error: errorBodyDetail{Code: "invalid_token", Message: "invalid or expired token"}})
+		respondError(c, http.StatusUnauthorized, "invalid_token", "invalid or expired token", nil)
+		c.Abort()
 		return
 	}
 	c.Set(contextUserKey, userID)

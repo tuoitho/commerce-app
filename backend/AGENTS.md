@@ -4,7 +4,7 @@
 
 - `cmd/server/app.go` is the composition root: it loads config, opens the pgx pool, wires repositories/use cases, and constructs the Gin router. Routes are registered under `/api/v1` in `internal/delivery/http/router.go`.
 - Keep dependency direction as `delivery -> usecase -> domain`; repository implementations satisfy interfaces owned by `internal/domain`.
-- `internal/delivery/http/error.go` owns the public JSON error envelope and domain-error-to-status mapping. Preserve it when adding handlers.
+- `internal/delivery/http/response.go` (`writeSuccess`, `writePaginatedSuccess`) and `internal/delivery/http/error.go` (`writeError`, `respondError`) own the public Full Status JSON Envelope (`ResponseEnvelope`) with direct payload in `data`, ISO 8601 UTC timestamp in `meta`, and domain-error-to-status mapping. Always use these helpers instead of ad-hoc `c.JSON()` calls.
 - `internal/repository/sqlc/` is committed generated code; never edit it directly. Change `db/queries` or `db/migrations`, then run `make gen` (`sqlc generate`).
 
 ## Commands

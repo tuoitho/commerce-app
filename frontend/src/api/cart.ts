@@ -1,41 +1,41 @@
 import { apiClient } from './client'
-import type { CartResponse } from './types'
+import type { Cart } from './types'
 
 export const cartApi = {
-  async getCart(): Promise<CartResponse> {
-    return apiClient<CartResponse>('/cart')
+  async getCart(): Promise<Cart> {
+    return apiClient<Cart>('/cart')
   },
 
-  async addItem(variantId: string): Promise<CartResponse> {
-    return apiClient<CartResponse>('/cart/items', {
+  async addItem(variantId: string): Promise<Cart> {
+    return apiClient<Cart>('/cart/items', {
       method: 'POST',
       body: { variantId },
     })
   },
 
-  async setQuantity(itemId: string, quantity: number): Promise<CartResponse> {
-    return apiClient<CartResponse>(`/cart/items/${itemId}`, {
+  async setQuantity(itemId: string, quantity: number): Promise<Cart> {
+    return apiClient<Cart>(`/cart/items/${itemId}`, {
       method: 'PUT',
       body: { quantity },
     })
   },
 
-  async setSelection(itemId: string, selected: boolean): Promise<CartResponse> {
-    return apiClient<CartResponse>(`/cart/items/${itemId}/selection`, {
+  async setSelection(itemId: string, selected: boolean): Promise<Cart> {
+    return apiClient<Cart>(`/cart/items/${itemId}/selection`, {
       method: 'PATCH',
       body: { selected },
     })
   },
 
-  async setAllSelection(selected: boolean): Promise<CartResponse> {
-    return apiClient<CartResponse>('/cart/selection', {
+  async setAllSelection(selected: boolean): Promise<Cart> {
+    return apiClient<Cart>('/cart/selection', {
       method: 'PUT',
       body: { selected },
     })
   },
 
-  async removeItem(itemId: string): Promise<CartResponse> {
-    return apiClient<CartResponse>(`/cart/items/${itemId}`, {
+  async removeItem(itemId: string): Promise<Cart> {
+    return apiClient<Cart>(`/cart/items/${itemId}`, {
       method: 'DELETE',
     })
   },

@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { ApiError } from '@/api/types'
 
 export function CartPage() {
   const navigate = useNavigate()
@@ -95,8 +96,12 @@ export function CartPage() {
     setUpdatingItemId(itemId)
     try {
       await updateQuantity(itemId, newQty)
-    } catch {
-      toastError('Lỗi cập nhật', 'Không thể cập nhật số lượng.')
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'stock_limit') {
+        toastError('Vượt quá tồn kho', err.message || 'Số lượng vượt quá tồn kho khả dụng.')
+      } else {
+        toastError('Lỗi cập nhật', 'Không thể cập nhật số lượng.')
+      }
     } finally {
       setUpdatingItemId(null)
     }

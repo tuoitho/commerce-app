@@ -26,6 +26,7 @@ import {
   Star,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
+import { ApiError } from '@/api/types'
 import type { ProductDetail, ProductVariant } from '@/api/types'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
@@ -262,7 +263,11 @@ export function ProductDetailPage() {
       )
     } catch (err: unknown) {
       console.error(err)
-      toastError('Thêm vào giỏ thất bại', 'Không thể thêm sản phẩm vào giỏ. Vui lòng thử lại.')
+      if (err instanceof ApiError && err.code === 'stock_limit') {
+        toastError('Vượt quá tồn kho', err.message || 'Số lượng vượt quá tồn kho khả dụng.')
+      } else {
+        toastError('Thêm vào giỏ thất bại', 'Không thể thêm sản phẩm vào giỏ. Vui lòng thử lại.')
+      }
     } finally {
       setIsAddingToCart(false)
     }

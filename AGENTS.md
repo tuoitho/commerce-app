@@ -13,6 +13,19 @@
 - If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. Verify completed governed work against requirement IDs and acceptance criteria.
 - Use the `question` tool for blocking product/architecture choices and approval gates that repository evidence cannot resolve.
 
+## API Contract Standards
+
+- All `/api/v1` HTTP endpoints (except 204 No Content) follow the Full Status Envelope:
+  - **Success (`200`, `201`):** `{"success": true, "message": string, "data": <T>, "error": null, "meta": {"timestamp": string, "pagination"?: PaginationMeta}}`.
+  - **No Content (`204`):** `POST /api/v1/auth/logout` returns HTTP 204 with no body.
+  - **Error (`4xx`, `5xx`):** `{"success": false, "message": string, "data": null, "error": {"code": string, "message": string, "fields"?: Record<string, string>}, "meta": {"timestamp": string}}`.
+- **Direct Payload:** The `data` property carries the primary entity or collection directly (`Category[]`, `ProductSummary[]`, `ProductDetail`, `Cart`, `User`, `{user, accessToken}`).
+- **Error Categorization:**
+  - **Validation Errors (`HTTP 400`):** `error.code` describes the validation issue (`validation_error`, `invalid_filter`), `error.fields` maps invalid fields to messages.
+  - **Business Logic Errors (`HTTP 401/404/409`):** `error.code` specifies the business violation (`out_of_stock`, `stock_limit`, `email_in_use`, `cart_item_unavailable`), `error.fields` is omitted.
+  - **System Errors (`HTTP 500`):** `error.code` is `"internal"`, `error.fields` is omitted.
+  - **Language Requirements:** All user-facing business error messages (don't need for validation errors) MUST be in Vietnamese.
+
 ## Process Safety
 
 - Use systematic debugging and test-driven development for behavior fixes. Prefer one agent for coupled frontend/backend work; delegate only independent work after shared contracts are stable.

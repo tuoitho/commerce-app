@@ -30,7 +30,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true)
       const res = await cartApi.getCart()
-      setCart(res.cart)
+      setCart(res)
     } catch {
       // If unauthorized or error, keep null
       setCart(null)
@@ -50,8 +50,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback(
     async (variantId: string): Promise<Cart> => {
       const res = await cartApi.addItem(variantId)
-      setCart(res.cart)
-      return res.cart
+      setCart(res)
+      return res
     },
     []
   )
@@ -59,8 +59,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback(
     async (itemId: string, quantity: number): Promise<Cart> => {
       const res = await cartApi.setQuantity(itemId, quantity)
-      setCart(res.cart)
-      return res.cart
+      setCart(res)
+      return res
     },
     []
   )
@@ -68,8 +68,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const toggleSelect = useCallback(
     async (itemId: string, selected: boolean): Promise<Cart> => {
       const res = await cartApi.setSelection(itemId, selected)
-      setCart(res.cart)
-      return res.cart
+      setCart(res)
+      return res
     },
     []
   )
@@ -77,8 +77,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const toggleSelectAll = useCallback(
     async (selected: boolean): Promise<Cart> => {
       const res = await cartApi.setAllSelection(selected)
-      setCart(res.cart)
-      return res.cart
+      setCart(res)
+      return res
     },
     []
   )
@@ -86,8 +86,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeItem = useCallback(
     async (itemId: string): Promise<Cart> => {
       const res = await cartApi.removeItem(itemId)
-      setCart(res.cart)
-      return res.cart
+      setCart(res)
+      return res
     },
     []
   )

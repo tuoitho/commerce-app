@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type FormEvent } from 'react'
+import { useEffect, useState, useRef, type MouseEvent, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   ShoppingCart,
@@ -12,7 +12,10 @@ import {
   MapPin,
   FileText,
   ShieldCheck,
+  ChevronDown,
 } from 'lucide-react'
+import { catalogApi } from '@/api/catalog'
+import type { Category } from '@/api/types'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
@@ -26,6 +29,56 @@ export function Header() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [headerSearch, setHeaderSearch] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
+  const brandDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let active = true
+    catalogApi
+      .listCategories()
+      .then((res) => {
+        if (active && res) {
+          setCategories(res)
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully if categories fail to load
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Close brand dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (e: globalThis.MouseEvent) => {
+      if (
+        brandDropdownRef.current &&
+        !brandDropdownRef.current.contains(e.target as Node)
+      ) {
+        setBrandDropdownOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setBrandDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  // Close menus on route change
+  useEffect(() => {
+    setBrandDropdownOpen(false)
+    setMobileMenuOpen(false)
+  }, [location.pathname, location.search])
 
   const handleCartClick = (e: MouseEvent) => {
     if (!isAuthenticated) {
@@ -50,14 +103,9 @@ export function Header() {
     }
   }
 
-  const navLinks = [
-    { name: 'Trang chủ', path: '/' },
-    { name: 'Sản phẩm', path: '/products' },
-  ]
-
   return (
     <header className="sticky top-0 z-40 w-full bg-white shadow-xs border-b border-slate-200">
-      {/* Top Utility Bar (Real E-Commerce Header Style) */}
+      {/* Top Utility Bar */}
       <div className="bg-slate-100 border-b border-slate-200/80 text-[12px] text-slate-600 hidden md:block">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-8">
           <div className="flex items-center gap-6">
@@ -94,7 +142,7 @@ export function Header() {
       {/* Main Retail Header Bar */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4 h-18">
-          {/* Brand Logo - Solid & Crisp */}
+          {/* Brand Logo */}
           <Link
             to="/"
             className="flex items-center gap-3 font-bold text-2xl text-slate-900 shrink-0"
@@ -119,7 +167,7 @@ export function Header() {
           >
             <input
               type="text"
-              placeholder="Bạn muốn tìm điện thoại gì? (vd: iPhone 16 Pro, Xiaomi 15...)"
+              placeholder="Bạn muốn tìm điện thoại gì? (vd: Tìm theo tên, hãng...)"
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
               className="w-full h-11 pl-10 pr-24 text-sm font-medium rounded-xl bg-slate-50 border border-slate-300 focus:bg-white focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100 outline-none transition-all placeholder:text-slate-400"
@@ -144,36 +192,97 @@ export function Header() {
 
           {/* Desktop Navigation Links */}
           <nav className="hidden xl:flex items-center gap-1 font-semibold text-sm">
-            {navLinks.map((link) => {
-              const isActive =
-                link.path === '/'
-                  ? location.pathname === '/'
-                  : location.pathname.startsWith(link.path)
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              )
-            })}
             <Link
-              to="/products?category_id=10000000-0000-0000-0000-000000000001"
-              className="px-3 py-2 text-slate-700 hover:text-emerald-600 hover:bg-slate-50 rounded-lg transition-colors"
+              to="/"
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                location.pathname === '/' && !location.search
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+              }`}
             >
-              iPhone
+              Trang chủ
             </Link>
+
             <Link
-              to="/products?category_id=10000000-0000-0000-0000-000000000002"
-              className="px-3 py-2 text-slate-700 hover:text-emerald-600 hover:bg-slate-50 rounded-lg transition-colors"
+              to="/products"
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                location.pathname === '/products' && !location.search.includes('category_id')
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+              }`}
             >
-              Xiaomi
+              Sản phẩm
+            </Link>
+
+            {/* Dynamic Brand Dropdown */}
+            <div className="relative" ref={brandDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setBrandDropdownOpen((prev) => !prev)}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                  brandDropdownOpen || location.search.includes('category_id')
+                    ? 'text-emerald-700 bg-emerald-50 font-bold'
+                    : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                }`}
+                aria-expanded={brandDropdownOpen}
+                aria-haspopup="true"
+              >
+                <span>Thương hiệu</span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${
+                    brandDropdownOpen ? 'rotate-180 text-emerald-600' : 'text-slate-400'
+                  }`}
+                />
+              </button>
+
+              {brandDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in duration-150">
+                  <div className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    Chọn theo thương hiệu
+                  </div>
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    {categories.length > 0 ? (
+                      categories.map((cat) => (
+                        <Link
+                          key={cat.id}
+                          to={`/products?category_id=${cat.id}`}
+                          onClick={() => setBrandDropdownOpen(false)}
+                          className={`flex items-center justify-between px-3.5 py-2 text-sm transition-colors ${
+                            location.search.includes(cat.id)
+                              ? 'text-emerald-700 bg-emerald-50 font-bold'
+                              : 'text-slate-700 hover:bg-slate-50 hover:text-emerald-600'
+                          }`}
+                        >
+                          <span>{cat.name}</span>
+                          <Smartphone className="h-3.5 w-3.5 text-slate-400" />
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="px-3.5 py-2 text-xs text-slate-400">Đang tải thương hiệu...</div>
+                    )}
+                  </div>
+                  <div className="pt-1 border-t border-slate-100 px-2">
+                    <Link
+                      to="/products"
+                      onClick={() => setBrandDropdownOpen(false)}
+                      className="block text-center py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                    >
+                      Tất cả sản phẩm &rarr;
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Link
+              to="/products?in_stock=true"
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                location.search.includes('in_stock=true')
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+              }`}
+            >
+              Hàng có sẵn
             </Link>
           </nav>
 
@@ -247,7 +356,7 @@ export function Header() {
           <form onSubmit={handleHeaderSearchSubmit} className="relative">
             <input
               type="text"
-              placeholder="Tìm kiếm iPhone, Xiaomi, phụ kiện..."
+              placeholder="Tìm kiếm điện thoại, thương hiệu..."
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
               className="w-full h-11 pl-10 pr-20 text-sm font-medium rounded-xl bg-slate-100 border border-slate-200 outline-none"
@@ -263,36 +372,65 @@ export function Header() {
 
           {/* Navigation links */}
           <nav className="flex flex-col gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
-                  location.pathname === link.path
-                    ? 'text-emerald-700 bg-emerald-50 font-bold'
-                    : 'text-slate-800 hover:bg-slate-50'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-              <Link
-                to="/products?category_id=10000000-0000-0000-0000-000000000001"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-50 text-xs font-bold text-slate-700 border border-slate-200"
-              >
-                Apple iPhone
-              </Link>
-              <Link
-                to="/products?category_id=10000000-0000-0000-0000-000000000002"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-50 text-xs font-bold text-slate-700 border border-slate-200"
-              >
-                Xiaomi Phone
-              </Link>
-            </div>
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
+                location.pathname === '/' && !location.search
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Trang chủ
+            </Link>
+            <Link
+              to="/products"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
+                location.pathname === '/products' && !location.search.includes('category_id')
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Tất cả sản phẩm
+            </Link>
+            <Link
+              to="/products?in_stock=true"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
+                location.search.includes('in_stock=true')
+                  ? 'text-emerald-700 bg-emerald-50 font-bold'
+                  : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Hàng có sẵn giao ngay
+            </Link>
+
+            {/* Dynamic Brands in Mobile Drawer */}
+            {categories.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Thương hiệu nổi bật
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-1.5">
+                  {categories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to={`/products?category_id=${cat.id}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center justify-between py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors ${
+                        location.search.includes(cat.id)
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                      }`}
+                    >
+                      <span className="truncate">{cat.name}</span>
+                      <Smartphone className="h-3.5 w-3.5 text-slate-400 shrink-0 ml-1" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Mobile Auth */}

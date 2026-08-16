@@ -1,11 +1,29 @@
+export interface PaginationMeta {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface ApiResponseMeta {
+  timestamp: string
+  pagination?: PaginationMeta
+}
+
 export interface ApiErrorDetail {
   code: string
   message: string
   fields?: Record<string, string>
 }
 
-export interface ApiErrorResponse {
-  error: ApiErrorDetail
+export interface ApiResponseEnvelope<T> {
+  success: boolean
+  message: string
+  data: T | null
+  error: ApiErrorDetail | null
+  meta: ApiResponseMeta
 }
 
 export class ApiError extends Error {
@@ -13,12 +31,20 @@ export class ApiError extends Error {
   readonly code: string
   readonly fields?: Record<string, string>
 
-  constructor(status: number, detail: ApiErrorDetail) {
-    super(detail.message || `API Error ${status}`)
+  constructor(status: number, detail: ApiErrorDetail, message?: string) {
+    super(message || detail.message || `API Error ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = detail.code || 'unknown_error'
     this.fields = detail.fields
+  }
+
+  isValidationError(): boolean {
+    return Boolean(this.fields && Object.keys(this.fields).length > 0)
+  }
+
+  isBusinessError(): boolean {
+    return !this.isValidationError() && this.status < 500
   }
 }
 
@@ -111,6 +137,8 @@ export interface ProductFilterParams {
   min_price?: string
   max_price?: string
   in_stock?: 'true' | 'false' | boolean
+  page?: number
+  limit?: number
 }
 
 // Cart

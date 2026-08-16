@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security"
 	"commerce-backend/internal/security/jwt"
 	"commerce-backend/internal/usecase/auth"
@@ -84,10 +85,18 @@ func TestRegisterHandler_Success(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
-	var resp sessionResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	var env struct {
+		Success bool            `json:"success"`
+		Message string          `json:"message"`
+		Data    sessionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
+	if !env.Success || env.Message == "" {
+		t.Fatalf("expected success: true and non-empty message, got %+v", env)
+	}
+	resp := env.Data
 	if resp.User.Email != "user@example.com" || resp.AccessToken == "" {
 		t.Fatal("missing user or access token")
 	}
@@ -111,11 +120,11 @@ func TestRegisterHandler_InvalidEmail(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var eb errorBody
+	var eb ResponseEnvelope
 	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
 		t.Fatal(err)
 	}
-	if eb.Error.Code != "validation_error" || eb.Error.Fields["email"] == "" {
+	if eb.Error == nil || eb.Error.Code != "validation_error" || eb.Error.Fields["email"] == "" {
 		t.Fatalf("unexpected error body: %+v", eb.Error)
 	}
 }
@@ -143,6 +152,17 @@ func TestLoginHandler_Success(t *testing.T) {
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var env struct {
+		Success bool            `json:"success"`
+		Message string          `json:"message"`
+		Data    sessionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatal(err)
+	}
+	if !env.Success || env.Message != "Đăng nhập thành công" {
+		t.Fatalf("unexpected login success envelope: %+v", env)
 	}
 	if refreshCookie(cookies) == nil {
 		t.Fatal("expected refresh cookie")
@@ -226,23 +246,32 @@ func TestMeHandler_WithValidToken(t *testing.T) {
 	router, users := newTestRouter(t)
 	registerBody := map[string]string{"email": "user@example.com", "password": "password123"}
 	w, _ := doRequest(t, router, http.MethodPost, "/api/v1/auth/register", registerBody)
-	var resp sessionResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	var env struct {
+		Data sessionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
 	id := users.ByID("1").ID
-	if resp.User.ID != id {
-		t.Fatalf("user id = %q, want %q", resp.User.ID, id)
+	if env.Data.User.ID != id {
+		t.Fatalf("user id = %q, want %q", env.Data.User.ID, id)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
-	req.Header.Set("Authorization", "Bearer "+resp.AccessToken)
+	req.Header.Set("Authorization", "Bearer "+env.Data.AccessToken)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w2.Code, w2.Body.String())
 	}
-	if !strings.Contains(w2.Body.String(), "user@example.com") {
-		t.Fatalf("body = %s", w2.Body.String())
+	var meEnv struct {
+		Success bool              `json:"success"`
+		Data    domain.UserPublic `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &meEnv); err != nil {
+		t.Fatal(err)
+	}
+	if meEnv.Data.Email != "user@example.com" {
+		t.Fatalf("user email = %q, want user@example.com", meEnv.Data.Email)
 	}
 }
 
@@ -265,11 +294,11 @@ func TestMeHandler_InvalidToken(t *testing.T) {
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var eb errorBody
+	var eb ResponseEnvelope
 	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
 		t.Fatal(err)
 	}
-	if eb.Error.Code == "" {
+	if eb.Error == nil || eb.Error.Code == "" {
 		t.Fatal("expected error body")
 	}
 }
@@ -312,11 +341,11 @@ func TestRegisterHandler_ShortPassword(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var eb errorBody
+	var eb ResponseEnvelope
 	if err := json.Unmarshal(w.Body.Bytes(), &eb); err != nil {
 		t.Fatal(err)
 	}
-	if eb.Error.Fields["password"] == "" {
+	if eb.Error == nil || eb.Error.Fields["password"] == "" {
 		t.Fatalf("unexpected error body: %+v", eb.Error)
 	}
 }

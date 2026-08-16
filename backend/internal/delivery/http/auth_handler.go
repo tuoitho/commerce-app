@@ -53,7 +53,7 @@ func (h *authHandler) Register(c *gin.Context) {
 		return
 	}
 	h.setRefreshCookie(c, sess.RefreshToken)
-	c.JSON(http.StatusCreated, toSessionResponse(sess))
+	writeSuccess(c, http.StatusCreated, "Đăng ký tài khoản thành công", toSessionResponse(sess))
 }
 
 func (h *authHandler) Login(c *gin.Context) {
@@ -68,7 +68,7 @@ func (h *authHandler) Login(c *gin.Context) {
 		return
 	}
 	h.setRefreshCookie(c, sess.RefreshToken)
-	c.JSON(http.StatusOK, toSessionResponse(sess))
+	writeSuccess(c, http.StatusOK, "Đăng nhập thành công", toSessionResponse(sess))
 }
 
 func (h *authHandler) Refresh(c *gin.Context) {
@@ -83,7 +83,7 @@ func (h *authHandler) Refresh(c *gin.Context) {
 		return
 	}
 	h.setRefreshCookie(c, sess.RefreshToken)
-	c.JSON(http.StatusOK, toSessionResponse(sess))
+	writeSuccess(c, http.StatusOK, "", toSessionResponse(sess))
 }
 
 func (h *authHandler) Logout(c *gin.Context) {
@@ -99,7 +99,7 @@ func (h *authHandler) Me(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	writeSuccess(c, http.StatusOK, "", user)
 }
 
 func (h *authHandler) setRefreshCookie(c *gin.Context, token string) {
