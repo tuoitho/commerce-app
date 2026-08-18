@@ -9,8 +9,12 @@ Create `.kiro/specs/<feature>/tasks.md` from approved `requirements.md` and
 `design.md`.
 
 This file is the canonical implementation plan. It defines implementation
-boundaries, dependencies, deliverables, and verification without pre-writing
-private implementation.
+boundaries, dependencies, deliverables, integration work, and verification
+without pre-writing private implementation.
+
+Plan from the approved feature behavior and the existing-system integration
+defined by design. Do not rediscover product behavior or architecture during
+task planning.
 
 ## Task Format
 
@@ -91,7 +95,10 @@ Before accepting a leaf task, verify:
 3. One reviewer can evaluate it without effectively reviewing the whole
    feature.
 4. A likely review failure can be corrected mostly within the task's scope.
-
+5. Any supporting dependency it consumes already has a stable approved contract
+   or is produced by an explicit prerequisite task.
+6. Any existing behavior it affects is bounded clearly enough that the task does
+   not require rediscovering adjacent feature scope during implementation.
 If these conditions do not hold, split or restructure the task.
 
 Do not impose arbitrary limits on file count, line count, or test count.
@@ -110,6 +117,18 @@ Cohesion and reviewability govern task size.
   approved design requires exact placement.
 - State important `Consumes` and `Produces` contracts and implementation
   prerequisites.
+- For every material cross-domain input such as an ID, code, reference value,
+  or selectable entity, ensure the consuming task names the approved source or
+  contract that supplies it.
+- When design identifies an affected existing flow, ensure the relevant leaf
+  task preserves or intentionally changes that behavior and owns focused
+  verification for it.
+- Do not create producer work for a supporting dependency when design has
+  established that an existing capability is sufficient.
+- Do not let implementation tasks decide whether an existing behavior should be
+  preserved, changed, rejected, detached, cascaded, migrated, or otherwise
+  handled when that choice is product- or contract-visible; such decisions must
+  already be settled upstream.
 - Include enough implementation direction to execute without inventing
   architecture, but do not duplicate design detail.
 - Do not prescribe private helper structure, local algorithms, exact line
@@ -159,6 +178,76 @@ component that the later task genuinely requires.
 Do not invent shared contracts for work confined to one implementation
 boundary with no independently implemented consumer.
 
+## Feature Dependency Coverage
+
+Build the implementation plan from both:
+
+1. feature-owned behavior; and
+2. downstream impacts and supporting dependencies defined by the approved
+   design.
+
+For each material dependency, determine whether implementation work is actually
+required.
+
+### Supporting Dependencies
+
+When a feature requires an existing capability, reference dataset, related
+domain, or shared contract to complete a supported workflow:
+
+- identify the canonical capability or contract defined by design;
+- make the consuming task explicitly name that contract under `Consumes`;
+- add producer-side implementation work only when the existing capability is
+  insufficient;
+- include integration verification proving that the consuming workflow works
+  against the approved contract.
+
+Do not assume that required IDs, codes, selectable values, or related-domain
+data will somehow be available during implementation.
+
+Do not create a new API, lookup, model, or duplicate source of truth when an
+existing supported capability already satisfies the dependency.
+
+### Downstream Impacts
+
+When the feature changes a concept already used by existing supported
+functionality:
+
+- include implementation work for affected existing behavior when code changes
+  are required;
+- include focused regression verification where compatibility must be
+  preserved;
+- make intentional behavior changes traceable to the approved requirement and
+  design decision.
+
+Do not add tasks for unrelated neighboring functionality merely because it was
+encountered during dependency discovery.
+
+### Dependency Tasking
+
+A dependency does not require its own leaf task merely because it crosses a
+domain or component boundary.
+
+Keep dependency work inside the behavior-oriented leaf task when it is small,
+cohesive, and independently reviewable.
+
+Create a separate leaf task when the dependency itself produces a coherent
+reusable deliverable, such as:
+
+- a new or extended shared API contract;
+- a schema or migration required by multiple consumers;
+- reusable generated bindings;
+- a cross-domain capability independently consumed by multiple tasks.
+
+Tasks must not rely on implementation-time negotiation to discover field names,
+reference values, validation semantics, error contracts, or compatibility
+behavior.
+
+When independently executable tasks communicate through a shared boundary, the
+approved contract must already be stable before those tasks are dispatched.
+
+Once the contract is stable, producer and consumer tasks do not depend on one
+another merely to discover or negotiate that contract.
+
 ## Quality Gate
 
 First self-check:
@@ -170,34 +259,21 @@ First self-check:
 5. coding-agent actionability;
 6. absence of technical-layer fragmentation;
 7. absence of mini-epics disguised as leaf tasks.
+8. downstream-impact coverage;
+9. supporting-dependency coverage;
+10. stable sources for material cross-domain IDs, codes, reference data, and
+    selectable values;
+11. absence of implementation tasks that must invent missing shared contracts
+    or compatibility behavior;
+12. absence of duplicate producer work when an existing approved capability is
+    sufficient.
 
-Then dispatch one independent broad review using `reviewing-feature-spec`.
-
-If blocking findings are accepted:
-
-1. revise only the affected tasks or upstream artifact;
-2. preserve the original finding set;
-3. perform a scoped re-review limited to:
-
-   - whether those findings were resolved; and
-   - regressions directly introduced by those revisions.
-
-A new observation outside the changed scope does not reopen the repair loop
-merely because the reviewer discovered it later. Treat it as advisory unless it
-demonstrates a load-bearing requirement, design, dependency, or correctness
-gap.
-
-Allow at most two repair rounds for task planning. If a material blocker or
-reviewer disagreement remains after that, stop and present it to the user for
-adjudication rather than continuing autonomous review.
-
-After the review gate is stable, use the `question` tool to ask exactly:
-
-"Do the tasks look good?"
-
-If the user requests a material change, revise the affected scope and rerun the
-relevant checks. Run another broad review only when the change materially
-alters task boundaries, shared contracts, dependencies, or requirements
-coverage.
-
-The workflow is not complete until the user explicitly approves `tasks.md`.
+## Completion
+After the self-check passes, return the completed `tasks.md` to the coordinating
+workflow.
+Do not request implementation approval, dispatch reviewers, dispatch coding
+work, or begin implementation.
+When governed by `spec-driven-development`, that workflow owns independent
+review, repair-round budgeting, and explicit user approval of `tasks.md`.
+When invoked outside that coordinating workflow, the caller must still arrange
+the governed independent specification review before implementation.

@@ -14,12 +14,54 @@ not implementation.
 Read applicable repository instructions and any existing specification for the
 feature.
 
-Do not perform broad code exploration during this phase. Inspect existing code
-or contracts only when needed to confirm externally visible compatibility
-behavior or constraints.
+Use the bounded dependency discovery supplied by the coordinating workflow. If
+it is unavailable or materially incomplete, load
+`discovering-feature-dependencies` before drafting requirements.
+
+Targeted inspection of directly related existing behavior, contracts, persisted
+relationships, and supporting capabilities is allowed and required when needed
+to establish feature completeness or compatibility.
+
+Do not perform open-ended repository exploration or search unrelated
+functionality for possible improvements.
 
 Draft the initial requirements from the user's idea before asking questions;
 refine material ambiguity through feedback after the draft exists.
+
+## Feature Dependency Completeness
+
+Requirements must describe a complete supported user workflow, not merely the
+primary resource operations requested by the user.
+
+For each workflow, identify material inputs or capabilities supplied by another
+domain or existing component.
+
+Pay particular attention to:
+
+- foreign or reference identifiers such as `categoryId`, `departmentId`,
+  `roleId`, or `parentId`;
+- codes, enums, reference data, and selectable values;
+- relationships to existing persisted entities;
+- existing functionality that consumes a concept changed by this feature.
+
+For every material dependency, establish whether a supported existing
+capability already supplies it.
+
+Do not assume that a user or caller somehow knows an internal identifier.
+
+If the workflow requires supporting data, express the observable capability
+needed by the user without prematurely prescribing its API or implementation.
+
+Example:
+
+A Product creation requirement may state that the system SHALL provide
+categories available for product assignment. Whether that is implemented by an
+existing category endpoint, a new lookup endpoint, or another approved contract
+belongs to design.
+
+When the feature affects existing supported behavior and multiple reasonable
+outcomes would be materially different, surface the decision for user approval
+instead of silently selecting one.
 
 ## Format
 
@@ -64,6 +106,16 @@ without copying prose.
 - Do not infer new product behavior from existing implementation details.
 - Do not leave `TBD`, `TODO`, open questions, or ambiguous adjectives such as
   "fast", "easy", or "secure" without measurable meaning.
+- Requirements must account for direct supporting capabilities required to
+  complete each supported user workflow.
+- Do not treat possession of an internal reference ID as implicit user
+  knowledge unless the external contract explicitly guarantees that input.
+- Existing supported behavior directly affected by the feature must be
+  preserved, intentionally changed, or made an explicit product decision.
+- Repository relationships may reveal affected behavior but do not themselves
+  authorize new product behavior.
+- Do not require a dedicated lookup API when an existing supported capability
+  already provides the required observable behavior.
 
 ## Quality Gate
 
@@ -74,7 +126,14 @@ Before requesting approval:
    constraint rather than an implementation decision.
 3. Check that edge and failure cases are justified by the feature rather than
    speculative completeness.
-4. Identify any remaining material ambiguity explicitly.
+4. Verify every supported user workflow has a documented source for material
+   related-domain data, selections, IDs, codes, or reference values required to
+   complete it.
+5. Verify direct existing behaviors identified by dependency discovery are
+   preserved, intentionally changed, or explicitly excluded without ambiguity.
+6. Verify no supporting dependency has been silently assumed merely because an
+   implementation could technically supply it.
+7. Identify any remaining material ambiguity explicitly.
 
 Use the `question` tool to ask exactly:
 

@@ -16,6 +16,13 @@ a coding agent can safely decide locally.
 
 Read the approved requirements, relevant repository architecture, affected
 contracts, code, tests, and established conventions.
+Load `discovering-feature-dependencies` when needed to validate or refresh the
+approved feature's direct downstream impacts and supporting dependencies against
+the concrete repository architecture.
+
+Design discovery may inspect implementation structure more deeply than
+requirements engineering, but remains bounded to dependencies required by the
+approved behavior.
 
 Stop if requirements are missing, unapproved, contradictory, or materially
 incomplete. Return requirement gaps to requirements engineering rather than
@@ -53,10 +60,19 @@ design.
 | Requirement | Design Elements | Verification |
 |---|---|---|
 | 1.1 | ... | ... |
+
+## Existing System Integration
+[Required when the feature affects existing supported functionality or depends
+on another domain/component. Describe downstream impacts, supporting
+dependencies, canonical sources, reused contracts, and compatibility behavior.]
 ```
 
 The six sections `Overview`, `Architecture`, `Components And Interfaces`,
 `Data Models`, `Error Handling`, and `Testing Strategy` are mandatory.
+
+`Existing System Integration` is additionally mandatory when bounded dependency
+discovery identifies a downstream impact, supporting dependency, or
+compatibility-sensitive existing contract.
 
 Add diagrams, compatibility, migration, alternatives, and traceability sections
 when applicable.
@@ -85,6 +101,31 @@ definition.
 Do not introduce a shared contract where no cross-boundary agreement between
 independently implemented work units is needed.
 
+## Feature Dependencies
+
+For every material downstream impact or supporting dependency identified by the
+approved requirements:
+
+1. identify the owning component or domain;
+2. identify the canonical existing contract or source of truth when one exists;
+3. verify whether that existing capability satisfies the required workflow;
+4. define the minimum contract extension or new supporting contract only when
+   the existing capability is insufficient;
+5. define validation and failure semantics at the consuming boundary; and
+6. identify affected existing consumers whose compatibility must be preserved.
+
+For externally supplied references such as IDs, codes, or selectable values,
+define both:
+
+- how the caller obtains or is contractually expected to know the value; and
+- how the receiving boundary validates it when used.
+
+Do not duplicate another domain's data merely to avoid an integration
+dependency.
+
+Do not introduce convenience APIs when an existing canonical contract already
+satisfies the requirement.
+
 ## Rules
 
 - Design only what approved requirements need; apply YAGNI.
@@ -110,6 +151,16 @@ independently implemented work units is needed.
   contractual.
 - Map every requirement ID to design elements and deterministic verification.
 - Do not leave placeholders or unresolved material decisions.
+- Trace every material supporting dependency from user workflow to its canonical
+  technical source.
+- Trace every material downstream impact to the design element responsible for
+  preserving or intentionally changing existing behavior.
+- Do not leave an implementer to invent where required cross-domain reference
+  data comes from.
+- Prefer reuse of an existing compatible contract over creation of a parallel
+  feature-specific contract.
+- If dependency analysis exposes an observable behavior not settled by approved
+  requirements, stop and return the decision to requirements engineering.
 
 ## Quality Gate
 
@@ -119,8 +170,13 @@ Review the design for:
 2. feasibility against the repository;
 3. internal consistency;
 4. clear ownership and boundary contracts;
-5. unresolved decisions that an implementer would otherwise have to invent;
-6. unnecessary implementation prescription that should remain local to coding.
+5. complete resolution of material downstream impacts;
+6. complete resolution of supporting dependencies required by user workflows;
+7. supported sources and validation semantics for cross-domain IDs, codes,
+   reference data, and selections;
+8. unresolved decisions that an implementer would otherwise have to invent;
+9. unnecessary duplication of existing contracts or sources of truth;
+10. unnecessary implementation prescription that should remain local to coding.
 
 Present material architecture decisions and research findings.
 

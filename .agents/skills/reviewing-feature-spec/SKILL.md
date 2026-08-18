@@ -6,10 +6,21 @@ description: Use for an independent read-only review of completed .kiro requirem
 # Reviewing A Feature Specification
 
 Perform a read-only review of one `.kiro/specs/<feature>/` artifact set. Read
-`requirements.md`, `design.md`, and `tasks.md` together. Inspect relevant code
-and tests only to verify a concrete claim, dependency, or compatibility concern
-identified while reading the artifacts. Do not perform open-ended repository
-inspection to discover additional risks.
+`requirements.md`, `design.md`, and `tasks.md` together.
+
+Independently apply bounded feature dependency discovery to the domain concepts,
+relationships, user workflows, and shared boundaries defined by the
+specification.
+
+Inspect relevant code, tests, existing specifications, and contracts to:
+
+1. verify concrete claims made by the artifacts; and
+2. identify direct downstream impacts or supporting dependencies that the
+   artifacts may have omitted.
+
+Do not perform open-ended repository inspection beyond those direct
+relationships and do not search for unrelated risks, hardening opportunities,
+or improvements.
 
 ## Review Discipline
 
@@ -25,6 +36,37 @@ A finding should identify:
 3. why implementation is blocked or may be incorrect.
 
 Stop there.
+
+## Independent Dependency Check
+
+Do not assume the specification has already identified all relevant
+dependencies.
+
+Derive impact anchors from the specification and inspect their direct existing
+producers, consumers, persisted relationships, and supported user flows.
+
+Check both directions:
+
+### Downstream
+
+Could the feature materially affect an existing supported behavior that directly
+depends on a concept being changed?
+
+### Supporting
+
+Does a required workflow depend on related-domain data, reference values,
+identifiers, or capabilities for which the specification provides no supported
+source?
+
+Examples:
+
+- Category management may affect Product records that reference Category.
+- Product management requiring `categoryId` may require a supported Category
+  selection or lookup capability.
+
+Repository evidence used to establish a finding must identify a concrete
+existing relationship or supported contract. Do not infer dependencies from
+domain similarity alone.
 
 ## Review Criteria
 
@@ -111,7 +153,35 @@ Check:
    approved specification already defines the boundary precisely enough. Do not
    require a shared contract when the work is confined to one implementation
    boundary and no independently implemented consumer relies on it.
+10. Feature dependency completeness.
 
+    For each domain concept, persisted relationship, public contract, or
+    cross-domain reference materially involved in the feature, verify both:
+
+    **Downstream impact**
+    - directly affected existing supported behavior is accounted for;
+    - compatibility is preserved or an intentional behavior change is defined.
+
+    **Supporting dependency**
+    - every material cross-domain input or reference value required by a
+      supported workflow has a documented supported source;
+    - the design identifies the canonical existing capability or defines the
+      required contract when none exists;
+    - tasks cover required integration work.
+
+    Flag a blocking issue only when:
+
+    - repository or specification evidence establishes the direct relationship;
+    - the relationship affects required user-visible or contract-visible
+      behavior;
+    - the specification does not resolve it;
+    - different reasonable implementations could produce materially different
+      behavior; and
+    - the implementer cannot resolve it through an ordinary local implementation
+      choice.
+
+    Do not require a new API when an existing supported capability already
+    satisfies the dependency.
 Do not flag wording preferences, formatting, or optional enhancements.
 
 An implementation or schema domain that is broader than approved product
@@ -127,6 +197,13 @@ Before reporting a blocking finding, verify all of the following:
 3. The issue cannot be resolved by an ordinary implementation choice.
 4. Resolving it requires changing or clarifying the specification.
 
+An omission may be established by concrete directly relevant repository
+evidence discovered during the bounded dependency check.
+
+When a finding depends on repository evidence, identify the relevant path,
+interface, schema, relationship, or supported flow in the finding so the caller
+can verify why the omitted dependency is material.
+
 If any condition is false, it is not a blocking finding.
 
 Advisory notes must still be concrete and specification-relevant. Do not use
@@ -135,12 +212,22 @@ choices.
 
 ## Stop Condition
 
-Once the artifacts have been checked against their directly relevant repository
-dependencies and all candidate blocking findings have passed the Finding Gate,
-stop the review.
+Stop once:
 
-Do not continue searching for additional edge cases, hardening opportunities,
-implementation risks, or alternative designs.
+1. all three specification artifacts have been checked for cross-phase
+   consistency;
+2. direct producers and consumers of the feature's material impact anchors have
+   been checked;
+3. required supporting dependencies for documented user workflows have been
+   checked;
+4. directly relevant repository contracts have been checked; and
+5. all candidate blocking findings have passed the Finding Gate.
+
+Do not continue outward into adjacent dependencies once these direct
+relationships are resolved.
+
+Do not search for additional edge cases, hardening opportunities,
+implementation risks, unrelated defects, or alternative designs.
 
 ## Re-review Mode
 
@@ -196,3 +283,15 @@ Use this output in Re-review Mode:
 
 Use `Approved` only when there are no blocking issues. If there are no
 findings, state that explicitly. Do not edit files.
+
+Do not repeat broad dependency discovery during Re-review Mode.
+
+Reinspect only:
+
+- dependencies involved in previous blocking findings;
+- dependencies directly touched by the repaired artifact sections; and
+- contradictions introduced into directly linked requirements, design
+  decisions, or tasks.
+
+A dependency unrelated to the repair cannot become a new blocking finding in
+Re-review Mode.

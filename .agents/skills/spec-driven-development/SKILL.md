@@ -29,24 +29,53 @@ reconciling them.
 ## Workflow
 
 1. Read relevant repository instructions and any existing specification for the
-   feature. Do not explore implementation code during initial requirements.
+   feature.
+
+   Load `discovering-feature-dependencies` and perform an initial bounded
+   dependency discovery from the user's requested feature.
+
+   Discover direct downstream impacts, supporting dependencies, reusable
+   existing capabilities, and material compatibility constraints before
+   drafting requirements.
+
+   Do not perform broad repository exploration. The discovery exists only to
+   establish the existing system context required for complete feature
+   requirements.
 2. Load `requirements-engineering` and create an initial `requirements.md`
-   directly from the user's rough idea without sequential questions first.
+   directly from the user's rough idea and the bounded dependency discovery
+   context without sequential questions first.
+
+   Existing repository behavior may establish compatibility constraints or
+   reveal capabilities required by the requested workflow, but must not silently
+   define new product behavior.
 3. If the first requirements draft still leaves material behavior, scope,
-   architecture, or compatibility unclear, or if design trade-offs remain,
-   load the `brainstorming` skill to clarify each material decision and obtain
-   explicit approval. After `brainstorming` hands back approved decisions,
+   dependency behavior, architecture, or compatibility unclear, or if design
+   trade-offs remain, load the `brainstorming` skill to clarify each material
+   decision and obtain explicit approval. After `brainstorming` hands back approved decisions,
    update `requirements.md` to match. If no such ambiguity remains, refine
    requirements through targeted feedback only.
 4. Present the requirements through the `question` tool and request explicit
    user approval. Stop and wait.
 5. After approval, load `design-documentation` and create or revise `design.md`.
+
+   During design, inspect the concrete repository architecture and contracts
+   needed to resolve the approved feature's downstream impacts and supporting
+   dependencies.
+
+   If this exposes a missing product behavior or changes an approved
+   requirement, return to requirements engineering and obtain approval again.
+   Purely technical resolution of an already approved behavior remains a design
+   decision.
 6. Present material design decisions through the `question` tool and request
    explicit user approval. Stop and wait.
 7. After approval, load `task-breakdown` and create or revise `tasks.md`.
 8. Dispatch one fresh reviewer subagent. Tell it to load
-   `reviewing-feature-spec` skill, pass all three artifact paths, and perform the
+   `reviewing-feature-spec`, pass all three artifact paths, and perform the
    single broad independent specification review.
+
+   The reviewer must independently perform bounded feature dependency discovery
+   from the specification's domain concepts and shared boundaries. It must not
+   rely solely on dependencies already named by the specification.
 9. If the review reports blocking findings, enter the bounded specification
    repair loop. Allow at most three review rounds total, including the initial
    broad review. For each repair round:
@@ -96,3 +125,15 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
 - Keep each feature focused enough for one implementation lifecycle.
 - Write requirements, design, and user-facing spec responses in the user's
   language when possible.
+- Feature completeness includes both feature-owned behavior and direct
+  capabilities required for supported user workflows to function.
+- Do not assume callers already know internal IDs, codes, reference values, or
+  related-domain data unless that is an explicit supported contract.
+- Existing functionality affected by a new feature must be preserved,
+  intentionally changed, or surfaced as a material decision; it must not remain
+  accidentally unspecified.
+- Dependency discovery is bounded. Direct relationships may be inspected;
+  unrelated neighboring functionality must not expand feature scope.
+- Reuse an existing supported capability when it satisfies a dependency. Do not
+  require a duplicate API, model, or source of truth merely to make the new
+  feature self-contained.
