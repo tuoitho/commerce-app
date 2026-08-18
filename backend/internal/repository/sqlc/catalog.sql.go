@@ -12,10 +12,370 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createProduct = `-- name: CreateProduct :one
+INSERT INTO products (
+    category_id,
+    name,
+    description,
+    price,
+    currency,
+    stock_quantity,
+    model,
+    brand,
+    featured,
+    active,
+    created_at,
+    updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, true, now(), now()
+)
+RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, active, created_at, updated_at
+`
+
+type CreateProductParams struct {
+	CategoryID    string
+	Name          string
+	Description   string
+	Price         pgtype.Numeric
+	Currency      string
+	StockQuantity int64
+	Model         string
+	Brand         string
+	Featured      bool
+}
+
+type CreateProductRow struct {
+	ID            string
+	CategoryID    string
+	Name          string
+	Description   string
+	Price         string
+	Currency      string
+	StockQuantity int64
+	Model         string
+	Brand         string
+	Featured      bool
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (CreateProductRow, error) {
+	row := q.db.QueryRow(ctx, createProduct,
+		arg.CategoryID,
+		arg.Name,
+		arg.Description,
+		arg.Price,
+		arg.Currency,
+		arg.StockQuantity,
+		arg.Model,
+		arg.Brand,
+		arg.Featured,
+	)
+	var i CreateProductRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Name,
+		&i.Description,
+		&i.Price,
+		&i.Currency,
+		&i.StockQuantity,
+		&i.Model,
+		&i.Brand,
+		&i.Featured,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createProductImage = `-- name: CreateProductImage :exec
+INSERT INTO product_images (
+    product_id,
+    url,
+    position,
+    created_at
+) VALUES (
+    $1, $2, $3, now()
+)
+`
+
+type CreateProductImageParams struct {
+	ProductID string
+	Url       string
+	Position  int32
+}
+
+func (q *Queries) CreateProductImage(ctx context.Context, arg CreateProductImageParams) error {
+	_, err := q.db.Exec(ctx, createProductImage, arg.ProductID, arg.Url, arg.Position)
+	return err
+}
+
+const createProductOptionGroup = `-- name: CreateProductOptionGroup :exec
+INSERT INTO product_option_groups (
+    id,
+    product_id,
+    label,
+    position
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type CreateProductOptionGroupParams struct {
+	ID        string
+	ProductID string
+	Label     string
+	Position  int32
+}
+
+func (q *Queries) CreateProductOptionGroup(ctx context.Context, arg CreateProductOptionGroupParams) error {
+	_, err := q.db.Exec(ctx, createProductOptionGroup,
+		arg.ID,
+		arg.ProductID,
+		arg.Label,
+		arg.Position,
+	)
+	return err
+}
+
+const createProductOptionValue = `-- name: CreateProductOptionValue :exec
+INSERT INTO product_option_values (
+    id,
+    product_id,
+    group_id,
+    label,
+    position
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+`
+
+type CreateProductOptionValueParams struct {
+	ID        string
+	ProductID string
+	GroupID   string
+	Label     string
+	Position  int32
+}
+
+func (q *Queries) CreateProductOptionValue(ctx context.Context, arg CreateProductOptionValueParams) error {
+	_, err := q.db.Exec(ctx, createProductOptionValue,
+		arg.ID,
+		arg.ProductID,
+		arg.GroupID,
+		arg.Label,
+		arg.Position,
+	)
+	return err
+}
+
+const createProductVariant = `-- name: CreateProductVariant :exec
+INSERT INTO product_variants (
+    id,
+    product_id,
+    price_vnd,
+    stock_quantity,
+    active,
+    created_at,
+    updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, now(), now()
+)
+`
+
+type CreateProductVariantParams struct {
+	ID            string
+	ProductID     string
+	PriceVnd      pgtype.Numeric
+	StockQuantity int64
+	Active        bool
+}
+
+func (q *Queries) CreateProductVariant(ctx context.Context, arg CreateProductVariantParams) error {
+	_, err := q.db.Exec(ctx, createProductVariant,
+		arg.ID,
+		arg.ProductID,
+		arg.PriceVnd,
+		arg.StockQuantity,
+		arg.Active,
+	)
+	return err
+}
+
+const createVariantOptionValue = `-- name: CreateVariantOptionValue :exec
+INSERT INTO variant_option_values (
+    variant_id,
+    product_id,
+    group_id,
+    option_value_id
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type CreateVariantOptionValueParams struct {
+	VariantID     string
+	ProductID     string
+	GroupID       string
+	OptionValueID string
+}
+
+func (q *Queries) CreateVariantOptionValue(ctx context.Context, arg CreateVariantOptionValueParams) error {
+	_, err := q.db.Exec(ctx, createVariantOptionValue,
+		arg.VariantID,
+		arg.ProductID,
+		arg.GroupID,
+		arg.OptionValueID,
+	)
+	return err
+}
+
+const deleteProductImages = `-- name: DeleteProductImages :exec
+DELETE FROM product_images
+WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductImages(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, deleteProductImages, productID)
+	return err
+}
+
+const deleteProductOptionGroups = `-- name: DeleteProductOptionGroups :exec
+DELETE FROM product_option_groups
+WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductOptionGroups(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, deleteProductOptionGroups, productID)
+	return err
+}
+
+const deleteProductOptionValues = `-- name: DeleteProductOptionValues :exec
+DELETE FROM product_option_values
+WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductOptionValues(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, deleteProductOptionValues, productID)
+	return err
+}
+
+const deleteProductVariant = `-- name: DeleteProductVariant :exec
+DELETE FROM product_variants
+WHERE id = $1 AND product_id = $2
+`
+
+type DeleteProductVariantParams struct {
+	ID        string
+	ProductID string
+}
+
+func (q *Queries) DeleteProductVariant(ctx context.Context, arg DeleteProductVariantParams) error {
+	_, err := q.db.Exec(ctx, deleteProductVariant, arg.ID, arg.ProductID)
+	return err
+}
+
+const deleteProductVariants = `-- name: DeleteProductVariants :exec
+DELETE FROM product_variants
+WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductVariants(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, deleteProductVariants, productID)
+	return err
+}
+
+const deleteVariantOptionValues = `-- name: DeleteVariantOptionValues :exec
+DELETE FROM variant_option_values
+WHERE product_id = $1
+`
+
+func (q *Queries) DeleteVariantOptionValues(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, deleteVariantOptionValues, productID)
+	return err
+}
+
+const getAdminProductByID = `-- name: GetAdminProductByID :one
+SELECT p.id,
+       p.name,
+       p.model,
+       p.brand,
+       p.description,
+       p.price::text AS price,
+       p.currency,
+       p.stock_quantity,
+       c.id AS category_id,
+       c.name AS category_name,
+       p.featured,
+       p.active,
+       p.created_at,
+       p.updated_at
+FROM products p
+JOIN categories c ON c.id = p.category_id
+WHERE p.id = $1
+  AND p.active
+`
+
+type GetAdminProductByIDRow struct {
+	ID            string
+	Name          string
+	Model         string
+	Brand         string
+	Description   string
+	Price         string
+	Currency      string
+	StockQuantity int64
+	CategoryID    string
+	CategoryName  string
+	Featured      bool
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) GetAdminProductByID(ctx context.Context, id string) (GetAdminProductByIDRow, error) {
+	row := q.db.QueryRow(ctx, getAdminProductByID, id)
+	var i GetAdminProductByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Model,
+		&i.Brand,
+		&i.Description,
+		&i.Price,
+		&i.Currency,
+		&i.StockQuantity,
+		&i.CategoryID,
+		&i.CategoryName,
+		&i.Featured,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCategoryByID = `-- name: GetCategoryByID :one
+SELECT id, name, created_at
+FROM categories
+WHERE id = $1
+`
+
+func (q *Queries) GetCategoryByID(ctx context.Context, id string) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategoryByID, id)
+	var i Category
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	return i, err
+}
+
 const getProductByID = `-- name: GetProductByID :one
 SELECT p.id,
        p.name,
        p.model,
+       p.brand,
        p.description,
        c.id AS category_id,
        c.name AS category_name,
@@ -34,6 +394,7 @@ type GetProductByIDRow struct {
 	ID           string
 	Name         string
 	Model        string
+	Brand        string
 	Description  string
 	CategoryID   string
 	CategoryName string
@@ -50,6 +411,7 @@ func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByID
 		&i.ID,
 		&i.Name,
 		&i.Model,
+		&i.Brand,
 		&i.Description,
 		&i.CategoryID,
 		&i.CategoryName,
@@ -89,6 +451,90 @@ func (q *Queries) ListActiveProductVariants(ctx context.Context, productID strin
 			&i.PriceVnd,
 			&i.StockQuantity,
 			&i.Active,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminProducts = `-- name: ListAdminProducts :many
+SELECT p.id,
+       p.name,
+       p.model,
+       p.brand,
+       p.description,
+       p.price::text AS price,
+       p.currency,
+       p.stock_quantity,
+       c.id AS category_id,
+       c.name AS category_name,
+       p.featured,
+       p.active,
+       p.created_at,
+       p.updated_at,
+       COALESCE((SELECT pi.url
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.position ASC, pi.id ASC
+        LIMIT 1), '')::text AS primary_image_url
+FROM products p
+JOIN categories c ON c.id = p.category_id
+WHERE p.active
+  AND ($1::text IS NULL OR lower(c.name) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.brand) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.name) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.model) LIKE '%' || lower($1::text) || '%')
+ORDER BY p.name ASC, p.model ASC, p.id ASC
+`
+
+type ListAdminProductsRow struct {
+	ID              string
+	Name            string
+	Model           string
+	Brand           string
+	Description     string
+	Price           string
+	Currency        string
+	StockQuantity   int64
+	CategoryID      string
+	CategoryName    string
+	Featured        bool
+	Active          bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	PrimaryImageUrl string
+}
+
+func (q *Queries) ListAdminProducts(ctx context.Context, q_ pgtype.Text) ([]ListAdminProductsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminProducts, q_)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminProductsRow
+	for rows.Next() {
+		var i ListAdminProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Model,
+			&i.Brand,
+			&i.Description,
+			&i.Price,
+			&i.Currency,
+			&i.StockQuantity,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.Featured,
+			&i.Active,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PrimaryImageUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -238,10 +684,50 @@ func (q *Queries) ListProductOptionValues(ctx context.Context, productID string)
 	return items, nil
 }
 
+const listProductVariants = `-- name: ListProductVariants :many
+SELECT id, price_vnd::text AS price_vnd, stock_quantity, active
+FROM product_variants
+WHERE product_id = $1
+ORDER BY price_vnd ASC, id ASC
+`
+
+type ListProductVariantsRow struct {
+	ID            string
+	PriceVnd      string
+	StockQuantity int64
+	Active        bool
+}
+
+func (q *Queries) ListProductVariants(ctx context.Context, productID string) ([]ListProductVariantsRow, error) {
+	rows, err := q.db.Query(ctx, listProductVariants, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProductVariantsRow
+	for rows.Next() {
+		var i ListProductVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceVnd,
+			&i.StockQuantity,
+			&i.Active,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProducts = `-- name: ListProducts :many
 SELECT p.id,
        p.name,
        p.model,
+       p.brand,
        p.description,
        c.id AS category_id,
        c.name AS category_name,
@@ -259,6 +745,7 @@ JOIN categories c ON c.id = p.category_id
 WHERE p.active
   AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
   AND ($1::text IS NULL OR lower(c.name) LIKE '%' || lower($1::text) || '%'
+       OR lower(p.brand) LIKE '%' || lower($1::text) || '%'
        OR lower(p.name) LIKE '%' || lower($1::text) || '%'
        OR lower(p.model) LIKE '%' || lower($1::text) || '%')
   AND ($2::uuid[] IS NULL
@@ -294,6 +781,7 @@ type ListProductsRow struct {
 	ID              string
 	Name            string
 	Model           string
+	Brand           string
 	Description     string
 	CategoryID      string
 	CategoryName    string
@@ -324,6 +812,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 			&i.ID,
 			&i.Name,
 			&i.Model,
+			&i.Brand,
 			&i.Description,
 			&i.CategoryID,
 			&i.CategoryName,
@@ -374,4 +863,189 @@ func (q *Queries) ListVariantOptionValues(ctx context.Context, productID string)
 		return nil, err
 	}
 	return items, nil
+}
+
+const softDeleteProduct = `-- name: SoftDeleteProduct :one
+UPDATE products
+SET active = false,
+    updated_at = now()
+WHERE id = $1 AND active
+RETURNING id
+`
+
+func (q *Queries) SoftDeleteProduct(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, softDeleteProduct, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const softDeleteProductVariant = `-- name: SoftDeleteProductVariant :exec
+UPDATE product_variants
+SET active = false,
+    updated_at = now()
+WHERE id = $1 AND product_id = $2
+`
+
+type SoftDeleteProductVariantParams struct {
+	ID        string
+	ProductID string
+}
+
+func (q *Queries) SoftDeleteProductVariant(ctx context.Context, arg SoftDeleteProductVariantParams) error {
+	_, err := q.db.Exec(ctx, softDeleteProductVariant, arg.ID, arg.ProductID)
+	return err
+}
+
+const softDeleteProductVariants = `-- name: SoftDeleteProductVariants :exec
+UPDATE product_variants
+SET active = false,
+    updated_at = now()
+WHERE product_id = $1
+`
+
+func (q *Queries) SoftDeleteProductVariants(ctx context.Context, productID string) error {
+	_, err := q.db.Exec(ctx, softDeleteProductVariants, productID)
+	return err
+}
+
+const updateProduct = `-- name: UpdateProduct :one
+UPDATE products
+SET category_id = $2,
+    name = $3,
+    description = $4,
+    price = $5,
+    currency = $6,
+    stock_quantity = $7,
+    model = $8,
+    brand = $9,
+    featured = $10,
+    active = true,
+    updated_at = now()
+WHERE id = $1 AND active
+RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, active, created_at, updated_at
+`
+
+type UpdateProductParams struct {
+	ID            string
+	CategoryID    string
+	Name          string
+	Description   string
+	Price         pgtype.Numeric
+	Currency      string
+	StockQuantity int64
+	Model         string
+	Brand         string
+	Featured      bool
+}
+
+type UpdateProductRow struct {
+	ID            string
+	CategoryID    string
+	Name          string
+	Description   string
+	Price         string
+	Currency      string
+	StockQuantity int64
+	Model         string
+	Brand         string
+	Featured      bool
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error) {
+	row := q.db.QueryRow(ctx, updateProduct,
+		arg.ID,
+		arg.CategoryID,
+		arg.Name,
+		arg.Description,
+		arg.Price,
+		arg.Currency,
+		arg.StockQuantity,
+		arg.Model,
+		arg.Brand,
+		arg.Featured,
+	)
+	var i UpdateProductRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Name,
+		&i.Description,
+		&i.Price,
+		&i.Currency,
+		&i.StockQuantity,
+		&i.Model,
+		&i.Brand,
+		&i.Featured,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateProductPriceAndStock = `-- name: UpdateProductPriceAndStock :exec
+UPDATE products
+SET price = $2,
+    stock_quantity = $3,
+    updated_at = now()
+WHERE id = $1
+`
+
+type UpdateProductPriceAndStockParams struct {
+	ID            string
+	Price         pgtype.Numeric
+	StockQuantity int64
+}
+
+func (q *Queries) UpdateProductPriceAndStock(ctx context.Context, arg UpdateProductPriceAndStockParams) error {
+	_, err := q.db.Exec(ctx, updateProductPriceAndStock, arg.ID, arg.Price, arg.StockQuantity)
+	return err
+}
+
+const updateProductVariant = `-- name: UpdateProductVariant :exec
+UPDATE product_variants
+SET price_vnd = $2,
+    stock_quantity = $3,
+    active = $4,
+    updated_at = now()
+WHERE id = $1 AND product_id = $5
+`
+
+type UpdateProductVariantParams struct {
+	ID            string
+	PriceVnd      pgtype.Numeric
+	StockQuantity int64
+	Active        bool
+	ProductID     string
+}
+
+func (q *Queries) UpdateProductVariant(ctx context.Context, arg UpdateProductVariantParams) error {
+	_, err := q.db.Exec(ctx, updateProductVariant,
+		arg.ID,
+		arg.PriceVnd,
+		arg.StockQuantity,
+		arg.Active,
+		arg.ProductID,
+	)
+	return err
+}
+
+const updateVariantStock = `-- name: UpdateVariantStock :exec
+UPDATE product_variants
+SET stock_quantity = $2
+WHERE id = $1
+`
+
+type UpdateVariantStockParams struct {
+	ID            string
+	StockQuantity int64
+}
+
+func (q *Queries) UpdateVariantStock(ctx context.Context, arg UpdateVariantStockParams) error {
+	_, err := q.db.Exec(ctx, updateVariantStock, arg.ID, arg.StockQuantity)
+	return err
 }

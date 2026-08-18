@@ -32,7 +32,12 @@ reconciling them.
    feature. Do not explore implementation code during initial requirements.
 2. Load `requirements-engineering` and create an initial `requirements.md`
    directly from the user's rough idea without sequential questions first.
-3. Refine requirements through targeted feedback when needed.
+3. If the first requirements draft still leaves material behavior, scope,
+   architecture, or compatibility unclear, or if design trade-offs remain,
+   load the `brainstorming` skill to clarify each material decision and obtain
+   explicit approval. After `brainstorming` hands back approved decisions,
+   update `requirements.md` to match. If no such ambiguity remains, refine
+   requirements through targeted feedback only.
 4. Present the requirements through the `question` tool and request explicit
    user approval. Stop and wait.
 5. After approval, load `design-documentation` and create or revise `design.md`.

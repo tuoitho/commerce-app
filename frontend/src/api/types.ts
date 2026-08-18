@@ -77,7 +77,7 @@ export interface ProductSummary {
   id: string
   name: string
   model: string
-  brand: Category
+  brand: string
   category: Category
   minPriceVnd: string
   maxPriceVnd: string
@@ -108,6 +108,7 @@ export interface ProductVariant {
   optionValueIds: Record<string, string>
   priceVnd: string
   stockQuantity: number
+  active?: boolean
 }
 
 export interface ProductDetail {
@@ -115,7 +116,7 @@ export interface ProductDetail {
   name: string
   model: string
   description: string
-  brand: Category
+  brand: string
   category: Category
   minPriceVnd: string
   maxPriceVnd: string

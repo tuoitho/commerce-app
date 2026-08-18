@@ -1,6 +1,6 @@
 DB_URL ?= postgres://commerce:commerce@localhost:5432/commerce?sslmode=disable
 -include .env
-export APP_ENV HTTP_PORT DB_URL JWT_ACCESS_SECRET ACCESS_TOKEN_TTL REFRESH_TOKEN_TTL COOKIE_SECURE
+export APP_ENV HTTP_PORT DB_URL JWT_ACCESS_SECRET ACCESS_TOKEN_TTL REFRESH_TOKEN_TTL COOKIE_SECURE ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD
 
 MIGRATE = migrate -source "file://db/migrations" -database "$(DB_URL)"
 

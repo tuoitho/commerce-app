@@ -20,23 +20,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
-  // Restore session via httpOnly refresh cookie on initial app load
+  // Restore session from localStorage on initial app load
   useEffect(() => {
     let isMounted = true
     async function restoreSession() {
-      try {
-        const session = await authApi.refresh()
-        if (isMounted && session?.user) {
-          setUser(session.user)
-          setAccessToken(session.accessToken)
-          tokenStore.setToken(session.accessToken)
-        }
-      } catch {
-        // No active session
+      const existingToken = tokenStore.getToken()
+      if (!existingToken) {
         if (isMounted) {
           setUser(null)
           setAccessToken(null)
-          tokenStore.clearToken()
+          setIsLoading(false)
+        }
+        return
+      }
+
+      try {
+        const currentUser = await authApi.getMe()
+        if (isMounted && currentUser) {
+          setUser(currentUser)
+          setAccessToken(existingToken)
+        }
+      } catch {
+        // Token might be expired, attempt refresh once or clear
+        try {
+          const session = await authApi.refresh()
+          if (isMounted && session?.user) {
+            setUser(session.user)
+            setAccessToken(session.accessToken)
+            tokenStore.setToken(session.accessToken)
+          }
+        } catch {
+          if (isMounted) {
+            setUser(null)
+            setAccessToken(null)
+            tokenStore.clearToken()
+          }
         }
       } finally {
         if (isMounted) {

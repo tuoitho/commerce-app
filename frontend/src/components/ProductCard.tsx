@@ -70,7 +70,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center justify-between gap-1.5 mb-2.5">
             <div className="flex items-center gap-1.5">
               <Badge variant="brand" className="font-bold text-[11px] px-2.5 py-0.5 shadow-2xs">
-                {product.brand?.name || 'Smartphone'}
+                {product.brand || 'Smartphone'}
               </Badge>
               <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
                 <Zap className="h-2.5 w-2.5" />
@@ -81,11 +81,11 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.inStock ? (
               <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-100">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Sẵn hàng
+                Còn hàng
               </span>
             ) : (
               <Badge variant="destructive" className="text-[10px] py-0 px-2">
-                Tạm hết
+                Hết hàng
               </Badge>
             )}
           </div>
@@ -104,7 +104,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {!imageFailed && product.primaryImageUrl ? (
               <img
                 src={product.primaryImageUrl}
-                alt={`${product.brand?.name ?? ''} ${product.name} ${product.model ?? ''}`}
+                alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
                 className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
                 onError={() => setImageFailed(true)}
                 loading="lazy"
@@ -112,7 +112,7 @@ export function ProductCard({ product }: ProductCardProps) {
             ) : (
               <img
                 src="/iphone-16-pro.jpg"
-                alt={`${product.brand?.name ?? ''} ${product.name} ${product.model ?? ''}`}
+                alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
                 className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
                 loading="lazy"
               />

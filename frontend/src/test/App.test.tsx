@@ -25,7 +25,7 @@ vi.mock('@/api/catalog', () => ({
         id: 'prod-1',
         name: 'iPhone 15 Pro',
         model: 'A3102',
-        brand: { id: 'cat-1', name: 'Apple' },
+        brand: 'Apple',
         category: { id: 'cat-1', name: 'Điện thoại' },
         minPriceVnd: '25990000',
         maxPriceVnd: '25990000',
@@ -73,10 +73,10 @@ describe('App navigation', () => {
     expect(screen.getAllByText('Trang chủ').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Sản phẩm').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Giỏ hàng').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Thương hiệu')).toBeInTheDocument()
+    expect(screen.getByText('Danh mục')).toBeInTheDocument()
   })
 
-  it('opens brand dropdown and displays dynamic brands', async () => {
+  it('opens category dropdown and displays dynamic categories', async () => {
     const { fireEvent, waitFor } = await import('@testing-library/react')
     render(
       <ToastProvider>
@@ -90,11 +90,11 @@ describe('App navigation', () => {
       </ToastProvider>
     )
 
-    const brandButton = screen.getByRole('button', { name: /thương hiệu/i })
-    fireEvent.click(brandButton)
+    const categoryButton = screen.getByRole('button', { name: /danh mục/i })
+    fireEvent.click(categoryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Chọn theo thương hiệu')).toBeInTheDocument()
+      expect(screen.getByText('Chọn theo danh mục')).toBeInTheDocument()
       expect(screen.getAllByText('Apple').length).toBeGreaterThanOrEqual(1)
     })
   })

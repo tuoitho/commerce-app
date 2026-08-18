@@ -1,0 +1,163 @@
+diff --git a/backend/internal/usecase/catalog/catalog.go b/backend/internal/usecase/catalog/catalog.go
+index 478ab26..7d0f8cd 100644
+--- a/backend/internal/usecase/catalog/catalog.go
++++ b/backend/internal/usecase/catalog/catalog.go
+@@ -2,6 +2,7 @@ package catalog
+ 
+ import (
+ 	"context"
++	"fmt"
+ 	"math/big"
+ 	"regexp"
+ 	"strconv"
+@@ -97,6 +98,150 @@ func (uc *UseCase) validateFilter(f *domain.ProductFilter) error {
+ 	return nil
+ }
+ 
++func (uc *UseCase) ListAdminProducts(ctx context.Context, query string) ([]domain.Product, error) {
++	return uc.catalog.ListAdminProducts(ctx, strings.TrimSpace(query))
++}
++
++func (uc *UseCase) GetAdminProduct(ctx context.Context, id string) (*domain.Product, error) {
++	if !uuidPattern.MatchString(id) {
++		return nil, domain.ErrInvalidProductID
++	}
++	return uc.catalog.GetAdminProductByID(ctx, id)
++}
++
++func (uc *UseCase) CreateProduct(ctx context.Context, input domain.SaveProductInput) (*domain.Product, error) {
++	if err := uc.validateSaveProductInput(&input); err != nil {
++		return nil, err
++	}
++	_, err := uc.catalog.GetCategoryByID(ctx, input.CategoryID)
++	if err != nil {
++		return nil, domain.NewValidationError(map[string]string{"categoryId": "Danh mục không tồn tại"})
++	}
++	return uc.catalog.CreateProduct(ctx, input)
++}
++
++func (uc *UseCase) UpdateProduct(ctx context.Context, id string, input domain.SaveProductInput) (*domain.Product, error) {
++	if !uuidPattern.MatchString(id) {
++		return nil, domain.ErrInvalidProductID
++	}
++	if err := uc.validateSaveProductInput(&input); err != nil {
++		return nil, err
++	}
++	_, err := uc.catalog.GetCategoryByID(ctx, input.CategoryID)
++	if err != nil {
++		return nil, domain.NewValidationError(map[string]string{"categoryId": "Danh mục không tồn tại"})
++	}
++	return uc.catalog.UpdateProduct(ctx, id, input)
++}
++
++func (uc *UseCase) DeleteProduct(ctx context.Context, id string) error {
++	if !uuidPattern.MatchString(id) {
++		return domain.ErrInvalidProductID
++	}
++	return uc.catalog.DeleteProduct(ctx, id)
++}
++
++func (uc *UseCase) validateSaveProductInput(input *domain.SaveProductInput) error {
++	input.Name = strings.TrimSpace(input.Name)
++	input.Model = strings.TrimSpace(input.Model)
++	input.Brand = strings.TrimSpace(input.Brand)
++	input.Description = strings.TrimSpace(input.Description)
++	input.CategoryID = strings.TrimSpace(input.CategoryID)
++	input.Price = strings.TrimSpace(input.Price)
++	input.Currency = strings.TrimSpace(input.Currency)
++	if input.Currency == "" {
++		input.Currency = "VND"
++	}
++
++	fields := map[string]string{}
++	if input.Name == "" {
++		fields["name"] = "Tên sản phẩm không được để trống"
++	}
++	if input.CategoryID == "" || !uuidPattern.MatchString(input.CategoryID) {
++		fields["categoryId"] = "Danh mục không hợp lệ"
++	}
++
++	if !input.HasVariants {
++		if input.Price == "" {
++			fields["price"] = "Giá sản phẩm không được để trống"
++		} else if !validPriceInput(input.Price) {
++			fields["price"] = "Giá sản phẩm phải là số không âm"
++		}
++		if input.StockQuantity < 0 {
++			fields["stockQuantity"] = "Số lượng tồn kho không được âm"
++		}
++	} else {
++		if len(input.OptionGroups) == 0 {
++			fields["optionGroups"] = "Phải có ít nhất một nhóm thuộc tính"
++		} else {
++			for i, group := range input.OptionGroups {
++				trimmedLabel := strings.TrimSpace(group.Label)
++				input.OptionGroups[i].Label = trimmedLabel
++				if trimmedLabel == "" {
++					fields[fmt.Sprintf("optionGroups[%d].label", i)] = "Tên nhóm thuộc tính không được để trống"
++				}
++				if len(group.Values) == 0 {
++					fields[fmt.Sprintf("optionGroups[%d].values", i)] = "Nhóm thuộc tính phải có ít nhất một giá trị"
++				} else {
++					seenVals := make(map[string]bool)
++					hasDup := false
++					for j, val := range group.Values {
++						trimmedVal := strings.TrimSpace(val.Label)
++						input.OptionGroups[i].Values[j].Label = trimmedVal
++						if trimmedVal != "" {
++							lower := strings.ToLower(trimmedVal)
++							if seenVals[lower] {
++								hasDup = true
++							}
++							seenVals[lower] = true
++						}
++					}
++					if hasDup {
++						fields[fmt.Sprintf("optionGroups[%d].values", i)] = "Giá trị thuộc tính không được trùng nhau"
++					}
++				}
++			}
++		}
++
++		if len(input.OptionGroups) > 0 && len(input.Variants) == 0 {
++			fields["variants"] = "Phải có ít nhất một biến thể"
++		} else {
++			for i, variant := range input.Variants {
++				trimmedPrice := strings.TrimSpace(variant.PriceVND)
++				input.Variants[i].PriceVND = trimmedPrice
++				if trimmedPrice == "" || !validPriceInput(trimmedPrice) {
++					fields[fmt.Sprintf("variants[%d].priceVnd", i)] = "Giá biến thể phải là số không âm"
++				}
++				if variant.StockQuantity < 0 {
++					fields[fmt.Sprintf("variants[%d].stockQuantity", i)] = "Số lượng tồn kho không được âm"
++				}
++			}
++		}
++
++		if input.Price != "" && !validPriceInput(input.Price) {
++			fields["price"] = "Giá sản phẩm phải là số không âm"
++		}
++		if input.StockQuantity < 0 {
++			fields["stockQuantity"] = "Số lượng tồn kho không được âm"
++		}
++	}
++
++	if len(fields) > 0 {
++		return domain.NewValidationError(fields)
++	}
++	return nil
++}
++
++func validPriceInput(s string) bool {
++	if s == "" {
++		return false
++	}
++	if domain.MoneyVND(s).IsCanonical() {
++		return true
++	}
++	return regexp.MustCompile(`^(?:[0-9]+|[0-9]*\.[0-9]{1,2})$`).MatchString(s)
++}
++
+ func validMoney(s string) bool {
+ 	return len(s) <= 38 && domain.MoneyVND(s).IsCanonical()
+ }

@@ -7,6 +7,7 @@ var (
 	ErrEmailInUse          = errors.New("email already in use")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrInvalidToken        = errors.New("invalid token")
+	ErrForbidden           = errors.New("forbidden")
 	ErrNotFound            = errors.New("not found")
 	ErrProductNotFound     = errors.New("product not found")
 	ErrInvalidProductID    = errors.New("invalid product id")

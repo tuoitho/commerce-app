@@ -19,8 +19,15 @@ func NewUserRepository(pool Querier) *UserRepository {
 	return &UserRepository{q: sqlc.New(pool)}
 }
 
-func (r *UserRepository) Create(ctx context.Context, email, passwordHash string) (*domain.User, error) {
-	u, err := r.q.CreateUser(ctx, sqlc.CreateUserParams{Email: email, PasswordHash: passwordHash})
+func (r *UserRepository) Create(ctx context.Context, email, passwordHash, role string) (*domain.User, error) {
+	if role == "" {
+		role = domain.RoleCustomer
+	}
+	u, err := r.q.CreateUser(ctx, sqlc.CreateUserParams{
+		Email:        email,
+		PasswordHash: passwordHash,
+		Role:         role,
+	})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -28,7 +35,14 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash string)
 		}
 		return nil, err
 	}
-	return toDomainUser(u), nil
+	return &domain.User{
+		ID:           u.ID,
+		Email:        u.Email,
+		PasswordHash: u.PasswordHash,
+		Role:         u.Role,
+		CreatedAt:    u.CreatedAt,
+		UpdatedAt:    u.UpdatedAt,
+	}, nil
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -39,7 +53,14 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		}
 		return nil, err
 	}
-	return toDomainUser(u), nil
+	return &domain.User{
+		ID:           u.ID,
+		Email:        u.Email,
+		PasswordHash: u.PasswordHash,
+		Role:         u.Role,
+		CreatedAt:    u.CreatedAt,
+		UpdatedAt:    u.UpdatedAt,
+	}, nil
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, error) {
@@ -50,15 +71,16 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, 
 		}
 		return nil, err
 	}
-	return toDomainUser(u), nil
-}
-
-func toDomainUser(u sqlc.User) *domain.User {
 	return &domain.User{
 		ID:           u.ID,
 		Email:        u.Email,
 		PasswordHash: u.PasswordHash,
+		Role:         u.Role,
 		CreatedAt:    u.CreatedAt,
 		UpdatedAt:    u.UpdatedAt,
-	}
+	}, nil
+}
+
+func (r *UserRepository) CountByRole(ctx context.Context, role string) (int64, error) {
+	return r.q.CountUsersByRole(ctx, role)
 }

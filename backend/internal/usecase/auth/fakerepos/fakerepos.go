@@ -19,7 +19,7 @@ func NewUsers() *Users {
 	return &Users{byID: map[string]*domain.User{}, next: 1}
 }
 
-func (f *Users) Create(ctx context.Context, email, passwordHash string) (*domain.User, error) {
+func (f *Users) Create(ctx context.Context, email, passwordHash, role string) (*domain.User, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, u := range f.byID {
@@ -27,11 +27,26 @@ func (f *Users) Create(ctx context.Context, email, passwordHash string) (*domain
 			return nil, domain.ErrEmailInUse
 		}
 	}
+	if role == "" {
+		role = domain.RoleCustomer
+	}
 	id := fmt.Sprintf("%d", f.next)
 	f.next++
-	u := &domain.User{ID: id, Email: email, PasswordHash: passwordHash, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	u := &domain.User{ID: id, Email: email, PasswordHash: passwordHash, Role: role, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	f.byID[u.ID] = u
 	return u, nil
+}
+
+func (f *Users) CountByRole(ctx context.Context, role string) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var count int64
+	for _, u := range f.byID {
+		if u.Role == role {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (f *Users) GetByEmail(ctx context.Context, email string) (*domain.User, error) {

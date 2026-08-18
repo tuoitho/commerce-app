@@ -28,7 +28,7 @@ type productSummaryResponse struct {
 	ID              string           `json:"id"`
 	Name            string           `json:"name"`
 	Model           string           `json:"model"`
-	Brand           categoryResponse `json:"brand"`
+	Brand           string           `json:"brand"`
 	Category        categoryResponse `json:"category"`
 	MinPriceVND     string           `json:"minPriceVnd"`
 	MaxPriceVND     string           `json:"maxPriceVnd"`
@@ -43,7 +43,7 @@ type productDetailResponse struct {
 	Name          string                `json:"name"`
 	Model         string                `json:"model"`
 	Description   string                `json:"description"`
-	Brand         categoryResponse      `json:"brand"`
+	Brand         string                `json:"brand"`
 	Category      categoryResponse      `json:"category"`
 	MinPriceVND   string                `json:"minPriceVnd"`
 	MaxPriceVND   string                `json:"maxPriceVnd"`
@@ -53,6 +53,7 @@ type productDetailResponse struct {
 	StockQuantity int64                 `json:"stockQuantity"`
 	InStock       bool                  `json:"inStock"`
 	Featured      bool                  `json:"featured"`
+	Active        bool                  `json:"active"`
 	OptionGroups  []optionGroupResponse `json:"optionGroups"`
 	Variants      []variantResponse     `json:"variants"`
 	CreatedAt     time.Time             `json:"createdAt"`
@@ -76,6 +77,7 @@ type variantResponse struct {
 	OptionValueIDs map[string]string `json:"optionValueIds"`
 	PriceVND       string            `json:"priceVnd"`
 	StockQuantity  int64             `json:"stockQuantity"`
+	Active         bool              `json:"active"`
 }
 
 func (h *catalogHandler) ListCategories(c *gin.Context) {
@@ -241,7 +243,7 @@ func toSummaryResponse(p domain.Product) productSummaryResponse {
 		ID:              p.ID,
 		Name:            p.Name,
 		Model:           p.Model,
-		Brand:           categoryResponse{ID: p.Brand.ID, Name: p.Brand.Name},
+		Brand:           p.Brand,
 		Category:        categoryResponse{ID: p.Category.ID, Name: p.Category.Name},
 		MinPriceVND:     string(p.MinPriceVND),
 		MaxPriceVND:     string(p.MaxPriceVND),
@@ -262,7 +264,7 @@ func toDetailResponse(p domain.Product) productDetailResponse {
 		Name:          p.Name,
 		Model:         p.Model,
 		Description:   p.Description,
-		Brand:         categoryResponse{ID: p.Brand.ID, Name: p.Brand.Name},
+		Brand:         p.Brand,
 		Category:      categoryResponse{ID: p.Category.ID, Name: p.Category.Name},
 		MinPriceVND:   string(p.MinPriceVND),
 		MaxPriceVND:   string(p.MaxPriceVND),
@@ -272,6 +274,7 @@ func toDetailResponse(p domain.Product) productDetailResponse {
 		StockQuantity: p.StockQuantity,
 		InStock:       p.InStock(),
 		Featured:      p.Featured,
+		Active:        p.Active,
 		OptionGroups:  toOptionGroupResponses(p.OptionGroups),
 		Variants:      toVariantResponses(p.Variants),
 		CreatedAt:     p.CreatedAt,
@@ -294,7 +297,17 @@ func toOptionGroupResponses(groups []domain.OptionGroup) []optionGroupResponse {
 func toVariantResponses(variants []domain.ProductVariant) []variantResponse {
 	out := make([]variantResponse, 0, len(variants))
 	for _, variant := range variants {
-		out = append(out, variantResponse{ID: variant.ID, OptionValueIDs: variant.OptionValueIDs, PriceVND: string(variant.PriceVND), StockQuantity: variant.StockQuantity})
+		optIDs := variant.OptionValueIDs
+		if optIDs == nil {
+			optIDs = make(map[string]string)
+		}
+		out = append(out, variantResponse{
+			ID:             variant.ID,
+			OptionValueIDs: optIDs,
+			PriceVND:       string(variant.PriceVND),
+			StockQuantity:  variant.StockQuantity,
+			Active:         variant.Active,
+		})
 	}
 	return out
 }

@@ -44,6 +44,7 @@ type Product struct {
 	Model         string
 	Featured      bool
 	Active        bool
+	Brand         string
 }
 
 type ProductImage struct {
@@ -94,6 +95,7 @@ type User struct {
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Role         string
 }
 
 type VariantOptionValue struct {

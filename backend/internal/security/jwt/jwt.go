@@ -20,12 +20,14 @@ func NewManager(secret, issuer string) *Manager {
 }
 
 type TokenClaims struct {
+	Role string `json:"role,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func (m *Manager) GenerateAccessToken(userID string, ttl time.Duration) (string, error) {
+func (m *Manager) GenerateAccessToken(userID, role string, ttl time.Duration) (string, error) {
 	now := m.now()
 	claims := TokenClaims{
+		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			Issuer:    m.issuer,
@@ -37,7 +39,7 @@ func (m *Manager) GenerateAccessToken(userID string, ttl time.Duration) (string,
 	return token.SignedString(m.secret)
 }
 
-func (m *Manager) ParseAccessToken(tokenStr string) (string, error) {
+func (m *Manager) ParseAccessToken(tokenStr string) (string, string, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &TokenClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -45,11 +47,15 @@ func (m *Manager) ParseAccessToken(tokenStr string) (string, error) {
 		return m.secret, nil
 	}, jwt.WithIssuer(m.issuer), jwt.WithExpirationRequired())
 	if err != nil {
-		return "", ErrInvalidToken
+		return "", "", ErrInvalidToken
 	}
 	claims, ok := token.Claims.(*TokenClaims)
 	if !ok || !token.Valid || claims.Subject == "" {
-		return "", ErrInvalidToken
+		return "", "", ErrInvalidToken
 	}
-	return claims.Subject, nil
+	role := claims.Role
+	if role == "" {
+		role = "customer"
+	}
+	return claims.Subject, role, nil
 }

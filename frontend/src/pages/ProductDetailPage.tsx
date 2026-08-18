@@ -194,7 +194,7 @@ export function ProductDetailPage() {
     if (!product) return false
     if (product.optionGroups?.length > 0) {
       if (!allGroupsSelected) return product.inStock
-      return selectedVariant ? selectedVariant.stockQuantity > 0 : false
+      return selectedVariant ? (selectedVariant.active !== false && selectedVariant.stockQuantity > 0) : false
     }
     return product.stockQuantity > 0
   }, [product, allGroupsSelected, selectedVariant])
@@ -244,12 +244,7 @@ export function ProductDetailPage() {
       return
     }
 
-    if (!selectedVariant) {
-      toastError('Phân loại không khả dụng', 'Phiên bản này hiện không có sẵn.')
-      return
-    }
-
-    if (selectedVariant.stockQuantity <= 0) {
+    if (!selectedVariant || selectedVariant.active === false || selectedVariant.stockQuantity <= 0) {
       toastError('Hết hàng', 'Phiên bản sản phẩm này tạm thời hết hàng.')
       return
     }
@@ -342,14 +337,14 @@ export function ProductDetailPage() {
               <Link to="/products" className="hover:text-emerald-600 transition-colors">
                 Điện thoại
               </Link>
-              {product.brand && (
+              {product.category && (
                 <>
                   <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   <Link
-                    to={`/products?category_id=${product.brand.id}`}
+                    to={`/products?category_id=${product.category.id}`}
                     className="hover:text-emerald-600 transition-colors"
                   >
-                    {product.brand.name}
+                    {product.category.name}
                   </Link>
                 </>
               )}
@@ -384,13 +379,13 @@ export function ProductDetailPage() {
               {images.length > 0 ? (
                 <img
                   src={images[selectedImageIndex] || images[0]}
-                  alt={`${product.brand?.name ?? ''} ${product.name}`}
+                  alt={`${product.brand || ''} ${product.name}`.trim()}
                   className="relative z-10 max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
                 <img
                   src="/iphone-16-pro.jpg"
-                  alt={`${product.brand?.name ?? ''} ${product.name}`}
+                  alt={`${product.brand || ''} ${product.name}`.trim()}
                   className="relative z-10 max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
                 />
               )}
@@ -400,11 +395,11 @@ export function ProductDetailPage() {
                 {isAvailable ? (
                   <Badge variant="success" className="shadow-xs font-bold text-xs py-1 px-3">
                     <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                    Sẵn hàng giao ngay
+                    Còn hàng
                   </Badge>
                 ) : (
                   <Badge variant="destructive" className="shadow-xs font-bold text-xs py-1 px-3">
-                    Tạm hết hàng
+                    Hết hàng
                   </Badge>
                 )}
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white text-[10px] font-extrabold px-3 py-1 shadow-xs border border-slate-700">
@@ -471,7 +466,7 @@ export function ProductDetailPage() {
               <div className="flex items-center gap-2.5 mb-2">
                 {product.brand && (
                   <Badge variant="brand" className="font-extrabold text-xs px-3 py-1">
-                    {product.brand.name}
+                    {product.brand}
                   </Badge>
                 )}
                 {product.model && (
@@ -498,8 +493,14 @@ export function ProductDetailPage() {
                   {displayedPrice}
                 </span>
                 {selectedVariant && (
-                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg ml-auto">
-                    Còn {selectedVariant.stockQuantity} máy sẵn hàng
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ml-auto ${
+                    selectedVariant.stockQuantity > 0 && selectedVariant.active !== false
+                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                      : 'text-rose-700 bg-rose-50 border border-rose-200'
+                  }`}>
+                    {selectedVariant.stockQuantity > 0 && selectedVariant.active !== false
+                      ? `Còn ${selectedVariant.stockQuantity} máy sẵn hàng`
+                      : 'Hết hàng'}
                   </span>
                 )}
               </div>
@@ -617,7 +618,7 @@ export function ProductDetailPage() {
                     {!allGroupsSelected
                       ? 'Vui lòng chọn phân loại'
                       : !isAvailable
-                      ? 'Tạm hết hàng'
+                      ? 'Hết hàng'
                       : 'Thêm vào giỏ hàng'}
                   </span>
                 </Button>

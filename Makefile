@@ -1,4 +1,4 @@
-.PHONY: backend frontend db-up seed run test build
+.PHONY: backend frontend frontend-admin admin db-up seed run test build
 
 ## Apply database migrations against the local backend DB.
 db-up:
@@ -15,6 +15,13 @@ backend:
 ## Start frontend server for local development (frontend on :5173).
 frontend:
 	$(MAKE) -C frontend run
+
+## Start admin frontend server for local development (admin on :5174).
+frontend-admin:
+	$(MAKE) -C frontend-admin run
+
+## Alias to run the admin frontend server.
+admin: frontend-admin
 
 ## Run backend and frontend tests.
 test:

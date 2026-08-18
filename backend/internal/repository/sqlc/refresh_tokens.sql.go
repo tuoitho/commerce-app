@@ -40,7 +40,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 
 const getRefreshTokenByHash = `-- name: GetRefreshTokenByHash :one
 SELECT rt.id, rt.token_hash, rt.expires_at, rt.revoked_at, rt.created_at,
-       u.id AS user_id, u.email, u.password_hash, u.created_at AS user_created_at, u.updated_at AS user_updated_at
+       u.id AS user_id, u.email, u.password_hash, u.role AS user_role, u.created_at AS user_created_at, u.updated_at AS user_updated_at
 FROM refresh_tokens rt
 JOIN users u ON u.id = rt.user_id
 WHERE rt.token_hash = $1
@@ -55,6 +55,7 @@ type GetRefreshTokenByHashRow struct {
 	UserID        string
 	Email         string
 	PasswordHash  string
+	UserRole      string
 	UserCreatedAt time.Time
 	UserUpdatedAt time.Time
 }
@@ -71,6 +72,7 @@ func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
+		&i.UserRole,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)

@@ -54,6 +54,8 @@ func TestCartRepositoryIntegration(t *testing.T) {
 	applyMigration(t, ctx, conn, "000002_create_catalog.up.sql")
 	applyMigration(t, ctx, conn, "000003_phone_variants_cart.up.sql")
 	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.up.sql")
+	applyMigration(t, ctx, conn, "000005_add_user_roles.up.sql")
+	applyMigration(t, ctx, conn, "000006_add_brand_to_products.up.sql")
 	seedPath := filepath.Join("..", "..", "db", "seed", "catalog.sql")
 	seedCatalog(t, ctx, conn, seedPath)
 	seedCatalog(t, ctx, conn, seedPath)
@@ -251,12 +253,19 @@ func TestCartRepositoryIntegration(t *testing.T) {
 	if _, err := conn.Exec(ctx, `UPDATE products SET stock_quantity=9223372036854775807 WHERE id=$1; UPDATE product_variants SET stock_quantity=9223372036854775807 WHERE id=$2; UPDATE cart_items SET quantity=9223372036854775807 WHERE user_id=$3 AND variant_id=$2`, integrationProduct, integrationVariantA, integrationUser); err != nil {
 		t.Fatal(err)
 	}
+	applyMigration(t, ctx, conn, "000006_add_brand_to_products.down.sql")
+	applyMigration(t, ctx, conn, "000005_add_user_roles.down.sql")
 	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.down.sql")
 	assertRolledBackInt64Schema(t, ctx, conn)
 	assertRolledBackInt64Constraints(t, ctx, conn)
 	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.up.sql")
+	applyMigration(t, ctx, conn, "000005_add_user_roles.up.sql")
+	applyMigration(t, ctx, conn, "000006_add_brand_to_products.up.sql")
 	assertInt64SchemaRestored(t, ctx, conn)
 	assertSchemaConstraints(t, ctx, conn)
+	applyMigration(t, ctx, conn, "000006_add_brand_to_products.down.sql")
+	applyMigration(t, ctx, conn, "000005_add_user_roles.down.sql")
+	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.down.sql")
 	applyMigration(t, ctx, conn, "000003_phone_variants_cart.down.sql")
 	applyMigration(t, ctx, conn, "000002_create_catalog.down.sql")
 	applyMigration(t, ctx, conn, "000001_create_users.down.sql")
@@ -264,6 +273,8 @@ func TestCartRepositoryIntegration(t *testing.T) {
 	applyMigration(t, ctx, conn, "000002_create_catalog.up.sql")
 	applyMigration(t, ctx, conn, "000003_phone_variants_cart.up.sql")
 	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.up.sql")
+	applyMigration(t, ctx, conn, "000005_add_user_roles.up.sql")
+	applyMigration(t, ctx, conn, "000006_add_brand_to_products.up.sql")
 }
 
 func TestInt64MigrationRejectsFractionalStructurallyValidVariant(t *testing.T) {
@@ -377,7 +388,7 @@ func seedIntegrationCartData(t *testing.T, ctx context.Context, conn *pgx.Conn) 
 		args []any
 	}{
 		{`INSERT INTO users(id,email,password_hash) VALUES ($1,'cart-a@example.com','x'),($2,'cart-b@example.com','x')`, []any{integrationUser, integrationOtherUser}},
-		{`INSERT INTO products(id,category_id,name,model,price,currency,active) VALUES ($1,$2,'Phone','P',0,'VND',true),($3,$2,'Phone B','PB',0,'VND',true),($4,$2,'Phone C','PC',0,'VND',true)`, []any{integrationProduct, integrationCategory, integrationProductB, integrationProductC}},
+		{`INSERT INTO products(id,category_id,name,model,brand,price,currency,active) VALUES ($1,$2,'Phone','P','Apple',0,'VND',true),($3,$2,'Phone B','PB','Apple',0,'VND',true),($4,$2,'Phone C','PC','Apple',0,'VND',true)`, []any{integrationProduct, integrationCategory, integrationProductB, integrationProductC}},
 		{`INSERT INTO product_option_groups(id,product_id,label) VALUES ($1,$2,'Color')`, []any{integrationGroup, integrationProduct}},
 		{`INSERT INTO product_option_values(id,product_id,group_id,label) VALUES ($1,$2,$3,'Red')`, []any{integrationValue, integrationProduct, integrationGroup}},
 		{`INSERT INTO product_images(id,product_id,url) VALUES ($1,$2,'cart-image.jpg')`, []any{integrationImage, integrationProduct}},

@@ -18,8 +18,8 @@ function createDummyProducts(count: number): ProductSummary[] {
     id: `prod-${i + 1}`,
     name: `Phone Model ${i + 1}`,
     model: `MOD-${i + 1}`,
-    brand: { id: 'cat-apple', name: 'Apple' },
-    category: { id: 'cat-apple', name: 'Apple' },
+    brand: 'Apple',
+    category: { id: 'cat-phone', name: 'Điện thoại' },
     minPriceVnd: `${(i + 1) * 1000000}`,
     maxPriceVnd: `${(i + 1) * 1000000 + 500000}`,
     price: `${(i + 1) * 1000000}`,
@@ -33,8 +33,8 @@ describe('CatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(catalogApi.listCategories).mockResolvedValue([
-      { id: 'cat-apple', name: 'Apple' },
-      { id: 'cat-xiaomi', name: 'Xiaomi' },
+      { id: 'cat-phone', name: 'Điện thoại' },
+      { id: 'cat-computer', name: 'Máy tính' },
     ])
   })
 
@@ -45,7 +45,7 @@ describe('CatalogPage', () => {
           id: 'p-1',
           name: 'iPhone 15 Pro Max',
           model: 'A3106',
-          brand: { id: 'cat-apple', name: 'Apple' },
+          brand: 'Apple',
           category: { id: 'cat-phone', name: 'Điện thoại' },
           minPriceVnd: '29990000',
           maxPriceVnd: '35990000',
@@ -78,7 +78,8 @@ describe('CatalogPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText('iPhone 15 Pro Max').length).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('Apple').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getAllByText('Xiaomi').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Điện thoại').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Máy tính').length).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -210,6 +211,66 @@ describe('CatalogPage', () => {
       expect(screen.getByText('Phone Model 7')).toBeInTheDocument()
       expect(screen.getByText('Phone Model 10')).toBeInTheDocument()
       expect(screen.queryByText('Phone Model 1')).not.toBeInTheDocument()
+    })
+  })
+
+  it('renders multi-variant products with price ranges and in-stock / out-of-stock badges', async () => {
+    vi.mocked(catalogApi.listProductsWithMeta).mockResolvedValue({
+      data: [
+        {
+          id: 'p-in-stock',
+          name: 'iPhone 16 Pro',
+          model: 'A3293',
+          brand: 'Apple',
+          category: { id: 'cat-phone', name: 'Điện thoại' },
+          minPriceVnd: '28990000',
+          maxPriceVnd: '34990000',
+          price: '28990000',
+          currency: 'VND',
+          primaryImageUrl: '',
+          inStock: true,
+        },
+        {
+          id: 'p-out-of-stock',
+          name: 'Xiaomi 15 Ultra',
+          model: 'X15U',
+          brand: 'Xiaomi',
+          category: { id: 'cat-phone', name: 'Điện thoại' },
+          minPriceVnd: '24990000',
+          maxPriceVnd: '24990000',
+          price: '24990000',
+          currency: 'VND',
+          primaryImageUrl: '',
+          inStock: false,
+        },
+      ],
+      meta: {
+        timestamp: '2026-08-16T00:00:00.000Z',
+        pagination: {
+          page: 1,
+          limit: 6,
+          total: 2,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+      message: '',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/products']}>
+        <CatalogPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('iPhone 16 Pro')).toBeInTheDocument()
+      expect(screen.getByText(/28\.990\.000\s*₫\s*-\s*34\.990\.000\s*₫/)).toBeInTheDocument()
+      expect(screen.getByText('Còn hàng')).toBeInTheDocument()
+
+      expect(screen.getByText('Xiaomi 15 Ultra')).toBeInTheDocument()
+      expect(screen.getByText('Hết hàng')).toBeInTheDocument()
     })
   })
 })

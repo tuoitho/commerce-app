@@ -100,6 +100,9 @@ func TestRegisterHandler_Success(t *testing.T) {
 	if resp.User.Email != "user@example.com" || resp.AccessToken == "" {
 		t.Fatal("missing user or access token")
 	}
+	if resp.User.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, resp.User.Role)
+	}
 	if strings.Contains(w.Body.String(), "refreshToken") {
 		t.Fatal("refresh token must not be in response body")
 	}
@@ -163,6 +166,9 @@ func TestLoginHandler_Success(t *testing.T) {
 	}
 	if !env.Success || env.Message != "Đăng nhập thành công" {
 		t.Fatalf("unexpected login success envelope: %+v", env)
+	}
+	if env.Data.User.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, env.Data.User.Role)
 	}
 	if refreshCookie(cookies) == nil {
 		t.Fatal("expected refresh cookie")
@@ -272,6 +278,9 @@ func TestMeHandler_WithValidToken(t *testing.T) {
 	}
 	if meEnv.Data.Email != "user@example.com" {
 		t.Fatalf("user email = %q, want user@example.com", meEnv.Data.Email)
+	}
+	if meEnv.Data.Role != domain.RoleCustomer {
+		t.Fatalf("user role = %q, want %s", meEnv.Data.Role, domain.RoleCustomer)
 	}
 }
 

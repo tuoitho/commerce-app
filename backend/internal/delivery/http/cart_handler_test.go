@@ -68,7 +68,7 @@ func newCartTestRouter(repo *httpCartRepo) (*gin.Engine, string) {
 }
 
 func cartToken(manager *jwt.Manager, userID string) string {
-	token, _ := manager.GenerateAccessToken(userID, 15*60*1e9)
+	token, _ := manager.GenerateAccessToken(userID, domain.RoleCustomer, 15*60*1e9)
 	return token
 }
 

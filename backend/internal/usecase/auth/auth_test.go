@@ -20,6 +20,9 @@ func TestRegister_Success(t *testing.T) {
 	if sess.User.Email != "user@example.com" {
 		t.Fatalf("email = %q", sess.User.Email)
 	}
+	if sess.User.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, sess.User.Role)
+	}
 	if sess.User.ID == "" {
 		t.Fatal("empty user id")
 	}
@@ -71,6 +74,9 @@ func TestLogin_Success(t *testing.T) {
 	if sess.User.Email != "user@example.com" {
 		t.Fatalf("email = %q", sess.User.Email)
 	}
+	if sess.User.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, sess.User.Role)
+	}
 	if sess.AccessToken == "" || sess.RefreshToken == "" {
 		t.Fatal("expected tokens")
 	}
@@ -103,6 +109,9 @@ func TestRefresh_Success(t *testing.T) {
 	if newSess.AccessToken == "" || newSess.RefreshToken == "" {
 		t.Fatal("expected new tokens")
 	}
+	if newSess.User.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, newSess.User.Role)
+	}
 	tk, _, err := uc.repos.Sessions.GetRefreshTokenByHash(context.Background(), security.HashRefreshToken(old.RefreshToken))
 	if err != nil {
 		t.Fatalf("lookup old token: %v", err)
@@ -121,7 +130,7 @@ func TestRefresh_Expired(t *testing.T) {
 	}
 	expiredAt := time.Now().Add(-1 * time.Hour)
 	manager := jwt.NewManager(testSecret, "commerce-backend")
-	accessToken, err := manager.GenerateAccessToken("1", time.Minute)
+	accessToken, err := manager.GenerateAccessToken("1", domain.RoleCustomer, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +196,9 @@ func TestMe_ReturnsUser(t *testing.T) {
 	}
 	if me.Email != "user@example.com" {
 		t.Fatalf("email = %q", me.Email)
+	}
+	if me.Role != domain.RoleCustomer {
+		t.Fatalf("expected role %s, got %s", domain.RoleCustomer, me.Role)
 	}
 }
 

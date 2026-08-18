@@ -37,7 +37,7 @@ type Product struct {
 	Name          string
 	Description   string
 	Category      Category
-	Brand         Category
+	Brand         string
 	Model         string
 	Featured      bool
 	Active        bool
@@ -84,9 +84,53 @@ type ProductFilter struct {
 	Featured    *bool
 }
 
+type OptionValueInput struct {
+	ID       string
+	Label    string
+	Position int
+}
+
+type OptionGroupInput struct {
+	ID       string
+	Label    string
+	Position int
+	Values   []OptionValueInput
+}
+
+type VariantInput struct {
+	ID             string
+	OptionValueIDs map[string]string
+	PriceVND       string
+	StockQuantity  int64
+	Active         bool
+}
+
+type SaveProductInput struct {
+	Name          string
+	Model         string
+	Brand         string
+	Description   string
+	CategoryID    string
+	Price         string
+	Currency      string
+	StockQuantity int64
+	Featured      bool
+	ImageURLs     []string
+	HasVariants   bool
+	OptionGroups  []OptionGroupInput
+	Variants      []VariantInput
+}
+
 type CatalogRepository interface {
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListProducts(ctx context.Context, f ProductFilter) ([]Product, error)
 	ListFeaturedProducts(ctx context.Context) ([]Product, error)
 	GetProductByID(ctx context.Context, id string) (*Product, error)
+
+	ListAdminProducts(ctx context.Context, query string) ([]Product, error)
+	GetAdminProductByID(ctx context.Context, id string) (*Product, error)
+	CreateProduct(ctx context.Context, input SaveProductInput) (*Product, error)
+	UpdateProduct(ctx context.Context, id string, input SaveProductInput) (*Product, error)
+	DeleteProduct(ctx context.Context, id string) error
+	GetCategoryByID(ctx context.Context, id string) (*Category, error)
 }

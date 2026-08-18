@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"commerce-backend/internal/domain"
 )
 
@@ -63,12 +65,8 @@ func (f *Catalog) ListCategories(ctx context.Context) ([]domain.Category, error)
 		if !publicEligible(product) {
 			continue
 		}
-		category := product.Brand
-		if category.ID == "" {
-			category = product.Category
-		}
-		if category.ID != "" {
-			byID[category.ID] = category
+		if product.Category.ID != "" {
+			byID[product.Category.ID] = product.Category
 		}
 	}
 	out := make([]domain.Category, 0, len(byID))
@@ -105,14 +103,10 @@ func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) (
 		if !publicEligible(p) {
 			continue
 		}
-		brand := p.Brand
-		if brand.ID == "" {
-			brand = p.Category
-		}
-		if query != "" && !strings.Contains(strings.ToLower(p.Name), query) && !strings.Contains(strings.ToLower(p.Model), query) && !strings.Contains(strings.ToLower(brand.Name), query) {
+		if query != "" && !strings.Contains(strings.ToLower(p.Name), query) && !strings.Contains(strings.ToLower(p.Model), query) && !strings.Contains(strings.ToLower(p.Brand), query) && !strings.Contains(strings.ToLower(p.Category.Name), query) {
 			continue
 		}
-		if len(categoryIDs) > 0 && !contains(categoryIDs, brand.ID) && !contains(categoryIDs, p.Category.ID) {
+		if len(categoryIDs) > 0 && !contains(categoryIDs, p.Category.ID) {
 			continue
 		}
 		activeVariants := 0
@@ -308,7 +302,392 @@ func isLegacyProduct(p domain.Product) bool {
 
 func isLegacyProductFields(p domain.Product) bool {
 	return len(p.Variants) == 0 && p.Price != "" && p.Currency != "" &&
-		p.Brand.ID == "" && p.Model == ""
+		p.Brand == "" && p.Model == ""
+}
+
+func (f *Catalog) GetCategoryByID(ctx context.Context, id string) (*domain.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, c := range f.categories {
+		if c.ID == id {
+			res := c
+			return &res, nil
+		}
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (f *Catalog) ListAdminProducts(ctx context.Context, query string) ([]domain.Product, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	q := strings.ToLower(strings.TrimSpace(query))
+	matches := make([]domain.Product, 0, len(f.products))
+	for _, p := range f.products {
+		if !p.Active {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(p.Name), q) &&
+			!strings.Contains(strings.ToLower(p.Model), q) &&
+			!strings.Contains(strings.ToLower(p.Brand), q) &&
+			!strings.Contains(strings.ToLower(p.Category.Name), q) {
+			continue
+		}
+		matches = append(matches, cloneAdminProduct(*p))
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].Name != matches[j].Name {
+			return matches[i].Name < matches[j].Name
+		}
+		return matches[i].ID < matches[j].ID
+	})
+	return matches, nil
+}
+
+func (f *Catalog) GetAdminProductByID(ctx context.Context, id string) (*domain.Product, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range f.products {
+		if p.ID == id && p.Active {
+			out := cloneAdminProduct(*p)
+			return &out, nil
+		}
+	}
+	return nil, domain.ErrProductNotFound
+}
+
+func (f *Catalog) CreateProduct(ctx context.Context, input domain.SaveProductInput) (*domain.Product, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var matchedCategory *domain.Category
+	for _, c := range f.categories {
+		if c.ID == input.CategoryID {
+			res := c
+			matchedCategory = &res
+			break
+		}
+	}
+	if matchedCategory == nil {
+		return nil, domain.NewValidationError(map[string]string{"categoryId": "Danh mục không tồn tại"})
+	}
+
+	id := uuid.New().String()
+	now := time.Now()
+	currency := input.Currency
+	if currency == "" {
+		currency = "VND"
+	}
+
+	var optionGroups []domain.OptionGroup
+	var variants []domain.ProductVariant
+	price := input.Price
+	stockQuantity := input.StockQuantity
+
+	if input.HasVariants && len(input.OptionGroups) > 0 {
+		for _, g := range input.OptionGroups {
+			gid := g.ID
+			if gid == "" {
+				gid = uuid.New().String()
+			}
+			vals := make([]domain.OptionValue, 0, len(g.Values))
+			for _, v := range g.Values {
+				vid := v.ID
+				if vid == "" {
+					vid = uuid.New().String()
+				}
+				vals = append(vals, domain.OptionValue{ID: vid, Label: v.Label})
+			}
+			optionGroups = append(optionGroups, domain.OptionGroup{
+				ID:       gid,
+				Label:    g.Label,
+				Position: g.Position,
+				Values:   vals,
+			})
+		}
+		var minActive, maxActive *big.Int
+		var minAll, maxAll *big.Int
+		var activeStock int64
+		for _, v := range input.Variants {
+			varID := v.ID
+			if varID == "" {
+				varID = uuid.New().String()
+			}
+			optIDs := make(map[string]string, len(v.OptionValueIDs))
+			for gid, vid := range v.OptionValueIDs {
+				optIDs[gid] = vid
+			}
+			variants = append(variants, domain.ProductVariant{
+				ID:             varID,
+				OptionValueIDs: optIDs,
+				PriceVND:       domain.MoneyVND(v.PriceVND),
+				StockQuantity:  v.StockQuantity,
+				Active:         v.Active,
+			})
+			pInt, ok := new(big.Int).SetString(v.PriceVND, 10)
+			if ok {
+				if minAll == nil || pInt.Cmp(minAll) < 0 {
+					minAll = pInt
+				}
+				if maxAll == nil || pInt.Cmp(maxAll) > 0 {
+					maxAll = pInt
+				}
+				if v.Active {
+					if minActive == nil || pInt.Cmp(minActive) < 0 {
+						minActive = pInt
+					}
+					if maxActive == nil || pInt.Cmp(maxActive) > 0 {
+						maxActive = pInt
+					}
+					activeStock += v.StockQuantity
+				}
+			}
+		}
+		if minActive != nil {
+			price = minActive.String()
+			stockQuantity = activeStock
+		} else if minAll != nil {
+			price = minAll.String()
+			stockQuantity = 0
+		}
+	}
+
+	p := &domain.Product{
+		ID:            id,
+		Name:          input.Name,
+		Model:         input.Model,
+		Brand:         input.Brand,
+		Description:   input.Description,
+		Category:      *matchedCategory,
+		Price:         price,
+		Currency:      currency,
+		StockQuantity: stockQuantity,
+		Featured:      input.Featured,
+		Active:        true,
+		ImageURLs:     append([]string(nil), input.ImageURLs...),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		OptionGroups:  optionGroups,
+		Variants:      variants,
+		MinPriceVND:   domain.MoneyVND(price),
+		MaxPriceVND:   domain.MoneyVND(price),
+	}
+	f.products = append(f.products, p)
+	out := cloneAdminProduct(*p)
+	return &out, nil
+}
+
+func (f *Catalog) UpdateProduct(ctx context.Context, id string, input domain.SaveProductInput) (*domain.Product, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var target *domain.Product
+	for _, p := range f.products {
+		if p.ID == id && p.Active {
+			target = p
+			break
+		}
+	}
+	if target == nil {
+		return nil, domain.ErrProductNotFound
+	}
+
+	var matchedCategory *domain.Category
+	for _, c := range f.categories {
+		if c.ID == input.CategoryID {
+			res := c
+			matchedCategory = &res
+			break
+		}
+	}
+	if matchedCategory == nil {
+		return nil, domain.NewValidationError(map[string]string{"categoryId": "Danh mục không tồn tại"})
+	}
+
+	currency := input.Currency
+	if currency == "" {
+		currency = "VND"
+	}
+
+	var optionGroups []domain.OptionGroup
+	var variants []domain.ProductVariant
+	price := input.Price
+	stockQuantity := input.StockQuantity
+
+	if input.HasVariants && len(input.OptionGroups) > 0 {
+		for _, g := range input.OptionGroups {
+			gid := g.ID
+			if gid == "" {
+				gid = uuid.New().String()
+			}
+			vals := make([]domain.OptionValue, 0, len(g.Values))
+			for _, v := range g.Values {
+				vid := v.ID
+				if vid == "" {
+					vid = uuid.New().String()
+				}
+				vals = append(vals, domain.OptionValue{ID: vid, Label: v.Label})
+			}
+			optionGroups = append(optionGroups, domain.OptionGroup{
+				ID:       gid,
+				Label:    g.Label,
+				Position: g.Position,
+				Values:   vals,
+			})
+		}
+		var minActive, maxActive *big.Int
+		var minAll, maxAll *big.Int
+		var activeStock int64
+		for _, v := range input.Variants {
+			varID := v.ID
+			if varID == "" {
+				varID = uuid.New().String()
+			}
+			optIDs := make(map[string]string, len(v.OptionValueIDs))
+			for gid, vid := range v.OptionValueIDs {
+				optIDs[gid] = vid
+			}
+			variants = append(variants, domain.ProductVariant{
+				ID:             varID,
+				OptionValueIDs: optIDs,
+				PriceVND:       domain.MoneyVND(v.PriceVND),
+				StockQuantity:  v.StockQuantity,
+				Active:         v.Active,
+			})
+			pInt, ok := new(big.Int).SetString(v.PriceVND, 10)
+			if ok {
+				if minAll == nil || pInt.Cmp(minAll) < 0 {
+					minAll = pInt
+				}
+				if maxAll == nil || pInt.Cmp(maxAll) > 0 {
+					maxAll = pInt
+				}
+				if v.Active {
+					if minActive == nil || pInt.Cmp(minActive) < 0 {
+						minActive = pInt
+					}
+					if maxActive == nil || pInt.Cmp(maxActive) > 0 {
+						maxActive = pInt
+					}
+					activeStock += v.StockQuantity
+				}
+			}
+		}
+		if minActive != nil {
+			price = minActive.String()
+			stockQuantity = activeStock
+		} else if minAll != nil {
+			price = minAll.String()
+			stockQuantity = 0
+		}
+	}
+
+	target.Name = input.Name
+	target.Model = input.Model
+	target.Brand = input.Brand
+	target.Description = input.Description
+	target.Category = *matchedCategory
+	target.Price = price
+	target.Currency = currency
+	target.StockQuantity = stockQuantity
+	target.Featured = input.Featured
+	target.ImageURLs = append([]string(nil), input.ImageURLs...)
+	target.OptionGroups = optionGroups
+	target.Variants = variants
+	target.UpdatedAt = time.Now()
+	target.MinPriceVND = domain.MoneyVND(price)
+	target.MaxPriceVND = domain.MoneyVND(price)
+
+	out := cloneAdminProduct(*target)
+	return &out, nil
+}
+
+func (f *Catalog) DeleteProduct(ctx context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, p := range f.products {
+		if p.ID == id && p.Active {
+			p.Active = false
+			p.UpdatedAt = time.Now()
+			return nil
+		}
+	}
+	return domain.ErrProductNotFound
+}
+
+func cloneAdminProduct(product domain.Product) domain.Product {
+	product.ImageURLs = append([]string(nil), product.ImageURLs...)
+	groups := make([]domain.OptionGroup, 0, len(product.OptionGroups))
+	for _, g := range product.OptionGroups {
+		vals := append([]domain.OptionValue(nil), g.Values...)
+		groups = append(groups, domain.OptionGroup{
+			ID:       g.ID,
+			Label:    g.Label,
+			Position: g.Position,
+			Values:   vals,
+		})
+	}
+	product.OptionGroups = groups
+
+	vars := make([]domain.ProductVariant, 0, len(product.Variants))
+	for _, v := range product.Variants {
+		optIDs := make(map[string]string, len(v.OptionValueIDs))
+		for k, val := range v.OptionValueIDs {
+			optIDs[k] = val
+		}
+		vars = append(vars, domain.ProductVariant{
+			ID:             v.ID,
+			OptionValueIDs: optIDs,
+			PriceVND:       v.PriceVND,
+			StockQuantity:  v.StockQuantity,
+			Active:         v.Active,
+		})
+	}
+	product.Variants = vars
+
+	if len(product.Variants) > 0 {
+		var minPrice, maxPrice *big.Int
+		var minAll, maxAll *big.Int
+		var activeStock int64
+		hasActive := false
+		for _, v := range product.Variants {
+			price, ok := new(big.Int).SetString(string(v.PriceVND), 10)
+			if ok {
+				if minAll == nil || price.Cmp(minAll) < 0 {
+					minAll = price
+				}
+				if maxAll == nil || price.Cmp(maxAll) > 0 {
+					maxAll = price
+				}
+				if v.Active {
+					hasActive = true
+					if minPrice == nil || price.Cmp(minPrice) < 0 {
+						minPrice = price
+					}
+					if maxPrice == nil || price.Cmp(maxPrice) > 0 {
+						maxPrice = price
+					}
+					activeStock += v.StockQuantity
+				}
+			}
+		}
+		if hasActive && minPrice != nil {
+			product.MinPriceVND = domain.MoneyVND(minPrice.String())
+			product.MaxPriceVND = domain.MoneyVND(maxPrice.String())
+			product.Price = minPrice.String()
+			product.StockQuantity = activeStock
+		} else if minAll != nil {
+			product.MinPriceVND = domain.MoneyVND(minAll.String())
+			product.MaxPriceVND = domain.MoneyVND(maxAll.String())
+			product.Price = minAll.String()
+			product.StockQuantity = 0
+		}
+	} else if product.Price != "" {
+		product.MinPriceVND = domain.MoneyVND(product.Price)
+		product.MaxPriceVND = domain.MoneyVND(product.Price)
+	}
+	return product
 }
 
 var _ domain.CatalogRepository = (*Catalog)(nil)

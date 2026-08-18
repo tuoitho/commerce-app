@@ -6,9 +6,10 @@ import (
 )
 
 type UserRepository interface {
-	Create(ctx context.Context, email, passwordHash string) (*User, error)
+	Create(ctx context.Context, email, passwordHash, role string) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByID(ctx context.Context, id string) (*User, error)
+	CountByRole(ctx context.Context, role string) (int64, error)
 }
 
 type RefreshToken struct {

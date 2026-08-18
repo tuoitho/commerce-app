@@ -88,7 +88,7 @@ func newCatalogTestRouterWithPhone(t *testing.T, includePhone bool) *gin.Engine 
 			ID:           productPhone,
 			Name:         "Phone Pro",
 			Model:        "P-1",
-			Brand:        domain.Category{ID: catElectronics, Name: "Apple"},
+			Brand:        "Apple",
 			Category:     domain.Category{ID: catElectronics, Name: "Apple"},
 			Featured:     true,
 			MinPriceVND:  "10000000000000000000000000000000000001",
@@ -309,7 +309,7 @@ func TestCatalog_ListProductsRepeatedCategoriesAndVNDContract(t *testing.T) {
 	if len(products) != 1 || products[0].ID != productPhone {
 		t.Fatalf("unexpected products: %+v", products)
 	}
-	if products[0].Model != "P-1" || products[0].Brand.Name != "Apple" || products[0].MinPriceVND != "10000000000000000000000000000000000001" || products[0].MaxPriceVND != "10000000000000000000000000000000000099" {
+	if products[0].Model != "P-1" || products[0].Brand != "Apple" || products[0].MinPriceVND != "10000000000000000000000000000000000001" || products[0].MaxPriceVND != "10000000000000000000000000000000000099" {
 		t.Fatalf("unexpected VND summary: %+v", products[0])
 	}
 }
@@ -379,6 +379,9 @@ func TestCatalog_ListFeaturedWithoutAuth(t *testing.T) {
 	if len(products) != 1 || products[0].ID != productPhone {
 		t.Fatalf("unexpected featured products: %+v", products)
 	}
+	if products[0].Brand != "Apple" {
+		t.Fatalf("unexpected brand: %q", products[0].Brand)
+	}
 }
 
 func TestCatalog_GetProductDetailVariants(t *testing.T) {
@@ -394,7 +397,7 @@ func TestCatalog_GetProductDetailVariants(t *testing.T) {
 		t.Fatal(err)
 	}
 	detail := env.Data
-	if !detail.Featured || detail.Model != "P-1" || detail.MinPriceVND == "" || len(detail.OptionGroups) != 1 || len(detail.Variants) != 1 {
+	if !detail.Featured || detail.Model != "P-1" || detail.Brand != "Apple" || detail.MinPriceVND == "" || len(detail.OptionGroups) != 1 || len(detail.Variants) != 1 {
 		t.Fatalf("unexpected phone detail: %+v", detail)
 	}
 	if detail.Variants[0].ID != variantPhone || detail.Variants[0].PriceVND != "10000000000000000000000000000000000001" || detail.Variants[0].OptionValueIDs["group-storage"] != optionStorage {
@@ -467,7 +470,7 @@ func TestCatalogStockQuantityUsesNumericJSONAtMaxInt64(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(body) != `[{"id":"variant","optionValueIds":null,"priceVnd":"100","stockQuantity":9223372036854775807}]` {
+	if string(body) != `[{"id":"variant","optionValueIds":{},"priceVnd":"100","stockQuantity":9223372036854775807,"active":false}]` {
 		t.Fatalf("unexpected numeric stock wire: %s", body)
 	}
 }
@@ -482,4 +485,51 @@ func TestCatalog_GetProductNotFound(t *testing.T) {
 	router := newCatalogTestRouter(t)
 	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/99999999-9999-9999-9999-999999999999", nil)
 	assertErrorEnvelope(t, w, http.StatusNotFound, "product_not_found", "")
+}
+
+func TestCatalog_BrandAsStringAndCategoryAsTaxonomy(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+
+	// Summary endpoint
+	w1, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?q=Phone", nil)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("summary status = %d", w1.Code)
+	}
+	var summaryRaw struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(w1.Body.Bytes(), &summaryRaw); err != nil {
+		t.Fatal(err)
+	}
+	if len(summaryRaw.Data) != 1 {
+		t.Fatalf("expected 1 summary product, got %d", len(summaryRaw.Data))
+	}
+	summaryBrand, ok := summaryRaw.Data[0]["brand"].(string)
+	if !ok || summaryBrand != "Apple" {
+		t.Fatalf("summary brand expected string 'Apple', got %v (%T)", summaryRaw.Data[0]["brand"], summaryRaw.Data[0]["brand"])
+	}
+	summaryCat, ok := summaryRaw.Data[0]["category"].(map[string]any)
+	if !ok || summaryCat["id"] != catElectronics || summaryCat["name"] != "Apple" {
+		t.Fatalf("summary category expected {id, name}, got %v", summaryRaw.Data[0]["category"])
+	}
+
+	// Detail endpoint
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products/"+productPhone, nil)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("detail status = %d", w2.Code)
+	}
+	var detailRaw struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &detailRaw); err != nil {
+		t.Fatal(err)
+	}
+	detailBrand, ok := detailRaw.Data["brand"].(string)
+	if !ok || detailBrand != "Apple" {
+		t.Fatalf("detail brand expected string 'Apple', got %v (%T)", detailRaw.Data["brand"], detailRaw.Data["brand"])
+	}
+	detailCat, ok := detailRaw.Data["category"].(map[string]any)
+	if !ok || detailCat["id"] != catElectronics || detailCat["name"] != "Apple" {
+		t.Fatalf("detail category expected {id, name}, got %v", detailRaw.Data["category"])
+	}
 }

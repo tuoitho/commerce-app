@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,6 +22,7 @@ import (
 )
 
 func run() error {
+	loadEnvFile(".env")
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -36,9 +39,17 @@ func run() error {
 		return fmt.Errorf("ping database: %w", err)
 	}
 
+	handler, authUC := newHandler(cfg, pool)
+
+	if cfg.AdminBootstrapEmail != "" && cfg.AdminBootstrapPassword != "" {
+		if err := authUC.BootstrapAdmin(ctx, cfg.AdminBootstrapEmail, cfg.AdminBootstrapPassword); err != nil {
+			return fmt.Errorf("bootstrap admin: %w", err)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: newHandler(cfg, pool),
+		Handler: handler,
 	}
 
 	log.Printf("server listening on %s", srv.Addr)
@@ -49,7 +60,7 @@ func run() error {
 	return nil
 }
 
-func newHandler(cfg *config.Config, pool *pgxpool.Pool) http.Handler {
+func newHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, *authuc.UseCase) {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -83,5 +94,27 @@ func newHandler(cfg *config.Config, pool *pgxpool.Pool) http.Handler {
 		CookieSecure: cfg.CookieSecure,
 	})
 
-	return router
+	return router, authUC
 }
+
+func loadEnvFile(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			if os.Getenv(k) == "" {
+				os.Setenv(k, v)
+			}
+		}
+	}
+}
+

@@ -55,4 +55,18 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		cart.PUT("/selection", cartHandler.SetAllSelection)
 		cart.DELETE("/items/:itemId", cartHandler.RemoveItem)
 	}
+
+	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)
+	admin := api.Group("/admin")
+	admin.Use(guard.AuthRequired, guard.RequireAdmin())
+	{
+		adminProducts := admin.Group("/products")
+		{
+			adminProducts.GET("", adminCatalogHandler.ListProducts)
+			adminProducts.GET("/:id", adminCatalogHandler.GetProduct)
+			adminProducts.POST("", adminCatalogHandler.CreateProduct)
+			adminProducts.PUT("/:id", adminCatalogHandler.UpdateProduct)
+			adminProducts.DELETE("/:id", adminCatalogHandler.DeleteProduct)
+		}
+	}
 }

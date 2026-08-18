@@ -15,7 +15,8 @@ func TestTask21_ListProductsEvaluatesPriceAndStockAcrossAllVariants(t *testing.T
 	repo.AddCategory(domain.Category{ID: fakeAppleID, Name: "Apple"})
 	repo.AddProduct(domain.Product{
 		ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Active: true,
-		Brand: domain.Category{ID: fakeAppleID, Name: "Apple"},
+		Brand:    "Apple",
+		Category: domain.Category{ID: fakeAppleID, Name: "Apple"},
 		Variants: []domain.ProductVariant{
 			{ID: "1", PriceVND: "100", StockQuantity: 0, Active: true},
 			{ID: "2", PriceVND: "200", StockQuantity: 3, Active: true},
@@ -68,8 +69,9 @@ func TestTask21_PublicFakePathsExcludeExplicitlyInactiveZeroVariantProduct(t *te
 	productID := "dddddddd-dddd-dddd-dddd-dddddddddddd"
 	repo.AddProduct(domain.Product{
 		ID: productID, Active: false, Featured: true,
-		Brand: domain.Category{ID: fakeAppleID, Name: "Apple"},
-		Model: "inactive-model", Price: "100", Currency: "VND",
+		Brand:    "Apple",
+		Category: domain.Category{ID: fakeAppleID, Name: "Apple"},
+		Model:    "inactive-model", Price: "100", Currency: "VND",
 	})
 
 	products, err := repo.ListProducts(context.Background(), domain.ProductFilter{})
@@ -111,7 +113,8 @@ func TestTask21_UnknownValidCategoryIsIgnoredByFake(t *testing.T) {
 	repo := NewCatalog()
 	repo.AddCategory(domain.Category{ID: fakeAppleID, Name: "Apple"})
 	repo.AddProduct(domain.Product{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Active: true,
-		Brand:    domain.Category{ID: fakeAppleID, Name: "Apple"},
+		Brand:    "Apple",
+		Category: domain.Category{ID: fakeAppleID, Name: "Apple"},
 		Variants: []domain.ProductVariant{{ID: "legacy", Active: true}}})
 	products, err := repo.ListProducts(context.Background(), domain.ProductFilter{CategoryIDs: []string{
 		"22222222-2222-2222-2222-222222222222",

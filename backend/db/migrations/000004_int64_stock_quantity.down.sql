@@ -22,15 +22,21 @@ BEGIN
 END $$;
 
 ALTER TABLE products
+    DROP CONSTRAINT IF EXISTS products_stock_quantity_rollback_int64;
+ALTER TABLE products
     ADD CONSTRAINT products_stock_quantity_rollback_int64
     CHECK (stock_quantity = trunc(stock_quantity)
         AND stock_quantity BETWEEN 0 AND 9223372036854775807);
 
 ALTER TABLE product_variants
+    DROP CONSTRAINT IF EXISTS product_variants_stock_quantity_rollback_int64;
+ALTER TABLE product_variants
     ADD CONSTRAINT product_variants_stock_quantity_rollback_int64
     CHECK (stock_quantity = trunc(stock_quantity)
         AND stock_quantity BETWEEN 0 AND 9223372036854775807);
 
+ALTER TABLE cart_items
+    DROP CONSTRAINT IF EXISTS cart_items_quantity_rollback_int64;
 ALTER TABLE cart_items
     ADD CONSTRAINT cart_items_quantity_rollback_int64
     CHECK (quantity = trunc(quantity)

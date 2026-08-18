@@ -76,9 +76,8 @@ export function HomePage() {
     if (selectedBrandTab === 'instock') return featuredProducts.filter((p) => p.inStock)
     return featuredProducts.filter(
       (p) =>
-        p.brand?.id === selectedBrandTab ||
         p.category?.id === selectedBrandTab ||
-        p.brand?.name?.toLowerCase().includes(selectedBrandTab.toLowerCase())
+        p.brand?.toLowerCase().includes(selectedBrandTab.toLowerCase())
     )
   }, [featuredProducts, selectedBrandTab])
 

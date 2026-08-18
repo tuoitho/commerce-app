@@ -15,7 +15,9 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
-	CookieSecure    bool
+	CookieSecure           bool
+	AdminBootstrapEmail    string
+	AdminBootstrapPassword string
 }
 
 func Load() (*Config, error) {
@@ -65,6 +67,9 @@ func Load() (*Config, error) {
 		}
 	}
 	cfg.CookieSecure = secure
+
+	cfg.AdminBootstrapEmail = envOrDefault("ADMIN_BOOTSTRAP_EMAIL", "")
+	cfg.AdminBootstrapPassword = envOrDefault("ADMIN_BOOTSTRAP_PASSWORD", "")
 
 	return cfg, nil
 }

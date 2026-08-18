@@ -54,6 +54,7 @@ func (r *SessionRepository) GetRefreshTokenByHash(ctx context.Context, tokenHash
 		ID:           row.UserID,
 		Email:        row.Email,
 		PasswordHash: row.PasswordHash,
+		Role:         row.UserRole,
 		CreatedAt:    row.UserCreatedAt,
 		UpdatedAt:    row.UserUpdatedAt,
 	}

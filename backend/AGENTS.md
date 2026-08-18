@@ -24,3 +24,10 @@ Run these from `backend/`:
 - Startup requires PostgreSQL plus `DB_URL` and `JWT_ACCESS_SECRET` (at least 32 characters). `HTTP_PORT` defaults to `8080`; durations use Go syntax such as `15m` or `24h`.
 - Database tasks use external CLIs: `make db-up` / `make db-down` require `migrate`; `make seed` requires `psql`. Run migrations before seeding.
 - Migrations are numbered up/down pairs in `db/migrations`; sqlc reads the entire migration directory as its schema source.
+- Whenever database schema, tables, columns, indexes, or constraints change:
+  - Add a new numbered migration pair in `db/migrations/` (e.g. `00000X_name.up.sql` and `00000X_name.down.sql`).
+  - Run `make db-up` to apply migrations to the local PostgreSQL database.
+  - Run `make gen` to update sqlc generated models and queriers.
+  - If seed data is affected, update `db/seed/catalog.sql` and run `make seed`.
+- When checking out updated branches or setting up locally, always run `make db-up` before running the backend server or integration tests.
+

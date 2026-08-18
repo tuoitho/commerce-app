@@ -30,8 +30,8 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [headerSearch, setHeaderSearch] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
-  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
-  const brandDropdownRef = useRef<HTMLDivElement>(null)
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+  const categoryDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
@@ -50,19 +50,19 @@ export function Header() {
     }
   }, [])
 
-  // Close brand dropdown when clicking outside or pressing Escape
+  // Close category dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (e: globalThis.MouseEvent) => {
       if (
-        brandDropdownRef.current &&
-        !brandDropdownRef.current.contains(e.target as Node)
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(e.target as Node)
       ) {
-        setBrandDropdownOpen(false)
+        setCategoryDropdownOpen(false)
       }
     }
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setBrandDropdownOpen(false)
+        setCategoryDropdownOpen(false)
       }
     }
 
@@ -76,7 +76,7 @@ export function Header() {
 
   // Close menus on route change
   useEffect(() => {
-    setBrandDropdownOpen(false)
+    setCategoryDropdownOpen(false)
     setMobileMenuOpen(false)
   }, [location.pathname, location.search])
 
@@ -214,31 +214,31 @@ export function Header() {
               Sản phẩm
             </Link>
 
-            {/* Dynamic Brand Dropdown */}
-            <div className="relative" ref={brandDropdownRef}>
+            {/* Dynamic Category Dropdown */}
+            <div className="relative" ref={categoryDropdownRef}>
               <button
                 type="button"
-                onClick={() => setBrandDropdownOpen((prev) => !prev)}
+                onClick={() => setCategoryDropdownOpen((prev) => !prev)}
                 className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                  brandDropdownOpen || location.search.includes('category_id')
+                  categoryDropdownOpen || location.search.includes('category_id')
                     ? 'text-emerald-700 bg-emerald-50 font-bold'
                     : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
                 }`}
-                aria-expanded={brandDropdownOpen}
+                aria-expanded={categoryDropdownOpen}
                 aria-haspopup="true"
               >
-                <span>Thương hiệu</span>
+                <span>Danh mục</span>
                 <ChevronDown
                   className={`h-4 w-4 transition-transform duration-200 ${
-                    brandDropdownOpen ? 'rotate-180 text-emerald-600' : 'text-slate-400'
+                    categoryDropdownOpen ? 'rotate-180 text-emerald-600' : 'text-slate-400'
                   }`}
                 />
               </button>
 
-              {brandDropdownOpen && (
+              {categoryDropdownOpen && (
                 <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in duration-150">
                   <div className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                    Chọn theo thương hiệu
+                    Chọn theo danh mục
                   </div>
                   <div className="py-1 max-h-64 overflow-y-auto">
                     {categories.length > 0 ? (
@@ -246,7 +246,7 @@ export function Header() {
                         <Link
                           key={cat.id}
                           to={`/products?category_id=${cat.id}`}
-                          onClick={() => setBrandDropdownOpen(false)}
+                          onClick={() => setCategoryDropdownOpen(false)}
                           className={`flex items-center justify-between px-3.5 py-2 text-sm transition-colors ${
                             location.search.includes(cat.id)
                               ? 'text-emerald-700 bg-emerald-50 font-bold'
@@ -258,13 +258,13 @@ export function Header() {
                         </Link>
                       ))
                     ) : (
-                      <div className="px-3.5 py-2 text-xs text-slate-400">Đang tải thương hiệu...</div>
+                      <div className="px-3.5 py-2 text-xs text-slate-400">Đang tải danh mục...</div>
                     )}
                   </div>
                   <div className="pt-1 border-t border-slate-100 px-2">
                     <Link
                       to="/products"
-                      onClick={() => setBrandDropdownOpen(false)}
+                      onClick={() => setCategoryDropdownOpen(false)}
                       className="block text-center py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                     >
                       Tất cả sản phẩm &rarr;
@@ -406,11 +406,11 @@ export function Header() {
               Hàng có sẵn giao ngay
             </Link>
 
-            {/* Dynamic Brands in Mobile Drawer */}
+            {/* Dynamic Categories in Mobile Drawer */}
             {categories.length > 0 && (
               <div className="pt-2 border-t border-slate-100">
                 <div className="px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Thương hiệu nổi bật
+                  Danh mục nổi bật
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-1.5">
                   {categories.map((cat) => (

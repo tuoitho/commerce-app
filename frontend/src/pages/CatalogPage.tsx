@@ -344,12 +344,12 @@ export function CatalogPage() {
               </div>
             )}
 
-            {/* Filter Section: Categories / Brands */}
+            {/* Filter Section: Categories */}
             <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
                   <Smartphone className="h-4 w-4 text-emerald-600" />
-                  <span>Thương hiệu</span>
+                  <span>Danh mục</span>
                 </h3>
                 {selectedCategoryIds.length > 0 && (
                   <button

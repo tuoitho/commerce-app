@@ -73,7 +73,7 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*Sessi
 		return nil, err
 	}
 
-	user, err := uc.repos.Users.Create(ctx, email, passwordHash)
+	user, err := uc.repos.Users.Create(ctx, email, passwordHash, domain.RoleCustomer)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (uc *UseCase) validRefreshToken(ctx context.Context, refreshToken string) (
 }
 
 func (uc *UseCase) issueSession(ctx context.Context, user *domain.User) (*Session, error) {
-	accessToken, err := uc.jwt.GenerateAccessToken(user.ID, uc.accessTTL)
+	accessToken, err := uc.jwt.GenerateAccessToken(user.ID, user.Role, uc.accessTTL)
 	if err != nil {
 		return nil, err
 	}

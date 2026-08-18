@@ -38,6 +38,24 @@ func (r *task21Repo) ListFeaturedProducts(context.Context) ([]domain.Product, er
 func (r *task21Repo) GetProductByID(context.Context, string) (*domain.Product, error) {
 	return r.detail, r.detailErr
 }
+func (r *task21Repo) ListAdminProducts(context.Context, string) ([]domain.Product, error) {
+	return nil, nil
+}
+func (r *task21Repo) GetAdminProductByID(context.Context, string) (*domain.Product, error) {
+	return nil, nil
+}
+func (r *task21Repo) CreateProduct(context.Context, domain.SaveProductInput) (*domain.Product, error) {
+	return nil, nil
+}
+func (r *task21Repo) UpdateProduct(context.Context, string, domain.SaveProductInput) (*domain.Product, error) {
+	return nil, nil
+}
+func (r *task21Repo) DeleteProduct(context.Context, string) error {
+	return nil
+}
+func (r *task21Repo) GetCategoryByID(context.Context, string) (*domain.Category, error) {
+	return nil, nil
+}
 
 func TestTask21_SearchProductsNormalizesBrandModelAndRepeatedCategories(t *testing.T) {
 	repo := &task21Repo{}
@@ -97,7 +115,7 @@ func TestTask21_RejectsNonCanonicalMoneyAndReversedRange(t *testing.T) {
 
 func TestTask21_FeaturedAndDetailPreservePhoneProjection(t *testing.T) {
 	now := time.Now()
-	p := domain.Product{ID: phoneID, Brand: domain.Category{ID: brandApple, Name: "Apple"}, Model: "A3294", Featured: true, Active: true, CreatedAt: now, UpdatedAt: now,
+	p := domain.Product{ID: phoneID, Brand: "Apple", Model: "A3294", Featured: true, Active: true, CreatedAt: now, UpdatedAt: now,
 		OptionGroups: []domain.OptionGroup{{ID: "33333333-3333-3333-3333-333333333333", Label: "Color"}},
 		Variants:     []domain.ProductVariant{{ID: "44444444-4444-4444-4444-444444444444", PriceVND: "999", StockQuantity: 2, Active: true}}}
 	repo := &task21Repo{featured: []domain.Product{p}, detail: &p}

@@ -35,6 +35,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 401, "invalid_credentials", "Email hoặc mật khẩu không đúng", nil)
 	case errors.Is(err, domain.ErrInvalidToken):
 		respondError(c, 401, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+	case errors.Is(err, domain.ErrForbidden):
+		respondError(c, 403, "forbidden", "Bạn không có quyền thực hiện thao tác này", nil)
 	case errors.Is(err, domain.ErrNotFound):
 		respondError(c, 404, "not_found", "Không tìm thấy tài nguyên", nil)
 	case errors.Is(err, domain.ErrCartItemNotFound):
