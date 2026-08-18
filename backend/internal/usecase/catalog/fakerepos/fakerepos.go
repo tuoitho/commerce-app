@@ -77,6 +77,27 @@ func (f *Catalog) ListCategories(ctx context.Context) ([]domain.Category, error)
 	return out, nil
 }
 
+func (f *Catalog) ListBrands(ctx context.Context) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	byBrand := make(map[string]bool)
+	for _, product := range f.products {
+		if !publicEligible(product) {
+			continue
+		}
+		trimmed := strings.TrimSpace(product.Brand)
+		if trimmed != "" {
+			byBrand[product.Brand] = true
+		}
+	}
+	out := make([]string, 0, len(byBrand))
+	for brand := range byBrand {
+		out = append(out, brand)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
 func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) ([]domain.Product, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -108,6 +129,18 @@ func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) (
 		}
 		if len(categoryIDs) > 0 && !contains(categoryIDs, p.Category.ID) {
 			continue
+		}
+		if len(filt.Brands) > 0 {
+			matchedBrand := false
+			for _, b := range filt.Brands {
+				if strings.EqualFold(p.Brand, b) {
+					matchedBrand = true
+					break
+				}
+			}
+			if !matchedBrand {
+				continue
+			}
 		}
 		activeVariants := 0
 		inStock := false

@@ -2,9 +2,12 @@
 
 ## Package Scope
 
-- This commerce repository has two packages. Read and follow `frontend/AGENTS.md` for work under `frontend/`, and `backend/AGENTS.md` for work under `backend/`; both apply to cross-package changes.
-- Run package commands from their package directories. Root `make test` runs both test suites; root `make build` runs backend `sqlc generate` and the frontend production build.
+- This commerce repository has three packages. Read and follow `frontend/AGENTS.md` for work under `frontend/`, `frontend-admin/AGENTS.md` for work under `frontend-admin/`, and `backend/AGENTS.md` for work under `backend/`; all apply to cross-package changes.
+- Run package commands from their package directories. Root `make test` runs all package test suites; root `make build` runs backend `sqlc generate` and the frontend/admin production builds.
 - Prefer executable configuration over README prose. The root Makefile's frontend `:3000` comment is stale; Vite uses its default port (`5173`).
+- Backend configuration is owned by Viper in `backend/internal/config`; process environment values override the optional `.env` file. Do not add direct environment reads to backend packages outside the config boundary.
+- Backend dependency construction uses Google Wire at compile time. Wire-generated files are committed and must be regenerated after provider or injector changes; do not edit generated Wire output manually.
+- Backend runtime logging uses Go `log/slog`: text outside production, JSON in production, and `LOG_LEVEL` values `debug`, `info`, `warn`, or `error`. Never log secrets, passwords, tokens, or the complete database URL.
 
 ## Governed Changes
 

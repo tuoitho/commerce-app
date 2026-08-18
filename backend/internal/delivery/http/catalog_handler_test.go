@@ -533,3 +533,72 @@ func TestCatalog_BrandAsStringAndCategoryAsTaxonomy(t *testing.T) {
 		t.Fatalf("detail category expected {id, name}, got %v", detailRaw.Data["category"])
 	}
 }
+
+func TestCatalog_ListBrands(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+	w, _ := doRequest(t, router, http.MethodGet, "/api/v1/brands", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Success bool     `json:"success"`
+		Data    []string `json:"data"`
+		Meta    struct {
+			Timestamp string `json:"timestamp"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Success {
+		t.Fatal("expected success = true")
+	}
+	if len(body.Data) != 1 || body.Data[0] != "Apple" {
+		t.Fatalf("expected ['Apple'], got %v", body.Data)
+	}
+	if body.Meta.Timestamp == "" {
+		t.Fatal("expected timestamp in meta")
+	}
+}
+
+func TestCatalog_ListProducts_BrandFilter(t *testing.T) {
+	router := newCatalogTestRouterWithPhone(t, true)
+
+	// Filter with matching brand (case-insensitive "apple" matching "Apple")
+	w1, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?brand=apple", nil)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("status = %d", w1.Code)
+	}
+	products := decodeProducts(t, w1)
+	if len(products) != 1 || products[0].ID != productPhone {
+		t.Fatalf("expected only phone for brand=apple, got %+v", products)
+	}
+
+	// Filter with multiple brands including non-matching
+	w2, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?brand=apple&brand=samsung", nil)
+	products2 := decodeProducts(t, w2)
+	if len(products2) != 1 || products2[0].ID != productPhone {
+		t.Fatalf("expected 1 product for apple OR samsung, got %+v", products2)
+	}
+
+	// Filter with empty brand parameter: should be ignored
+	w3, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?brand=", nil)
+	products3 := decodeProducts(t, w3)
+	if len(products3) != 4 {
+		t.Fatalf("empty brand parameter should be ignored and return all 4 products, got %d", len(products3))
+	}
+
+	// Brand filter combined with pagination
+	w4, _ := doRequest(t, router, http.MethodGet, "/api/v1/products?brand=apple&page=1&limit=5", nil)
+	var paginatedResp struct {
+		Success bool                     `json:"success"`
+		Data    []productSummaryResponse `json:"data"`
+		Meta    ResponseMeta             `json:"meta"`
+	}
+	if err := json.Unmarshal(w4.Body.Bytes(), &paginatedResp); err != nil {
+		t.Fatal(err)
+	}
+	if paginatedResp.Meta.Pagination == nil || paginatedResp.Meta.Pagination.Total != 1 {
+		t.Fatalf("expected pagination total = 1 after brand filter, got %+v", paginatedResp.Meta.Pagination)
+	}
+}

@@ -135,6 +135,7 @@ export interface ProductDetail {
 export interface ProductFilterParams {
   q?: string
   category_id?: string | string[]
+  brand?: string | string[]
   min_price?: string
   max_price?: string
   in_stock?: 'true' | 'false' | boolean

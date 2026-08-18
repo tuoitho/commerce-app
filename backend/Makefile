@@ -1,10 +1,11 @@
 DB_URL ?= postgres://commerce:commerce@localhost:5432/commerce?sslmode=disable
 -include .env
-export APP_ENV HTTP_PORT DB_URL JWT_ACCESS_SECRET ACCESS_TOKEN_TTL REFRESH_TOKEN_TTL COOKIE_SECURE ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD
+export APP_ENV HTTP_PORT DB_URL JWT_ACCESS_SECRET ACCESS_TOKEN_TTL REFRESH_TOKEN_TTL COOKIE_SECURE ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD LOG_LEVEL
 
 MIGRATE = migrate -source "file://db/migrations" -database "$(DB_URL)"
 
-.PHONY: db-up db-down db-drop seed gen run test test-integration vet
+.PHONY: db-up db-down db-drop seed gen wire run test test-integration vet
+
 
 db-up:
 	$(MIGRATE) up
@@ -20,6 +21,10 @@ seed:
 
 gen:
 	sqlc generate
+
+wire:
+	wire ./cmd/server
+
 
 run:
 	go run ./cmd/server

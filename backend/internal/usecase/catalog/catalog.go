@@ -31,6 +31,10 @@ func (uc *UseCase) ListCategories(ctx context.Context) ([]domain.Category, error
 	return uc.catalog.ListCategories(ctx)
 }
 
+func (uc *UseCase) ListBrands(ctx context.Context) ([]string, error) {
+	return uc.catalog.ListBrands(ctx)
+}
+
 func (uc *UseCase) SearchProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error) {
 	if err := uc.validateFilter(&f); err != nil {
 		return nil, err
@@ -57,6 +61,14 @@ func (uc *UseCase) validateFilter(f *domain.ProductFilter) error {
 	for i := range f.CategoryIDs {
 		f.CategoryIDs[i] = strings.TrimSpace(f.CategoryIDs[i])
 	}
+	var cleanBrands []string
+	for _, b := range f.Brands {
+		trimmed := strings.TrimSpace(b)
+		if trimmed != "" {
+			cleanBrands = append(cleanBrands, trimmed)
+		}
+	}
+	f.Brands = cleanBrands
 	fields := map[string]string{}
 
 	for _, id := range f.CategoryIDs {

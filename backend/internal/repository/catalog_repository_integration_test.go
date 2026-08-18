@@ -51,7 +51,28 @@ func TestCatalogRepositorySQLIntegration(t *testing.T) {
 		t.Fatalf("active categories = %+v", categories)
 	}
 
-	products, err := repo.ListProducts(ctx, domain.ProductFilter{Query: "xIaOmI"})
+	brands, err := repo.ListBrands(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(brands) != 2 || brands[0] != "Apple" || brands[1] != "Xiaomi" {
+		t.Fatalf("active brands = %+v", brands)
+	}
+
+	products, err := repo.ListProducts(ctx, domain.ProductFilter{Brands: []string{"apple"}})
+	if err != nil || len(products) != 2 {
+		t.Fatalf("brand filter apple = %+v, err = %v", products, err)
+	}
+	products, err = repo.ListProducts(ctx, domain.ProductFilter{Brands: []string{"xIaOmI"}})
+	if err != nil || len(products) != 1 || products[0].ID != integrationP3 {
+		t.Fatalf("brand filter xIaOmI = %+v, err = %v", products, err)
+	}
+	products, err = repo.ListProducts(ctx, domain.ProductFilter{Brands: []string{"apple", "xiaomi"}})
+	if err != nil || len(products) != 3 {
+		t.Fatalf("multi brand filter = %+v, err = %v", products, err)
+	}
+
+	products, err = repo.ListProducts(ctx, domain.ProductFilter{Query: "xIaOmI"})
 	if err != nil || len(products) != 1 || products[0].ID != integrationP3 {
 		t.Fatalf("brand search = %+v, err = %v", products, err)
 	}

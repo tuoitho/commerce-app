@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, type FormEvent } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Search, SlidersHorizontal, RefreshCw, X, PackageSearch, Smartphone, ChevronRight, ChevronLeft, Zap } from 'lucide-react'
+import { Search, SlidersHorizontal, RefreshCw, X, PackageSearch, Smartphone, ChevronRight, ChevronLeft, Zap, Tag } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
 import type { ProductSummary, Category, PaginationMeta } from '@/api/types'
 import { ProductCard } from '@/components/ProductCard'
@@ -44,6 +44,9 @@ export function CatalogPage() {
 
   const [products, setProducts] = useState<ProductSummary[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<string[]>([])
+  const [isBrandLoading, setIsBrandLoading] = useState(true)
+  const [brandError, setBrandError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<PaginationMeta>({
     page: 1,
     limit: PAGE_SIZE,
@@ -60,6 +63,10 @@ export function CatalogPage() {
   // Query state derived from URL
   const querySearch = searchParams.get('q') || ''
   const selectedCategoryIds = useMemo(() => searchParams.getAll('category_id'), [searchParams])
+  const selectedBrands = useMemo(
+    () => searchParams.getAll('brand').filter((b) => b.trim().length > 0),
+    [searchParams]
+  )
   const queryMinPrice = searchParams.get('min_price') || ''
   const queryMaxPrice = searchParams.get('max_price') || ''
   const queryInStock = searchParams.get('in_stock') === 'true'
@@ -94,6 +101,25 @@ export function CatalogPage() {
       .catch((err) => console.error('Failed to load categories', err))
   }, [])
 
+  // Load Brands on mount with retry affordance
+  const fetchBrands = useCallback(async () => {
+    setIsBrandLoading(true)
+    setBrandError(null)
+    try {
+      const res = await catalogApi.listBrands()
+      setBrands(res || [])
+    } catch (err: unknown) {
+      console.error('Failed to load brands', err)
+      setBrandError('Không thể tải danh sách thương hiệu.')
+    } finally {
+      setIsBrandLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchBrands()
+  }, [fetchBrands])
+
   // Fetch Products based on URL query and backend pagination
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
@@ -102,6 +128,7 @@ export function CatalogPage() {
       const res = await catalogApi.listProductsWithMeta({
         q: querySearch || undefined,
         category_id: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        brand: selectedBrands.length > 0 ? selectedBrands : undefined,
         min_price: queryMinPrice || undefined,
         max_price: queryMaxPrice || undefined,
         in_stock: queryInStock ? 'true' : undefined,
@@ -128,7 +155,7 @@ export function CatalogPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [querySearch, selectedCategoryIds, queryMinPrice, queryMaxPrice, queryInStock, currentPage])
+  }, [querySearch, selectedCategoryIds, selectedBrands, queryMinPrice, queryMaxPrice, queryInStock, currentPage])
 
   useEffect(() => {
     fetchProducts()
@@ -157,6 +184,20 @@ export function CatalogPage() {
       currentCats.filter((id) => id !== catId).forEach((id) => newParams.append('category_id', id))
     } else {
       [...currentCats, catId].forEach((id) => newParams.append('category_id', id))
+    }
+    setSearchParams(newParams)
+  }
+
+  const handleBrandToggle = (brandName: string) => {
+    const newParams = new URLSearchParams(searchParams)
+    newParams.delete('page')
+    const currentBrands = newParams.getAll('brand').filter((b) => b.trim().length > 0)
+    newParams.delete('brand')
+
+    if (currentBrands.includes(brandName)) {
+      currentBrands.filter((b) => b !== brandName).forEach((b) => newParams.append('brand', b))
+    } else {
+      [...currentBrands, brandName].forEach((b) => newParams.append('brand', b))
     }
     setSearchParams(newParams)
   }
@@ -234,6 +275,7 @@ export function CatalogPage() {
   const hasActiveFilters =
     Boolean(querySearch) ||
     selectedCategoryIds.length > 0 ||
+    selectedBrands.length > 0 ||
     Boolean(queryMinPrice) ||
     Boolean(queryMaxPrice) ||
     queryInStock
@@ -386,6 +428,80 @@ export function CatalogPage() {
                   )
                 })}
               </div>
+            </div>
+
+            {/* Filter Section: Brands */}
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                  <Tag className="h-4 w-4 text-emerald-600" />
+                  <span>Thương hiệu</span>
+                </h3>
+                {selectedBrands.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const newParams = new URLSearchParams(searchParams)
+                      newParams.delete('brand')
+                      newParams.delete('page')
+                      setSearchParams(newParams)
+                    }}
+                    className="text-xs font-bold text-emerald-600 hover:underline"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
+
+              {isBrandLoading && (
+                <div className="space-y-2 py-1" data-testid="brand-loading">
+                  <Skeleton className="h-5 w-full rounded-md" />
+                  <Skeleton className="h-5 w-3/4 rounded-md" />
+                </div>
+              )}
+
+              {!isBrandLoading && brandError && (
+                <div className="py-2 text-center space-y-2">
+                  <p className="text-xs text-rose-500 font-semibold">{brandError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchBrands}
+                    className="h-7 text-xs font-bold rounded-lg px-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Thử lại
+                  </Button>
+                </div>
+              )}
+
+              {!isBrandLoading && !brandError && brands.length === 0 && (
+                <p className="text-xs text-slate-400 py-1 italic">Không có thương hiệu nào</p>
+              )}
+
+              {!isBrandLoading && !brandError && brands.length > 0 && (
+                <div className="space-y-1">
+                  {brands.map((brand) => {
+                    const isChecked = selectedBrands.includes(brand)
+                    return (
+                      <div
+                        key={brand}
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition select-none"
+                      >
+                        <label
+                          htmlFor={`brand-${brand}`}
+                          className="text-sm font-semibold text-slate-700 cursor-pointer flex-1"
+                        >
+                          {brand}
+                        </label>
+                        <Checkbox
+                          id={`brand-${brand}`}
+                          checked={isChecked}
+                          onCheckedChange={() => handleBrandToggle(brand)}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Filter Section: In Stock */}

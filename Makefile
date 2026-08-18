@@ -27,8 +27,10 @@ admin: frontend-admin
 test:
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
+	$(MAKE) -C frontend-admin test
 
-## Build backend binary and frontend production bundle.
+## Build backend binary and frontend production bundles.
 build:
 	$(MAKE) -C backend gen
 	cd frontend && npm run build
+	cd frontend-admin && npm run build

@@ -93,6 +93,18 @@ func (h *catalogHandler) ListCategories(c *gin.Context) {
 	writeSuccess(c, http.StatusOK, "", out)
 }
 
+func (h *catalogHandler) ListBrands(c *gin.Context) {
+	brands, err := h.uc.ListBrands(c)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if brands == nil {
+		brands = []string{}
+	}
+	writeSuccess(c, http.StatusOK, "", brands)
+}
+
 func (h *catalogHandler) ListProducts(c *gin.Context) {
 	minPrice, minPriceSet := c.GetQuery("min_price")
 	maxPrice, maxPriceSet := c.GetQuery("max_price")
@@ -142,6 +154,7 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 	filter := domain.ProductFilter{
 		Query:       c.Query("q"),
 		CategoryIDs: c.QueryArray("category_id"),
+		Brands:      c.QueryArray("brand"),
 		MinPriceVND: moneyQuery(minPrice),
 		MaxPriceVND: moneyQuery(maxPrice),
 	}

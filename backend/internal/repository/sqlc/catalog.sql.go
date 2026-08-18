@@ -546,6 +546,35 @@ func (q *Queries) ListAdminProducts(ctx context.Context, q_ pgtype.Text) ([]List
 	return items, nil
 }
 
+const listBrands = `-- name: ListBrands :many
+SELECT DISTINCT p.brand
+FROM products p
+WHERE p.active
+  AND p.brand <> ''
+  AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+ORDER BY p.brand ASC
+`
+
+func (q *Queries) ListBrands(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listBrands)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var brand string
+		if err := rows.Scan(&brand); err != nil {
+			return nil, err
+		}
+		items = append(items, brand)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCategories = `-- name: ListCategories :many
 SELECT c.id, c.name
 FROM categories c
@@ -751,26 +780,29 @@ WHERE p.active
   AND ($2::uuid[] IS NULL
        OR NOT EXISTS (SELECT 1 FROM categories fc WHERE fc.id = ANY($2::uuid[]))
        OR p.category_id = ANY($2::uuid[]))
-  AND ($3::numeric IS NULL AND $4::numeric IS NULL OR EXISTS (
+  AND ($3::text[] IS NULL
+       OR p.brand ILIKE ANY ($3::text[]))
+  AND ($4::numeric IS NULL AND $5::numeric IS NULL OR EXISTS (
        SELECT 1 FROM product_variants v
        WHERE v.product_id = p.id AND v.active
-         AND ($3::numeric IS NULL OR v.price_vnd >= $3::numeric)
-         AND ($4::numeric IS NULL OR v.price_vnd <= $4::numeric)
+         AND ($4::numeric IS NULL OR v.price_vnd >= $4::numeric)
+         AND ($5::numeric IS NULL OR v.price_vnd <= $5::numeric)
   ))
-  AND ($5::boolean IS NULL
-       OR ($5::boolean AND EXISTS (
+  AND ($6::boolean IS NULL
+       OR ($6::boolean AND EXISTS (
            SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active AND v.stock_quantity > 0
        ))
-       OR (NOT $5::boolean AND NOT EXISTS (
+       OR (NOT $6::boolean AND NOT EXISTS (
            SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active AND v.stock_quantity > 0
        )))
-  AND ($6::boolean IS NULL OR p.featured = $6::boolean)
+  AND ($7::boolean IS NULL OR p.featured = $7::boolean)
 ORDER BY p.name ASC, p.model ASC, p.id ASC
 `
 
 type ListProductsParams struct {
 	Q           pgtype.Text
 	CategoryIds []string
+	Brands      []string
 	MinPriceVnd pgtype.Numeric
 	MaxPriceVnd pgtype.Numeric
 	InStock     pgtype.Bool
@@ -796,6 +828,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 	rows, err := q.db.Query(ctx, listProducts,
 		arg.Q,
 		arg.CategoryIds,
+		arg.Brands,
 		arg.MinPriceVnd,
 		arg.MaxPriceVnd,
 		arg.InStock,

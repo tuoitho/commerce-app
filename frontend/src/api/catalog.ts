@@ -6,6 +6,10 @@ export const catalogApi = {
     return apiClient<Category[]>('/categories')
   },
 
+  async listBrands(): Promise<string[]> {
+    return apiClient<string[]>('/brands')
+  },
+
   async listProducts(filter: ProductFilterParams = {}): Promise<ProductSummary[]> {
     const params = new URLSearchParams()
 
@@ -20,6 +24,16 @@ export const catalogApi = {
         }
       } else {
         params.set('category_id', filter.category_id)
+      }
+    }
+
+    if (filter.brand) {
+      if (Array.isArray(filter.brand)) {
+        for (const b of filter.brand) {
+          if (b) params.append('brand', b)
+        }
+      } else {
+        params.set('brand', filter.brand)
       }
     }
 
@@ -62,6 +76,16 @@ export const catalogApi = {
         }
       } else {
         params.set('category_id', filter.category_id)
+      }
+    }
+
+    if (filter.brand) {
+      if (Array.isArray(filter.brand)) {
+        for (const b of filter.brand) {
+          if (b) params.append('brand', b)
+        }
+      } else {
+        params.set('brand', filter.brand)
       }
     }
 

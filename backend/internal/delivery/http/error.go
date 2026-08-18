@@ -2,7 +2,7 @@ package http
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -52,7 +52,23 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrCartItemUnavailable):
 		respondError(c, 409, "cart_item_unavailable", "Sản phẩm trong giỏ hàng không khả dụng", nil)
 	default:
-		log.Printf("internal error: %v", err)
+		var l *slog.Logger
+		if val, ok := c.Get(contextLoggerKey); ok {
+			if lg, ok := val.(*slog.Logger); ok && lg != nil {
+				l = lg
+			}
+		}
+		if l == nil {
+			l = slog.Default()
+		}
+		var method, path string
+		if c.Request != nil {
+			method = c.Request.Method
+			if c.Request.URL != nil {
+				path = c.Request.URL.Path
+			}
+		}
+		l.Error("internal error", "error", err.Error(), "method", method, "path", path)
 		respondError(c, 500, "internal", "Lỗi máy chủ nội bộ", nil)
 	}
 }

@@ -1,106 +1,188 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	AppEnv          string
-	HTTPPort        int
-	DBURL           string
-	JWTSecret       string
-	AccessTokenTTL  time.Duration
-	RefreshTokenTTL time.Duration
+	AppEnv                 string
+	HTTPPort               int
+	DBURL                  string
+	JWTSecret              string
+	AccessTokenTTL         time.Duration
+	RefreshTokenTTL        time.Duration
 	CookieSecure           bool
 	AdminBootstrapEmail    string
 	AdminBootstrapPassword string
+	LogLevel               string
 }
 
+const (
+	defaultAppEnv         = "development"
+	defaultHTTPPort       = 8080
+	defaultAccessTokenTTL = 15 * time.Minute
+	defaultRefreshTokenTTL = 720 * time.Hour
+	defaultLogLevel       = "info"
+)
+
+var allowedLogLevels = map[string]bool{
+	"debug": true,
+	"info":  true,
+	"warn":  true,
+	"error": true,
+}
+
+// Load loads configuration from environment variables and an optional .env file at the default location.
 func Load() (*Config, error) {
-	cfg := &Config{}
+	return LoadWithFile(".env")
+}
 
-	cfg.AppEnv = envOrDefault("APP_ENV", "development")
+// LoadWithFile loads configuration using the specified .env file path if present.
+func LoadWithFile(envFile string) (*Config, error) {
+	v := viper.New()
 
-	port, err := envInt("HTTP_PORT", 8080)
-	if err != nil {
-		return nil, err
-	}
-	cfg.HTTPPort = port
-
-	cfg.DBURL = os.Getenv("DB_URL")
-	if cfg.DBURL == "" {
-		return nil, fmt.Errorf("config: DB_URL is required")
-	}
-
-	cfg.JWTSecret = os.Getenv("JWT_ACCESS_SECRET")
-	if cfg.JWTSecret == "" {
-		return nil, fmt.Errorf("config: JWT_ACCESS_SECRET is required")
-	}
-	if len(cfg.JWTSecret) < 32 {
-		return nil, fmt.Errorf("config: JWT_ACCESS_SECRET must be at least 32 characters")
+	keys := []string{
+		"APP_ENV",
+		"HTTP_PORT",
+		"DB_URL",
+		"JWT_ACCESS_SECRET",
+		"ACCESS_TOKEN_TTL",
+		"REFRESH_TOKEN_TTL",
+		"COOKIE_SECURE",
+		"ADMIN_BOOTSTRAP_EMAIL",
+		"ADMIN_BOOTSTRAP_PASSWORD",
+		"LOG_LEVEL",
 	}
 
-	accessTTL, err := envDuration("ACCESS_TOKEN_TTL", 15*time.Minute)
-	if err != nil {
-		return nil, err
+	for _, key := range keys {
+		_ = v.BindEnv(key)
 	}
-	cfg.AccessTokenTTL = accessTTL
 
-	refreshTTL, err := envDuration("REFRESH_TOKEN_TTL", 30*24*time.Hour)
-	if err != nil {
-		return nil, err
-	}
-	cfg.RefreshTokenTTL = refreshTTL
+	v.AutomaticEnv()
 
-	var secure bool
-	secureVal := strings.TrimSpace(os.Getenv("COOKIE_SECURE"))
-	if secureVal == "" {
-		secure = cfg.AppEnv == "production"
-	} else {
-		secure, err = strconv.ParseBool(secureVal)
-		if err != nil {
-			return nil, fmt.Errorf("config: COOKIE_SECURE must be a boolean, got %q", secureVal)
+	if envFile != "" {
+		v.SetConfigFile(envFile)
+		v.SetConfigType("env")
+		if err := v.ReadInConfig(); err != nil {
+			var configFileNotFoundErr viper.ConfigFileNotFoundError
+			if !errors.Is(err, os.ErrNotExist) && !errors.As(err, &configFileNotFoundErr) {
+				return nil, fmt.Errorf("config: read file %q: %w", envFile, err)
+			}
 		}
 	}
-	cfg.CookieSecure = secure
 
-	cfg.AdminBootstrapEmail = envOrDefault("ADMIN_BOOTSTRAP_EMAIL", "")
-	cfg.AdminBootstrapPassword = envOrDefault("ADMIN_BOOTSTRAP_PASSWORD", "")
+	cfg := &Config{}
+
+	// 1. APP_ENV
+	appEnv := strings.TrimSpace(v.GetString("APP_ENV"))
+	if appEnv == "" {
+		appEnv = defaultAppEnv
+	}
+	cfg.AppEnv = appEnv
+
+	// 2. HTTP_PORT
+	if v.IsSet("HTTP_PORT") {
+		rawPort := strings.TrimSpace(v.GetString("HTTP_PORT"))
+		if rawPort != "" {
+			port, err := strconv.Atoi(rawPort)
+			if err != nil {
+				return nil, fmt.Errorf("config: HTTP_PORT must be an integer, got %q", rawPort)
+			}
+			cfg.HTTPPort = port
+		} else {
+			cfg.HTTPPort = defaultHTTPPort
+		}
+	} else {
+		cfg.HTTPPort = defaultHTTPPort
+	}
+
+	// 3. DB_URL (Required)
+	dbURL := strings.TrimSpace(v.GetString("DB_URL"))
+	if dbURL == "" {
+		return nil, fmt.Errorf("config: DB_URL is required")
+	}
+	cfg.DBURL = dbURL
+
+	// 4. JWT_ACCESS_SECRET (Required, >= 32 chars)
+	jwtSecret := strings.TrimSpace(v.GetString("JWT_ACCESS_SECRET"))
+	if jwtSecret == "" {
+		return nil, fmt.Errorf("config: JWT_ACCESS_SECRET is required")
+	}
+	if len(jwtSecret) < 32 {
+		return nil, fmt.Errorf("config: JWT_ACCESS_SECRET must be at least 32 characters")
+	}
+	cfg.JWTSecret = jwtSecret
+
+	// 5. ACCESS_TOKEN_TTL
+	if v.IsSet("ACCESS_TOKEN_TTL") {
+		rawAccessTTL := strings.TrimSpace(v.GetString("ACCESS_TOKEN_TTL"))
+		if rawAccessTTL != "" {
+			ttl, err := time.ParseDuration(rawAccessTTL)
+			if err != nil {
+				return nil, fmt.Errorf("config: ACCESS_TOKEN_TTL must be a duration (e.g. 15m, 24h), got %q", rawAccessTTL)
+			}
+			cfg.AccessTokenTTL = ttl
+		} else {
+			cfg.AccessTokenTTL = defaultAccessTokenTTL
+		}
+	} else {
+		cfg.AccessTokenTTL = defaultAccessTokenTTL
+	}
+
+	// 6. REFRESH_TOKEN_TTL
+	if v.IsSet("REFRESH_TOKEN_TTL") {
+		rawRefreshTTL := strings.TrimSpace(v.GetString("REFRESH_TOKEN_TTL"))
+		if rawRefreshTTL != "" {
+			ttl, err := time.ParseDuration(rawRefreshTTL)
+			if err != nil {
+				return nil, fmt.Errorf("config: REFRESH_TOKEN_TTL must be a duration (e.g. 15m, 24h), got %q", rawRefreshTTL)
+			}
+			cfg.RefreshTokenTTL = ttl
+		} else {
+			cfg.RefreshTokenTTL = defaultRefreshTokenTTL
+		}
+	} else {
+		cfg.RefreshTokenTTL = defaultRefreshTokenTTL
+	}
+
+	// 7. COOKIE_SECURE
+	if v.IsSet("COOKIE_SECURE") {
+		rawSecure := strings.TrimSpace(v.GetString("COOKIE_SECURE"))
+		if rawSecure != "" {
+			secure, err := strconv.ParseBool(rawSecure)
+			if err != nil {
+				return nil, fmt.Errorf("config: COOKIE_SECURE must be a boolean, got %q", rawSecure)
+			}
+			cfg.CookieSecure = secure
+		} else {
+			cfg.CookieSecure = cfg.AppEnv == "production"
+		}
+	} else {
+		cfg.CookieSecure = cfg.AppEnv == "production"
+	}
+
+	// 8. ADMIN_BOOTSTRAP_EMAIL & ADMIN_BOOTSTRAP_PASSWORD
+	cfg.AdminBootstrapEmail = strings.TrimSpace(v.GetString("ADMIN_BOOTSTRAP_EMAIL"))
+	cfg.AdminBootstrapPassword = strings.TrimSpace(v.GetString("ADMIN_BOOTSTRAP_PASSWORD"))
+
+	// 9. LOG_LEVEL
+	rawLogLevel := strings.TrimSpace(v.GetString("LOG_LEVEL"))
+	if rawLogLevel == "" {
+		cfg.LogLevel = defaultLogLevel
+	} else {
+		normalizedLevel := strings.ToLower(rawLogLevel)
+		if !allowedLogLevels[normalizedLevel] {
+			return nil, fmt.Errorf("config: LOG_LEVEL must be one of debug, info, warn, error, got %q", rawLogLevel)
+		}
+		cfg.LogLevel = normalizedLevel
+	}
 
 	return cfg, nil
-}
-
-func envOrDefault(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func envInt(key string, fallback int) (int, error) {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
-		return fallback, nil
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return 0, fmt.Errorf("config: %s must be an integer, got %q", key, v)
-	}
-	return n, nil
-}
-
-func envDuration(key string, fallback time.Duration) (time.Duration, error) {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
-		return fallback, nil
-	}
-	d, err := time.ParseDuration(v)
-	if err != nil {
-		return 0, fmt.Errorf("config: %s must be a duration (e.g. 15m, 24h), got %q", key, v)
-	}
-	return d, nil
 }

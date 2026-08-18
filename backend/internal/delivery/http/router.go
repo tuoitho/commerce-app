@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,9 @@ type Dependencies struct {
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
+	Logger       *slog.Logger
 }
+
 
 func NewRouter(router *gin.Engine, deps Dependencies) {
 	api := router.Group("/api/v1")
@@ -37,6 +40,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 
 	catalogHandler := newCatalogHandler(deps.Catalog)
 	api.GET("/categories", catalogHandler.ListCategories)
+	api.GET("/brands", catalogHandler.ListBrands)
 	products := api.Group("/products")
 	{
 		products.GET("", catalogHandler.ListProducts)

@@ -11,6 +11,14 @@ WHERE EXISTS (
 )
 ORDER BY c.name ASC, c.id ASC;
 
+-- name: ListBrands :many
+SELECT DISTINCT p.brand
+FROM products p
+WHERE p.active
+  AND p.brand <> ''
+  AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+ORDER BY p.brand ASC;
+
 -- name: ListProducts :many
 SELECT p.id,
        p.name,
@@ -39,6 +47,8 @@ WHERE p.active
   AND (sqlc.narg('category_ids')::uuid[] IS NULL
        OR NOT EXISTS (SELECT 1 FROM categories fc WHERE fc.id = ANY(sqlc.narg('category_ids')::uuid[]))
        OR p.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
+  AND (sqlc.narg('brands')::text[] IS NULL
+       OR p.brand ILIKE ANY (sqlc.narg('brands')::text[]))
   AND (sqlc.narg('min_price_vnd')::numeric IS NULL AND sqlc.narg('max_price_vnd')::numeric IS NULL OR EXISTS (
        SELECT 1 FROM product_variants v
        WHERE v.product_id = p.id AND v.active

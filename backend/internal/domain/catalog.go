@@ -76,6 +76,7 @@ type ProductFilter struct {
 	Query       string
 	CategoryIDs []string
 	CategoryID  string
+	Brands      []string
 	MinPriceVND *MoneyVND
 	MaxPriceVND *MoneyVND
 	MinPrice    string
@@ -123,6 +124,7 @@ type SaveProductInput struct {
 
 type CatalogRepository interface {
 	ListCategories(ctx context.Context) ([]Category, error)
+	ListBrands(ctx context.Context) ([]string, error)
 	ListProducts(ctx context.Context, f ProductFilter) ([]Product, error)
 	ListFeaturedProducts(ctx context.Context) ([]Product, error)
 	GetProductByID(ctx context.Context, id string) (*Product, error)

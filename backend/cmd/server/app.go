@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,100 +19,117 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 )
 
-func run() error {
-	loadEnvFile(".env")
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
+type App struct {
+	Config *config.Config
+	Logger *slog.Logger
+	Pool   *pgxpool.Pool
+	Server *http.Server
+	AuthUC *authuc.UseCase
+}
 
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DBURL)
-	if err != nil {
-		return fmt.Errorf("create pgx pool: %w", err)
-	}
-	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
+func (a *App) Run(ctx context.Context) error {
+	if err := a.Pool.Ping(ctx); err != nil {
+		a.Logger.Error("database ping failed", "category", "db_ping")
 		return fmt.Errorf("ping database: %w", err)
 	}
 
-	handler, authUC := newHandler(cfg, pool)
-
-	if cfg.AdminBootstrapEmail != "" && cfg.AdminBootstrapPassword != "" {
-		if err := authUC.BootstrapAdmin(ctx, cfg.AdminBootstrapEmail, cfg.AdminBootstrapPassword); err != nil {
+	if a.Config.AdminBootstrapEmail != "" && a.Config.AdminBootstrapPassword != "" {
+		if err := a.AuthUC.BootstrapAdmin(ctx, a.Config.AdminBootstrapEmail, a.Config.AdminBootstrapPassword); err != nil {
+			a.Logger.Error("bootstrap admin failed", "category", "bootstrap_admin")
 			return fmt.Errorf("bootstrap admin: %w", err)
 		}
 	}
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: handler,
-	}
-
-	log.Printf("server listening on %s", srv.Addr)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	a.Logger.Info("server listening", "addr", a.Server.Addr)
+	if err := a.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("serve: %w", err)
 	}
 
 	return nil
 }
 
-func newHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, *authuc.UseCase) {
-	if cfg.AppEnv == "production" {
-		gin.SetMode(gin.ReleaseMode)
+func providePgxPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func(), error) {
+	pool, err := pgxpool.New(ctx, cfg.DBURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create pgx pool: %w", err)
 	}
+	cleanup := func() {
+		pool.Close()
+	}
+	return pool, cleanup, nil
+}
 
-	userRepo := repository.NewUserRepository(pool)
-	sessionRepo := repository.NewSessionRepository(pool)
-	catalogRepo := repository.NewCatalogRepository(pool)
-	cartRepo := repository.NewCartRepository(pool)
+func provideUserRepository(pool *pgxpool.Pool) *repository.UserRepository {
+	return repository.NewUserRepository(pool)
+}
 
-	jwtManager := jwt.NewManager(cfg.JWTSecret, "commerce-backend")
-	authUC := authuc.New(authuc.Dependencies{
+func provideSessionRepository(pool *pgxpool.Pool) *repository.SessionRepository {
+	return repository.NewSessionRepository(pool)
+}
+
+func provideCatalogRepository(pool *pgxpool.Pool) *repository.CatalogRepository {
+	return repository.NewCatalogRepository(pool)
+}
+
+func provideCartRepository(pool *pgxpool.Pool) *repository.CartRepository {
+	return repository.NewCartRepository(pool)
+}
+
+func provideJWTManager(cfg *config.Config) *jwt.Manager {
+	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
+}
+
+func provideAuthUseCase(userRepo *repository.UserRepository, sessionRepo *repository.SessionRepository, jwtMgr *jwt.Manager, cfg *config.Config) *authuc.UseCase {
+	return authuc.New(authuc.Dependencies{
 		Repos:                authuc.Repositories{Users: userRepo, Sessions: sessionRepo},
-		JWT:                  jwtManager,
+		JWT:                  jwtMgr,
 		AccessTTL:            cfg.AccessTokenTTL,
 		RefreshTTL:           cfg.RefreshTokenTTL,
 		HashPassword:         security.HashPassword,
 		CheckPassword:        security.CheckPassword,
 		GenerateRefreshToken: security.GenerateRefreshToken,
 	})
-	catalogUC := cataloguc.New(cataloguc.Dependencies{Catalog: catalogRepo})
-	cartUC := cartuc.New(cartuc.Dependencies{Cart: cartRepo})
+}
 
+func provideCatalogUseCase(repo *repository.CatalogRepository) *cataloguc.UseCase {
+	return cataloguc.New(cataloguc.Dependencies{Catalog: repo})
+}
+
+func provideCartUseCase(repo *repository.CartRepository) *cartuc.UseCase {
+	return cartuc.New(cartuc.Dependencies{Cart: repo})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+	if cfg.AppEnv == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
+	router.Use(delivery.LoggingMiddleware(log), delivery.RecoveryMiddleware(log))
 	delivery.NewRouter(router, delivery.Dependencies{
 		UseCase:      authUC,
 		Catalog:      catalogUC,
 		Cart:         cartUC,
-		JWT:          jwtManager,
+		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,
+		Logger:       log,
 	})
-
-	return router, authUC
+	return router
 }
 
-func loadEnvFile(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			k := strings.TrimSpace(parts[0])
-			v := strings.TrimSpace(parts[1])
-			if os.Getenv(k) == "" {
-				os.Setenv(k, v)
-			}
-		}
+func provideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
+		Handler: router,
 	}
 }
 
+func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase) *App {
+	return &App{
+		Config: cfg,
+		Logger: log,
+		Pool:   pool,
+		Server: srv,
+		AuthUC: authUC,
+	}
+}

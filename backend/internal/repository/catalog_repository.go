@@ -69,6 +69,18 @@ func (r *CatalogRepository) ListCategories(ctx context.Context) ([]domain.Catego
 	return out, nil
 }
 
+func (r *CatalogRepository) ListBrands(ctx context.Context) ([]string, error) {
+	rows, err := r.q.ListBrands(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row)
+	}
+	return out, nil
+}
+
 func (r *CatalogRepository) ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error) {
 	if err := validateProductPriceFilter(f); err != nil {
 		return nil, err
@@ -83,6 +95,9 @@ func (r *CatalogRepository) ListProducts(ctx context.Context, f domain.ProductFi
 		categoryIDs = []string{f.CategoryID}
 	}
 	params.CategoryIds = categoryIDs
+	if len(f.Brands) > 0 {
+		params.Brands = f.Brands
+	}
 	if f.InStock != nil {
 		params.InStock = pgtype.Bool{Bool: *f.InStock, Valid: true}
 	}
