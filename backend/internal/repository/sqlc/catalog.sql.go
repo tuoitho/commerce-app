@@ -12,6 +12,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countProductsByCategory = `-- name: CountProductsByCategory :one
+SELECT count(*) FROM products WHERE category_id = $1
+`
+
+func (q *Queries) CountProductsByCategory(ctx context.Context, categoryID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countProductsByCategory, categoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createCategory = `-- name: CreateCategory :one
+INSERT INTO categories (name) VALUES ($1) RETURNING id, name
+`
+
+type CreateCategoryRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) CreateCategory(ctx context.Context, name string) (CreateCategoryRow, error) {
+	row := q.db.QueryRow(ctx, createCategory, name)
+	var i CreateCategoryRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (
     category_id,
@@ -233,6 +260,22 @@ func (q *Queries) CreateVariantOptionValue(ctx context.Context, arg CreateVarian
 	return err
 }
 
+const deleteCategory = `-- name: DeleteCategory :one
+DELETE FROM categories WHERE id = $1 RETURNING id, name
+`
+
+type DeleteCategoryRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) DeleteCategory(ctx context.Context, id string) (DeleteCategoryRow, error) {
+	row := q.db.QueryRow(ctx, deleteCategory, id)
+	var i DeleteCategoryRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const deleteProductImages = `-- name: DeleteProductImages :exec
 DELETE FROM product_images
 WHERE product_id = $1
@@ -452,6 +495,35 @@ func (q *Queries) ListActiveProductVariants(ctx context.Context, productID strin
 			&i.StockQuantity,
 			&i.Active,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminCategories = `-- name: ListAdminCategories :many
+SELECT id, name FROM categories ORDER BY name ASC, id ASC
+`
+
+type ListAdminCategoriesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) ListAdminCategories(ctx context.Context) ([]ListAdminCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminCategoriesRow
+	for rows.Next() {
+		var i ListAdminCategoriesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -940,6 +1012,27 @@ WHERE product_id = $1
 func (q *Queries) SoftDeleteProductVariants(ctx context.Context, productID string) error {
 	_, err := q.db.Exec(ctx, softDeleteProductVariants, productID)
 	return err
+}
+
+const updateCategory = `-- name: UpdateCategory :one
+UPDATE categories SET name = $2 WHERE id = $1 RETURNING id, name
+`
+
+type UpdateCategoryParams struct {
+	ID   string
+	Name string
+}
+
+type UpdateCategoryRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (UpdateCategoryRow, error) {
+	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.Name)
+	var i UpdateCategoryRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
 const updateProduct = `-- name: UpdateProduct :one

@@ -57,6 +57,77 @@ func (f *Catalog) addProduct(p domain.Product, active *bool) {
 	f.products = append(f.products, &p)
 }
 
+func (f *Catalog) ListAdminCategories(ctx context.Context) ([]domain.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := append([]domain.Category(nil), f.categories...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out, nil
+}
+func (f *Catalog) CreateCategory(ctx context.Context, name string) (*domain.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, c := range f.categories {
+		if strings.EqualFold(strings.TrimSpace(c.Name), name) {
+			return nil, domain.ErrCategoryNameInUse
+		}
+	}
+	c := domain.Category{ID: uuid.New().String(), Name: name}
+	f.categories = append(f.categories, c)
+	return &c, nil
+}
+func (f *Catalog) UpdateCategory(ctx context.Context, id, name string) (*domain.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	idx := -1
+	for i := range f.categories {
+		if f.categories[i].ID == id {
+			idx = i
+		}
+		if f.categories[i].ID != id && strings.EqualFold(strings.TrimSpace(f.categories[i].Name), name) {
+			return nil, domain.ErrCategoryNameInUse
+		}
+	}
+	if idx < 0 {
+		return nil, domain.ErrCategoryNotFound
+	}
+	f.categories[idx].Name = name
+	for _, product := range f.products {
+		if product.Category.ID == id {
+			product.Category.Name = name
+		}
+	}
+	c := f.categories[idx]
+	return &c, nil
+}
+func (f *Catalog) DeleteCategory(ctx context.Context, id string) (*domain.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	idx := -1
+	for i, c := range f.categories {
+		if c.ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, domain.ErrCategoryNotFound
+	}
+	for _, p := range f.products {
+		if p.Category.ID == id {
+			return nil, domain.ErrCategoryInUse
+		}
+	}
+	c := f.categories[idx]
+	f.categories = append(f.categories[:idx], f.categories[idx+1:]...)
+	return &c, nil
+}
+
 func (f *Catalog) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

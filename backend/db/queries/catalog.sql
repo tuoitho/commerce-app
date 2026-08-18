@@ -11,6 +11,21 @@ WHERE EXISTS (
 )
 ORDER BY c.name ASC, c.id ASC;
 
+-- name: ListAdminCategories :many
+SELECT id, name FROM categories ORDER BY name ASC, id ASC;
+
+-- name: CreateCategory :one
+INSERT INTO categories (name) VALUES ($1) RETURNING id, name;
+
+-- name: UpdateCategory :one
+UPDATE categories SET name = $2 WHERE id = $1 RETURNING id, name;
+
+-- name: DeleteCategory :one
+DELETE FROM categories WHERE id = $1 RETURNING id, name;
+
+-- name: CountProductsByCategory :one
+SELECT count(*) FROM products WHERE category_id = $1;
+
 -- name: ListBrands :many
 SELECT DISTINCT p.brand
 FROM products p

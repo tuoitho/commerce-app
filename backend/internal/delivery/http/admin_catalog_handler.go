@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -126,6 +127,66 @@ func (req saveProductRequest) toDomain() domain.SaveProductInput {
 		OptionGroups:  optionGroups,
 		Variants:      variants,
 	}
+}
+
+type categoryRequest struct {
+	Name *string `json:"name"`
+}
+
+func invalidCategoryName() *domain.ValidationError {
+	return domain.NewValidationError(map[string]string{"name": "Tên danh mục không hợp lệ"})
+}
+
+func (req categoryRequest) validName() bool {
+	return req.Name != nil && strings.TrimSpace(*req.Name) != ""
+}
+
+func toCategoryResponse(c domain.Category) gin.H { return gin.H{"id": c.ID, "name": c.Name} }
+func (h *adminCatalogHandler) ListCategories(c *gin.Context) {
+	cats, err := h.uc.ListAdminCategories(c)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	out := make([]gin.H, 0, len(cats))
+	for _, x := range cats {
+		out = append(out, toCategoryResponse(x))
+	}
+	writeSuccess(c, http.StatusOK, "Lấy danh sách danh mục thành công", out)
+}
+func (h *adminCatalogHandler) CreateCategory(c *gin.Context) {
+	var req categoryRequest
+	if c.ShouldBindJSON(&req) != nil || !req.validName() {
+		writeError(c, invalidCategoryName())
+		return
+	}
+	cat, err := h.uc.CreateCategory(c, *req.Name)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusCreated, "Tạo danh mục thành công", toCategoryResponse(*cat))
+}
+func (h *adminCatalogHandler) UpdateCategory(c *gin.Context) {
+	var req categoryRequest
+	if c.ShouldBindJSON(&req) != nil || !req.validName() {
+		writeError(c, invalidCategoryName())
+		return
+	}
+	cat, err := h.uc.RenameCategory(c, c.Param("id"), *req.Name)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Đổi tên danh mục thành công", toCategoryResponse(*cat))
+}
+func (h *adminCatalogHandler) DeleteCategory(c *gin.Context) {
+	cat, err := h.uc.DeleteCategory(c, c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Xoá danh mục thành công", toCategoryResponse(*cat))
 }
 
 func (h *adminCatalogHandler) ListProducts(c *gin.Context) {

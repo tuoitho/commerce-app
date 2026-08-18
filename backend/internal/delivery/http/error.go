@@ -25,6 +25,14 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", valErr.Fields)
 	case errors.As(err, &filterErr):
 		respondError(c, 400, "invalid_filter", "Tiêu chí lọc sản phẩm không hợp lệ", filterErr.Fields)
+	case errors.Is(err, domain.ErrInvalidCategoryID):
+		respondError(c, 400, "validation_error", "Mã danh mục không hợp lệ", map[string]string{"id": "Mã danh mục không hợp lệ"})
+	case errors.Is(err, domain.ErrCategoryNameInUse):
+		respondError(c, 409, "category_name_in_use", "Tên danh mục đã được sử dụng", nil)
+	case errors.Is(err, domain.ErrCategoryNotFound):
+		respondError(c, 404, "category_not_found", "Không tìm thấy danh mục", nil)
+	case errors.Is(err, domain.ErrCategoryInUse):
+		respondError(c, 409, "category_in_use", "Danh mục đang được sử dụng", nil)
 	case errors.Is(err, domain.ErrInvalidProductID):
 		respondError(c, 400, "invalid_product_id", "Mã sản phẩm không hợp lệ", nil)
 	case errors.Is(err, domain.ErrProductNotFound):

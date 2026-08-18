@@ -31,6 +31,36 @@ func (uc *UseCase) ListCategories(ctx context.Context) ([]domain.Category, error
 	return uc.catalog.ListCategories(ctx)
 }
 
+func (uc *UseCase) ListAdminCategories(ctx context.Context) ([]domain.Category, error) {
+	return uc.catalog.ListAdminCategories(ctx)
+}
+
+func (uc *UseCase) CreateCategory(ctx context.Context, name string) (*domain.Category, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, domain.NewValidationError(map[string]string{"name": "Tên danh mục không được để trống"})
+	}
+	return uc.catalog.CreateCategory(ctx, name)
+}
+
+func (uc *UseCase) RenameCategory(ctx context.Context, id, name string) (*domain.Category, error) {
+	if !uuidPattern.MatchString(id) {
+		return nil, domain.ErrInvalidCategoryID
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, domain.NewValidationError(map[string]string{"name": "Tên danh mục không được để trống"})
+	}
+	return uc.catalog.UpdateCategory(ctx, id, name)
+}
+
+func (uc *UseCase) DeleteCategory(ctx context.Context, id string) (*domain.Category, error) {
+	if !uuidPattern.MatchString(id) {
+		return nil, domain.ErrInvalidCategoryID
+	}
+	return uc.catalog.DeleteCategory(ctx, id)
+}
+
 func (uc *UseCase) ListBrands(ctx context.Context) ([]string, error) {
 	return uc.catalog.ListBrands(ctx)
 }

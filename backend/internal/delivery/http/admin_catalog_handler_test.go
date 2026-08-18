@@ -832,3 +832,162 @@ func TestAdminCatalog_UpdateProduct_WithVariants_Success(t *testing.T) {
 	}
 }
 
+func TestAdminCatalog_CategoryAuthGuards(t *testing.T) {
+	router, manager, _, _ := setupAdminCatalogTestRouter()
+	endpoints := []struct{ method, url, body string }{
+		{http.MethodGet, "/api/v1/admin/categories", ""},
+		{http.MethodPost, "/api/v1/admin/categories", `{"name":"New"}`},
+		{http.MethodPut, "/api/v1/admin/categories/11111111-1111-1111-1111-111111111111", `{"name":"New"}`},
+		{http.MethodDelete, "/api/v1/admin/categories/11111111-1111-1111-1111-111111111111", ""},
+	}
+	for _, ep := range endpoints {
+		t.Run("anonymous_"+ep.method, func(t *testing.T) {
+			req := httptest.NewRequest(ep.method, ep.url, bytes.NewBufferString(ep.body))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != http.StatusUnauthorized {
+				t.Fatalf("got %d, want 401", w.Code)
+			}
+		})
+		t.Run("customer_"+ep.method, func(t *testing.T) {
+			req := httptest.NewRequest(ep.method, ep.url, bytes.NewBufferString(ep.body))
+			req.Header.Set("Authorization", customerBearerToken(t, manager))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("got %d, want 403", w.Code)
+			}
+		})
+	}
+}
+
+func TestAdminCatalog_CategoriesCRUD(t *testing.T) {
+	router, manager, repo, _ := setupAdminCatalogTestRouter()
+	token := adminBearerToken(t, manager)
+	prodID := "33333333-3333-3333-3333-333333333333"
+	repo.AddProduct(domain.Product{
+		ID:       prodID,
+		Name:     "Test Phone",
+		Category: domain.Category{ID: "11111111-1111-1111-1111-111111111111", Name: "Điện thoại"},
+		Active:   true,
+		Variants: []domain.ProductVariant{
+			{ID: "var-1", Active: true, StockQuantity: 10, PriceVND: "100000"},
+		},
+	})
+	request := func(method, url, body string) (int, ResponseEnvelope) {
+		req := httptest.NewRequest(method, url, bytes.NewBufferString(body))
+		req.Header.Set("Authorization", token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		var env ResponseEnvelope
+		_ = json.Unmarshal(w.Body.Bytes(), &env)
+		return w.Code, env
+	}
+	code, env := request(http.MethodGet, "/api/v1/admin/categories", "")
+	if code != 200 || !env.Success || env.Message != "Lấy danh sách danh mục thành công" {
+		t.Fatalf("list: %d %+v", code, env)
+	}
+	code, env = request(http.MethodPost, "/api/v1/admin/categories", `{"name":"  Phụ kiện  "}`)
+	if code != 201 || env.Message != "Tạo danh mục thành công" {
+		t.Fatalf("create: %d %+v", code, env)
+	}
+	code, env = request(http.MethodPost, "/api/v1/admin/categories", `{"name":"  "}`)
+	if code != 400 || env.Error == nil || env.Error.Code != "validation_error" || env.Error.Fields["name"] == "" {
+		t.Fatalf("blank create: %d %+v", code, env)
+	}
+	code, env = request(http.MethodPost, "/api/v1/admin/categories", `{"name":"đIỆN THOẠI"}`)
+	if code != 409 || env.Error == nil || env.Error.Code != "category_name_in_use" {
+		t.Fatalf("duplicate create: %d %+v", code, env)
+	}
+	code, env = request(http.MethodPut, "/api/v1/admin/categories/11111111-1111-1111-1111-111111111111", `{"name":"Điện thoại mới"}`)
+	if code != 200 || env.Message != "Đổi tên danh mục thành công" {
+		t.Fatalf("rename: %d %+v", code, env)
+	}
+
+	// Requirement 3.1: Renaming category reflects updated category name in product retrieval
+	pCode, pEnv := request(http.MethodGet, "/api/v1/admin/products/"+prodID, "")
+	if pCode != 200 || pEnv.Data == nil {
+		t.Fatalf("get product after category rename failed: %d %+v", pCode, pEnv)
+	}
+	var prodResp struct {
+		Category struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"category"`
+	}
+	rawProd, _ := json.Marshal(pEnv.Data)
+	_ = json.Unmarshal(rawProd, &prodResp)
+	if prodResp.Category.Name != "Điện thoại mới" {
+		t.Fatalf("expected product category name 'Điện thoại mới', got '%s'", prodResp.Category.Name)
+	}
+	code, env = request(http.MethodPut, "/api/v1/admin/categories/bad", `{"name":"x"}`)
+	if code != 400 {
+		t.Fatalf("invalid rename: %d", code)
+	}
+	code, env = request(http.MethodPut, "/api/v1/admin/categories/22222222-2222-2222-2222-222222222222", `{"name":"   "}`)
+	if code != 400 || env.Error == nil || env.Error.Fields["name"] == "" {
+		t.Fatalf("blank rename: %d %+v", code, env)
+	}
+	code, env = request(http.MethodPut, "/api/v1/admin/categories/22222222-2222-2222-2222-222222222222", `{"name":"Điện thoại mới"}`)
+	if code != 409 {
+		t.Fatalf("duplicate rename: %d", code)
+	}
+	code, env = request(http.MethodPut, "/api/v1/admin/categories/99999999-9999-9999-9999-999999999999", `{"name":"x"}`)
+	if code != 404 {
+		t.Fatalf("missing rename: %d", code)
+	}
+	code, env = request(http.MethodDelete, "/api/v1/admin/categories/bad", "")
+	if code != 400 {
+		t.Fatalf("invalid delete: %d", code)
+	}
+	code, env = request(http.MethodDelete, "/api/v1/admin/categories/99999999-9999-9999-9999-999999999999", "")
+	if code != 404 {
+		t.Fatalf("missing delete: %d", code)
+	}
+	repo.AddProduct(domain.Product{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Category: domain.Category{ID: "22222222-2222-2222-2222-222222222222"}})
+	code, env = request(http.MethodDelete, "/api/v1/admin/categories/22222222-2222-2222-2222-222222222222", "")
+	if code != 409 || env.Error == nil || env.Error.Code != "category_in_use" {
+		t.Fatalf("in use delete: %d %+v", code, env)
+	}
+	unusedCatID := "44444444-4444-4444-4444-444444444444"
+	repo.AddCategory(domain.Category{ID: unusedCatID, Name: "Chưa dùng"})
+	code, env = request(http.MethodDelete, "/api/v1/admin/categories/"+unusedCatID, "")
+	if code != 200 || env.Message != "Xoá danh mục thành công" {
+		t.Fatalf("delete: %d %+v", code, env)
+	}
+}
+
+func TestAdminCatalog_CategoryInvalidJSONAndMissingNameBindNameField(t *testing.T) {
+	router, manager, _, _ := setupAdminCatalogTestRouter()
+	token := adminBearerToken(t, manager)
+	for _, tc := range []struct {
+		method string
+		url    string
+		body   string
+	}{
+		{http.MethodPost, "/api/v1/admin/categories", `{"name":`},
+		{http.MethodPost, "/api/v1/admin/categories", `{}`},
+		{http.MethodPut, "/api/v1/admin/categories/11111111-1111-1111-1111-111111111111", `{"name":`},
+		{http.MethodPut, "/api/v1/admin/categories/11111111-1111-1111-1111-111111111111", `{}`},
+	} {
+		t.Run(tc.method+tc.url+tc.body, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.url, bytes.NewBufferString(tc.body))
+			req.Header.Set("Authorization", token)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+			var env ResponseEnvelope
+			if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if env.Error == nil || env.Error.Fields["name"] != "Tên danh mục không hợp lệ" {
+				t.Fatalf("expected name validation field, got %+v", env.Error)
+			}
+		})
+	}
+}

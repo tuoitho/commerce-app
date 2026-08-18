@@ -123,6 +123,7 @@ type SaveProductInput struct {
 }
 
 type CatalogRepository interface {
+	CategoryAdminRepository
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListBrands(ctx context.Context) ([]string, error)
 	ListProducts(ctx context.Context, f ProductFilter) ([]Product, error)
@@ -135,4 +136,11 @@ type CatalogRepository interface {
 	UpdateProduct(ctx context.Context, id string, input SaveProductInput) (*Product, error)
 	DeleteProduct(ctx context.Context, id string) error
 	GetCategoryByID(ctx context.Context, id string) (*Category, error)
+}
+
+type CategoryAdminRepository interface {
+	ListAdminCategories(ctx context.Context) ([]Category, error)
+	CreateCategory(ctx context.Context, name string) (*Category, error)
+	UpdateCategory(ctx context.Context, id, name string) (*Category, error)
+	DeleteCategory(ctx context.Context, id string) (*Category, error)
 }

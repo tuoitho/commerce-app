@@ -247,6 +247,20 @@ func TestGetProduct_Existing(t *testing.T) {
 	}
 }
 
+func TestGetProduct_UsesRenamedCategoryName(t *testing.T) {
+	uc, fake := newTestEnv(t)
+	if _, err := uc.RenameCategory(context.Background(), "11111111-1111-1111-1111-111111111111", "Consumer Electronics"); err != nil {
+		t.Fatal(err)
+	}
+	product, err := uc.GetProduct(context.Background(), "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if product.Category.Name != "Consumer Electronics" {
+		t.Fatalf("category name = %q, want renamed category; categories=%v", product.Category.Name, fake)
+	}
+}
+
 func TestGetProduct_OutOfStockReportsFalse(t *testing.T) {
 	uc, _ := newTestEnv(t)
 	product, err := uc.GetProduct(context.Background(), "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
@@ -427,8 +441,20 @@ type stubErrorRepo struct {
 	err error
 }
 
+func (r *stubErrorRepo) ListAdminCategories(context.Context) ([]domain.Category, error) {
+	return nil, r.err
+}
+func (r *stubErrorRepo) CreateCategory(context.Context, string) (*domain.Category, error) {
+	return nil, r.err
+}
+func (r *stubErrorRepo) UpdateCategory(context.Context, string, string) (*domain.Category, error) {
+	return nil, r.err
+}
+func (r *stubErrorRepo) DeleteCategory(context.Context, string) (*domain.Category, error) {
+	return nil, r.err
+}
 func (r *stubErrorRepo) ListCategories(context.Context) ([]domain.Category, error) { return nil, r.err }
-func (r *stubErrorRepo) ListBrands(context.Context) ([]string, error)             { return nil, r.err }
+func (r *stubErrorRepo) ListBrands(context.Context) ([]string, error)              { return nil, r.err }
 func (r *stubErrorRepo) ListProducts(context.Context, domain.ProductFilter) ([]domain.Product, error) {
 	return nil, r.err
 }
@@ -554,4 +580,3 @@ func TestGetProduct_NotFoundRemainsDomainError(t *testing.T) {
 		t.Fatalf("expected not found, got %v", err)
 	}
 }
-

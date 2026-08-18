@@ -4,7 +4,7 @@ import { useForm, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, Save, Layers, Package } from 'lucide-react'
-import { getCategories } from '@/api/categories'
+import { getAdminCategories } from '@/api/categories'
 import { createAdminProduct, getAdminProductById, updateAdminProduct } from '@/api/products'
 import { ApiError, type SaveProductRequest, type OptionGroupInput, type VariantInput } from '@/api/types'
 import { productFormSchema, type ProductFormValues, type ProductFormInput } from '@/lib/validations/product'
@@ -116,8 +116,8 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
     data: categories = [],
     isLoading: isCategoriesLoading,
   } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
+    queryKey: ['admin', 'categories'],
+    queryFn: getAdminCategories,
   })
 
   const {

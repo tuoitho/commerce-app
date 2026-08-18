@@ -22,7 +22,6 @@ type Dependencies struct {
 	Logger       *slog.Logger
 }
 
-
 func NewRouter(router *gin.Engine, deps Dependencies) {
 	api := router.Group("/api/v1")
 
@@ -64,6 +63,13 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	admin := api.Group("/admin")
 	admin.Use(guard.AuthRequired, guard.RequireAdmin())
 	{
+		adminCategories := admin.Group("/categories")
+		{
+			adminCategories.GET("", adminCatalogHandler.ListCategories)
+			adminCategories.POST("", adminCatalogHandler.CreateCategory)
+			adminCategories.PUT("/:id", adminCatalogHandler.UpdateCategory)
+			adminCategories.DELETE("/:id", adminCatalogHandler.DeleteCategory)
+		}
 		adminProducts := admin.Group("/products")
 		{
 			adminProducts.GET("", adminCatalogHandler.ListProducts)

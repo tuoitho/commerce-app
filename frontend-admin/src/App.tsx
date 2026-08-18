@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { ProductFormPage } from '@/pages/ProductFormPage'
+import { CategoriesPage } from '@/pages/CategoriesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ export function AppRoutes() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
         <Route path="products/new" element={<ProductFormPage mode="create" />} />
         <Route path="products/:id" element={<ProductFormPage mode="edit" />} />
         <Route path="products/:id/edit" element={<ProductFormPage mode="edit" />} />

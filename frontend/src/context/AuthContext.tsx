@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { authApi } from '@/api/auth'
 import { tokenStore } from '@/api/tokenStore'
-import type { User } from '@/api/types'
+import { ApiError, type User } from '@/api/types'
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null
+  role?: string | null
   accessToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
@@ -36,18 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const currentUser = await authApi.getMe()
-        if (isMounted && currentUser) {
-          setUser(currentUser)
-          setAccessToken(existingToken)
+        if (isMounted) {
+          if (currentUser && currentUser.role !== 'admin') {
+            setUser(currentUser)
+            setAccessToken(existingToken)
+          } else {
+            setUser(null)
+            setAccessToken(null)
+            tokenStore.clearToken()
+          }
         }
       } catch {
         // Token might be expired, attempt refresh once or clear
         try {
           const session = await authApi.refresh()
-          if (isMounted && session?.user) {
-            setUser(session.user)
-            setAccessToken(session.accessToken)
-            tokenStore.setToken(session.accessToken)
+          if (isMounted) {
+            if (session?.user && session.user.role !== 'admin') {
+              setUser(session.user)
+              setAccessToken(session.accessToken)
+              tokenStore.setToken(session.accessToken)
+            } else {
+              setUser(null)
+              setAccessToken(null)
+              tokenStore.clearToken()
+            }
           }
         } catch {
           if (isMounted) {
@@ -71,6 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await authApi.login(email, password)
+    if (!session?.user || session.user.role === 'admin') {
+      tokenStore.clearToken()
+      setUser(null)
+      setAccessToken(null)
+      throw new ApiError(403, {
+        code: 'forbidden',
+        message: 'Tài khoản quản trị không thể đăng nhập vào trang khách hàng',
+      })
+    }
     setUser(session.user)
     setAccessToken(session.accessToken)
     tokenStore.setToken(session.accessToken)
@@ -78,6 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (email: string, password: string) => {
     const session = await authApi.register(email, password)
+    if (!session?.user || session.user.role === 'admin') {
+      tokenStore.clearToken()
+      setUser(null)
+      setAccessToken(null)
+      throw new ApiError(403, {
+        code: 'forbidden',
+        message: 'Tài khoản quản trị không thể đăng nhập vào trang khách hàng',
+      })
+    }
     setUser(session.user)
     setAccessToken(session.accessToken)
     tokenStore.setToken(session.accessToken)
@@ -97,8 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        role: user?.role ?? null,
         accessToken,
-        isAuthenticated: !!user,
+        isAuthenticated: Boolean(user && user.role !== 'admin'),
         isLoading,
         login,
         register,

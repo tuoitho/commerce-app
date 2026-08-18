@@ -74,6 +74,14 @@ export interface CategoriesResponse {
   categories: Category[]
 }
 
+export interface CreateCategoryInput {
+  name: string
+}
+
+export interface UpdateCategoryInput {
+  name: string
+}
+
 export interface ProductSummary {
   id: string
   name: string

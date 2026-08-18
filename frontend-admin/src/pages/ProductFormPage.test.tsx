@@ -16,6 +16,7 @@ vi.mock('@/api/products', () => ({
 
 vi.mock('@/api/categories', () => ({
   getCategories: vi.fn(),
+  getAdminCategories: vi.fn(),
 }))
 
 const mockCategories: Category[] = [
@@ -117,6 +118,7 @@ describe('ProductFormPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(categoriesApi.getCategories).mockResolvedValue(mockCategories)
+    vi.mocked(categoriesApi.getAdminCategories).mockResolvedValue(mockCategories)
   })
 
   describe('Create Mode (Simple Product)', () => {

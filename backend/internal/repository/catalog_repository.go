@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"commerce-backend/internal/domain"
@@ -68,6 +70,82 @@ func (r *CatalogRepository) ListCategories(ctx context.Context) ([]domain.Catego
 	}
 	return out, nil
 }
+
+func (r *CatalogRepository) ListAdminCategories(ctx context.Context) ([]domain.Category, error) {
+	rows, err := r.q.ListAdminCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Category, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, domain.Category{ID: x.ID, Name: x.Name})
+	}
+	return out, nil
+}
+func (r *CatalogRepository) CreateCategory(ctx context.Context, name string) (*domain.Category, error) {
+	row, err := r.q.CreateCategory(ctx, strings.TrimSpace(name))
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, domain.ErrCategoryNameInUse
+		}
+		return nil, err
+	}
+	return &domain.Category{ID: row.ID, Name: row.Name}, nil
+}
+func (r *CatalogRepository) UpdateCategory(ctx context.Context, id, name string) (*domain.Category, error) {
+	row, err := r.q.UpdateCategory(ctx, sqlc.UpdateCategoryParams{ID: id, Name: strings.TrimSpace(name)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrCategoryNotFound
+	}
+	if isUniqueViolation(err) {
+		return nil, domain.ErrCategoryNameInUse
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &domain.Category{ID: row.ID, Name: row.Name}, nil
+}
+func (r *CatalogRepository) DeleteCategory(ctx context.Context, id string) (*domain.Category, error) {
+	var deleted domain.Category
+	err := r.withTx(ctx, func(q *sqlc.Queries) error {
+		if _, err := q.GetCategoryByID(ctx, id); errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrCategoryNotFound
+		} else if err != nil {
+			return err
+		}
+		count, err := q.CountProductsByCategory(ctx, id)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return domain.ErrCategoryInUse
+		}
+		row, err := q.DeleteCategory(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrCategoryNotFound
+		}
+		if isForeignKeyViolation(err) {
+			return domain.ErrCategoryInUse
+		}
+		if err != nil {
+			return err
+		}
+		deleted = domain.Category{ID: row.ID, Name: row.Name}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &deleted, nil
+}
+
+func isPostgresCode(err error, code string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == code
+}
+
+func isUniqueViolation(err error) bool     { return isPostgresCode(err, "23505") }
+func isForeignKeyViolation(err error) bool { return isPostgresCode(err, "23503") }
 
 func (r *CatalogRepository) ListBrands(ctx context.Context) ([]string, error) {
 	rows, err := r.q.ListBrands(ctx)
