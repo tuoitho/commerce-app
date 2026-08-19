@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var (
 	ErrValidation          = errors.New("validation failed")
@@ -22,6 +25,11 @@ var (
 	ErrOutOfStock          = errors.New("out of stock")
 	ErrStockLimit          = errors.New("stock limit reached")
 	ErrCartItemUnavailable = errors.New("cart item unavailable")
+	ErrCartEmpty           = errors.New("cart empty")
+	ErrAddressNotFound     = errors.New("address not found")
+	ErrOrderNotFound       = errors.New("order not found")
+	ErrOrderNotCancellable = errors.New("order not cancellable")
+	ErrOrderNotCancelRequested = errors.New("order not cancel requested")
 )
 
 type ValidationError struct {
@@ -47,3 +55,23 @@ func (e *FilterValidationError) Error() string {
 func NewFilterValidationError(fields map[string]string) *FilterValidationError {
 	return &FilterValidationError{Fields: fields}
 }
+
+type ProductChangedError struct {
+	Products []string
+}
+
+func (e *ProductChangedError) Error() string {
+	if len(e.Products) == 1 {
+		return "Sản phẩm " + e.Products[0] + " vừa được cập nhật. Vui lòng tải lại để xem thông tin mới nhất."
+	}
+	if len(e.Products) > 1 {
+		return "Các sản phẩm " + strings.Join(e.Products, ", ") + " vừa được cập nhật. Vui lòng tải lại để xem thông tin mới nhất."
+	}
+	return "Sản phẩm vừa được cập nhật. Vui lòng tải lại để xem thông tin mới nhất."
+}
+
+func NewProductChangedError(products []string) *ProductChangedError {
+	return &ProductChangedError{Products: products}
+}
+
+

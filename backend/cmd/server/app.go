@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,17 +15,21 @@ import (
 	"commerce-backend/internal/repository"
 	"commerce-backend/internal/security"
 	"commerce-backend/internal/security/jwt"
+	addressuc "commerce-backend/internal/usecase/address"
+	areauc "commerce-backend/internal/usecase/area"
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	orderuc "commerce-backend/internal/usecase/order"
 )
 
 type App struct {
-	Config *config.Config
-	Logger *slog.Logger
-	Pool   *pgxpool.Pool
-	Server *http.Server
-	AuthUC *authuc.UseCase
+	Config  *config.Config
+	Logger  *slog.Logger
+	Pool    *pgxpool.Pool
+	Server  *http.Server
+	AuthUC  *authuc.UseCase
+	OrderUC *orderuc.UseCase
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -38,6 +43,24 @@ func (a *App) Run(ctx context.Context) error {
 			a.Logger.Error("bootstrap admin failed", "category", "bootstrap_admin")
 			return fmt.Errorf("bootstrap admin: %w", err)
 		}
+	}
+
+	if a.OrderUC != nil {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					cutoff := time.Now().Add(-a.Config.OrderConfirmTimeout)
+					if err := a.OrderUC.AutoConfirmDue(ctx, cutoff); err != nil {
+						a.Logger.Error("auto confirm due orders failed", "category", "auto_confirm", "error", err)
+					}
+				}
+			}
+		}()
 	}
 
 	a.Logger.Info("server listening", "addr", a.Server.Addr)
@@ -75,6 +98,18 @@ func provideCartRepository(pool *pgxpool.Pool) *repository.CartRepository {
 	return repository.NewCartRepository(pool)
 }
 
+func provideAreaRepository() (*repository.AreaRepository, error) {
+	return repository.NewAreaRepository()
+}
+
+func provideAddressRepository(pool *pgxpool.Pool, areaRepo *repository.AreaRepository) *repository.AddressRepository {
+	return repository.NewAddressRepository(pool, areaRepo)
+}
+
+func provideOrderRepository(pool *pgxpool.Pool) *repository.OrderRepository {
+	return repository.NewOrderRepository(pool)
+}
+
 func provideJWTManager(cfg *config.Config) *jwt.Manager {
 	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 }
@@ -95,11 +130,33 @@ func provideCatalogUseCase(repo *repository.CatalogRepository) *cataloguc.UseCas
 	return cataloguc.New(cataloguc.Dependencies{Catalog: repo})
 }
 
-func provideCartUseCase(repo *repository.CartRepository) *cartuc.UseCase {
-	return cartuc.New(cartuc.Dependencies{Cart: repo})
+func provideCartUseCase(repo *repository.CartRepository, cfg *config.Config) *cartuc.UseCase {
+	return cartuc.New(cartuc.Dependencies{
+		Cart:           repo,
+		ShippingFeeVND: cfg.ShippingFeeVND,
+	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideAreaUseCase(repo *repository.AreaRepository) *areauc.UseCase {
+	return areauc.New(areauc.Dependencies{Area: repo})
+}
+
+func provideAddressUseCase(repo *repository.AddressRepository, areaRepo *repository.AreaRepository) *addressuc.UseCase {
+	return addressuc.New(addressuc.Dependencies{
+		Address: repo,
+		Area:    areaRepo,
+	})
+}
+
+func provideOrderUseCase(repo *repository.OrderRepository, cfg *config.Config) *orderuc.UseCase {
+	return orderuc.New(orderuc.Dependencies{
+		Order:               repo,
+		ShippingFeeVND:      cfg.ShippingFeeVND,
+		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
+	})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -109,6 +166,9 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		UseCase:      authUC,
 		Catalog:      catalogUC,
 		Cart:         cartUC,
+		Area:         areaUC,
+		Address:      addressUC,
+		Order:        orderUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,
@@ -124,12 +184,13 @@ func provideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	}
 }
 
-func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase) *App {
+func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase, orderUC *orderuc.UseCase) *App {
 	return &App{
-		Config: cfg,
-		Logger: log,
-		Pool:   pool,
-		Server: srv,
-		AuthUC: authUC,
+		Config:  cfg,
+		Logger:  log,
+		Pool:    pool,
+		Server:  srv,
+		AuthUC:  authUC,
+		OrderUC: orderUC,
 	}
 }

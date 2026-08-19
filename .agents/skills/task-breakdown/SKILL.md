@@ -26,13 +26,13 @@ executable units dispatched to coding agents.
 ```markdown
 # Implementation Plan
 
-- [ ] 1. Catalog backend
+- [ ] 1. Core behavior
 
-- [ ] 1.1 Implement product-detail retrieval
-  - **Produces:** `GET /products/{id}` with the approved detail contract.
-  - **Scope:** catalog use case, persistence/query mapping, HTTP boundary, and focused tests.
-  - **Consumes:** approved product and money contracts from design.
-  - **Acceptance:** existing products return the complete projection; missing products return the approved not-found contract; timestamps and prices are preserved.
+- [ ] 1.1 Implement resource retrieval
+  - **Produces:** `GET /items/{id}` with the approved detail contract.
+  - **Scope:** query/mapping, boundary handling, and focused tests.
+  - **Consumes:** approved data and payload contracts from design.
+  - **Acceptance:** valid requests return the complete projection; missing targets return the approved not-found contract; values and metadata are preserved.
   - **Verification:** focused automated tests proving the behavior.
   - _Requirements: 3.8, 7.1, 8.6_
 ```
@@ -117,9 +117,9 @@ Cohesion and reviewability govern task size.
   approved design requires exact placement.
 - State important `Consumes` and `Produces` contracts and implementation
   prerequisites.
-- For every material cross-domain input such as an ID, code, reference value,
-  or selectable entity, ensure the consuming task names the approved source or
-  contract that supplies it.
+- For every material input or dependency supplied outside the task's own
+  boundary, ensure the consuming task names the approved source or contract
+  that supplies it.
 - When design identifies an affected existing flow, ensure the relevant leaf
   task preserves or intentionally changes that behavior and owns focused
   verification for it.
@@ -184,15 +184,15 @@ Build the implementation plan from both:
 
 1. feature-owned behavior; and
 2. downstream impacts and supporting dependencies defined by the approved
-   design.
+    design.
 
 For each material dependency, determine whether implementation work is actually
 required.
 
 ### Supporting Dependencies
 
-When a feature requires an existing capability, reference dataset, related
-domain, or shared contract to complete a supported workflow:
+When a feature requires behavior, data, state, or a contract owned outside its
+primary implementation boundary to complete a supported workflow:
 
 - identify the canonical capability or contract defined by design;
 - make the consuming task explicitly name that contract under `Consumes`;
@@ -201,16 +201,16 @@ domain, or shared contract to complete a supported workflow:
 - include integration verification proving that the consuming workflow works
   against the approved contract.
 
-Do not assume that required IDs, codes, selectable values, or related-domain
-data will somehow be available during implementation.
+Do not assume that required external inputs, state, capabilities, or contracts
+will somehow be available during implementation.
 
-Do not create a new API, lookup, model, or duplicate source of truth when an
-existing supported capability already satisfies the dependency.
+Do not create a parallel capability or duplicate source of truth when an
+existing supported mechanism already satisfies the dependency.
 
 ### Downstream Impacts
 
-When the feature changes a concept already used by existing supported
-functionality:
+When the feature changes behavior, state, contracts, or concepts relied on by
+existing supported functionality:
 
 - include implementation work for affected existing behavior when code changes
   are required;
@@ -236,11 +236,11 @@ reusable deliverable, such as:
 - a new or extended shared API contract;
 - a schema or migration required by multiple consumers;
 - reusable generated bindings;
-- a cross-domain capability independently consumed by multiple tasks.
+- a shared capability independently consumed by multiple tasks.
 
-Tasks must not rely on implementation-time negotiation to discover field names,
-reference values, validation semantics, error contracts, or compatibility
-behavior.
+Tasks must not rely on implementation-time negotiation to discover material
+shared contracts, ownership, semantics, compatibility behavior, or unresolved
+cross-boundary decisions.
 
 When independently executable tasks communicate through a shared boundary, the
 approved contract must already be stable before those tasks are dispatched.
@@ -261,12 +261,12 @@ First self-check:
 7. absence of mini-epics disguised as leaf tasks.
 8. downstream-impact coverage;
 9. supporting-dependency coverage;
-10. stable sources for material cross-domain IDs, codes, reference data, and
-    selectable values;
-11. absence of implementation tasks that must invent missing shared contracts
-    or compatibility behavior;
-12. absence of duplicate producer work when an existing approved capability is
-    sufficient.
+10. stable sources or contracts for material dependencies outside each task's
+    implementation boundary;
+11. absence of implementation tasks that must invent missing shared contracts,
+    ownership, semantics, or compatibility behavior;
+12. absence of duplicate implementation work when an existing approved
+    capability is sufficient.
 
 ## Completion
 After the self-check passes, return the completed `tasks.md` to the coordinating

@@ -63,8 +63,9 @@ design.
 
 ## Existing System Integration
 [Required when the feature affects existing supported functionality or depends
-on another domain/component. Describe downstream impacts, supporting
-dependencies, canonical sources, reused contracts, and compatibility behavior.]
+on behavior, state, or contracts outside its primary boundary. Describe
+downstream impacts, supporting dependencies, canonical sources, reused
+contracts, and compatibility behavior.]
 ```
 
 The six sections `Overview`, `Architecture`, `Components And Interfaces`,
@@ -114,17 +115,16 @@ approved requirements:
 5. define validation and failure semantics at the consuming boundary; and
 6. identify affected existing consumers whose compatibility must be preserved.
 
-For externally supplied references such as IDs, codes, or selectable values,
-define both:
+For externally supplied inputs, references, or state, define both:
 
-- how the caller obtains or is contractually expected to know the value; and
+- how the caller obtains or is contractually expected to supply the input; and
 - how the receiving boundary validates it when used.
 
-Do not duplicate another domain's data merely to avoid an integration
+Do not duplicate external state or data merely to avoid an integration
 dependency.
 
-Do not introduce convenience APIs when an existing canonical contract already
-satisfies the requirement.
+Do not introduce parallel or convenience mechanisms when an existing canonical
+contract already satisfies the requirement.
 
 ## Rules
 
@@ -155,8 +155,8 @@ satisfies the requirement.
   technical source.
 - Trace every material downstream impact to the design element responsible for
   preserving or intentionally changing existing behavior.
-- Do not leave an implementer to invent where required cross-domain reference
-  data comes from.
+- Do not leave an implementer to invent where required cross-boundary inputs or
+  reference data come from.
 - Prefer reuse of an existing compatible contract over creation of a parallel
   feature-specific contract.
 - If dependency analysis exposes an observable behavior not settled by approved
@@ -172,10 +172,11 @@ Review the design for:
 4. clear ownership and boundary contracts;
 5. complete resolution of material downstream impacts;
 6. complete resolution of supporting dependencies required by user workflows;
-7. supported sources and validation semantics for cross-domain IDs, codes,
-   reference data, and selections;
+7. supported sources and validation semantics for external inputs, references,
+   state, and cross-boundary dependencies;
 8. unresolved decisions that an implementer would otherwise have to invent;
-9. unnecessary duplication of existing contracts or sources of truth;
+9. absence of duplicate contracts, parallel mechanisms, or redundant sources
+   of truth;
 10. unnecessary implementation prescription that should remain local to coding.
 
 Present material architecture decisions and research findings.

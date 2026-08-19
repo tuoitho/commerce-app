@@ -41,7 +41,9 @@ type Cart struct {
 	TotalUnits        int64
 	SelectedLineCount int
 	SelectedTotalVND  MoneyVND
+	ShippingFeeVND    MoneyVND
 }
+
 
 func MoneyVNDPtr(value MoneyVND) *MoneyVND { return &value }
 

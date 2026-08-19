@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"commerce-backend/internal/domain"
 )
 
 type Config struct {
@@ -22,14 +24,18 @@ type Config struct {
 	AdminBootstrapEmail    string
 	AdminBootstrapPassword string
 	LogLevel               string
+	OrderConfirmTimeout    time.Duration
+	ShippingFeeVND         domain.MoneyVND
 }
 
 const (
-	defaultAppEnv         = "development"
-	defaultHTTPPort       = 8080
-	defaultAccessTokenTTL = 15 * time.Minute
-	defaultRefreshTokenTTL = 720 * time.Hour
-	defaultLogLevel       = "info"
+	defaultAppEnv              = "development"
+	defaultHTTPPort            = 8080
+	defaultAccessTokenTTL      = 15 * time.Minute
+	defaultRefreshTokenTTL     = 720 * time.Hour
+	defaultLogLevel            = "info"
+	defaultOrderConfirmTimeout = 30 * time.Minute
+	defaultShippingFeeVND      = domain.MoneyVND("0")
 )
 
 var allowedLogLevels = map[string]bool{
@@ -59,6 +65,8 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"ADMIN_BOOTSTRAP_EMAIL",
 		"ADMIN_BOOTSTRAP_PASSWORD",
 		"LOG_LEVEL",
+		"ORDER_CONFIRM_TIMEOUT",
+		"SHIPPING_FEE_VND",
 	}
 
 	for _, key := range keys {
@@ -182,6 +190,38 @@ func LoadWithFile(envFile string) (*Config, error) {
 			return nil, fmt.Errorf("config: LOG_LEVEL must be one of debug, info, warn, error, got %q", rawLogLevel)
 		}
 		cfg.LogLevel = normalizedLevel
+	}
+
+	// 10. ORDER_CONFIRM_TIMEOUT
+	if v.IsSet("ORDER_CONFIRM_TIMEOUT") {
+		rawTimeout := strings.TrimSpace(v.GetString("ORDER_CONFIRM_TIMEOUT"))
+		if rawTimeout != "" {
+			timeout, err := time.ParseDuration(rawTimeout)
+			if err != nil {
+				return nil, fmt.Errorf("config: ORDER_CONFIRM_TIMEOUT must be a duration (e.g. 30m, 1h), got %q", rawTimeout)
+			}
+			cfg.OrderConfirmTimeout = timeout
+		} else {
+			cfg.OrderConfirmTimeout = defaultOrderConfirmTimeout
+		}
+	} else {
+		cfg.OrderConfirmTimeout = defaultOrderConfirmTimeout
+	}
+
+	// 11. SHIPPING_FEE_VND
+	if v.IsSet("SHIPPING_FEE_VND") {
+		rawFee := strings.TrimSpace(v.GetString("SHIPPING_FEE_VND"))
+		if rawFee != "" {
+			fee := domain.MoneyVND(rawFee)
+			if !fee.IsCanonical() {
+				return nil, fmt.Errorf("config: SHIPPING_FEE_VND must be a valid canonical VND amount, got %q", rawFee)
+			}
+			cfg.ShippingFeeVND = fee
+		} else {
+			cfg.ShippingFeeVND = defaultShippingFeeVND
+		}
+	} else {
+		cfg.ShippingFeeVND = defaultShippingFeeVND
 	}
 
 	return cfg, nil

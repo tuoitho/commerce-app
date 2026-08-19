@@ -20,6 +20,8 @@ func clearEnv() func() {
 		"ADMIN_BOOTSTRAP_EMAIL",
 		"ADMIN_BOOTSTRAP_PASSWORD",
 		"LOG_LEVEL",
+		"ORDER_CONFIRM_TIMEOUT",
+		"SHIPPING_FEE_VND",
 	}
 
 	saved := make(map[string]string)
@@ -72,6 +74,12 @@ func TestConfig_Defaults(t *testing.T) {
 	}
 	if cfg.AdminBootstrapEmail != "" || cfg.AdminBootstrapPassword != "" {
 		t.Errorf("expected empty admin credentials, got email=%q password=%q", cfg.AdminBootstrapEmail, cfg.AdminBootstrapPassword)
+	}
+	if cfg.OrderConfirmTimeout != 30*time.Minute {
+		t.Errorf("expected OrderConfirmTimeout 30m, got %v", cfg.OrderConfirmTimeout)
+	}
+	if cfg.ShippingFeeVND != "0" {
+		t.Errorf("expected ShippingFeeVND '0', got %q", string(cfg.ShippingFeeVND))
 	}
 }
 
@@ -222,6 +230,42 @@ func TestConfig_ValidationFailures(t *testing.T) {
 			},
 			errContains: "LOG_LEVEL must be one of debug, info, warn, error",
 		},
+		{
+			name: "invalid ORDER_CONFIRM_TIMEOUT",
+			env: map[string]string{
+				"DB_URL":                "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET":     "super-secret-key-that-is-at-least-32-chars-long",
+				"ORDER_CONFIRM_TIMEOUT": "invalid-duration",
+			},
+			errContains: "ORDER_CONFIRM_TIMEOUT must be a duration",
+		},
+		{
+			name: "invalid non-canonical SHIPPING_FEE_VND with negative amount",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"SHIPPING_FEE_VND":  "-5000",
+			},
+			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
+		},
+		{
+			name: "invalid non-canonical SHIPPING_FEE_VND with decimal",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"SHIPPING_FEE_VND":  "15000.50",
+			},
+			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
+		},
+		{
+			name: "invalid non-canonical SHIPPING_FEE_VND with leading zero",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"SHIPPING_FEE_VND":  "015000",
+			},
+			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
+		},
 	}
 
 	for _, tt := range tests {
@@ -265,3 +309,26 @@ func TestConfig_LogLevelParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_OrderPlacementConfigs(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+
+	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
+	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("ORDER_CONFIRM_TIMEOUT", "45m")
+	os.Setenv("SHIPPING_FEE_VND", "30000")
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.OrderConfirmTimeout != 45*time.Minute {
+		t.Errorf("expected OrderConfirmTimeout 45m, got %v", cfg.OrderConfirmTimeout)
+	}
+	if cfg.ShippingFeeVND != "30000" {
+		t.Errorf("expected ShippingFeeVND '30000', got %q", string(cfg.ShippingFeeVND))
+	}
+}
+

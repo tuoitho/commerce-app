@@ -195,3 +195,109 @@ func TestResponseEnvelope_SystemError(t *testing.T) {
 		t.Fatalf("expected internal code, got %+v", envelope.Error)
 	}
 }
+
+func TestResponseEnvelope_OrderPlacementErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name         string
+		err          error
+		expectedCode int
+		expectedSlug string
+		expectedMsg  string
+	}{
+		{
+			name:         "product changed single",
+			err:          &domain.ProductChangedError{Products: []string{"Áo thun"}},
+			expectedCode: http.StatusConflict,
+			expectedSlug: "product_changed",
+			expectedMsg:  "Sản phẩm Áo thun vừa được cập nhật. Vui lòng tải lại để xem thông tin mới nhất.",
+		},
+		{
+			name:         "product changed multiple",
+			err:          &domain.ProductChangedError{Products: []string{"Áo thun", "Quần jean"}},
+			expectedCode: http.StatusConflict,
+			expectedSlug: "product_changed",
+			expectedMsg:  "Các sản phẩm Áo thun, Quần jean vừa được cập nhật. Vui lòng tải lại để xem thông tin mới nhất.",
+		},
+		{
+			name:         "cart empty",
+			err:          domain.ErrCartEmpty,
+			expectedCode: http.StatusConflict,
+			expectedSlug: "cart_empty",
+			expectedMsg:  "Không có sản phẩm nào để đặt hàng",
+		},
+		{
+			name:         "address not found",
+			err:          domain.ErrAddressNotFound,
+			expectedCode: http.StatusNotFound,
+			expectedSlug: "address_not_found",
+			expectedMsg:  "Không tìm thấy địa chỉ",
+		},
+		{
+			name:         "order not found",
+			err:          domain.ErrOrderNotFound,
+			expectedCode: http.StatusNotFound,
+			expectedSlug: "order_not_found",
+			expectedMsg:  "Không tìm thấy đơn hàng",
+		},
+		{
+			name:         "order not cancellable",
+			err:          domain.ErrOrderNotCancellable,
+			expectedCode: http.StatusConflict,
+			expectedSlug: "order_not_cancellable",
+			expectedMsg:  "Đơn hàng không thể hủy được nữa",
+		},
+		{
+			name:         "order not cancel requested",
+			err:          domain.ErrOrderNotCancelRequested,
+			expectedCode: http.StatusConflict,
+			expectedSlug: "order_not_cancel_request",
+			expectedMsg:  "Đơn hàng không có yêu cầu hủy đang chờ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			writeError(c, tt.err)
+
+			if w.Code != tt.expectedCode {
+				t.Fatalf("expected HTTP status %d, got %d", tt.expectedCode, w.Code)
+			}
+
+			var envelope struct {
+				Success bool             `json:"success"`
+				Message string           `json:"message"`
+				Data    any              `json:"data"`
+				Error   *errorBodyDetail `json:"error"`
+				Meta    ResponseMeta     `json:"meta"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("failed to unmarshal JSON: %v", err)
+			}
+
+			if envelope.Success {
+				t.Error("expected success: false")
+			}
+			if envelope.Error == nil {
+				t.Fatal("expected error detail, got nil")
+			}
+			if envelope.Error.Code != tt.expectedSlug {
+				t.Errorf("expected error code %q, got %q", tt.expectedSlug, envelope.Error.Code)
+			}
+			if envelope.Error.Message != tt.expectedMsg {
+				t.Errorf("expected error message %q, got %q", tt.expectedMsg, envelope.Error.Message)
+			}
+			if envelope.Message != tt.expectedMsg {
+				t.Errorf("expected envelope message %q, got %q", tt.expectedMsg, envelope.Message)
+			}
+			if len(envelope.Error.Fields) > 0 {
+				t.Errorf("expected no fields for business error, got %+v", envelope.Error.Fields)
+			}
+		})
+	}
+}
+

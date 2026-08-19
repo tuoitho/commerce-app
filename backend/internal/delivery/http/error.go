@@ -19,12 +19,15 @@ type errorBodyDetail struct {
 func writeError(c *gin.Context, err error) {
 	var valErr *domain.ValidationError
 	var filterErr *domain.FilterValidationError
+	var prodChangedErr *domain.ProductChangedError
 
 	switch {
 	case errors.As(err, &valErr):
 		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", valErr.Fields)
 	case errors.As(err, &filterErr):
 		respondError(c, 400, "invalid_filter", "Tiêu chí lọc sản phẩm không hợp lệ", filterErr.Fields)
+	case errors.As(err, &prodChangedErr):
+		respondError(c, 409, "product_changed", prodChangedErr.Error(), nil)
 	case errors.Is(err, domain.ErrInvalidCategoryID):
 		respondError(c, 400, "validation_error", "Mã danh mục không hợp lệ", map[string]string{"id": "Mã danh mục không hợp lệ"})
 	case errors.Is(err, domain.ErrCategoryNameInUse):
@@ -59,6 +62,16 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "stock_limit", "Số lượng vượt quá tồn kho", nil)
 	case errors.Is(err, domain.ErrCartItemUnavailable):
 		respondError(c, 409, "cart_item_unavailable", "Sản phẩm trong giỏ hàng không khả dụng", nil)
+	case errors.Is(err, domain.ErrCartEmpty):
+		respondError(c, 409, "cart_empty", "Không có sản phẩm nào để đặt hàng", nil)
+	case errors.Is(err, domain.ErrAddressNotFound):
+		respondError(c, 404, "address_not_found", "Không tìm thấy địa chỉ", nil)
+	case errors.Is(err, domain.ErrOrderNotFound):
+		respondError(c, 404, "order_not_found", "Không tìm thấy đơn hàng", nil)
+	case errors.Is(err, domain.ErrOrderNotCancellable):
+		respondError(c, 409, "order_not_cancellable", "Đơn hàng không thể hủy được nữa", nil)
+	case errors.Is(err, domain.ErrOrderNotCancelRequested):
+		respondError(c, 409, "order_not_cancel_request", "Đơn hàng không có yêu cầu hủy đang chờ", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

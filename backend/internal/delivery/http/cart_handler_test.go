@@ -279,3 +279,30 @@ func TestCartHTTP_OwnershipUsesDistinctCallerTokens(t *testing.T) {
 		t.Fatalf("second caller: status=%d user=%q", w.Code, repo.user)
 	}
 }
+
+func TestCartHTTP_IncludesShippingFeeVnd(t *testing.T) {
+	repo := &httpCartRepo{}
+	manager := jwt.NewManager(testSecret, "commerce-backend")
+	router := gin.New()
+	NewRouter(router, Dependencies{
+		Cart: cartuc.New(cartuc.Dependencies{Cart: repo, ShippingFeeVND: "30000"}),
+		JWT:  manager,
+	})
+
+	w := cartRequest(router, cartToken(manager, cartTestUser), http.MethodGet, "/api/v1/cart", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Data struct {
+			ShippingFeeVND string `json:"shippingFeeVnd"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.ShippingFeeVND != "30000" {
+		t.Fatalf("expected shippingFeeVnd 30000, got %q", body.Data.ShippingFeeVND)
+	}
+}
+

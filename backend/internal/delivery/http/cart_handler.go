@@ -18,7 +18,9 @@ type cartResponse struct {
 	TotalUnits        int64              `json:"totalUnits"`
 	SelectedLineCount int                `json:"selectedLineCount"`
 	SelectedTotalVND  string             `json:"selectedTotalVnd"`
+	ShippingFeeVND    string             `json:"shippingFeeVnd"`
 }
+
 
 type cartItemResponse struct {
 	ID            string              `json:"id"`
@@ -120,8 +122,15 @@ func toCartResponse(cart *domain.Cart) cartResponse {
 			Quantity: item.Quantity, Selected: item.Selected, Availability: string(item.Availability),
 		})
 	}
-	return cartResponse{Items: items, TotalUnits: cart.TotalUnits, SelectedLineCount: cart.SelectedLineCount, SelectedTotalVND: string(cart.SelectedTotalVND)}
+	return cartResponse{
+		Items:             items,
+		TotalUnits:        cart.TotalUnits,
+		SelectedLineCount: cart.SelectedLineCount,
+		SelectedTotalVND:  string(cart.SelectedTotalVND),
+		ShippingFeeVND:    string(cart.ShippingFeeVND),
+	}
 }
+
 
 func moneyPtr(value *domain.MoneyVND) *string {
 	if value == nil {

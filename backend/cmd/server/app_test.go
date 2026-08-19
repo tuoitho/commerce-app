@@ -30,7 +30,37 @@ func TestApp_ProvidersUnit(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, jwtMgr)
+	areaRepo, err := provideAreaRepository()
+	if err != nil || areaRepo == nil {
+		t.Fatalf("expected valid area repo, got err: %v", err)
+	}
+
+	areaUC := provideAreaUseCase(areaRepo)
+	if areaUC == nil {
+		t.Fatal("expected non-nil area use case")
+	}
+
+	addrRepo := provideAddressRepository(nil, areaRepo)
+	if addrRepo == nil {
+		t.Fatal("expected non-nil address repo")
+	}
+
+	addrUC := provideAddressUseCase(addrRepo, areaRepo)
+	if addrUC == nil {
+		t.Fatal("expected non-nil address use case")
+	}
+
+	orderRepo := provideOrderRepository(nil)
+	if orderRepo == nil {
+		t.Fatal("expected non-nil order repo")
+	}
+
+	orderUC := provideOrderUseCase(orderRepo, cfg)
+	if orderUC == nil {
+		t.Fatal("expected non-nil order use case")
+	}
+
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}
@@ -40,8 +70,8 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatalf("expected http server listening on :8080, got %v", srv)
 	}
 
-	app := provideApp(cfg, log, nil, srv, nil)
-	if app == nil || app.Config != cfg || app.Server != srv {
+	app := provideApp(cfg, log, nil, srv, nil, orderUC)
+	if app == nil || app.Config != cfg || app.Server != srv || app.OrderUC != orderUC {
 		t.Fatal("expected valid app instance")
 	}
 }
@@ -51,6 +81,7 @@ func TestApp_SecretSafeLogging(t *testing.T) {
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	log.Error("bootstrap failed", "category", "db_ping")
+	log.Error("auto confirm due orders failed", "category", "auto_confirm")
 
 	out := buf.String()
 	if strings.Contains(out, "postgres://") || strings.Contains(out, "super-secret") {
@@ -58,5 +89,8 @@ func TestApp_SecretSafeLogging(t *testing.T) {
 	}
 	if !strings.Contains(out, "db_ping") {
 		t.Fatalf("expected category db_ping in log: %s", out)
+	}
+	if !strings.Contains(out, "auto_confirm") {
+		t.Fatalf("expected category auto_confirm in log: %s", out)
 	}
 }

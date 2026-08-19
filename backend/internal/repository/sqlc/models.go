@@ -10,6 +10,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Address struct {
+	ID            string
+	UserID        string
+	RecipientName string
+	Phone         string
+	ProvinceCode  int32
+	ProvinceName  string
+	WardCode      int32
+	WardName      string
+	DetailAddress string
+	IsDefault     bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type CartItem struct {
 	ID                  string
 	UserID              string
@@ -29,6 +44,40 @@ type Category struct {
 	ID        string
 	Name      string
 	CreatedAt time.Time
+}
+
+type Order struct {
+	ID             string
+	UserID         string
+	Status         string
+	PaymentMethod  string
+	SubtotalVnd    pgtype.Numeric
+	ShippingFeeVnd pgtype.Numeric
+	TotalVnd       pgtype.Numeric
+	RecipientName  string
+	Phone          string
+	ProvinceName   string
+	WardName       string
+	DetailAddress  string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ConfirmedAt    pgtype.Timestamptz
+	CancelledAt    pgtype.Timestamptz
+}
+
+type OrderItem struct {
+	ID           string
+	OrderID      string
+	VariantID    string
+	ProductID    string
+	BrandName    string
+	ProductName  string
+	Model        string
+	ImageUrl     string
+	Options      []byte
+	UnitPriceVnd pgtype.Numeric
+	Quantity     int64
+	LineTotalVnd pgtype.Numeric
 }
 
 type Product struct {

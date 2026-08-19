@@ -36,7 +36,6 @@ export function CartPage() {
   const { success, error: toastError } = useToast()
 
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -355,7 +354,11 @@ export function CartPage() {
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>Phí vận chuyển:</span>
-                    <span className="font-semibold text-emerald-600">Miễn phí</span>
+                    <span className="font-semibold text-emerald-600">
+                      {!cart?.shippingFeeVnd || cart.shippingFeeVnd === '0'
+                        ? 'Miễn phí'
+                        : formatVND(cart.shippingFeeVnd)}
+                    </span>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex justify-between items-baseline">
@@ -371,7 +374,7 @@ export function CartPage() {
                   variant="primary"
                   size="lg"
                   disabled={!cart?.selectedLineCount || cart.selectedLineCount === 0}
-                  onClick={() => setIsCheckoutModalOpen(true)}
+                  onClick={() => navigate('/checkout')}
                   className="w-full h-13 rounded-2xl font-bold text-base shadow-lg shadow-emerald-600/20 gap-2"
                 >
                   <span>Tiến hành mua hàng</span>
@@ -398,36 +401,6 @@ export function CartPage() {
           </div>
         )}
       </div>
-
-      {/* Checkout Info Modal */}
-      {isCheckoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mx-auto">
-              <Info className="h-6 w-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 text-center">
-              Thông Báo Mua Hàng
-            </h3>
-            <p className="text-sm text-slate-600 text-center leading-relaxed">
-              Bạn đã chọn <strong className="text-slate-900">{cart?.selectedLineCount}</strong> sản phẩm với tổng tiền{' '}
-              <strong className="text-emerald-700">{formatVND(cart?.selectedTotalVnd || 0)}</strong>.
-              <br /><br />
-              <em>* Lưu ý: Chức năng tạo đơn hàng và thanh toán trực tuyến chưa thuộc phạm vi phiên bản hiện tại.</em>
-            </p>
-            <div className="pt-2 flex justify-center">
-              <Button
-                variant="default"
-                size="default"
-                className="w-full rounded-xl bg-slate-900 hover:bg-emerald-600"
-                onClick={() => setIsCheckoutModalOpen(false)}
-              >
-                Đã hiểu
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

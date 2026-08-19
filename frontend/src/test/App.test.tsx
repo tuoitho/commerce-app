@@ -42,7 +42,7 @@ vi.mock('@/api/catalog', () => ({
 
 vi.mock('@/api/cart', () => ({
   cartApi: {
-    getCart: vi.fn().mockResolvedValue({ items: [], totalUnits: 0, selectedLineCount: 0, selectedTotalVnd: '0' }),
+    getCart: vi.fn().mockResolvedValue({ items: [], totalUnits: 0, selectedLineCount: 0, selectedTotalVnd: '0', shippingFeeVnd: '0' }),
     addItem: vi.fn(),
     setQuantity: vi.fn(),
     setSelection: vi.fn(),

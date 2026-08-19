@@ -126,14 +126,14 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
 - Write requirements, design, and user-facing spec responses in the user's
   language when possible.
 - Feature completeness includes both feature-owned behavior and direct
-  capabilities required for supported user workflows to function.
-- Do not assume callers already know internal IDs, codes, reference values, or
-  related-domain data unless that is an explicit supported contract.
+  capabilities or inputs required for supported workflows to function.
+- Do not assume callers already know or possess internal IDs, reference values,
+  or external state unless that is an explicit supported contract.
 - Existing functionality affected by a new feature must be preserved,
   intentionally changed, or surfaced as a material decision; it must not remain
   accidentally unspecified.
 - Dependency discovery is bounded. Direct relationships may be inspected;
   unrelated neighboring functionality must not expand feature scope.
 - Reuse an existing supported capability when it satisfies a dependency. Do not
-  require a duplicate API, model, or source of truth merely to make the new
-  feature self-contained.
+  require a parallel mechanism, duplicate API, model, or source of truth merely
+  to make the new feature self-contained.

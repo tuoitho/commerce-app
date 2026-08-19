@@ -52,6 +52,7 @@ describe('CartPage', () => {
         totalUnits: 1,
         selectedLineCount: 1,
         selectedTotalVnd: '25990000',
+        shippingFeeVnd: '0',
       },
       isLoading: false,
       badgeCount: 1,
@@ -76,6 +77,56 @@ describe('CartPage', () => {
       expect(screen.getByText('Titan Tự Nhiên')).toBeInTheDocument()
       expect(screen.getByText('Tóm tắt đơn hàng')).toBeInTheDocument()
       expect(screen.getByText('Tiến hành mua hàng')).toBeInTheDocument()
+      expect(screen.getByText('Miễn phí')).toBeInTheDocument()
+    })
+  })
+
+  it('renders non-zero shipping fee properly', async () => {
+    vi.mocked(useCart).mockReturnValue({
+      cart: {
+        items: [
+          {
+            id: 'item-1',
+            variantId: 'v-1',
+            productId: 'p-1',
+            brandName: 'Apple',
+            productName: 'iPhone 15 Pro',
+            model: 'A3102',
+            imageUrl: '',
+            options: [{ groupLabel: 'Màu sắc', valueLabel: 'Titan Tự Nhiên' }],
+            unitPriceVnd: '25990000',
+            lineTotalVnd: '25990000',
+            stockQuantity: 5,
+            quantity: 1,
+            selected: true,
+            availability: 'available',
+          },
+        ],
+        totalUnits: 1,
+        selectedLineCount: 1,
+        selectedTotalVnd: '25990000',
+        shippingFeeVnd: '30000',
+      },
+      isLoading: false,
+      badgeCount: 1,
+      refreshCart: vi.fn(),
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/cart']}>
+          <CartPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('30.000 ₫')).toBeInTheDocument()
     })
   })
 
@@ -86,6 +137,7 @@ describe('CartPage', () => {
         totalUnits: 0,
         selectedLineCount: 0,
         selectedTotalVnd: '0',
+        shippingFeeVnd: '0',
       },
       isLoading: false,
       badgeCount: 0,

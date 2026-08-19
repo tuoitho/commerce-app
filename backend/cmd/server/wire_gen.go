@@ -27,10 +27,20 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	catalogRepository := provideCatalogRepository(pool)
 	catalogUseCase := provideCatalogUseCase(catalogRepository)
 	cartRepository := provideCartRepository(pool)
-	cartUseCase := provideCartUseCase(cartRepository)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, manager)
+	cartUseCase := provideCartUseCase(cartRepository, cfg)
+	areaRepository, err := provideAreaRepository()
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	areaUseCase := provideAreaUseCase(areaRepository)
+	addressRepository := provideAddressRepository(pool, areaRepository)
+	addressUseCase := provideAddressUseCase(addressRepository, areaRepository)
+	orderRepository := provideOrderRepository(pool)
+	orderUseCase := provideOrderUseCase(orderRepository, cfg)
+	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, manager)
 	server := provideHTTPServer(cfg, engine)
-	app := provideApp(cfg, log, pool, server, useCase)
+	app := provideApp(cfg, log, pool, server, useCase, orderUseCase)
 	return app, func() {
 		cleanup()
 	}, nil
@@ -44,10 +54,16 @@ var appProviderSet = wire.NewSet(
 	provideSessionRepository,
 	provideCatalogRepository,
 	provideCartRepository,
+	provideAreaRepository,
+	provideAddressRepository,
+	provideOrderRepository,
 	provideJWTManager,
 	provideAuthUseCase,
 	provideCatalogUseCase,
 	provideCartUseCase,
+	provideAreaUseCase,
+	provideAddressUseCase,
+	provideOrderUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

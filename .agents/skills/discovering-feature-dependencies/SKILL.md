@@ -1,6 +1,6 @@
 ---
 name: discovering-feature-dependencies
-description: Use when a feature in an existing repository may interact with existing domain concepts, user flows, reference data, persisted relationships, or public contracts.
+description: Use when a feature in an existing repository may interact with existing behavior, state, contracts, dependencies, or consumers.
 ---
 
 # Discovering Feature Dependencies
@@ -12,49 +12,47 @@ The goal is not to understand the whole repository. Discover only direct
 relationships needed to identify affected existing behavior and capabilities
 required by the requested feature.
 
-## Impact Anchors
+## Dependency Signals
 
-Derive a small set of impact anchors from the feature description or approved
-specification:
+Treat a feature element as a dependency signal when correct implementation
+requires behavior, information, state, ownership, or a contract outside the
+feature's primary boundary.
 
-- domain concepts and resources;
-- persisted entities and relationships;
-- externally supplied IDs, codes, enums, or reference values;
-- user workflows;
-- public APIs, messages, schemas, or shared interfaces;
-- lifecycle, authorization, or ownership boundaries when relevant.
+Common signals include:
 
-Use these anchors to locate direct existing producers and consumers.
+- relationships to existing concepts or state;
+- inputs supplied by another component or workflow;
+- shared contracts or persisted formats;
+- existing consumers of behavior being changed;
+- lifecycle or ownership rules spanning boundaries;
+- capabilities required to complete a supported workflow.
+
+Signals guide bounded discovery; they do not automatically expand feature
+scope.
 
 ## Discovery
 
-For each impact anchor, inspect directly related repository artifacts and
+For each dependency signal, inspect directly related repository artifacts and
 identify:
 
 ### Downstream Impacts
 
 Existing supported functionality that creates, reads, updates, deletes,
-displays, filters, validates, references, or otherwise depends on a concept the
-feature changes.
-
-Example:
-
-`Category Management` may affect existing Product behavior when Product
-references Category.
+displays, filters, validates, references, or otherwise depends on behavior,
+state, contracts, or concepts the feature changes.
 
 ### Supporting Dependencies
 
-Existing capabilities or reference data required for the requested user
+Existing capabilities, state, or shared contracts required for the requested
 workflow to work completely.
 
-Example:
+Do not assume that required external inputs, state, capabilities, or contracts
+will somehow be available during implementation. Trace such inputs to a supported
+source unless the contract explicitly requires the caller to provide them
+independently.
 
-`Product Management` with `categoryId` may require a supported way to obtain
-available categories for product creation and editing.
-
-Do not assume callers somehow know internal identifiers or reference values.
-Trace such inputs to a supported source unless the contract explicitly requires
-the caller to provide them independently.
+A feature may both depend on existing capabilities and affect existing
+consumers. Check both directions.
 
 ## Dependency Classification
 
@@ -82,8 +80,8 @@ behavior or a material integration contract.
 Do not recursively inspect adjacent subsystems, search for unrelated defects,
 or expand the feature merely because nearby functionality exists.
 
-Do not require a new API or convenience capability when an existing supported
-contract already satisfies the workflow.
+Do not create a parallel capability or duplicate source of truth when an
+existing supported mechanism already satisfies the dependency.
 
 Requirements define required observable behavior. Design determines the
 technical mechanism and exact integration contract.
@@ -95,10 +93,10 @@ new specification artifact.
 
 Include only material findings under:
 
-- Impact anchors
+- Dependency signals
 - Downstream impacts
 - Supporting dependencies
 - Existing capabilities that may be reused
 - Material unresolved decisions
 
-If a category is empty, state `None`.
+If a section has no findings, state `None`.

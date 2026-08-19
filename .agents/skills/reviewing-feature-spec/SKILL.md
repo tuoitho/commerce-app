@@ -42,27 +42,25 @@ Stop there.
 Do not assume the specification has already identified all relevant
 dependencies.
 
-Derive impact anchors from the specification and inspect their direct existing
-producers, consumers, persisted relationships, and supported user flows.
+Derive dependency signals from the specification and inspect their direct
+existing producers, consumers, persisted relationships, and supported user
+flows.
 
 Check both directions:
 
 ### Downstream
 
-Could the feature materially affect an existing supported behavior that directly
-depends on a concept being changed?
+Could the feature materially affect existing supported behavior, state, or
+contracts that directly depend on what is being changed?
 
 ### Supporting
 
-Does a required workflow depend on related-domain data, reference values,
-identifiers, or capabilities for which the specification provides no supported
-source?
+Does a required workflow depend on external inputs, state, reference data, or
+capabilities for which the specification provides no supported source or
+contract?
 
-Examples:
-
-- Category management may affect Product records that reference Category.
-- Product management requiring `categoryId` may require a supported Category
-  selection or lookup capability.
+A feature may both depend on existing capabilities and affect existing
+consumers. Check both directions.
 
 Repository evidence used to establish a finding must identify a concrete
 existing relationship or supported contract. Do not infer dependencies from
@@ -155,16 +153,17 @@ Check:
    boundary and no independently implemented consumer relies on it.
 10. Feature dependency completeness.
 
-    For each domain concept, persisted relationship, public contract, or
-    cross-domain reference materially involved in the feature, verify both:
+    For each concept, persisted relationship, public contract, or
+    cross-boundary dependency materially involved in the feature, verify both:
 
     **Downstream impact**
-    - directly affected existing supported behavior is accounted for;
+    - directly affected existing supported behavior, state, and contracts are
+      accounted for;
     - compatibility is preserved or an intentional behavior change is defined.
 
     **Supporting dependency**
-    - every material cross-domain input or reference value required by a
-      supported workflow has a documented supported source;
+    - every material external input, state, or capability required by a
+      supported workflow has a documented supported source or contract;
     - the design identifies the canonical existing capability or defines the
       required contract when none exists;
     - tasks cover required integration work.
@@ -180,8 +179,8 @@ Check:
     - the implementer cannot resolve it through an ordinary local implementation
       choice.
 
-    Do not require a new API when an existing supported capability already
-    satisfies the dependency.
+    Do not require a parallel capability or new API when an existing supported
+    capability already satisfies the dependency.
 Do not flag wording preferences, formatting, or optional enhancements.
 
 An implementation or schema domain that is broader than approved product

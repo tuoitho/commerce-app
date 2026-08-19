@@ -13,6 +13,7 @@ import {
   FileText,
   ShieldCheck,
   ChevronDown,
+  Package,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
 import type { Category } from '@/api/types'
@@ -284,6 +285,19 @@ export function Header() {
             >
               Hàng có sẵn
             </Link>
+
+            {isAuthenticated && (
+              <Link
+                to="/orders"
+                className={`px-3 py-2 rounded-lg transition-colors ${
+                  location.pathname.startsWith('/orders')
+                    ? 'text-emerald-700 bg-emerald-50 font-bold'
+                    : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                }`}
+              >
+                Lịch sử mua hàng
+              </Link>
+            )}
           </nav>
 
           {/* Right Functional Actions */}
@@ -405,6 +419,21 @@ export function Header() {
             >
               Hàng có sẵn giao ngay
             </Link>
+
+            {isAuthenticated && (
+              <Link
+                to="/orders"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
+                  location.pathname.startsWith('/orders')
+                    ? 'text-emerald-700 bg-emerald-50 font-bold'
+                    : 'text-slate-800 hover:bg-slate-50'
+                }`}
+              >
+                <Package className="h-4 w-4 text-emerald-600" />
+                <span>Lịch sử mua hàng</span>
+              </Link>
+            )}
 
             {/* Dynamic Categories in Mobile Drawer */}
             {categories.length > 0 && (

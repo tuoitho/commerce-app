@@ -7,15 +7,21 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"commerce-backend/internal/security/jwt"
+	addressuc "commerce-backend/internal/usecase/address"
+	areauc "commerce-backend/internal/usecase/area"
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	orderuc "commerce-backend/internal/usecase/order"
 )
 
 type Dependencies struct {
 	UseCase      *authuc.UseCase
 	Catalog      *cataloguc.UseCase
 	Cart         *cartuc.UseCase
+	Area         *areauc.UseCase
+	Address      *addressuc.UseCase
+	Order        *orderuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -47,6 +53,21 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		products.GET("/:id", catalogHandler.GetProduct)
 	}
 
+	areaHandler := newAreaHandler(deps.Area)
+	api.GET("/provinces", areaHandler.ListProvinces)
+	api.GET("/provinces/:code/wards", areaHandler.ListWards)
+
+	addressHandler := newAddressHandler(deps.Address)
+	addresses := api.Group("/addresses")
+	addresses.Use(guard.AuthRequired)
+	{
+		addresses.GET("", addressHandler.List)
+		addresses.POST("", addressHandler.Create)
+		addresses.PUT("/:id", addressHandler.Update)
+		addresses.PATCH("/:id/default", addressHandler.SetDefault)
+		addresses.DELETE("/:id", addressHandler.Delete)
+	}
+
 	cartHandler := newCartHandler(deps.Cart)
 	cart := api.Group("/cart")
 	cart.Use(guard.AuthRequired)
@@ -57,6 +78,18 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		cart.PATCH("/items/:itemId/selection", cartHandler.SetSelection)
 		cart.PUT("/selection", cartHandler.SetAllSelection)
 		cart.DELETE("/items/:itemId", cartHandler.RemoveItem)
+	}
+
+	orderHandler := newOrderHandler(deps.Order)
+	orders := api.Group("/orders")
+	orders.Use(guard.AuthRequired)
+	{
+		orders.POST("", orderHandler.Create)
+		orders.GET("/stats", orderHandler.Stats)
+		orders.GET("", orderHandler.List)
+		orders.GET("/:id", orderHandler.GetByID)
+		orders.POST("/:id/cancel", orderHandler.Cancel)
+		orders.POST("/:id/cancel/undo", orderHandler.UndoCancel)
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)

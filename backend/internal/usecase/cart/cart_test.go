@@ -150,3 +150,23 @@ func TestCartUseCasePropagatesStableBusinessErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestCartUseCaseEnrichesCartWithShippingFee(t *testing.T) {
+	wantFee := domain.MoneyVND("30000")
+	r := &fakeRepo{cart: &domain.Cart{SelectedTotalVND: "100000"}}
+	uc := New(Dependencies{Cart: r, ShippingFeeVND: wantFee})
+
+	cart, err := uc.Get(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cart.ShippingFeeVND != wantFee {
+		t.Fatalf("expected ShippingFeeVND %q, got %q", wantFee, cart.ShippingFeeVND)
+	}
+
+	cart, err = uc.AddVariant(context.Background(), userID, variantID)
+	if err != nil || cart.ShippingFeeVND != wantFee {
+		t.Fatalf("AddVariant: expected ShippingFeeVND %q, got %q", wantFee, cart.ShippingFeeVND)
+	}
+}
+

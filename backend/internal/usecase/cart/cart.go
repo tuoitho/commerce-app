@@ -10,17 +10,36 @@ import (
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-type Dependencies struct{ Cart domain.CartRepository }
-type UseCase struct{ cart domain.CartRepository }
+type Dependencies struct {
+	Cart           domain.CartRepository
+	ShippingFeeVND domain.MoneyVND
+}
+type UseCase struct {
+	cart           domain.CartRepository
+	shippingFeeVND domain.MoneyVND
+}
 
-func New(deps Dependencies) *UseCase { return &UseCase{cart: deps.Cart} }
+func New(deps Dependencies) *UseCase {
+	return &UseCase{
+		cart:           deps.Cart,
+		shippingFeeVND: deps.ShippingFeeVND,
+	}
+}
+
+func (uc *UseCase) enrich(cart *domain.Cart) *domain.Cart {
+	if cart == nil {
+		return nil
+	}
+	cart.ShippingFeeVND = uc.shippingFeeVND
+	return cart
+}
 
 func (uc *UseCase) Get(ctx context.Context, userID string) (*domain.Cart, error) {
 	if err := validateUUID(userID, "user_id"); err != nil {
 		return nil, err
 	}
 	cart, err := uc.cart.Get(ctx, userID)
-	return cart, err
+	return uc.enrich(cart), err
 }
 
 func (uc *UseCase) AddVariant(ctx context.Context, userID, variantID string) (*domain.Cart, error) {
@@ -28,7 +47,7 @@ func (uc *UseCase) AddVariant(ctx context.Context, userID, variantID string) (*d
 		return nil, err
 	}
 	cart, err := uc.cart.AddVariant(ctx, userID, variantID)
-	return cart, mapMutationError(err, domain.ErrVariantNotFound)
+	return uc.enrich(cart), mapMutationError(err, domain.ErrVariantNotFound)
 }
 
 func (uc *UseCase) SetQuantity(ctx context.Context, userID, itemID string, quantity int64) (*domain.Cart, error) {
@@ -39,7 +58,7 @@ func (uc *UseCase) SetQuantity(ctx context.Context, userID, itemID string, quant
 		return nil, domain.NewValidationError(map[string]string{"quantity": "must be at least 1"})
 	}
 	cart, err := uc.cart.SetQuantity(ctx, userID, itemID, quantity)
-	return cart, mapMutationError(err, domain.ErrCartItemNotFound)
+	return uc.enrich(cart), mapMutationError(err, domain.ErrCartItemNotFound)
 }
 
 func (uc *UseCase) SetSelected(ctx context.Context, userID, itemID string, selected bool) (*domain.Cart, error) {
@@ -47,7 +66,7 @@ func (uc *UseCase) SetSelected(ctx context.Context, userID, itemID string, selec
 		return nil, err
 	}
 	cart, err := uc.cart.SetSelected(ctx, userID, itemID, selected)
-	return cart, mapMutationError(err, domain.ErrCartItemNotFound)
+	return uc.enrich(cart), mapMutationError(err, domain.ErrCartItemNotFound)
 }
 
 func (uc *UseCase) SetAllSelected(ctx context.Context, userID string, selected bool) (*domain.Cart, error) {
@@ -55,7 +74,7 @@ func (uc *UseCase) SetAllSelected(ctx context.Context, userID string, selected b
 		return nil, err
 	}
 	cart, err := uc.cart.SetAllSelected(ctx, userID, selected)
-	return cart, mapMutationError(err, domain.ErrCartItemNotFound)
+	return uc.enrich(cart), mapMutationError(err, domain.ErrCartItemNotFound)
 }
 
 func (uc *UseCase) Remove(ctx context.Context, userID, itemID string) (*domain.Cart, error) {
@@ -63,8 +82,9 @@ func (uc *UseCase) Remove(ctx context.Context, userID, itemID string) (*domain.C
 		return nil, err
 	}
 	cart, err := uc.cart.Remove(ctx, userID, itemID)
-	return cart, mapMutationError(err, domain.ErrCartItemNotFound)
+	return uc.enrich(cart), mapMutationError(err, domain.ErrCartItemNotFound)
 }
+
 
 func validateUUID(id, field string) error {
 	if !uuidPattern.MatchString(id) {

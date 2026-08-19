@@ -21,3 +21,5 @@ sql:
             go_type: "int64"
           - column: "cart_items.quantity"
             go_type: "int64"
+          - column: "order_items.quantity"
+            go_type: "int64"

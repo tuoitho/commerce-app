@@ -174,8 +174,121 @@ export interface Cart {
   totalUnits: number
   selectedLineCount: number
   selectedTotalVnd: string
+  shippingFeeVnd: string
 }
 
 export interface CartResponse {
   cart: Cart
 }
+
+// Areas
+export interface Province {
+  code: number
+  name: string
+}
+
+export interface Ward {
+  code: number
+  provinceCode: number
+  name: string
+}
+
+// Addresses
+export interface Address {
+  id: string
+  userId: string
+  recipientName: string
+  phone: string
+  provinceCode: number
+  provinceName: string
+  wardCode: number
+  wardName: string
+  detailAddress: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AddressInput {
+  recipientName: string
+  phone: string
+  provinceCode: number
+  wardCode: number
+  detailAddress: string
+  isDefault?: boolean
+}
+
+// Orders
+export type OrderStatus =
+  | 'pending_confirmation'
+  | 'confirmed'
+  | 'preparing'
+  | 'cancel_requested'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'returned'
+
+export type OrderStatusBucket =
+  | 'all'
+  | 'pending'
+  | 'pickup'
+  | 'delivery'
+  | 'delivered'
+  | 'returns'
+  | 'cancelled'
+
+export interface OrderItem {
+  id: string
+  variantId: string
+  productId: string
+  brandName: string
+  productName: string
+  model: string
+  imageUrl: string
+  options: CartOption[]
+  unitPriceVnd: string
+  quantity: number
+  lineTotalVnd: string
+}
+
+export interface Order {
+  id: string
+  userId: string
+  status: OrderStatus
+  paymentMethod: string
+  recipientName: string
+  phone: string
+  provinceName: string
+  wardName: string
+  detailAddress: string
+  subtotalVnd: string
+  shippingFeeVnd: string
+  totalVnd: string
+  items: OrderItem[]
+  createdAt: string
+  updatedAt: string
+  confirmedAt?: string | null
+  cancelledAt?: string | null
+  cancellableUntil?: string | null
+}
+
+export interface OrderStats {
+  pendingConfirmation: number
+  awaitingPickup: number
+  awaitingDelivery: number
+  awaitingReview: number
+}
+
+export interface OrderLineInput {
+  variantId: string
+  quantity: number
+  productName: string
+  unitPriceVnd: string
+}
+
+export interface CreateOrderInput {
+  addressId: string
+  lines: OrderLineInput[]
+}
+
