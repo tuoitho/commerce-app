@@ -720,3 +720,284 @@ func (r *OrderRepository) AutoConfirmDue(ctx context.Context, cutoff time.Time) 
 	q := sqlc.New(r.db)
 	return q.AutoConfirmDueOrders(ctx, cutoff)
 }
+
+func (r *OrderRepository) ListByAdmin(ctx context.Context, statuses []string) ([]domain.Order, error) {
+	q := sqlc.New(r.db)
+	orderRows, err := q.ListOrdersByAdmin(ctx, statuses)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(orderRows) == 0 {
+		return []domain.Order{}, nil
+	}
+
+	orderIDs := make([]string, len(orderRows))
+	for i, row := range orderRows {
+		orderIDs[i] = row.ID
+	}
+
+	itemRows, err := q.ListOrderItemsByOrderIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	itemsByOrderID := make(map[string][]domain.OrderItem)
+	for _, row := range itemRows {
+		var options []domain.CartOption
+		if err := json.Unmarshal([]byte(row.Options), &options); err != nil {
+			options = []domain.CartOption{}
+		}
+
+		item := domain.OrderItem{
+			ID:           row.ID,
+			OrderID:      row.OrderID,
+			VariantID:    row.VariantID,
+			ProductID:    row.ProductID,
+			BrandName:    row.BrandName,
+			ProductName:  row.ProductName,
+			Model:        row.Model,
+			ImageURL:     row.ImageUrl,
+			Options:      options,
+			UnitPriceVND: domain.MoneyVND(row.UnitPriceVnd),
+			Quantity:     row.Quantity,
+			LineTotalVND: domain.MoneyVND(row.LineTotalVnd),
+		}
+		itemsByOrderID[row.OrderID] = append(itemsByOrderID[row.OrderID], item)
+	}
+
+	orders := make([]domain.Order, len(orderRows))
+	for i, row := range orderRows {
+		items := itemsByOrderID[row.ID]
+		if items == nil {
+			items = []domain.OrderItem{}
+		}
+
+		orders[i] = domain.Order{
+			ID:             row.ID,
+			UserID:         row.UserID,
+			BuyerEmail:     row.BuyerEmail,
+			Status:         domain.OrderStatus(row.Status),
+			PaymentMethod:  row.PaymentMethod,
+			SubtotalVND:    domain.MoneyVND(row.SubtotalVnd),
+			ShippingFeeVND: domain.MoneyVND(row.ShippingFeeVnd),
+			TotalVND:       domain.MoneyVND(row.TotalVnd),
+			ShippingInfo: domain.ShippingInfo{
+				RecipientName: row.RecipientName,
+				Phone:         row.Phone,
+				ProvinceName:  row.ProvinceName,
+				WardName:      row.WardName,
+				DetailAddress: row.DetailAddress,
+			},
+			Items:     items,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		}
+		if row.ConfirmedAt.Valid {
+			t := row.ConfirmedAt.Time
+			orders[i].ConfirmedAt = &t
+		}
+		if row.CancelledAt.Valid {
+			t := row.CancelledAt.Time
+			orders[i].CancelledAt = &t
+		}
+	}
+
+	return orders, nil
+}
+
+func (r *OrderRepository) GetByAdminID(ctx context.Context, orderID string) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+
+	q := sqlc.New(r.db)
+	orderRow, err := q.GetOrderByAdminID(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrOrderNotFound
+		}
+		return nil, err
+	}
+
+	itemRows, err := q.ListOrderItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]domain.OrderItem, len(itemRows))
+	for i, row := range itemRows {
+		var options []domain.CartOption
+		if err := json.Unmarshal([]byte(row.Options), &options); err != nil {
+			options = []domain.CartOption{}
+		}
+
+		items[i] = domain.OrderItem{
+			ID:           row.ID,
+			OrderID:      row.OrderID,
+			VariantID:    row.VariantID,
+			ProductID:    row.ProductID,
+			BrandName:    row.BrandName,
+			ProductName:  row.ProductName,
+			Model:        row.Model,
+			ImageURL:     row.ImageUrl,
+			Options:      options,
+			UnitPriceVND: domain.MoneyVND(row.UnitPriceVnd),
+			Quantity:     row.Quantity,
+			LineTotalVND: domain.MoneyVND(row.LineTotalVnd),
+		}
+	}
+
+	order := &domain.Order{
+		ID:             orderRow.ID,
+		UserID:         orderRow.UserID,
+		BuyerEmail:     orderRow.BuyerEmail,
+		Status:         domain.OrderStatus(orderRow.Status),
+		PaymentMethod:  orderRow.PaymentMethod,
+		SubtotalVND:    domain.MoneyVND(orderRow.SubtotalVnd),
+		ShippingFeeVND: domain.MoneyVND(orderRow.ShippingFeeVnd),
+		TotalVND:       domain.MoneyVND(orderRow.TotalVnd),
+		ShippingInfo: domain.ShippingInfo{
+			RecipientName: orderRow.RecipientName,
+			Phone:         orderRow.Phone,
+			ProvinceName:  orderRow.ProvinceName,
+			WardName:      orderRow.WardName,
+			DetailAddress: orderRow.DetailAddress,
+		},
+		Items:     items,
+		CreatedAt: orderRow.CreatedAt,
+		UpdatedAt: orderRow.UpdatedAt,
+	}
+	if orderRow.ConfirmedAt.Valid {
+		t := orderRow.ConfirmedAt.Time
+		order.ConfirmedAt = &t
+	}
+	if orderRow.CancelledAt.Valid {
+		t := orderRow.CancelledAt.Time
+		order.CancelledAt = &t
+	}
+
+	return order, nil
+}
+
+func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, action domain.OrderAdminAction) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := sqlc.New(tx)
+
+	orderRow, err := q.LockOrderForUpdateAdmin(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrOrderNotFound
+		}
+		return nil, err
+	}
+
+	from, to, restock, ok := action.Transition()
+	if !ok || domain.OrderStatus(orderRow.Status) != from {
+		return nil, domain.ErrOrderActionNotAllowed
+	}
+
+	if restock {
+		itemRows, err := q.ListOrderItemsByOrderID(ctx, orderID)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range itemRows {
+			if err := q.IncrementVariantStock(ctx, sqlc.IncrementVariantStockParams{
+				ID:       item.VariantID,
+				Quantity: item.Quantity,
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	cancelledAt := orderRow.CancelledAt
+	if to == domain.OrderStatusCancelled {
+		cancelledAt = pgtype.Timestamptz{Time: now, Valid: true}
+	}
+	confirmedAt := orderRow.ConfirmedAt
+
+	if err := q.SetOrderStatus(ctx, sqlc.SetOrderStatusParams{
+		ID:          orderID,
+		Status:      string(to),
+		ConfirmedAt: confirmedAt,
+		CancelledAt: cancelledAt,
+	}); err != nil {
+		return nil, err
+	}
+
+	itemRows, err := q.ListOrderItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	items := make([]domain.OrderItem, len(itemRows))
+	for i, row := range itemRows {
+		var options []domain.CartOption
+		if err := json.Unmarshal([]byte(row.Options), &options); err != nil {
+			options = []domain.CartOption{}
+		}
+
+		items[i] = domain.OrderItem{
+			ID:           row.ID,
+			OrderID:      row.OrderID,
+			VariantID:    row.VariantID,
+			ProductID:    row.ProductID,
+			BrandName:    row.BrandName,
+			ProductName:  row.ProductName,
+			Model:        row.Model,
+			ImageURL:     row.ImageUrl,
+			Options:      options,
+			UnitPriceVND: domain.MoneyVND(row.UnitPriceVnd),
+			Quantity:     row.Quantity,
+			LineTotalVND: domain.MoneyVND(row.LineTotalVnd),
+		}
+	}
+
+	order := &domain.Order{
+		ID:             orderRow.ID,
+		UserID:         orderRow.UserID,
+		BuyerEmail:     orderRow.BuyerEmail,
+		Status:         to,
+		PaymentMethod:  orderRow.PaymentMethod,
+		SubtotalVND:    domain.MoneyVND(orderRow.SubtotalVnd),
+		ShippingFeeVND: domain.MoneyVND(orderRow.ShippingFeeVnd),
+		TotalVND:       domain.MoneyVND(orderRow.TotalVnd),
+		ShippingInfo: domain.ShippingInfo{
+			RecipientName: orderRow.RecipientName,
+			Phone:         orderRow.Phone,
+			ProvinceName:  orderRow.ProvinceName,
+			WardName:      orderRow.WardName,
+			DetailAddress: orderRow.DetailAddress,
+		},
+		Items:     items,
+		CreatedAt: orderRow.CreatedAt,
+		UpdatedAt: now,
+	}
+	if confirmedAt.Valid {
+		t := confirmedAt.Time
+		order.ConfirmedAt = &t
+	}
+	if cancelledAt.Valid {
+		t := cancelledAt.Time
+		order.CancelledAt = &t
+	}
+
+	return order, nil
+}
+

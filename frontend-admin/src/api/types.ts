@@ -167,3 +167,68 @@ export interface SaveProductRequest {
   variants?: VariantInput[]
 }
 
+// Orders
+export type OrderStatus =
+  | 'pending_confirmation'
+  | 'confirmed'
+  | 'preparing'
+  | 'cancel_requested'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'returned'
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  pending_confirmation: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  preparing: 'Đang chuẩn bị hàng',
+  cancel_requested: 'Chờ duyệt hủy',
+  shipped: 'Đã giao cho ĐVVC',
+  delivered: 'Đã giao',
+  cancelled: 'Đã hủy',
+  returned: 'Đã trả hàng',
+}
+
+export interface CartOption {
+  groupLabel: string
+  valueLabel: string
+}
+
+export interface OrderItem {
+  id: string
+  variantId: string
+  productId: string
+  brandName: string
+  productName: string
+  model: string
+  imageUrl: string
+  options: CartOption[]
+  unitPriceVnd: string
+  quantity: number
+  lineTotalVnd: string
+}
+
+export interface Order {
+  id: string
+  userId: string
+  status: OrderStatus
+  paymentMethod: string
+  recipientName: string
+  phone: string
+  provinceName: string
+  wardName: string
+  detailAddress: string
+  subtotalVnd: string
+  shippingFeeVnd: string
+  totalVnd: string
+  items: OrderItem[]
+  createdAt: string
+  updatedAt: string
+  confirmedAt?: string | null
+  cancelledAt?: string | null
+}
+
+export interface AdminOrder extends Order {
+  buyerEmail: string
+}
+

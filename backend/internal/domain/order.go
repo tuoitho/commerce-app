@@ -108,6 +108,7 @@ type OrderItem struct {
 type Order struct {
 	ID               string
 	UserID           string
+	BuyerEmail       string
 	Status           OrderStatus
 	PaymentMethod    string
 	SubtotalVND      MoneyVND
@@ -120,6 +121,46 @@ type Order struct {
 	ConfirmedAt      *time.Time
 	CancelledAt      *time.Time
 	CancellableUntil *time.Time
+}
+
+type OrderAdminAction string
+
+const (
+	OrderAdminActionConfirmPreparing OrderAdminAction = "confirm_preparing"
+	OrderAdminActionShip             OrderAdminAction = "ship"
+	OrderAdminActionDeliver          OrderAdminAction = "deliver"
+	OrderAdminActionApproveCancel    OrderAdminAction = "approve_cancel"
+	OrderAdminActionDeclineCancel    OrderAdminAction = "decline_cancel"
+)
+
+func (a OrderAdminAction) IsValid() bool {
+	switch a {
+	case OrderAdminActionConfirmPreparing,
+		OrderAdminActionShip,
+		OrderAdminActionDeliver,
+		OrderAdminActionApproveCancel,
+		OrderAdminActionDeclineCancel:
+		return true
+	default:
+		return false
+	}
+}
+
+func (a OrderAdminAction) Transition() (from, to OrderStatus, restock bool, ok bool) {
+	switch a {
+	case OrderAdminActionConfirmPreparing:
+		return OrderStatusConfirmed, OrderStatusPreparing, false, true
+	case OrderAdminActionShip:
+		return OrderStatusPreparing, OrderStatusShipped, false, true
+	case OrderAdminActionDeliver:
+		return OrderStatusShipped, OrderStatusDelivered, false, true
+	case OrderAdminActionApproveCancel:
+		return OrderStatusCancelRequested, OrderStatusCancelled, true, true
+	case OrderAdminActionDeclineCancel:
+		return OrderStatusCancelRequested, OrderStatusPreparing, false, true
+	default:
+		return "", "", false, false
+	}
 }
 
 type OrderLineInput struct {
@@ -148,4 +189,7 @@ type OrderRepository interface {
 	Cancel(ctx context.Context, userID, orderID string) (*Order, error)
 	UndoCancelRequest(ctx context.Context, userID, orderID string) (*Order, error)
 	AutoConfirmDue(ctx context.Context, cutoff time.Time) error
+	ListByAdmin(ctx context.Context, statuses []string) ([]Order, error)
+	GetByAdminID(ctx context.Context, orderID string) (*Order, error)
+	AdminTransition(ctx context.Context, orderID string, action OrderAdminAction) (*Order, error)
 }

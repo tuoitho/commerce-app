@@ -77,6 +77,64 @@ func (q *Queries) DecrementVariantStock(ctx context.Context, arg DecrementVarian
 	return id, err
 }
 
+const getOrderByAdminID = `-- name: GetOrderByAdminID :one
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.id = $1
+`
+
+type GetOrderByAdminIDRow struct {
+	ID             string
+	UserID         string
+	Status         string
+	PaymentMethod  string
+	SubtotalVnd    string
+	ShippingFeeVnd string
+	TotalVnd       string
+	RecipientName  string
+	Phone          string
+	ProvinceName   string
+	WardName       string
+	DetailAddress  string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ConfirmedAt    pgtype.Timestamptz
+	CancelledAt    pgtype.Timestamptz
+	BuyerEmail     string
+}
+
+func (q *Queries) GetOrderByAdminID(ctx context.Context, id string) (GetOrderByAdminIDRow, error) {
+	row := q.db.QueryRow(ctx, getOrderByAdminID, id)
+	var i GetOrderByAdminIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.PaymentMethod,
+		&i.SubtotalVnd,
+		&i.ShippingFeeVnd,
+		&i.TotalVnd,
+		&i.RecipientName,
+		&i.Phone,
+		&i.ProvinceName,
+		&i.WardName,
+		&i.DetailAddress,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ConfirmedAt,
+		&i.CancelledAt,
+		&i.BuyerEmail,
+	)
+	return i, err
+}
+
 const getOrderByID = `-- name: GetOrderByID :one
 SELECT id, user_id, status, payment_method,
        subtotal_vnd::text AS subtotal_vnd,
@@ -405,6 +463,78 @@ func (q *Queries) ListOrderItemsByOrderIDs(ctx context.Context, orderIds []strin
 	return items, nil
 }
 
+const listOrdersByAdmin = `-- name: ListOrdersByAdmin :many
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE (COALESCE(cardinality($1::text[]), 0) = 0 OR o.status = ANY($1::text[]))
+ORDER BY o.created_at DESC, o.id DESC
+`
+
+type ListOrdersByAdminRow struct {
+	ID             string
+	UserID         string
+	Status         string
+	PaymentMethod  string
+	SubtotalVnd    string
+	ShippingFeeVnd string
+	TotalVnd       string
+	RecipientName  string
+	Phone          string
+	ProvinceName   string
+	WardName       string
+	DetailAddress  string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ConfirmedAt    pgtype.Timestamptz
+	CancelledAt    pgtype.Timestamptz
+	BuyerEmail     string
+}
+
+func (q *Queries) ListOrdersByAdmin(ctx context.Context, statuses []string) ([]ListOrdersByAdminRow, error) {
+	rows, err := q.db.Query(ctx, listOrdersByAdmin, statuses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrdersByAdminRow
+	for rows.Next() {
+		var i ListOrdersByAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Status,
+			&i.PaymentMethod,
+			&i.SubtotalVnd,
+			&i.ShippingFeeVnd,
+			&i.TotalVnd,
+			&i.RecipientName,
+			&i.Phone,
+			&i.ProvinceName,
+			&i.WardName,
+			&i.DetailAddress,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ConfirmedAt,
+			&i.CancelledAt,
+			&i.BuyerEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrdersByUser = `-- name: ListOrdersByUser :many
 SELECT id, user_id, status, payment_method,
        subtotal_vnd::text AS subtotal_vnd,
@@ -535,6 +665,65 @@ func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdate
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+	)
+	return i, err
+}
+
+const lockOrderForUpdateAdmin = `-- name: LockOrderForUpdateAdmin :one
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.id = $1
+FOR UPDATE
+`
+
+type LockOrderForUpdateAdminRow struct {
+	ID             string
+	UserID         string
+	Status         string
+	PaymentMethod  string
+	SubtotalVnd    string
+	ShippingFeeVnd string
+	TotalVnd       string
+	RecipientName  string
+	Phone          string
+	ProvinceName   string
+	WardName       string
+	DetailAddress  string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ConfirmedAt    pgtype.Timestamptz
+	CancelledAt    pgtype.Timestamptz
+	BuyerEmail     string
+}
+
+func (q *Queries) LockOrderForUpdateAdmin(ctx context.Context, id string) (LockOrderForUpdateAdminRow, error) {
+	row := q.db.QueryRow(ctx, lockOrderForUpdateAdmin, id)
+	var i LockOrderForUpdateAdminRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.PaymentMethod,
+		&i.SubtotalVnd,
+		&i.ShippingFeeVnd,
+		&i.TotalVnd,
+		&i.RecipientName,
+		&i.Phone,
+		&i.ProvinceName,
+		&i.WardName,
+		&i.DetailAddress,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ConfirmedAt,
+		&i.CancelledAt,
+		&i.BuyerEmail,
 	)
 	return i, err
 }

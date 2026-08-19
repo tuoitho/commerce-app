@@ -30,6 +30,7 @@ var (
 	ErrOrderNotFound       = errors.New("order not found")
 	ErrOrderNotCancellable = errors.New("order not cancellable")
 	ErrOrderNotCancelRequested = errors.New("order not cancel requested")
+	ErrOrderActionNotAllowed   = errors.New("order action not allowed")
 )
 
 type ValidationError struct {

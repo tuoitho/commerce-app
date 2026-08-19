@@ -93,6 +93,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)
+	adminOrderHandler := newAdminOrderHandler(deps.Order)
 	admin := api.Group("/admin")
 	admin.Use(guard.AuthRequired, guard.RequireAdmin())
 	{
@@ -110,6 +111,16 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminProducts.POST("", adminCatalogHandler.CreateProduct)
 			adminProducts.PUT("/:id", adminCatalogHandler.UpdateProduct)
 			adminProducts.DELETE("/:id", adminCatalogHandler.DeleteProduct)
+		}
+		adminOrders := admin.Group("/orders")
+		{
+			adminOrders.GET("", adminOrderHandler.List)
+			adminOrders.GET("/:id", adminOrderHandler.GetByID)
+			adminOrders.POST("/:id/confirm-preparing", adminOrderHandler.ConfirmPreparing)
+			adminOrders.POST("/:id/ship", adminOrderHandler.Ship)
+			adminOrders.POST("/:id/deliver", adminOrderHandler.Deliver)
+			adminOrders.POST("/:id/cancel/approve", adminOrderHandler.ApproveCancel)
+			adminOrders.POST("/:id/cancel/decline", adminOrderHandler.DeclineCancel)
 		}
 	}
 }

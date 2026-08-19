@@ -34,7 +34,7 @@ const (
 	defaultAccessTokenTTL      = 15 * time.Minute
 	defaultRefreshTokenTTL     = 720 * time.Hour
 	defaultLogLevel            = "info"
-	defaultOrderConfirmTimeout = 30 * time.Minute
+	defaultOrderConfirmTimeout = 1 * time.Minute
 	defaultShippingFeeVND      = domain.MoneyVND("0")
 )
 

@@ -41,6 +41,19 @@ type fakeOrderRepo struct {
 
 	autoConfirmErr        error
 	lastAutoConfirmCutoff time.Time
+
+	adminListOrders   []domain.Order
+	adminListErr      error
+	lastAdminStatuses []string
+
+	adminGetByIDOrder *domain.Order
+	adminGetByIDErr   error
+	lastAdminGetID    string
+
+	adminTransitionOrder  *domain.Order
+	adminTransitionErr    error
+	lastAdminTransitionID string
+	lastAdminAction       domain.OrderAdminAction
 }
 
 func (f *fakeOrderRepo) Create(_ context.Context, userID string, addressID string, lines []domain.OrderLineInput, shippingFeeVND domain.MoneyVND) (*domain.Order, error) {
@@ -102,6 +115,32 @@ func (f *fakeOrderRepo) AutoConfirmDue(_ context.Context, cutoff time.Time) erro
 	f.lastAutoConfirmCutoff = cutoff
 	return f.autoConfirmErr
 }
+
+func (f *fakeOrderRepo) ListByAdmin(_ context.Context, statuses []string) ([]domain.Order, error) {
+	f.lastAdminStatuses = statuses
+	if f.adminListErr != nil {
+		return nil, f.adminListErr
+	}
+	return f.adminListOrders, nil
+}
+
+func (f *fakeOrderRepo) GetByAdminID(_ context.Context, orderID string) (*domain.Order, error) {
+	f.lastAdminGetID = orderID
+	if f.adminGetByIDErr != nil {
+		return nil, f.adminGetByIDErr
+	}
+	return f.adminGetByIDOrder, nil
+}
+
+func (f *fakeOrderRepo) AdminTransition(_ context.Context, orderID string, action domain.OrderAdminAction) (*domain.Order, error) {
+	f.lastAdminTransitionID = orderID
+	f.lastAdminAction = action
+	if f.adminTransitionErr != nil {
+		return nil, f.adminTransitionErr
+	}
+	return f.adminTransitionOrder, nil
+}
+
 
 func TestOrderUseCase_Create_Validation(t *testing.T) {
 	fakeRepo := &fakeOrderRepo{}
@@ -821,5 +860,328 @@ func TestOrderUseCase_AutoConfirmDue(t *testing.T) {
 		}
 	})
 }
+
+func TestOrderUseCase_AdminList(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	t.Run("invalid status returns ValidationError", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		invalidStatuses := []string{"invalid_status", "foo", "PENDING_CONFIRMATION", "123"}
+		for _, status := range invalidStatuses {
+			_, err := uc.AdminList(ctx, status)
+			var valErr *domain.ValidationError
+			if !errors.As(err, &valErr) {
+				t.Fatalf("status %q: expected ValidationError, got %v", status, err)
+			}
+			if msg, ok := valErr.Fields["status"]; !ok || msg != "Trạng thái đơn hàng không hợp lệ" {
+				t.Errorf("status %q: expected status error message 'Trạng thái đơn hàng không hợp lệ', got %+v", status, valErr.Fields)
+			}
+		}
+	})
+
+	t.Run("empty status passes nil to repo and returns orders without CancellableUntil", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{
+			adminListOrders: []domain.Order{
+				{
+					ID:         "11111111-1111-1111-1111-111111111111",
+					BuyerEmail: "user@example.com",
+					Status:     domain.OrderStatusPendingConfirmation,
+					CreatedAt:  now,
+				},
+				{
+					ID:         "22222222-2222-2222-2222-222222222222",
+					BuyerEmail: "user2@example.com",
+					Status:     domain.OrderStatusConfirmed,
+					CreatedAt:  now,
+				},
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               fakeRepo,
+			OrderConfirmTimeout: 30 * time.Minute,
+		})
+
+		orders, err := uc.AdminList(ctx, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if fakeRepo.lastAdminStatuses != nil {
+			t.Errorf("expected nil statuses, got %+v", fakeRepo.lastAdminStatuses)
+		}
+		if len(orders) != 2 {
+			t.Fatalf("expected 2 orders, got %d", len(orders))
+		}
+		for i, o := range orders {
+			if o.CancellableUntil != nil {
+				t.Errorf("orders[%d]: expected CancellableUntil to be nil for admin list, got %v", i, *o.CancellableUntil)
+			}
+		}
+	})
+
+	t.Run("valid status passes slice to repo", func(t *testing.T) {
+		validStatuses := []domain.OrderStatus{
+			domain.OrderStatusPendingConfirmation,
+			domain.OrderStatusConfirmed,
+			domain.OrderStatusPreparing,
+			domain.OrderStatusCancelRequested,
+			domain.OrderStatusShipped,
+			domain.OrderStatusDelivered,
+			domain.OrderStatusCancelled,
+			domain.OrderStatusReturned,
+		}
+
+		for _, status := range validStatuses {
+			fakeRepo := &fakeOrderRepo{
+				adminListOrders: []domain.Order{
+					{
+						ID:         "11111111-1111-1111-1111-111111111111",
+						BuyerEmail: "user@example.com",
+						Status:     status,
+						CreatedAt:  now,
+					},
+				},
+			}
+			uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+			orders, err := uc.AdminList(ctx, string(status))
+			if err != nil {
+				t.Fatalf("status %s: unexpected error: %v", status, err)
+			}
+			if len(fakeRepo.lastAdminStatuses) != 1 || fakeRepo.lastAdminStatuses[0] != string(status) {
+				t.Errorf("expected statuses [%s], got %+v", status, fakeRepo.lastAdminStatuses)
+			}
+			if len(orders) != 1 {
+				t.Fatalf("expected 1 order, got %d", len(orders))
+			}
+			if orders[0].CancellableUntil != nil {
+				t.Errorf("expected CancellableUntil to be nil, got %v", *orders[0].CancellableUntil)
+			}
+		}
+	})
+
+	t.Run("nil orders from repo returns empty slice", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{adminListOrders: nil}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		orders, err := uc.AdminList(ctx, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if orders == nil {
+			t.Errorf("expected non-nil empty slice, got nil")
+		}
+		if len(orders) != 0 {
+			t.Errorf("expected 0 orders, got %d", len(orders))
+		}
+	})
+
+	t.Run("repo error propagates", func(t *testing.T) {
+		customErr := errors.New("db query error")
+		fakeRepo := &fakeOrderRepo{adminListErr: customErr}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminList(ctx, "")
+		if !errors.Is(err, customErr) {
+			t.Errorf("expected error %v, got %v", customErr, err)
+		}
+	})
+}
+
+func TestOrderUseCase_AdminGetByID(t *testing.T) {
+	ctx := context.Background()
+	validOrderID := "22222222-2222-2222-2222-222222222222"
+	now := time.Now().UTC()
+
+	t.Run("invalid UUID returns ErrOrderNotFound", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		invalidIDs := []string{"", "   ", "not-a-uuid", "123"}
+		for _, id := range invalidIDs {
+			_, err := uc.AdminGetByID(ctx, id)
+			if !errors.Is(err, domain.ErrOrderNotFound) {
+				t.Errorf("id %q: expected ErrOrderNotFound, got %v", id, err)
+			}
+		}
+	})
+
+	t.Run("repo returns ErrOrderNotFound", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{adminGetByIDErr: domain.ErrOrderNotFound}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminGetByID(ctx, validOrderID)
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Errorf("expected ErrOrderNotFound, got %v", err)
+		}
+		if fakeRepo.lastAdminGetID != validOrderID {
+			t.Errorf("expected repo called with order ID %s, got %s", validOrderID, fakeRepo.lastAdminGetID)
+		}
+	})
+
+	t.Run("valid UUID returns order without setting CancellableUntil", func(t *testing.T) {
+		expectedOrder := &domain.Order{
+			ID:          validOrderID,
+			UserID:      "11111111-1111-1111-1111-111111111111",
+			BuyerEmail:  "buyer@example.com",
+			Status:      domain.OrderStatusPendingConfirmation,
+			CreatedAt:   now,
+			SubtotalVND: "500000",
+			TotalVND:    "500000",
+		}
+		fakeRepo := &fakeOrderRepo{adminGetByIDOrder: expectedOrder}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               fakeRepo,
+			OrderConfirmTimeout: 30 * time.Minute,
+		})
+
+		order, err := uc.AdminGetByID(ctx, validOrderID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if order == nil {
+			t.Fatal("expected order, got nil")
+		}
+		if order.ID != validOrderID {
+			t.Errorf("expected ID %s, got %s", validOrderID, order.ID)
+		}
+		if order.BuyerEmail != "buyer@example.com" {
+			t.Errorf("expected buyer email buyer@example.com, got %s", order.BuyerEmail)
+		}
+		if order.CancellableUntil != nil {
+			t.Errorf("expected CancellableUntil to be nil for admin get, got %v", *order.CancellableUntil)
+		}
+	})
+
+	t.Run("repo error propagates", func(t *testing.T) {
+		customErr := errors.New("db error")
+		fakeRepo := &fakeOrderRepo{adminGetByIDErr: customErr}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminGetByID(ctx, validOrderID)
+		if !errors.Is(err, customErr) {
+			t.Errorf("expected error %v, got %v", customErr, err)
+		}
+	})
+}
+
+func TestOrderUseCase_AdminTransition(t *testing.T) {
+	ctx := context.Background()
+	validOrderID := "22222222-2222-2222-2222-222222222222"
+	now := time.Now().UTC()
+
+	t.Run("invalid UUID returns ErrOrderNotFound", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		invalidIDs := []string{"", "   ", "not-a-uuid", "123"}
+		for _, id := range invalidIDs {
+			_, err := uc.AdminTransition(ctx, id, domain.OrderAdminActionConfirmPreparing)
+			if !errors.Is(err, domain.ErrOrderNotFound) {
+				t.Errorf("id %q: expected ErrOrderNotFound, got %v", id, err)
+			}
+		}
+	})
+
+	t.Run("invalid action returns ValidationError", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		invalidActions := []domain.OrderAdminAction{
+			"",
+			"invalid_action",
+			"cancel",
+			"SHIP",
+		}
+		for _, action := range invalidActions {
+			_, err := uc.AdminTransition(ctx, validOrderID, action)
+			var valErr *domain.ValidationError
+			if !errors.As(err, &valErr) {
+				t.Fatalf("action %q: expected ValidationError, got %v", action, err)
+			}
+			if msg, ok := valErr.Fields["action"]; !ok || msg != "Thao tác không hợp lệ" {
+				t.Errorf("action %q: expected action error message 'Thao tác không hợp lệ', got %+v", action, valErr.Fields)
+			}
+		}
+	})
+
+	t.Run("valid actions delegate to repo and return order without CancellableUntil", func(t *testing.T) {
+		actions := []struct {
+			action domain.OrderAdminAction
+			status domain.OrderStatus
+		}{
+			{domain.OrderAdminActionConfirmPreparing, domain.OrderStatusPreparing},
+			{domain.OrderAdminActionShip, domain.OrderStatusShipped},
+			{domain.OrderAdminActionDeliver, domain.OrderStatusDelivered},
+			{domain.OrderAdminActionApproveCancel, domain.OrderStatusCancelled},
+			{domain.OrderAdminActionDeclineCancel, domain.OrderStatusPreparing},
+		}
+
+		for _, tc := range actions {
+			repoOrder := &domain.Order{
+				ID:         validOrderID,
+				BuyerEmail: "buyer@example.com",
+				Status:     tc.status,
+				CreatedAt:  now,
+			}
+			fakeRepo := &fakeOrderRepo{adminTransitionOrder: repoOrder}
+			uc := orderuc.New(orderuc.Dependencies{
+				Order:               fakeRepo,
+				OrderConfirmTimeout: 30 * time.Minute,
+			})
+
+			res, err := uc.AdminTransition(ctx, validOrderID, tc.action)
+			if err != nil {
+				t.Fatalf("action %s: unexpected error: %v", tc.action, err)
+			}
+			if fakeRepo.lastAdminTransitionID != validOrderID {
+				t.Errorf("action %s: expected orderID %s, got %s", tc.action, validOrderID, fakeRepo.lastAdminTransitionID)
+			}
+			if fakeRepo.lastAdminAction != tc.action {
+				t.Errorf("action %s: expected action %s, got %s", tc.action, tc.action, fakeRepo.lastAdminAction)
+			}
+			if res == nil || res.Status != tc.status {
+				t.Errorf("action %s: expected status %s, got %+v", tc.action, tc.status, res)
+			}
+			if res.CancellableUntil != nil {
+				t.Errorf("action %s: expected CancellableUntil to be nil, got %v", tc.action, *res.CancellableUntil)
+			}
+		}
+	})
+
+	t.Run("repo returns ErrOrderActionNotAllowed", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{adminTransitionErr: domain.ErrOrderActionNotAllowed}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminTransition(ctx, validOrderID, domain.OrderAdminActionShip)
+		if !errors.Is(err, domain.ErrOrderActionNotAllowed) {
+			t.Errorf("expected ErrOrderActionNotAllowed, got %v", err)
+		}
+	})
+
+	t.Run("repo returns ErrOrderNotFound", func(t *testing.T) {
+		fakeRepo := &fakeOrderRepo{adminTransitionErr: domain.ErrOrderNotFound}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminTransition(ctx, validOrderID, domain.OrderAdminActionShip)
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Errorf("expected ErrOrderNotFound, got %v", err)
+		}
+	})
+
+	t.Run("repo error propagates", func(t *testing.T) {
+		customErr := errors.New("db error")
+		fakeRepo := &fakeOrderRepo{adminTransitionErr: customErr}
+		uc := orderuc.New(orderuc.Dependencies{Order: fakeRepo})
+
+		_, err := uc.AdminTransition(ctx, validOrderID, domain.OrderAdminActionShip)
+		if !errors.Is(err, customErr) {
+			t.Errorf("expected error %v, got %v", customErr, err)
+		}
+	})
+}
+
 
 

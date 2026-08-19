@@ -159,4 +159,43 @@ func (uc *UseCase) AutoConfirmDue(ctx context.Context, cutoff time.Time) error {
 	return uc.order.AutoConfirmDue(ctx, cutoff)
 }
 
+func (uc *UseCase) AdminList(ctx context.Context, status string) ([]domain.Order, error) {
+	var statuses []string
+	if status != "" {
+		if !domain.OrderStatus(status).IsValid() {
+			return nil, domain.NewValidationError(map[string]string{"status": "Trạng thái đơn hàng không hợp lệ"})
+		}
+		statuses = []string{status}
+	}
+
+	orders, err := uc.order.ListByAdmin(ctx, statuses)
+	if err != nil {
+		return nil, err
+	}
+	if orders == nil {
+		return []domain.Order{}, nil
+	}
+	return orders, nil
+}
+
+func (uc *UseCase) AdminGetByID(ctx context.Context, orderID string) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+
+	return uc.order.GetByAdminID(ctx, orderID)
+}
+
+func (uc *UseCase) AdminTransition(ctx context.Context, orderID string, action domain.OrderAdminAction) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+	if !action.IsValid() {
+		return nil, domain.NewValidationError(map[string]string{"action": "Thao tác không hợp lệ"})
+	}
+
+	return uc.order.AdminTransition(ctx, orderID, action)
+}
+
+
 

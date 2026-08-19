@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -105,6 +106,19 @@ func (f *fakeOrderUsecaseRepo) UndoCancelRequest(_ context.Context, userID, orde
 func (f *fakeOrderUsecaseRepo) AutoConfirmDue(_ context.Context, _ time.Time) error {
 	return nil
 }
+
+func (f *fakeOrderUsecaseRepo) ListByAdmin(_ context.Context, statuses []string) ([]domain.Order, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (f *fakeOrderUsecaseRepo) GetByAdminID(_ context.Context, orderID string) (*domain.Order, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (f *fakeOrderUsecaseRepo) AdminTransition(_ context.Context, orderID string, action domain.OrderAdminAction) (*domain.Order, error) {
+	return nil, errors.New("unimplemented")
+}
+
 
 func newOrderTestRouter(orderRepo *fakeOrderUsecaseRepo) (*gin.Engine, string) {
 	gin.SetMode(gin.TestMode)

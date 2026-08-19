@@ -72,6 +72,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "order_not_cancellable", "Đơn hàng không thể hủy được nữa", nil)
 	case errors.Is(err, domain.ErrOrderNotCancelRequested):
 		respondError(c, 409, "order_not_cancel_request", "Đơn hàng không có yêu cầu hủy đang chờ", nil)
+	case errors.Is(err, domain.ErrOrderActionNotAllowed):
+		respondError(c, 409, "order_action_not_allowed", "Không thể thực hiện thao tác này trên đơn hàng ở trạng thái hiện tại", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

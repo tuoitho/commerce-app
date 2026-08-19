@@ -139,3 +139,42 @@ SET status = 'confirmed',
     confirmed_at = now(),
     updated_at = now()
 WHERE status = 'pending_confirmation' AND created_at <= $1;
+
+-- name: ListOrdersByAdmin :many
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE (COALESCE(cardinality(@statuses::text[]), 0) = 0 OR o.status = ANY(@statuses::text[]))
+ORDER BY o.created_at DESC, o.id DESC;
+
+-- name: GetOrderByAdminID :one
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.id = $1;
+
+-- name: LockOrderForUpdateAdmin :one
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       u.email AS buyer_email
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.id = $1
+FOR UPDATE;
+
