@@ -3,7 +3,7 @@
 ## Package Scope
 
 - This commerce repository has three packages. Read and follow `frontend/AGENTS.md` for work under `frontend/`, `frontend-admin/AGENTS.md` for work under `frontend-admin/`, and `backend/AGENTS.md` for work under `backend/`; all apply to cross-package changes.
-- Run package commands from their package directories. Root `make test` runs all package test suites; root `make build` runs backend `sqlc generate` and the frontend/admin production builds.
+- Run package commands from their package directories. Root `make test` runs all package test suites; root `make build` runs backend `sqlc generate` and the frontend/admin production builds. Root `make db-up` applies database migrations via `golang-migrate` (`migrate`), and `make seed` loads sample catalog data.
 - Prefer executable configuration over README prose. The root Makefile's frontend `:3000` comment is stale; Vite uses its default port (`5173`).
 - Backend configuration is owned by Viper in `backend/internal/config`; process environment values override the optional `.env` file. Do not add direct environment reads to backend packages outside the config boundary.
 - Backend dependency construction uses Google Wire at compile time. Wire-generated files are committed and must be regenerated after provider or injector changes; do not edit generated Wire output manually.
@@ -15,6 +15,10 @@
 - Canonical governed artifacts are `.kiro/specs/<feature>/requirements.md`, `design.md`, and `tasks.md`; approve each stage and independently review the complete set before implementation. `tasks.md` is the implementation plan.
 - If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. Verify completed governed work against requirement IDs and acceptance criteria.
 - Use the `question` tool for blocking product/architecture choices and approval gates that repository evidence cannot resolve.
+- Whenever database schema, tables, columns, constraints, or queries are modified:
+  - Add numbered migration files in `backend/db/migrations/` (`.up.sql` and `.down.sql`).
+  - Run `make db-up` (or `golang-migrate` / `migrate`) to apply migrations to the database.
+  - Run `make build` or `make -C backend gen` (`sqlc generate`) to regenerate sqlc models and queriers.
 
 ## API Contract Standards
 
