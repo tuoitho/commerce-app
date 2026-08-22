@@ -1,0 +1,11 @@
+findings:
+  - id: <REV-ID>
+    classification: contract_violation # requirement_violation | architecture_violation | security_or_integrity_violation | contract_gap | non_blocking_suggestion
+    severity: blocking # blocking | non_blocking
+    scope: <task/workstream>
+    authority: <REQ-ID | CONTRACT-ID@rev | design section | invariant>
+    expected: <expected behavior>
+    actual: <observed behavior>
+    evidence: <test/diff/runtime evidence>
+    owner: <workstream-owner>
+    closure: deterministic_reverification # targeted_rereview | contract_revision

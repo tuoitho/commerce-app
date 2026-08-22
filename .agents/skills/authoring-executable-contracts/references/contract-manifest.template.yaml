@@ -1,0 +1,9 @@
+contracts:
+  - id: <CONTRACT-ID>
+    revision: 1
+    status: DRAFT # DRAFT | APPROVED | FROZEN
+    requirements: [<REQ-ID>]
+    providers: [<owner-id>]
+    consumers: [<owner-id>]
+    artifacts:
+      - <path>

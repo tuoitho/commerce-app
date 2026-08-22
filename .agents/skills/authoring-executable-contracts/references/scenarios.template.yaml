@@ -1,0 +1,9 @@
+scenarios:
+  - id: <CONTRACT-ID>-001
+    requirement: <REQ-ID>
+    given: <precondition and actor/caller context>
+    when: <observable action/request/event>
+    then:
+      status: <expected status/result>
+      assertions:
+        - <observable assertion>

@@ -1,0 +1,31 @@
+contracts:
+  - id: RETURN-CUSTOMER-API
+    revision: 1
+    status: FROZEN # DRAFT | APPROVED | FROZEN — frozen tại revision 1 sau review độc lập
+    requirements: [REQ-RET-01, REQ-RET-02, REQ-RET-03, REQ-RET-04]
+    providers: [backend]
+    consumers: [frontend]
+    artifacts:
+      - api.openapi.yaml
+      - scenarios.yaml
+
+  - id: RETURN-ADMIN-API
+    revision: 1
+    status: FROZEN
+    requirements: [REQ-RET-04, REQ-RET-05, REQ-RET-06, REQ-RET-07, REQ-RET-08, REQ-RET-09]
+    providers: [backend]
+    consumers: [frontend-admin]
+    artifacts:
+      - api.openapi.yaml
+      - scenarios.yaml
+
+  - id: ORDER-DELIVEREDAT-FIELD
+    revision: 1
+    status: FROZEN
+    requirements: [REQ-RET-02]
+    providers: [backend]
+    consumers: [frontend, frontend-admin]
+    compatibility: additive-backward-compatible # bổ sung trường tuỳ chọn vào orderResponse hiện có
+    artifacts:
+      - api.openapi.yaml
+      - scenarios.yaml

@@ -1,0 +1,306 @@
+# Kịch bản hành vi cho contracts của order-returns-refunds.
+# Định danh actor: customer=A (chủ đơn O1), customer=B (không liên quan), admin=X.
+# Đơn mẫu O1: delivered_at = 2026-08-15T09:00:00Z, shipping_fee_vnd = "20000",
+# dòng I1 (quantity 2, unitPriceVnd "500000"), dòng I2 (quantity 1, unitPriceVnd "300000").
+scenarios:
+  # ---------- RETURN-CUSTOMER-API ----------
+  - id: RETURN-CUSTOMER-API-001
+    requirement: REQ-RET-01
+    given: customer=A đã đăng nhập, đơn O1 ở trạng thái delivered, còn trong 7 ngày kể từ delivered_at
+    when: POST /orders/O1/return-requests với body { items: [{orderItemId: I1, quantity: 1}], reasonCode: "defective", description: "" }
+    then:
+      status: 201
+      assertions:
+        - data.status == "pending_approval"
+        - data.orderId == O1
+        - data.items[0].orderItemId == I1 và data.items[0].quantity == 1
+        - envelope success==true và error==null
+
+  - id: RETURN-CUSTOMER-API-002
+    requirement: REQ-RET-01
+    given: customer=A đã đăng nhập trên đơn O1 đủ điều kiện
+    when: POST /orders/O1/return-requests với body thiếu items hoặc items rỗng, hoặc reasonCode ngoài enum
+    then:
+      status: 400
+      assertions:
+        - error.code == "validation_error"
+        - error.fields chứa ít nhất một trong "items" | "reasonCode" | "description"
+
+  - id: RETURN-CUSTOMER-API-003
+    requirement: REQ-RET-02
+    given: đơn O1 có delivered_at cách hiện tại hơn 7 ngày (SR1)
+    when: POST /orders/O1/return-requests với body hợp lệ
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_window_expired"
+        - error.message bằng tiếng Việt, error không có fields
+
+  - id: RETURN-CUSTOMER-API-004
+    requirement: REQ-RET-02
+    given: đơn O1 đang có yêu cầu trả hàng ở trạng thái approved (SR3)
+    when: POST /orders/O1/return-requests
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_request_exists"
+
+  - id: RETURN-CUSTOMER-API-005
+    requirement: REQ-RET-02
+    given: dòng I1 quantity mua 2; các yêu cầu tiêu thụ trước đó đã chiếm 1 (SR4)
+    when: POST với items [{orderItemId: I1, quantity: 2}] (vượt lượng còn lại 1)
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_item_limit_exceeded"
+
+  - id: RETURN-CUSTOMER-API-006
+    requirement: REQ-RET-02
+    given: customer=B đăng nhập, không sở hữu O1
+    when: POST /orders/O1/return-requests (hoặc GET) 
+    then:
+      status: 404
+      assertions:
+        - error.code == "order_not_found"
+        - response không tiết lộ bất kỳ dữ liệu nào của O1
+
+  - id: RETURN-CUSTOMER-API-007
+    requirement: REQ-RET-02
+    given: đơn O2 ở trạng thái shipped (chưa giao)
+    when: POST /orders/O2/return-requests với body hợp lệ
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_not_allowed"
+
+  - id: RETURN-CUSTOMER-API-008
+    requirement: REQ-RET-03
+    given: yêu cầu RR1 do A tạo đang pending_approval trên O1
+    when: POST /orders/O1/return-requests/RR1/cancel bởi A
+    then:
+      status: 200
+      assertions:
+        - data.status == "cancelled"
+        - data.cancelledAt != null
+
+  - id: RETURN-CUSTOMER-API-009
+    requirement: REQ-RET-03
+    given: yêu cầu RR1 đã được admin duyệt (approved)
+    when: POST /orders/O1/return-requests/RR1/cancel bởi A
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_action_not_allowed"
+        - data == null (envelope lỗi)
+        - sau đó GET /orders/O1/return-requests trả về RR1 vẫn có status "approved"
+
+  - id: RETURN-CUSTOMER-API-010
+    requirement: REQ-RET-04
+    given: đơn O1 có hai yêu cầu (một refunded, một rejected kèm lý do)
+    when: GET /orders/O1/return-requests bởi A
+    then:
+      status: 200
+      assertions:
+        - data là mảng sắp xếp createdAt giảm dần
+        - phần tử refunded có refundAmountVnd là chuỗi số nguyên
+        - phần tử rejected có rejectReason khác rỗng
+
+  - id: RETURN-CUSTOMER-API-011
+    requirement: REQ-RET-01
+    given: caller không mang access token
+    when: POST /orders/O1/return-requests
+    then:
+      status: 401
+      assertions:
+        - error.code == "unauthorized"
+
+  - id: RETURN-CUSTOMER-API-012
+    requirement: REQ-RET-02
+    given: dòng I1 quantity mua 2, chưa có yêu cầu tiêu thụ nào; hai request tạo gần đồng thời
+    when: A gửi song song 2 request POST /orders/O1/return-requests, mỗi request trả I1 số lượng 2
+    then:
+      status: 200/201 cho đúng MỘT request, 409 cho request còn lại
+      assertions:
+        - tổng lượng đã tiêu thụ của I1 không bao giờ vượt quá 2 (SR4)
+        - request bị chặn nhận error.code == "return_item_limit_exceeded"
+        - không có trạng thái trung gian hỏng nào của O1 (mọi response đều theo envelope)
+
+  # ---------- RETURN-ADMIN-API ----------
+  - id: RETURN-ADMIN-API-001
+    requirement: REQ-RET-05
+    given: admin=X đăng nhập, hệ thống có nhiều yêu cầu trả hàng
+    when: GET /admin/return-requests?page=1&limit=20 (không lọc)
+    then:
+      status: 200
+      assertions:
+        - data là mảng AdminReturnRequestView (có buyerEmail, suggestedRefundVnd)
+        - meta.pagination.page == 1, limit == 20, total khớp tổng số yêu cầu
+        - sắp xếp theo createdAt giảm dần
+
+  - id: RETURN-ADMIN-API-002
+    requirement: REQ-RET-05
+    given: tồn tại cả yêu cầu pending_approval lẫn approved
+    when: GET /admin/return-requests?status=pending_approval
+    then:
+      status: 200
+      assertions:
+        - mọi phần tử trong data đều có status == "pending_approval"
+
+  - id: RETURN-ADMIN-API-003
+    requirement: REQ-RET-05
+    given: admin=X đăng nhập
+    when: GET /admin/return-requests?status=khong_hop_le
+    then:
+      status: 400
+      assertions:
+        - error.code == "validation_error"
+        - error.fields["status"] khác rỗng
+
+  - id: RETURN-ADMIN-API-004
+    requirement: REQ-RET-05
+    given: caller là customer role
+    when: GET /admin/return-requests
+    then:
+      status: 403
+      assertions:
+        - error.message bằng tiếng Việt, không trả về dữ liệu danh sách
+
+  - id: RETURN-ADMIN-API-005
+    requirement: REQ-RET-08
+    given: yêu cầu RR1 trên O1 chưa từng có hoàn tiền nào cho O1 (SR6)
+    when: GET /admin/return-requests/RR1 bởi X
+    then:
+      status: 200
+      assertions:
+        - data.suggestedRefundVnd == "520000"  # 500000×1 + phí ship 20000
+        - data.buyerEmail và data.shippingFeeVnd khác rỗng
+
+  - id: RETURN-ADMIN-API-006
+    requirement: REQ-RET-08
+    given: O1 đã có MỘT yêu cầu refunded trước đó; yêu cầu RR2 mới (trả I2)
+    when: GET /admin/return-requests/RR2
+    then:
+      status: 200
+      assertions:
+        - data.suggestedRefundVnd == "300000"  # chỉ giá trị hàng, KHÔNG cộng phí ship lần hai
+
+  - id: RETURN-ADMIN-API-007
+    requirement: REQ-RET-06
+    given: yêu cầu RR1 đang pending_approval
+    when: POST /admin/return-requests/RR1/approve bởi X
+    then:
+      status: 200
+      assertions:
+        - data.status == "approved"
+        - data.approvedAt != null
+
+  - id: RETURN-ADMIN-API-008
+    requirement: REQ-RET-06
+    given: yêu cầu RR1 đang pending_approval
+    when: POST /admin/return-requests/RR1/reject với body { reason: "Hàng đã qua sử dụng" }
+    then:
+      status: 200
+      assertions:
+        - data.status == "rejected"
+        - data.rejectReason == "Hàng đã qua sử dụng"
+        - data.rejectedAt != null
+
+  - id: RETURN-ADMIN-API-009
+    requirement: REQ-RET-06
+    given: yêu cầu RR1 đang pending_approval
+    when: POST /admin/return-requests/RR1/reject với body { reason: "" } hoặc thiếu reason
+    then:
+      status: 400
+      assertions:
+        - error.code == "validation_error"
+        - error.fields["reason"] khác rỗng
+
+  - id: RETURN-ADMIN-API-010
+    requirement: REQ-RET-06
+    given: yêu cầu RR1 đã ở trạng thái approved
+    when: POST /admin/return-requests/RR1/approve (hoặc /reject) lần nữa
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_action_not_allowed"
+
+  - id: RETURN-ADMIN-API-011
+    requirement: REQ-RET-07
+    given: yêu cầu RR1 (trả I1 số lượng 1) đang approved
+    when: POST /admin/return-requests/RR1/receive bởi X
+    then:
+      status: 200
+      assertions:
+        - data.status == "received"
+        - data.receivedAt != null
+        - tồn kho biến thể của I1 tăng đúng 1 đơn vị (SR8)
+
+  - id: RETURN-ADMIN-API-012
+    requirement: REQ-RET-07
+    given: yêu cầu RR1 đã received
+    when: POST /admin/return-requests/RR1/receive lần nữa
+    then:
+      status: 409
+      assertions:
+        - error.code == "return_action_not_allowed"
+        - tồn kho biến thể của I1 KHÔNG tăng thêm lần hai (SR8)
+
+  - id: RETURN-ADMIN-API-013
+    requirement: REQ-RET-08
+    given: yêu cầu RR1 đang received
+    when: POST /admin/return-requests/RR1/refund với amount "0" hoặc "-100" hoặc "abc"
+    then:
+      status: 400
+      assertions:
+        - error.code == "validation_error"
+        - error.fields["amount"] khác rỗng
+        - data == null (envelope lỗi)
+        - sau đó GET /admin/return-requests/RR1 vẫn trả về status "received"
+
+  - id: RETURN-ADMIN-API-014
+    requirement: REQ-RET-09
+    given: yêu cầu RR1 đang received; đây là lần hoàn tiền đầu tiên của O1
+    when: POST /admin/return-requests/RR1/refund với amount "520000"
+    then:
+      status: 200
+      assertions:
+        - data.status == "refunded", data.refundedAt != null, data.refundAmountVnd == "520000"
+        - GET /admin/orders/O1 trả về status == "returned" (SR7)
+
+  - id: RETURN-ADMIN-API-015
+    requirement: REQ-RET-09
+    given: O1 đã ở trạng thái returned do hoàn tiền trước đó
+    when: hoàn tất thêm một yêu cầu trả hàng khác trên O1
+    then:
+      status: 200
+      assertions:
+        - GET /admin/orders/O1 vẫn trả về status == "returned" (giữ nguyên)
+
+  - id: RETURN-ADMIN-API-016
+    requirement: REQ-RET-07
+    given: yêu cầu RR3 đang approved, dòng I1 thuộc biến thể đã bị xóa mềm sau khi đặt hàng
+    when: POST /admin/return-requests/RR3/receive bởi X
+    then:
+      status: 200
+      assertions:
+        - data.status == "received" (hoàn kho biến thể đã xoá mềm vẫn thực hiện an toàn)
+        - tồn kho các biến thể KHÁC không bị thay đổi nhầm
+
+  # ---------- ORDER-DELIVEREDAT-FIELD ----------
+  - id: ORDER-DELIVEREDAT-FIELD-001
+    requirement: REQ-RET-02
+    given: admin=X chuyển đơn O3 từ shipped sang delivered bằng POST /admin/orders/O3/deliver
+    when: GET /orders/O3 (bởi chủ đơn) hoặc GET /admin/orders/O3
+    then:
+      status: 200
+      assertions:
+        - data.deliveredAt là ISO 8601 UTC, xấp xỉ thời điểm gọi deliver (±60s)
+
+  - id: ORDER-DELIVEREDAT-FIELD-002
+    requirement: REQ-RET-02
+    given: đơn O4 đã delivered TRƯỚC khi migration 000010 chạy (delivered_at NULL)
+    when: kiểm tra dữ liệu sau backfill
+    then:
+      status: n/a
+      assertions:
+        - O4.delivered_at == updated_at (backfill theo thiết kế B3/B4)
