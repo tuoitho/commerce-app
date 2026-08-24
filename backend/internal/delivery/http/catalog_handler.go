@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,12 +12,17 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 )
 
-type catalogHandler struct {
-	uc *cataloguc.UseCase
+type favoriteReader interface {
+	GetFavoriteProductIDs(ctx context.Context, userID string, productIDs []string) ([]string, error)
 }
 
-func newCatalogHandler(uc *cataloguc.UseCase) *catalogHandler {
-	return &catalogHandler{uc: uc}
+type catalogHandler struct {
+	uc        *cataloguc.UseCase
+	favorites favoriteReader
+}
+
+func newCatalogHandler(uc *cataloguc.UseCase, favorites favoriteReader) *catalogHandler {
+	return &catalogHandler{uc: uc, favorites: favorites}
 }
 
 type categoryResponse struct {
@@ -36,6 +42,7 @@ type productSummaryResponse struct {
 	Currency        string           `json:"currency"`
 	PrimaryImageURL string           `json:"primaryImageUrl"`
 	InStock         bool             `json:"inStock"`
+	Viewer          viewerState      `json:"viewer"`
 }
 
 type productDetailResponse struct {
@@ -58,6 +65,7 @@ type productDetailResponse struct {
 	Variants      []variantResponse     `json:"variants"`
 	CreatedAt     time.Time             `json:"createdAt"`
 	UpdatedAt     time.Time             `json:"updatedAt"`
+	Viewer        viewerState           `json:"viewer"`
 }
 
 type optionGroupResponse struct {
@@ -103,6 +111,26 @@ func (h *catalogHandler) ListBrands(c *gin.Context) {
 		brands = []string{}
 	}
 	writeSuccess(c, http.StatusOK, "", brands)
+}
+
+func (h *catalogHandler) getFavoriteMap(c *gin.Context, products []domain.Product) (map[string]bool, error) {
+	favMap := make(map[string]bool)
+	userID := callerUserID(c)
+	if userID == "" || h.favorites == nil || len(products) == 0 {
+		return favMap, nil
+	}
+	ids := make([]string, len(products))
+	for i, p := range products {
+		ids[i] = p.ID
+	}
+	favs, err := h.favorites.GetFavoriteProductIDs(c.Request.Context(), userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range favs {
+		favMap[id] = true
+	}
+	return favMap, nil
 }
 
 func (h *catalogHandler) ListProducts(c *gin.Context) {
@@ -177,10 +205,6 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	out := make([]productSummaryResponse, 0, len(products))
-	for _, p := range products {
-		out = append(out, toSummaryResponse(p))
-	}
 
 	if pageSet || limitSet {
 		if page < 1 {
@@ -189,21 +213,32 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 		if limit < 1 {
 			limit = 6
 		}
-		total := len(out)
+		total := len(products)
 		totalPages := 0
 		if total > 0 {
 			totalPages = (total + limit - 1) / limit
 		}
 		offset := (page - 1) * limit
-		var pageItems []productSummaryResponse
+		var pageProducts []domain.Product
 		if offset < total {
 			end := offset + limit
 			if end > total {
 				end = total
 			}
-			pageItems = out[offset:end]
+			pageProducts = products[offset:end]
 		} else {
-			pageItems = []productSummaryResponse{}
+			pageProducts = []domain.Product{}
+		}
+
+		favMap, err := h.getFavoriteMap(c, pageProducts)
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+
+		pageItems := make([]productSummaryResponse, 0, len(pageProducts))
+		for _, p := range pageProducts {
+			pageItems = append(pageItems, toSummaryResponse(p, favMap[p.ID]))
 		}
 
 		pagination := PaginationMeta{
@@ -216,6 +251,17 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 		}
 		writePaginatedSuccess(c, http.StatusOK, "", pageItems, pagination)
 		return
+	}
+
+	favMap, err := h.getFavoriteMap(c, products)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	out := make([]productSummaryResponse, 0, len(products))
+	for _, p := range products {
+		out = append(out, toSummaryResponse(p, favMap[p.ID]))
 	}
 
 	writeSuccess(c, http.StatusOK, "", out)
@@ -235,9 +281,14 @@ func (h *catalogHandler) ListFeaturedProducts(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	favMap, err := h.getFavoriteMap(c, products)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
 	out := make([]productSummaryResponse, 0, len(products))
 	for _, p := range products {
-		out = append(out, toSummaryResponse(p))
+		out = append(out, toSummaryResponse(p, favMap[p.ID]))
 	}
 	writeSuccess(c, http.StatusOK, "", out)
 }
@@ -248,10 +299,22 @@ func (h *catalogHandler) GetProduct(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product))
+	isFav := false
+	userID := callerUserID(c)
+	if userID != "" && h.favorites != nil {
+		favs, err := h.favorites.GetFavoriteProductIDs(c.Request.Context(), userID, []string{product.ID})
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+		if len(favs) > 0 && favs[0] == product.ID {
+			isFav = true
+		}
+	}
+	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, isFav))
 }
 
-func toSummaryResponse(p domain.Product) productSummaryResponse {
+func toSummaryResponse(p domain.Product, isFavorite bool) productSummaryResponse {
 	return productSummaryResponse{
 		ID:              p.ID,
 		Name:            p.Name,
@@ -264,10 +327,11 @@ func toSummaryResponse(p domain.Product) productSummaryResponse {
 		Currency:        p.Currency,
 		PrimaryImageURL: p.PrimaryImageURL(),
 		InStock:         p.InStock(),
+		Viewer:          viewerState{IsFavorite: isFavorite},
 	}
 }
 
-func toDetailResponse(p domain.Product) productDetailResponse {
+func toDetailResponse(p domain.Product, isFavorite bool) productDetailResponse {
 	images := p.ImageURLs
 	if images == nil {
 		images = []string{}
@@ -292,6 +356,7 @@ func toDetailResponse(p domain.Product) productDetailResponse {
 		Variants:      toVariantResponses(p.Variants),
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,
+		Viewer:        viewerState{IsFavorite: isFavorite},
 	}
 }
 

@@ -97,6 +97,12 @@ type Product struct {
 	Brand         string
 }
 
+type ProductFavorite struct {
+	UserID    string
+	ProductID string
+	CreatedAt time.Time
+}
+
 type ProductImage struct {
 	ID        string
 	ProductID string

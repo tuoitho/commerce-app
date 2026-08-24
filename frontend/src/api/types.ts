@@ -74,6 +74,32 @@ export interface CategoriesResponse {
   categories: Category[]
 }
 
+export interface ViewerState {
+  isFavorite: boolean
+}
+
+export interface FavoriteStateResponse {
+  productId: string
+  isFavorite: boolean
+}
+
+export interface FavoriteProductSummary {
+  id: string
+  name: string
+  model: string
+  brand: string
+  category: Category
+  minPriceVnd: string
+  maxPriceVnd: string
+  price: string
+  currency: string
+  primaryImageUrl: string
+  inStock: boolean
+  viewer: ViewerState
+  active: boolean
+  favoritedAt: string
+}
+
 export interface ProductSummary {
   id: string
   name: string
@@ -86,6 +112,7 @@ export interface ProductSummary {
   currency: string
   primaryImageUrl: string
   inStock: boolean
+  viewer?: ViewerState
 }
 
 export interface ProductsResponse {
@@ -127,10 +154,12 @@ export interface ProductDetail {
   stockQuantity: number
   inStock: boolean
   featured: boolean
+  active?: boolean
   optionGroups: OptionGroup[]
   variants: ProductVariant[]
   createdAt: string
   updatedAt: string
+  viewer?: ViewerState
 }
 
 export interface ProductFilterParams {

@@ -1,8 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ProductCard } from './ProductCard'
 import type { ProductSummary } from '@/api/types'
+import { useAuth } from '@/context/AuthContext'
+import { ToastProvider } from '@/context/ToastContext'
+import { useFavorites } from '@/context/FavoritesContext'
+
+vi.mock('@/context/AuthContext', () => ({
+  AuthProvider: ({ children }: any) => <div>{children}</div>,
+  useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/FavoritesContext', () => ({
+  FavoritesProvider: ({ children }: any) => <div>{children}</div>,
+  useFavorites: vi.fn(),
+}))
 
 describe('ProductCard', () => {
   const dummyProduct: ProductSummary = {
@@ -17,13 +30,36 @@ describe('ProductCard', () => {
     currency: 'VND',
     primaryImageUrl: 'https://example.com/iphone-16.jpg',
     inStock: true,
+    viewer: { isFavorite: false },
   }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com', role: 'customer' },
+      role: 'customer',
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    vi.mocked(useFavorites).mockReturnValue({
+      resolveIsFavorite: vi.fn((_id: string, serverVal: boolean) => serverVal),
+      isPending: vi.fn(() => false),
+      mutate: vi.fn(),
+    })
+  })
 
   it('renders brand text badge and product details', () => {
     render(
-      <MemoryRouter>
-        <ProductCard product={dummyProduct} />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={dummyProduct} />
+        </MemoryRouter>
+      </ToastProvider>
     )
 
     expect(screen.getByText('Apple')).toBeInTheDocument()
@@ -40,9 +76,11 @@ describe('ProductCard', () => {
     }
 
     render(
-      <MemoryRouter>
-        <ProductCard product={productWithoutBrand} />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={productWithoutBrand} />
+        </MemoryRouter>
+      </ToastProvider>
     )
 
     expect(screen.getByText('Smartphone')).toBeInTheDocument()
@@ -50,9 +88,11 @@ describe('ProductCard', () => {
 
   it('renders "Còn hàng" badge when inStock is true', () => {
     render(
-      <MemoryRouter>
-        <ProductCard product={{ ...dummyProduct, inStock: true }} />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={{ ...dummyProduct, inStock: true }} />
+        </MemoryRouter>
+      </ToastProvider>
     )
 
     expect(screen.getByText('Còn hàng')).toBeInTheDocument()
@@ -60,9 +100,11 @@ describe('ProductCard', () => {
 
   it('renders "Hết hàng" badge when inStock is false', () => {
     render(
-      <MemoryRouter>
-        <ProductCard product={{ ...dummyProduct, inStock: false }} />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={{ ...dummyProduct, inStock: false }} />
+        </MemoryRouter>
+      </ToastProvider>
     )
 
     expect(screen.getByText('Hết hàng')).toBeInTheDocument()
@@ -77,11 +119,38 @@ describe('ProductCard', () => {
     }
 
     render(
-      <MemoryRouter>
-        <ProductCard product={multiVariantProduct} />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={multiVariantProduct} />
+        </MemoryRouter>
+      </ToastProvider>
     )
 
     expect(screen.getByText(/25\.990\.000\s*₫\s*-\s*32\.990\.000\s*₫/)).toBeInTheDocument()
+  })
+
+  it('renders favorite button with initial state from product viewer (CATALOG-VIEWER-008, FAVORITE-UI-001)', () => {
+    const favoriteProduct: ProductSummary = {
+      ...dummyProduct,
+      viewer: { isFavorite: true },
+    }
+
+    vi.mocked(useFavorites).mockReturnValue({
+      resolveIsFavorite: vi.fn((_id: string, _serverVal: boolean) => true),
+      isPending: vi.fn(() => false),
+      mutate: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <ProductCard product={favoriteProduct} />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const favButton = screen.getByRole('button', { name: 'Bỏ khỏi yêu thích' })
+    expect(favButton).toBeInTheDocument()
+    expect(favButton).toHaveAttribute('aria-pressed', 'true')
   })
 })

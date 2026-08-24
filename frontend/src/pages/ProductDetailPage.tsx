@@ -34,6 +34,7 @@ import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FavoriteButton } from '@/components/FavoriteButton'
 
 // Currency formatter
 function formatVND(value: string | number): string {
@@ -623,16 +624,25 @@ export function ProductDetailPage() {
                   </span>
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleAddToCart}
-                  disabled={!isAvailable || isAddingToCart}
-                  className="h-13 rounded-xl font-bold text-sm border border-slate-300 bg-white text-slate-800 hover:border-slate-900 hover:bg-slate-50 transition gap-2"
-                >
-                  <CreditCard className="h-5 w-5 text-slate-600" />
-                  <span>Trả góp 0% qua thẻ</span>
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={handleAddToCart}
+                    disabled={!isAvailable || isAddingToCart}
+                    className="flex-1 h-13 rounded-xl font-bold text-sm border border-slate-300 bg-white text-slate-800 hover:border-slate-900 hover:bg-slate-50 transition gap-2"
+                  >
+                    <CreditCard className="h-5 w-5 text-slate-600" />
+                    <span>Trả góp 0% qua thẻ</span>
+                  </Button>
+
+                  <FavoriteButton
+                    productId={product.id}
+                    initialIsFavorite={product.viewer?.isFavorite}
+                    surface="product-detail"
+                    className="h-13 px-4 shrink-0"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500 pt-1 px-1">

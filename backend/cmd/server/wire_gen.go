@@ -40,7 +40,9 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	orderUseCase := provideOrderUseCase(orderRepository, cfg)
 	returnRepository := provideReturnRepository(pool)
 	returnsUseCase := provideReturnsUseCase(returnRepository)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, manager)
+	favoriteRepository := provideFavoriteRepository(pool)
+	favoriteUseCase := provideFavoriteUseCase(favoriteRepository)
+	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, favoriteUseCase, manager)
 	server := provideHTTPServer(cfg, engine)
 	app := provideApp(cfg, log, pool, server, useCase, orderUseCase)
 	return app, func() {
@@ -60,6 +62,7 @@ var appProviderSet = wire.NewSet(
 	provideAddressRepository,
 	provideOrderRepository,
 	provideReturnRepository,
+	provideFavoriteRepository,
 	provideJWTManager,
 	provideAuthUseCase,
 	provideCatalogUseCase,
@@ -68,6 +71,7 @@ var appProviderSet = wire.NewSet(
 	provideAddressUseCase,
 	provideOrderUseCase,
 	provideReturnsUseCase,
+	provideFavoriteUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

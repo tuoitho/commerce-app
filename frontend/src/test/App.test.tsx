@@ -51,6 +51,23 @@ vi.mock('@/api/cart', () => ({
   },
 }))
 
+vi.mock('@/api/favorites', () => ({
+  favoritesApi: {
+    listFavorites: vi.fn().mockResolvedValue({
+      success: true,
+      message: '',
+      data: [],
+      error: null,
+      meta: {
+        timestamp: '2026-08-24T00:00:00Z',
+        pagination: { page: 1, limit: 12, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+      },
+    }),
+    addFavorite: vi.fn(),
+    removeFavorite: vi.fn(),
+  },
+}))
+
 describe('App navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -113,5 +130,25 @@ describe('App navigation', () => {
     )
 
     expect(screen.getByText('Trang không tồn tại')).toBeInTheDocument()
+  })
+
+  it('renders FavoritesPage when navigating to /favorites', async () => {
+    const { waitFor } = await import('@testing-library/react')
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <MemoryRouter initialEntries={['/favorites']}>
+              <AppContent />
+            </MemoryRouter>
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      // Unauthenticated redirects to login page in App
+      expect(screen.getByText('Đăng Nhập')).toBeInTheDocument()
+    })
   })
 })

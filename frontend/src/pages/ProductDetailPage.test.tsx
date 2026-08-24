@@ -365,4 +365,40 @@ describe('ProductDetailPage', () => {
       expect(screen.getByText('Trang đăng nhập')).toBeInTheDocument()
     })
   })
+
+  it('renders favorite button initialized from product viewer state (CATALOG-VIEWER-008, FAVORITE-UI-001)', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'cust-1', email: 'cust@auraphone.vn', role: 'customer' },
+      role: 'customer',
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    vi.mocked(catalogApi.getProduct).mockResolvedValue({
+      ...mockMultiVariantProduct,
+      viewer: { isFavorite: true },
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'iPhone 16 Pro' })).toBeInTheDocument()
+    })
+
+    const favButton = screen.getByRole('button', { name: 'Bỏ khỏi yêu thích' })
+    expect(favButton).toBeInTheDocument()
+    expect(favButton).toHaveAttribute('aria-pressed', 'true')
+  })
 })

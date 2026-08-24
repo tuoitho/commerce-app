@@ -39,7 +39,7 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrInvalidProductID):
 		respondError(c, 400, "invalid_product_id", "Mã sản phẩm không hợp lệ", nil)
 	case errors.Is(err, domain.ErrProductNotFound):
-		respondError(c, 404, "product_not_found", "Không tìm thấy sản phẩm", nil)
+		respondError(c, 404, "product_not_found", "Sản phẩm không tồn tại hoặc đã ngừng kinh doanh", nil)
 	case errors.Is(err, domain.ErrEmailInUse):
 		respondError(c, 409, "email_in_use", "Email đã được sử dụng", nil)
 	case errors.Is(err, domain.ErrInvalidCredentials):
@@ -104,7 +104,7 @@ func writeError(c *gin.Context, err error) {
 			}
 		}
 		l.Error("internal error", "error", err.Error(), "method", method, "path", path)
-		respondError(c, 500, "internal", "Lỗi máy chủ nội bộ", nil)
+		respondError(c, 500, "internal", "Đã xảy ra lỗi hệ thống", nil)
 	}
 }
 

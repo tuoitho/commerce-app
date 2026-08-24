@@ -4,13 +4,15 @@ import { Smartphone, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ApiError } from '@/api/types'
+import { getSafeLoginReturn } from '@/utils/authRedirect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 
 export function LoginPage() {
   const [searchParams] = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  const redirectParam = searchParams.get('redirect')
+  const safeReturn = getSafeLoginReturn(redirectParam)
   const navigate = useNavigate()
   const { login } = useAuth()
   const { success } = useToast()
@@ -33,7 +35,7 @@ export function LoginPage() {
     try {
       await login(email, password)
       success('Đăng nhập thành công!', 'Chào mừng bạn quay trở lại.')
-      navigate(redirect, { replace: true })
+      navigate(safeReturn, { replace: true })
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.code === 'invalid_credentials') {
@@ -127,7 +129,7 @@ export function LoginPage() {
             <div>
               Chưa có tài khoản?{' '}
               <Link
-                to={`/register${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`}
+                to={`/register${safeReturn !== '/' ? `?redirect=${encodeURIComponent(safeReturn)}` : ''}`}
                 className="font-bold text-emerald-600 hover:underline"
               >
                 Đăng ký ngay

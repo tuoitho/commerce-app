@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { CartProvider } from '@/context/CartContext'
+import { FavoritesProvider } from '@/context/FavoritesContext'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { HomePage } from '@/pages/HomePage'
@@ -13,6 +14,7 @@ import { OrderHistoryPage } from '@/pages/OrderHistoryPage'
 import { OrderDetailPage } from '@/pages/OrderDetailPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { FavoritesPage } from '@/pages/FavoritesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function AppContent() {
@@ -28,6 +30,7 @@ export function AppContent() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />
@@ -43,9 +46,11 @@ export function App() {
     <ToastProvider>
       <AuthProvider>
         <CartProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <FavoritesProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </FavoritesProvider>
         </CartProvider>
       </AuthProvider>
     </ToastProvider>

@@ -236,7 +236,7 @@ func (h *adminCatalogHandler) ListProducts(c *gin.Context) {
 
 	out := make([]productSummaryResponse, 0, len(products))
 	for _, p := range products {
-		out = append(out, toSummaryResponse(p))
+		out = append(out, toSummaryResponse(p, false))
 	}
 
 	total := len(out)
@@ -274,7 +274,7 @@ func (h *adminCatalogHandler) GetProduct(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product))
+	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, false))
 }
 
 func (h *adminCatalogHandler) CreateProduct(c *gin.Context) {
@@ -291,7 +291,7 @@ func (h *adminCatalogHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	writeSuccess(c, http.StatusCreated, "Tạo sản phẩm thành công", toDetailResponse(*created))
+	writeSuccess(c, http.StatusCreated, "Tạo sản phẩm thành công", toDetailResponse(*created, false))
 }
 
 func (h *adminCatalogHandler) UpdateProduct(c *gin.Context) {
@@ -308,7 +308,7 @@ func (h *adminCatalogHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	writeSuccess(c, http.StatusOK, "Cập nhật sản phẩm thành công", toDetailResponse(*updated))
+	writeSuccess(c, http.StatusOK, "Cập nhật sản phẩm thành công", toDetailResponse(*updated, false))
 }
 
 func (h *adminCatalogHandler) DeleteProduct(c *gin.Context) {

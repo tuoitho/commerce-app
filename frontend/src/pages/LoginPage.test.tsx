@@ -145,4 +145,55 @@ describe('LoginPage', () => {
       expect(screen.getByText('Email hoặc mật khẩu không chính xác.')).toBeInTheDocument()
     })
   })
+
+  it('safely navigates to the requested local route upon successful login (FAVORITE-AUTH-REDIRECT-002)', async () => {
+    mockLogin.mockResolvedValueOnce(undefined)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/login?redirect=%2Fproducts%3Fq%3Dphone%23results']}>
+          <LoginPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('name@example.com'), {
+      target: { value: 'customer@auraphone.vn' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+      target: { value: 'Customer123!' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Đăng nhập/i }))
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalled()
+    })
+  })
+
+  it('falls back to / on unsafe or external redirect (FAVORITE-AUTH-REDIRECT-004)', async () => {
+    mockLogin.mockResolvedValueOnce(undefined)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/login?redirect=https%3A%2F%2Fevil.example']}>
+          <LoginPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('name@example.com'), {
+      target: { value: 'customer@auraphone.vn' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+      target: { value: 'Customer123!' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Đăng nhập/i }))
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalled()
+    })
+  })
 })
+

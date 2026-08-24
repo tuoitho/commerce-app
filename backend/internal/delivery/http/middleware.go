@@ -42,6 +42,60 @@ func (g *guard) AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
+func (g *guard) RequireCustomerAuthForFavorites(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để sử dụng danh sách yêu thích", nil)
+		c.Abort()
+		return
+	}
+	tokenStr, ok := strings.CutPrefix(authHeader, bearerPrefix)
+	if !ok || strings.TrimSpace(tokenStr) == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để sử dụng danh sách yêu thích", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(tokenStr)
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+		c.Abort()
+		return
+	}
+	if role != domain.RoleCustomer && role != "" {
+		respondError(c, http.StatusForbidden, "forbidden", "Bạn không có quyền sử dụng danh sách yêu thích", nil)
+		c.Abort()
+		return
+	}
+	c.Set(contextUserKey, userID)
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
+func (g *guard) OptionalCustomerAuth(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.Next()
+		return
+	}
+	tokenStr, ok := strings.CutPrefix(authHeader, bearerPrefix)
+	if !ok || strings.TrimSpace(tokenStr) == "" {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(tokenStr)
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+		c.Abort()
+		return
+	}
+	if role == domain.RoleCustomer {
+		c.Set(contextUserKey, userID)
+	}
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
 func (g *guard) RequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		currentRole := callerRole(c)

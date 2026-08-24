@@ -20,6 +20,7 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnsuc "commerce-backend/internal/usecase/returns"
 )
@@ -115,6 +116,10 @@ func provideReturnRepository(pool *pgxpool.Pool) *repository.ReturnRepository {
 	return repository.NewReturnRepository(pool)
 }
 
+func provideFavoriteRepository(pool *pgxpool.Pool) *repository.FavoriteRepository {
+	return repository.NewFavoriteRepository(pool)
+}
+
 func provideJWTManager(cfg *config.Config) *jwt.Manager {
 	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 }
@@ -165,7 +170,11 @@ func provideReturnsUseCase(repo *repository.ReturnRepository) *returnsuc.UseCase
 	return returnsuc.New(returnsuc.Dependencies{Returns: repo})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnsUC *returnsuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.UseCase {
+	return favoriteuc.New(favoriteuc.Dependencies{Favorites: repo})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnsUC *returnsuc.UseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -179,6 +188,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Address:      addressUC,
 		Order:        orderUC,
 		Returns:      returnsUC,
+		Favorites:    favoriteUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,

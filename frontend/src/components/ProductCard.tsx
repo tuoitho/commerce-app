@@ -5,6 +5,7 @@ import type { ProductSummary } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { FavoriteButton } from './FavoriteButton'
 
 interface ProductCardProps {
   product: ProductSummary
@@ -78,16 +79,25 @@ export function ProductCard({ product }: ProductCardProps) {
               </span>
             </div>
 
-            {product.inStock ? (
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-100">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Còn hàng
-              </span>
-            ) : (
-              <Badge variant="destructive" className="text-[10px] py-0 px-2">
-                Hết hàng
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {product.inStock ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Còn hàng
+                </span>
+              ) : (
+                <Badge variant="destructive" className="text-[10px] py-0 px-2">
+                  Hết hàng
+                </Badge>
+              )}
+
+              <FavoriteButton
+                productId={product.id}
+                initialIsFavorite={product.viewer?.isFavorite}
+                surface="product-card"
+                className="h-8 w-8 shrink-0"
+              />
+            </div>
           </div>
 
           {/* Studio Image Container with Light Sheen Sweep Effect */}

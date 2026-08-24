@@ -34,3 +34,5 @@ build:
 	$(MAKE) -C backend gen
 	cd frontend && npm run build
 	cd frontend-admin && npm run build
+
+all: backend frontend frontend-admin

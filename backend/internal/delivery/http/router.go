@@ -14,6 +14,7 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnsuc "commerce-backend/internal/usecase/returns"
+	favoriteuc "commerce-backend/internal/usecase/favorite"
 )
 
 type Dependencies struct {
@@ -24,6 +25,7 @@ type Dependencies struct {
 	Address      *addressuc.UseCase
 	Order        *orderuc.UseCase
 	Returns      *returnsuc.UseCase
+	Favorites    *favoriteuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -45,14 +47,24 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		auth.GET("/me", guard.AuthRequired, authHandler.Me)
 	}
 
-	catalogHandler := newCatalogHandler(deps.Catalog)
+	catalogHandler := newCatalogHandler(deps.Catalog, deps.Favorites)
 	api.GET("/categories", catalogHandler.ListCategories)
 	api.GET("/brands", catalogHandler.ListBrands)
 	products := api.Group("/products")
+	products.Use(guard.OptionalCustomerAuth)
 	{
 		products.GET("", catalogHandler.ListProducts)
 		products.GET("/featured", catalogHandler.ListFeaturedProducts)
 		products.GET("/:id", catalogHandler.GetProduct)
+	}
+
+	favoriteHandler := newFavoriteHandler(deps.Favorites)
+	favorites := api.Group("/favorites")
+	favorites.Use(guard.RequireCustomerAuthForFavorites)
+	{
+		favorites.GET("", favoriteHandler.List)
+		favorites.PUT("/:productId", favoriteHandler.Add)
+		favorites.DELETE("/:productId", favoriteHandler.Remove)
 	}
 
 	areaHandler := newAreaHandler(deps.Area)

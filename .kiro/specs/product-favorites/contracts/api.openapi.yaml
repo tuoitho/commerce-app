@@ -1,0 +1,792 @@
+openapi: 3.1.0
+info:
+  title: Product Favorites Contract
+  version: 1.0.0
+  description: Observable API contract for FAVORITES-API revision 1 and CATALOG-VIEWER revision 1.
+  x-contract-scope:
+    favorites: New endpoint behavior is fully authoritative in this document.
+    catalog: Existing product fields and behavior are a compatibility snapshot; revision 1 authority is limited to the additive required viewer property and caller-context semantics.
+    unknown-response-fields: Consumers ignore unknown response fields; providers use a new frozen revision before adding observable fields or semantics.
+servers:
+  - url: /api/v1
+
+paths:
+  /favorites:
+    get:
+      operationId: listFavorites
+      summary: List the authenticated customer's favorite products
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FavoritePage'
+        - $ref: '#/components/parameters/FavoriteLimit'
+      responses:
+        '200':
+          description: Favorites ordered by favorite date descending and product ID ascending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteProductListEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - Only relationships owned by the authenticated customer are returned.
+        - Inactive products remain in the collection.
+        - active is true only when the product is active and has at least one active variant, matching public catalog eligibility.
+        - For an eligible product, minPriceVnd and maxPriceVnd use active variants.
+        - For an ineligible product, minPriceVnd and maxPriceVnd use all stored variants and fall back to the stored product price when no variant remains.
+        - inStock is false whenever active is false; otherwise it reflects positive stock in an active variant.
+        - Page defaults to 1 and limit defaults to 12.
+        - A page beyond the available range returns an empty data array with valid pagination metadata.
+
+  /favorites/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    put:
+      operationId: addFavorite
+      summary: Idempotently add an active product to customer favorites
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The product is a favorite, whether newly inserted or already present
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteEnabledEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/ProductNotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - A product is eligible only when it is active and has at least one active variant, matching public catalog eligibility.
+        - Repeated and concurrent requests create at most one relationship.
+        - Repeated requests preserve the first favorite timestamp.
+    delete:
+      operationId: removeFavorite
+      summary: Idempotently remove a product from customer favorites
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The product is not a favorite, whether a relationship was deleted or absent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteDisabledEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - Product activity and product existence are not preconditions for removal.
+        - Only the authenticated customer's relationship can be deleted.
+
+  /products:
+    get:
+      operationId: listProducts
+      summary: List public products with caller-specific favorite viewer state
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: category_id
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { type: string, format: uuid }
+        - name: brand
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { type: string }
+        - name: min_price
+          in: query
+          schema: { type: string, pattern: '^[0-9]+$' }
+        - name: max_price
+          in: query
+          schema: { type: string, pattern: '^[0-9]+$' }
+        - name: in_stock
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/CatalogPage'
+        - $ref: '#/components/parameters/CatalogLimit'
+      responses:
+        '200':
+          description: Existing product collection with additive viewer state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSummaryListEnvelope'
+        '400':
+          $ref: '#/components/responses/CatalogFilterValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidTokenError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - No Authorization header yields viewer.isFavorite false without a favorite lookup.
+        - A valid customer token yields the relationship state for that customer.
+        - A supplied invalid or expired token yields 401.
+        - Existing filters, ordering, availability, and pagination semantics do not change.
+
+  /products/featured:
+    get:
+      operationId: listFeaturedProducts
+      summary: List featured public products with caller-specific favorite viewer state
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Existing featured product collection with additive viewer state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSummaryListEnvelope'
+        '401':
+          $ref: '#/components/responses/InvalidTokenError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - Viewer-state authentication semantics match GET /products.
+        - Existing featured-product selection and ordering do not change.
+
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      summary: Get an active public product with caller-specific favorite viewer state
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Existing product detail with additive viewer state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailEnvelope'
+        '401':
+          $ref: '#/components/responses/InvalidTokenError'
+        '404':
+          description: Existing catalog not-found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-semantic-rules:
+        - Viewer-state authentication semantics match GET /products.
+        - Inactive products remain unavailable through this public endpoint.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FavoritePage:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    FavoriteLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        const: 12
+        default: 12
+    CatalogPage:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+    CatalogLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+
+  responses:
+    ValidationError:
+      description: One or more request fields are invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorEnvelope'
+          example:
+            success: false
+            message: Dữ liệu không hợp lệ
+            data: null
+            error:
+              code: validation_error
+              message: Dữ liệu không hợp lệ
+              fields:
+                productId: must be a valid UUID
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+    CatalogFilterValidationError:
+      description: An existing catalog filter or pagination parameter is invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CatalogFilterValidationEnvelope'
+    AuthenticationError:
+      description: Customer authentication is missing, malformed, invalid, or expired where caller identity is required or supplied
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/MissingAuthenticationEnvelope'
+              - $ref: '#/components/schemas/InvalidTokenEnvelope'
+          example:
+            success: false
+            message: Vui lòng đăng nhập để sử dụng danh sách yêu thích
+            data: null
+            error:
+              code: unauthorized
+              message: Vui lòng đăng nhập để sử dụng danh sách yêu thích
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+    InvalidTokenError:
+      description: A supplied bearer token is malformed, invalid, or expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InvalidTokenEnvelope'
+          example:
+            success: false
+            message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+            data: null
+            error:
+              code: invalid_token
+              message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+    ForbiddenError:
+      description: The authenticated account is not a customer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ForbiddenEnvelope'
+          example:
+            success: false
+            message: Bạn không có quyền sử dụng danh sách yêu thích
+            data: null
+            error:
+              code: forbidden
+              message: Bạn không có quyền sử dụng danh sách yêu thích
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+    ProductNotFoundError:
+      description: The product does not exist or is inactive
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProductNotFoundEnvelope'
+          example:
+            success: false
+            message: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh
+            data: null
+            error:
+              code: product_not_found
+              message: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+    InternalError:
+      description: Unexpected system failure without implementation details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InternalErrorEnvelope'
+          example:
+            success: false
+            message: Đã xảy ra lỗi hệ thống
+            data: null
+            error:
+              code: internal
+              message: Đã xảy ra lỗi hệ thống
+            meta:
+              timestamp: '2026-08-24T00:00:00Z'
+
+  schemas:
+    ViewerState:
+      type: object
+      required: [isFavorite]
+      properties:
+        isFavorite:
+          type: boolean
+
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    ProductSummary:
+      type: object
+      required:
+        - id
+        - name
+        - model
+        - brand
+        - category
+        - minPriceVnd
+        - maxPriceVnd
+        - price
+        - currency
+        - primaryImageUrl
+        - inStock
+        - viewer
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        model: { type: string }
+        brand: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        minPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        maxPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        price: { type: string, pattern: '^[0-9]+(?:\.[0-9]{1,2})?$' }
+        currency: { type: string, const: VND }
+        primaryImageUrl: { type: string }
+        inStock: { type: boolean }
+        viewer: { $ref: '#/components/schemas/ViewerState' }
+
+    FavoriteProductSummary:
+      type: object
+      required:
+        - id
+        - name
+        - model
+        - brand
+        - category
+        - minPriceVnd
+        - maxPriceVnd
+        - price
+        - currency
+        - primaryImageUrl
+        - inStock
+        - viewer
+        - active
+        - favoritedAt
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        model: { type: string }
+        brand: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        minPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        maxPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        price: { type: string, pattern: '^[0-9]+(?:\.[0-9]{1,2})?$' }
+        currency: { type: string, const: VND }
+        primaryImageUrl: { type: string }
+        inStock: { type: boolean }
+        viewer: { $ref: '#/components/schemas/ViewerState' }
+        active: { type: boolean }
+        favoritedAt: { type: string, format: date-time }
+
+    OptionValue:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+
+    OptionGroup:
+      type: object
+      required: [id, label, position, values]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        position: { type: integer }
+        values:
+          type: array
+          items: { $ref: '#/components/schemas/OptionValue' }
+
+    ProductVariant:
+      type: object
+      required: [id, optionValueIds, priceVnd, stockQuantity, active]
+      properties:
+        id: { type: string, format: uuid }
+        optionValueIds:
+          type: object
+          additionalProperties: { type: string, format: uuid }
+        priceVnd: { type: string, pattern: '^[0-9]+$' }
+        stockQuantity: { type: integer, format: int64, minimum: 0 }
+        active: { type: boolean }
+
+    ProductDetail:
+      type: object
+      required:
+        - id
+        - name
+        - model
+        - description
+        - brand
+        - category
+        - minPriceVnd
+        - maxPriceVnd
+        - price
+        - currency
+        - imageUrls
+        - stockQuantity
+        - inStock
+        - featured
+        - active
+        - optionGroups
+        - variants
+        - createdAt
+        - updatedAt
+        - viewer
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        model: { type: string }
+        description: { type: string }
+        brand: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        minPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        maxPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        price: { type: string, pattern: '^[0-9]+(?:\.[0-9]{1,2})?$' }
+        currency: { type: string, const: VND }
+        imageUrls:
+          type: array
+          items: { type: string }
+        stockQuantity: { type: integer, format: int64, minimum: 0 }
+        inStock: { type: boolean }
+        featured: { type: boolean }
+        active: { type: boolean }
+        optionGroups:
+          type: array
+          items: { $ref: '#/components/schemas/OptionGroup' }
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/ProductVariant' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        viewer: { $ref: '#/components/schemas/ViewerState' }
+
+    FavoriteStateEnabled:
+      type: object
+      required: [productId, isFavorite]
+      properties:
+        productId: { type: string, format: uuid }
+        isFavorite: { type: boolean, const: true }
+
+    FavoriteStateDisabled:
+      type: object
+      required: [productId, isFavorite]
+      properties:
+        productId: { type: string, format: uuid }
+        isFavorite: { type: boolean, const: false }
+
+    CatalogPaginationMeta:
+      type: object
+      required: [page, limit, total, totalPages, hasNext, hasPrev]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        hasNext: { type: boolean }
+        hasPrev: { type: boolean }
+
+    FavoritePaginationMeta:
+      type: object
+      required: [page, limit, total, totalPages, hasNext, hasPrev]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, const: 12 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        hasNext: { type: boolean }
+        hasPrev: { type: boolean }
+
+    TimestampMeta:
+      type: object
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+
+    CatalogResponseMeta:
+      type: object
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+        pagination: { $ref: '#/components/schemas/CatalogPaginationMeta' }
+
+    PaginatedMeta:
+      type: object
+      required: [timestamp, pagination]
+      properties:
+        timestamp: { type: string, format: date-time }
+        pagination: { $ref: '#/components/schemas/FavoritePaginationMeta' }
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+
+    ErrorEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ErrorDetail' }
+        meta: { $ref: '#/components/schemas/TimestampMeta' }
+
+    ValidationErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, fields]
+      properties:
+        code: { type: string, const: validation_error }
+        message: { type: string }
+        fields:
+          type: object
+          minProperties: 1
+          additionalProperties: { type: string }
+
+    CatalogFilterValidationDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, fields]
+      properties:
+        code: { type: string, const: invalid_filter }
+        message: { type: string }
+        fields:
+          type: object
+          minProperties: 1
+          additionalProperties: { type: string }
+
+    MissingAuthenticationDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, const: unauthorized }
+        message: { type: string, const: Vui lòng đăng nhập để sử dụng danh sách yêu thích }
+
+    InvalidTokenDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, const: invalid_token }
+        message: { type: string, const: Phiên đăng nhập không hợp lệ hoặc đã hết hạn }
+
+    ForbiddenDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, const: forbidden }
+        message: { type: string, const: Bạn không có quyền sử dụng danh sách yêu thích }
+
+    ProductNotFoundDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, const: product_not_found }
+        message: { type: string, const: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh }
+
+    InternalErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, const: internal }
+        message: { type: string, const: Đã xảy ra lỗi hệ thống }
+
+    ValidationErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ValidationErrorDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    CatalogFilterValidationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/CatalogFilterValidationDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    MissingAuthenticationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string, const: Vui lòng đăng nhập để sử dụng danh sách yêu thích }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/MissingAuthenticationDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    InvalidTokenEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string, const: Phiên đăng nhập không hợp lệ hoặc đã hết hạn }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/InvalidTokenDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    ForbiddenEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string, const: Bạn không có quyền sử dụng danh sách yêu thích }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ForbiddenDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    ProductNotFoundEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string, const: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ProductNotFoundDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    InternalErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string, const: Đã xảy ra lỗi hệ thống }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/InternalErrorDetail' }
+        meta: { $ref: '#/components/schemas/StrictTimestampMeta' }
+
+    StrictTimestampMeta:
+      type: object
+      additionalProperties: false
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+
+    ProductSummaryListEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ProductSummary' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/CatalogResponseMeta' }
+
+    ProductDetailEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/ProductDetail' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/TimestampMeta' }
+
+    FavoriteProductListEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FavoriteProductSummary' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/PaginatedMeta' }
+
+    FavoriteEnabledEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string, const: Đã thêm sản phẩm vào yêu thích }
+        data: { $ref: '#/components/schemas/FavoriteStateEnabled' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/TimestampMeta' }
+
+    FavoriteDisabledEnvelope:
+      type: object
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string, const: Đã bỏ sản phẩm khỏi yêu thích }
+        data: { $ref: '#/components/schemas/FavoriteStateDisabled' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/TimestampMeta' }
