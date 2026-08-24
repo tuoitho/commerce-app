@@ -63,6 +63,7 @@ type Order struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 }
 
 type OrderItem struct {
@@ -136,6 +137,32 @@ type RefreshToken struct {
 	ExpiresAt time.Time
 	RevokedAt pgtype.Timestamptz
 	CreatedAt time.Time
+}
+
+type ReturnRequest struct {
+	ID               string
+	OrderID          string
+	UserID           string
+	Status           string
+	ReasonCode       string
+	Description      string
+	RejectReason     string
+	RefundAmountVnd  pgtype.Numeric
+	RefundedByUserID pgtype.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ApprovedAt       pgtype.Timestamptz
+	RejectedAt       pgtype.Timestamptz
+	ReceivedAt       pgtype.Timestamptz
+	RefundedAt       pgtype.Timestamptz
+	CancelledAt      pgtype.Timestamptz
+}
+
+type ReturnRequestItem struct {
+	ID              string
+	ReturnRequestID string
+	OrderItemID     string
+	Quantity        int64
 }
 
 type User struct {

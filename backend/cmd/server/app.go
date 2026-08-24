@@ -21,6 +21,7 @@ import (
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	orderuc "commerce-backend/internal/usecase/order"
+	returnsuc "commerce-backend/internal/usecase/returns"
 )
 
 type App struct {
@@ -110,6 +111,10 @@ func provideOrderRepository(pool *pgxpool.Pool) *repository.OrderRepository {
 	return repository.NewOrderRepository(pool)
 }
 
+func provideReturnRepository(pool *pgxpool.Pool) *repository.ReturnRepository {
+	return repository.NewReturnRepository(pool)
+}
+
 func provideJWTManager(cfg *config.Config) *jwt.Manager {
 	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 }
@@ -156,7 +161,11 @@ func provideOrderUseCase(repo *repository.OrderRepository, cfg *config.Config) *
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideReturnsUseCase(repo *repository.ReturnRepository) *returnsuc.UseCase {
+	return returnsuc.New(returnsuc.Dependencies{Returns: repo})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnsUC *returnsuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -169,6 +178,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Area:         areaUC,
 		Address:      addressUC,
 		Order:        orderUC,
+		Returns:      returnsUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,

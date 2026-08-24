@@ -31,6 +31,13 @@ var (
 	ErrOrderNotCancellable = errors.New("order not cancellable")
 	ErrOrderNotCancelRequested = errors.New("order not cancel requested")
 	ErrOrderActionNotAllowed   = errors.New("order action not allowed")
+
+	ErrReturnNotFound          = errors.New("return request not found")
+	ErrReturnNotAllowed        = errors.New("return not allowed")
+	ErrReturnWindowExpired     = errors.New("return window expired")
+	ErrReturnRequestExists     = errors.New("return request exists")
+	ErrReturnItemLimitExceeded = errors.New("return item limit exceeded")
+	ErrReturnActionNotAllowed  = errors.New("return action not allowed")
 )
 
 type ValidationError struct {

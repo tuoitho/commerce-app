@@ -83,7 +83,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -107,6 +107,7 @@ type GetOrderByAdminIDRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 	BuyerEmail     string
 }
 
@@ -130,6 +131,7 @@ func (q *Queries) GetOrderByAdminID(ctx context.Context, id string) (GetOrderByA
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+		&i.DeliveredAt,
 		&i.BuyerEmail,
 	)
 	return i, err
@@ -141,7 +143,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2
 `
@@ -168,6 +170,7 @@ type GetOrderByIDRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 }
 
 func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error) {
@@ -190,6 +193,7 @@ func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (Get
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+		&i.DeliveredAt,
 	)
 	return i, err
 }
@@ -227,7 +231,7 @@ RETURNING id, user_id, status, payment_method,
           shipping_fee_vnd::text AS shipping_fee_vnd,
           total_vnd::text AS total_vnd,
           recipient_name, phone, province_name, ward_name, detail_address,
-          created_at, updated_at, confirmed_at, cancelled_at
+          created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 `
 
 type InsertOrderParams struct {
@@ -261,6 +265,7 @@ type InsertOrderRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 }
 
 func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) (InsertOrderRow, error) {
@@ -295,6 +300,7 @@ func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) (Inser
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+		&i.DeliveredAt,
 	)
 	return i, err
 }
@@ -469,7 +475,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -494,6 +500,7 @@ type ListOrdersByAdminRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 	BuyerEmail     string
 }
 
@@ -523,6 +530,7 @@ func (q *Queries) ListOrdersByAdmin(ctx context.Context, statuses []string) ([]L
 			&i.UpdatedAt,
 			&i.ConfirmedAt,
 			&i.CancelledAt,
+			&i.DeliveredAt,
 			&i.BuyerEmail,
 		); err != nil {
 			return nil, err
@@ -541,7 +549,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE user_id = $1
   AND (COALESCE(cardinality($2::text[]), 0) = 0 OR status = ANY($2::text[]))
@@ -570,6 +578,7 @@ type ListOrdersByUserRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 }
 
 func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]ListOrdersByUserRow, error) {
@@ -598,6 +607,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 			&i.UpdatedAt,
 			&i.ConfirmedAt,
 			&i.CancelledAt,
+			&i.DeliveredAt,
 		); err != nil {
 			return nil, err
 		}
@@ -615,7 +625,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2
 FOR UPDATE
@@ -643,6 +653,7 @@ type LockOrderForUpdateRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 }
 
 func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdateParams) (LockOrderForUpdateRow, error) {
@@ -665,6 +676,7 @@ func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdate
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+		&i.DeliveredAt,
 	)
 	return i, err
 }
@@ -675,7 +687,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -700,6 +712,7 @@ type LockOrderForUpdateAdminRow struct {
 	UpdatedAt      time.Time
 	ConfirmedAt    pgtype.Timestamptz
 	CancelledAt    pgtype.Timestamptz
+	DeliveredAt    pgtype.Timestamptz
 	BuyerEmail     string
 }
 
@@ -723,6 +736,7 @@ func (q *Queries) LockOrderForUpdateAdmin(ctx context.Context, id string) (LockO
 		&i.UpdatedAt,
 		&i.ConfirmedAt,
 		&i.CancelledAt,
+		&i.DeliveredAt,
 		&i.BuyerEmail,
 	)
 	return i, err
@@ -824,6 +838,17 @@ WHERE user_id = $1 AND selected = true
 
 func (q *Queries) RemoveSelectedCartItems(ctx context.Context, userID string) error {
 	_, err := q.db.Exec(ctx, removeSelectedCartItems, userID)
+	return err
+}
+
+const setOrderDeliveredAt = `-- name: SetOrderDeliveredAt :exec
+UPDATE orders
+SET delivered_at = now(), updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) SetOrderDeliveredAt(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setOrderDeliveredAt, id)
 	return err
 }
 

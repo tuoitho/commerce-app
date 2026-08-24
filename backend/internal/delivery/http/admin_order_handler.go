@@ -42,6 +42,7 @@ type adminOrderResponse struct {
 	UpdatedAt      time.Time           `json:"updatedAt"`
 	ConfirmedAt    *time.Time          `json:"confirmedAt,omitempty"`
 	CancelledAt    *time.Time          `json:"cancelledAt,omitempty"`
+	DeliveredAt    *time.Time          `json:"deliveredAt,omitempty"`
 }
 
 func toAdminOrderResponse(order domain.Order) adminOrderResponse {
@@ -65,6 +66,7 @@ func toAdminOrderResponse(order domain.Order) adminOrderResponse {
 		UpdatedAt:      base.UpdatedAt,
 		ConfirmedAt:    base.ConfirmedAt,
 		CancelledAt:    base.CancelledAt,
+		DeliveredAt:    base.DeliveredAt,
 	}
 }
 

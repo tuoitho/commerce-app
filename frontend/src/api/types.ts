@@ -271,6 +271,7 @@ export interface Order {
   confirmedAt?: string | null
   cancelledAt?: string | null
   cancellableUntil?: string | null
+  deliveredAt?: string | null
 }
 
 export interface OrderStats {

@@ -1,0 +1,63 @@
+- generic [ref=f2e37]:
+  - complementary [ref=f2e38]:
+    - generic [ref=f2e44]:
+      - heading "AuraPhone Admin" [level=1] [ref=f2e45]
+      - paragraph [ref=f2e46]: Management Portal
+    - navigation [ref=f2e47]:
+      - link "Tổng quan" [ref=f2e48] [cursor=pointer]:
+        - /url: /
+      - link "Sản phẩm" [ref=f2e55] [cursor=pointer]:
+        - /url: /products
+      - link "Đơn hàng" [ref=f2e61] [cursor=pointer]:
+        - /url: /orders
+      - link "Trả hàng" [ref=f2e66] [cursor=pointer]:
+        - /url: /return-requests
+      - link "Danh mục" [ref=f2e71] [cursor=pointer]:
+        - /url: /categories
+      - generic "Sắp ra mắt" [ref=f2e78]: Người dùng
+      - generic "Sắp ra mắt" [ref=f2e85]: Cài đặt
+    - generic [ref=f2e91]:
+      - generic [ref=f2e92]: AD
+      - generic [ref=f2e93]:
+        - paragraph [ref=f2e94]: Quản trị viên
+        - paragraph [ref=f2e95]: admin@example.com
+      - generic [ref=f2e96]: Admin
+  - generic [ref=f2e97]:
+    - banner [ref=f2e98]:
+      - generic [ref=f2e99]:
+        - heading "Bảng điều khiển quản trị hệ thống AuraPhone" [level=2] [ref=f2e100]
+        - generic [ref=f2e101]: Phiên bản 3.0
+      - generic [ref=f2e105]:
+        - generic [ref=f2e106]:
+          - generic [ref=f2e107]: Đang đăng nhập
+          - text: admin@example.com
+        - button "Đăng xuất" [ref=f2e108] [cursor=pointer]
+    - main [ref=f2e112]:
+      - generic [ref=f2e113]:
+        - generic [ref=f2e114]:
+          - generic [ref=f2e115]:
+            - heading "Thống kê nhanh" [level=3] [ref=f2e117]
+            - generic [ref=f2e120]:
+              - generic [ref=f2e121]: Sẵn sàng
+              - paragraph [ref=f2e122]: Đã kết nối giao diện quản trị thành công
+          - generic [ref=f2e123]:
+            - heading "Hệ thống" [level=3] [ref=f2e125]
+            - generic [ref=f2e129]:
+              - generic [ref=f2e130]:
+                - generic [ref=f2e131]: Hoạt động
+                - generic [ref=f2e132]: Online
+              - paragraph [ref=f2e133]: Vite + React 19 + Tailwind v4
+          - generic [ref=f2e134]:
+            - heading "Tương tác" [level=3] [ref=f2e136]
+            - generic [ref=f2e142]:
+              - generic [ref=f2e143]: Chưa có hành động
+              - paragraph [ref=f2e144]: Nhấn nút bên dưới để cập nhật
+              - button "Làm mới dữ liệu" [ref=f2e146] [cursor=pointer]
+        - generic [ref=f2e152]:
+          - generic [ref=f2e153]:
+            - generic [ref=f2e154]: Khởi tạo thành công
+            - heading "Chào mừng đến với Bảng Quản Trị AuraPhone" [level=3] [ref=f2e156]
+            - paragraph [ref=f2e157]: Hệ thống quản trị cung cấp các tính năng quản lý danh mục sản phẩm, phân quyền vai trò và giám sát dịch vụ thương mại điện tử AuraPhone.
+          - generic [ref=f2e159]:
+            - button "Khám phá tính năng" [ref=f2e160] [cursor=pointer]
+            - button "Tài liệu API" [ref=f2e161] [cursor=pointer]

@@ -13,6 +13,7 @@ import (
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	orderuc "commerce-backend/internal/usecase/order"
+	returnsuc "commerce-backend/internal/usecase/returns"
 )
 
 type Dependencies struct {
@@ -22,6 +23,7 @@ type Dependencies struct {
 	Area         *areauc.UseCase
 	Address      *addressuc.UseCase
 	Order        *orderuc.UseCase
+	Returns      *returnsuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -81,6 +83,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	}
 
 	orderHandler := newOrderHandler(deps.Order)
+	returnHandler := newReturnHandler(deps.Returns)
 	orders := api.Group("/orders")
 	orders.Use(guard.AuthRequired)
 	{
@@ -90,10 +93,14 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.GET("/:id", orderHandler.GetByID)
 		orders.POST("/:id/cancel", orderHandler.Cancel)
 		orders.POST("/:id/cancel/undo", orderHandler.UndoCancel)
+		orders.POST("/:id/return-requests", returnHandler.Create)
+		orders.GET("/:id/return-requests", returnHandler.ListByOrder)
+		orders.POST("/:id/return-requests/:requestId/cancel", returnHandler.Cancel)
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)
 	adminOrderHandler := newAdminOrderHandler(deps.Order)
+	adminReturnHandler := newAdminReturnHandler(deps.Returns)
 	admin := api.Group("/admin")
 	admin.Use(guard.AuthRequired, guard.RequireAdmin())
 	{
@@ -121,6 +128,15 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminOrders.POST("/:id/deliver", adminOrderHandler.Deliver)
 			adminOrders.POST("/:id/cancel/approve", adminOrderHandler.ApproveCancel)
 			adminOrders.POST("/:id/cancel/decline", adminOrderHandler.DeclineCancel)
+		}
+		adminReturns := admin.Group("/return-requests")
+		{
+			adminReturns.GET("", adminReturnHandler.List)
+			adminReturns.GET("/:id", adminReturnHandler.GetByID)
+			adminReturns.POST("/:id/approve", adminReturnHandler.Approve)
+			adminReturns.POST("/:id/reject", adminReturnHandler.Reject)
+			adminReturns.POST("/:id/receive", adminReturnHandler.Receive)
+			adminReturns.POST("/:id/refund", adminReturnHandler.RecordRefund)
 		}
 	}
 }

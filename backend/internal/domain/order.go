@@ -120,6 +120,7 @@ type Order struct {
 	UpdatedAt        time.Time
 	ConfirmedAt      *time.Time
 	CancelledAt      *time.Time
+	DeliveredAt      *time.Time
 	CancellableUntil *time.Time
 }
 

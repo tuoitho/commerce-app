@@ -74,6 +74,18 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "order_not_cancel_request", "Đơn hàng không có yêu cầu hủy đang chờ", nil)
 	case errors.Is(err, domain.ErrOrderActionNotAllowed):
 		respondError(c, 409, "order_action_not_allowed", "Không thể thực hiện thao tác này trên đơn hàng ở trạng thái hiện tại", nil)
+	case errors.Is(err, domain.ErrReturnNotFound):
+		respondError(c, 404, "return_request_not_found", "Không tìm thấy yêu cầu trả hàng", nil)
+	case errors.Is(err, domain.ErrReturnNotAllowed):
+		respondError(c, 409, "return_not_allowed", "Đơn hàng không thể yêu cầu trả hàng ở trạng thái hiện tại", nil)
+	case errors.Is(err, domain.ErrReturnWindowExpired):
+		respondError(c, 409, "return_window_expired", "Đã quá 7 ngày kể từ khi nhận hàng, không thể yêu cầu trả hàng", nil)
+	case errors.Is(err, domain.ErrReturnRequestExists):
+		respondError(c, 409, "return_request_exists", "Đơn hàng đang có một yêu cầu trả hàng đang mở", nil)
+	case errors.Is(err, domain.ErrReturnItemLimitExceeded):
+		respondError(c, 409, "return_item_limit_exceeded", "Số lượng trả vượt quá số lượng có thể trả của mặt hàng", nil)
+	case errors.Is(err, domain.ErrReturnActionNotAllowed):
+		respondError(c, 409, "return_action_not_allowed", "Không thể thực hiện thao tác này trên yêu cầu trả hàng ở trạng thái hiện tại", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

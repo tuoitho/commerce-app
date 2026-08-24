@@ -1,0 +1,411 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: Hệ thống điện thoại chính hãng 100% VNA
+          - generic [ref=e13]: "|"
+          - generic [ref=e14]: Hà Nội • TP. HCM • Đà Nẵng
+        - generic [ref=e19]:
+          - 'link "Hotline: 1800 6868 (Miễn phí)" [ref=e20] [cursor=pointer]':
+            - /url: tel:18006868
+          - link "Tra cứu bảo hành" [ref=e26] [cursor=pointer]:
+            - /url: /products
+      - generic [ref=e32]:
+        - link "AuraPhone Điện thoại chính hãng" [ref=e33] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e37]:
+            - generic [ref=e38]: AuraPhone
+            - generic [ref=e39]: Điện thoại chính hãng
+        - generic [ref=e40]:
+          - 'textbox "Bạn muốn tìm điện thoại gì? (vd: Tìm theo tên, hãng...)" [ref=e41]'
+          - button "Tìm kiếm" [ref=e45]
+        - generic [ref=e46]:
+          - link "Giỏ hàng" [ref=e47] [cursor=pointer]:
+            - /url: /cart
+          - generic [ref=e194]:
+            - generic [ref=e195]:
+              - generic [ref=e196]: r
+              - generic [ref=e197]: rt-a-592355@example.test
+            - button "Đăng xuất" [ref=e198]
+          - button "Toggle menu" [ref=e60]
+    - main [ref=e62]:
+      - generic [ref=e202]:
+        - generic [ref=e205]:
+          - generic [ref=e206]:
+            - generic [ref=e207]: HỆ THỐNG SMARTPHONE CHÍNH HÃNG VNA
+            - heading "Thế Hệ Smartphone Cao Cấp Chính Hãng & Bảo Hành VIP" [level=1] [ref=e212]
+            - paragraph [ref=e213]: Khám phá các dòng điện thoại thông minh mới nhất từ Apple iPhone 16 Series, Xiaomi 15 và các thương hiệu hàng đầu với cam kết 100% nguyên seal, bảo hành 1 đổi 1 và hỗ trợ trả góp 0% lãi suất.
+            - generic [ref=e214]:
+              - link [ref=e215] [cursor=pointer]:
+                - /url: /products
+                - button "Xem tất cả điện thoại" [ref=e216]
+              - link [ref=e220] [cursor=pointer]:
+                - /url: /products?in_stock=true
+                - button "Hàng có sẵn giao ngay" [ref=e221]
+            - generic [ref=e222]:
+              - generic [ref=e223]:
+                - generic [ref=e224]: 100% Chính hãng
+                - paragraph [ref=e229]: VNA phân phối chính thức
+              - generic [ref=e230]:
+                - generic [ref=e231]: Trả góp 0%
+                - paragraph [ref=e235]: Duyệt hồ sơ 5 phút
+              - generic [ref=e236]:
+                - generic [ref=e237]: Giao hỏa tốc
+                - paragraph [ref=e244]: Miễn phí nội thành
+          - generic [ref=e246]:
+            - generic [ref=e247]:
+              - generic [ref=e248]: Sản phẩm tâm điểm 2026
+              - generic [ref=e251]: Mới ra mắt
+            - generic [ref=e252]:
+              - generic [ref=e253]:
+                - img "iPhone 16 Pro Natural Titanium" [ref=e254]
+                - generic [ref=e255]: Natural Titanium
+              - generic [ref=e256]:
+                - heading "iPhone 16 Pro & Xiaomi 15" [level=3] [ref=e257]
+                - paragraph [ref=e258]: Thiết kế Titanium siêu bền, camera cảm biến lớn và hiệu năng chip đầu bảng.
+              - generic [ref=e259]:
+                - generic [ref=e260]:
+                  - generic [ref=e261]: Màn hình
+                  - text: OLED 120Hz mượt mà
+                - generic [ref=e262]:
+                  - generic [ref=e263]: Bảo hành
+                  - text: 1 Đổi 1 trong 30 ngày
+              - link [ref=e264] [cursor=pointer]:
+                - /url: /products
+                - button "Xem chi tiết sản phẩm" [ref=e265]
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - heading "Thương hiệu smartphone chính hãng" [level=2] [ref=e272]
+            - link "Xem tất cả danh mục →" [ref=e273] [cursor=pointer]:
+              - /url: /products
+          - generic [ref=e274]:
+            - link "Điện thoại" [ref=e275] [cursor=pointer]:
+              - /url: /products?category_id=10000000-0000-0000-0000-000000000001
+            - link "Hàng có sẵn" [ref=e279] [cursor=pointer]:
+              - /url: /products?in_stock=true
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - generic [ref=e288]: GIỜ VÀNG GIÁ SỐC - CHỈ HÔM NAY
+            - heading "Flash Sale Smartphone Giảm Đến 30%" [level=2] [ref=e292]
+            - paragraph [ref=e293]: Cơ hội sở hữu điện thoại cao cấp với mức giá ưu đãi nhất. Số lượng có hạn, áp dụng cho đơn đặt hàng trực tuyến.
+          - generic [ref=e298]:
+            - generic [ref=e299]:
+              - text: "04"
+              - generic [ref=e300]: Giờ
+            - generic [ref=e301]: ":"
+            - generic [ref=e302]:
+              - text: "35"
+              - generic [ref=e303]: Phút
+            - generic [ref=e304]: ":"
+            - generic [ref=e305]:
+              - text: "27"
+              - generic [ref=e306]: Giây
+        - generic [ref=e307]:
+          - generic [ref=e308]:
+            - generic [ref=e309]:
+              - generic [ref=e310]: Sản Phẩm Đáng Mua Nhất
+              - heading "Điện Thoại Nổi Bật" [level=2] [ref=e314]
+            - generic [ref=e315]:
+              - button "Tất cả" [ref=e316]
+              - button "Điện thoại" [ref=e317]
+              - button "Còn hàng" [ref=e318]
+              - link [ref=e319] [cursor=pointer]:
+                - /url: /products
+                - button "Xem catalog" [ref=e320]
+          - generic [ref=e324]:
+            - generic [ref=e326]:
+              - generic [ref=e327]:
+                - generic [ref=e328]:
+                  - generic [ref=e329]:
+                    - generic [ref=e330]: Samsung
+                    - generic [ref=e331]: Góp 0%
+                  - generic [ref=e334]: Còn hàng
+                - link [ref=e336] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000010
+                  - img "Samsung Samsung Galaxy S25 Ultra SM-S938B"
+                - generic [ref=e341]:
+                  - heading [level=3] [ref=e342]:
+                    - link "Samsung Galaxy S25 Ultra" [ref=e343] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000010
+                  - generic [ref=e344]:
+                    - generic [ref=e345]: SM-S938B
+                    - generic [ref=e346]: •
+                    - generic [ref=e347]: VNA Chính hãng
+                - generic [ref=e351]:
+                  - generic [ref=e352]: Chính hãng 100%
+                  - generic [ref=e353]: Màn hình sắc nét
+                  - generic [ref=e354]: Hỗ trợ 5G
+                  - generic [ref=e355]: Bảo hành 12T
+              - generic [ref=e357]:
+                - generic [ref=e358]:
+                  - generic [ref=e359]: 3.599.000 ₫ - 38.990.000 ₫
+                  - generic [ref=e360]: Góp từ ~299.917 ₫/tháng
+                - link [ref=e361] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000010
+                  - button "Chi tiết" [ref=e362]
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - generic [ref=e369]:
+                  - generic [ref=e370]:
+                    - generic [ref=e371]: Samsung
+                    - generic [ref=e372]: Góp 0%
+                  - generic [ref=e375]: Còn hàng
+                - link [ref=e377] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000011
+                  - img "Samsung Samsung Galaxy S25 new SM-S931B"
+                - generic [ref=e382]:
+                  - heading [level=3] [ref=e383]:
+                    - link "Samsung Galaxy S25 new" [ref=e384] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000011
+                  - generic [ref=e385]:
+                    - generic [ref=e386]: SM-S931B
+                    - generic [ref=e387]: •
+                    - generic [ref=e388]: VNA Chính hãng
+                - generic [ref=e392]:
+                  - generic [ref=e393]: Chính hãng 100%
+                  - generic [ref=e394]: Màn hình sắc nét
+                  - generic [ref=e395]: Hỗ trợ 5G
+                  - generic [ref=e396]: Bảo hành 12T
+              - generic [ref=e398]:
+                - generic [ref=e399]:
+                  - generic [ref=e400]: 21.990.000 ₫ - 23.990.000 ₫
+                  - generic [ref=e401]: Góp từ ~1.832.500 ₫/tháng
+                - link [ref=e402] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000011
+                  - button "Chi tiết" [ref=e403]
+            - generic [ref=e408]:
+              - generic [ref=e409]:
+                - generic [ref=e410]:
+                  - generic [ref=e411]:
+                    - generic [ref=e412]: Samsung
+                    - generic [ref=e413]: Góp 0%
+                  - generic [ref=e416]: Còn hàng
+                - link [ref=e418] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000012
+                  - img "Samsung Samsung Galaxy Z Fold6 SM-F956B"
+                - generic [ref=e423]:
+                  - heading [level=3] [ref=e424]:
+                    - link "Samsung Galaxy Z Fold6" [ref=e425] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000012
+                  - generic [ref=e426]:
+                    - generic [ref=e427]: SM-F956B
+                    - generic [ref=e428]: •
+                    - generic [ref=e429]: VNA Chính hãng
+                - generic [ref=e433]:
+                  - generic [ref=e434]: Chính hãng 100%
+                  - generic [ref=e435]: Màn hình sắc nét
+                  - generic [ref=e436]: Hỗ trợ 5G
+                  - generic [ref=e437]: Bảo hành 12T
+              - generic [ref=e439]:
+                - generic [ref=e440]:
+                  - generic [ref=e441]: 43.990.000 ₫ - 46.990.000 ₫
+                  - generic [ref=e442]: Góp từ ~3.665.833 ₫/tháng
+                - link [ref=e443] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000012
+                  - button "Chi tiết" [ref=e444]
+            - generic [ref=e449]:
+              - generic [ref=e450]:
+                - generic [ref=e451]:
+                  - generic [ref=e452]:
+                    - generic [ref=e453]: Xiaomi
+                    - generic [ref=e454]: Góp 0%
+                  - generic [ref=e457]: Còn hàng
+                - link [ref=e459] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000003
+                  - img "Xiaomi Xiaomi 15 24129PN74G"
+                - generic [ref=e464]:
+                  - heading [level=3] [ref=e465]:
+                    - link "Xiaomi 15" [ref=e466] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000003
+                  - generic [ref=e467]:
+                    - generic [ref=e468]: 24129PN74G
+                    - generic [ref=e469]: •
+                    - generic [ref=e470]: VNA Chính hãng
+                - generic [ref=e474]:
+                  - generic [ref=e475]: OLED Retina
+                  - generic [ref=e476]: Chip Apple
+                  - generic [ref=e477]: Camera kép 48MP
+                  - generic [ref=e478]: Pin cả ngày
+              - generic [ref=e480]:
+                - generic [ref=e481]:
+                  - generic [ref=e482]: 20.990.000 ₫ - 23.990.000 ₫
+                  - generic [ref=e483]: Góp từ ~1.749.167 ₫/tháng
+                - link [ref=e484] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000003
+                  - button "Chi tiết" [ref=e485]
+            - generic [ref=e490]:
+              - generic [ref=e491]:
+                - generic [ref=e492]:
+                  - generic [ref=e493]:
+                    - generic [ref=e494]: Xiaomi
+                    - generic [ref=e495]: Góp 0%
+                  - generic [ref=e498]: Còn hàng
+                - link [ref=e500] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000016
+                  - img "Xiaomi Xiaomi 15 Ultra 25010PN30G"
+                - generic [ref=e505]:
+                  - heading [level=3] [ref=e506]:
+                    - link "Xiaomi 15 Ultra" [ref=e507] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000016
+                  - generic [ref=e508]:
+                    - generic [ref=e509]: 25010PN30G
+                    - generic [ref=e510]: •
+                    - generic [ref=e511]: VNA Chính hãng
+                - generic [ref=e515]:
+                  - generic [ref=e516]: OLED Retina
+                  - generic [ref=e517]: Chip Apple
+                  - generic [ref=e518]: Camera kép 48MP
+                  - generic [ref=e519]: Pin cả ngày
+              - generic [ref=e521]:
+                - generic [ref=e522]:
+                  - generic [ref=e523]: 34.990.000 ₫ - 38.990.000 ₫
+                  - generic [ref=e524]: Góp từ ~2.915.833 ₫/tháng
+                - link [ref=e525] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000016
+                  - button "Chi tiết" [ref=e526]
+            - generic [ref=e531]:
+              - generic [ref=e532]:
+                - generic [ref=e533]:
+                  - generic [ref=e534]:
+                    - generic [ref=e535]: Apple
+                    - generic [ref=e536]: Góp 0%
+                  - generic [ref=e539]: Còn hàng
+                - link [ref=e541] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000005
+                  - img "Apple iPhone 16 Pro Max A3297"
+                - generic [ref=e547]:
+                  - heading [level=3] [ref=e548]:
+                    - link "iPhone 16 Pro Max" [ref=e549] [cursor=pointer]:
+                      - /url: /products/10000000-0000-0001-0000-000000000005
+                  - generic [ref=e550]:
+                    - generic [ref=e551]: A3297
+                    - generic [ref=e552]: •
+                    - generic [ref=e553]: VNA Chính hãng
+                - generic [ref=e557]:
+                  - generic [ref=e558]: OLED 120Hz
+                  - generic [ref=e559]: Chip A-Series Pro
+                  - generic [ref=e560]: Camera 48MP
+                  - generic [ref=e561]: Titanium
+              - generic [ref=e563]:
+                - generic [ref=e564]:
+                  - generic [ref=e565]: 36.990.000 ₫ - 39.990.000 ₫
+                  - generic [ref=e566]: Góp từ ~3.082.500 ₫/tháng
+                - link [ref=e567] [cursor=pointer]:
+                  - /url: /products/10000000-0000-0001-0000-000000000005
+                  - button "Chi tiết" [ref=e568]
+        - generic [ref=e574]:
+          - generic [ref=e575]:
+            - generic [ref=e576]: CHƯƠNG TRÌNH ĐỘC QUYỀN AURAPHONE
+            - heading "Thu Cũ Đổi Mới - Trợ Giá Đến 2.000.000₫" [level=2] [ref=e583]
+            - paragraph [ref=e584]: Lên đời smartphone thế hệ mới chưa bao giờ dễ dàng hơn. Định giá minh bạch, kiểm tra máy nhanh trong 15 phút, thu mọi tình trạng máy.
+            - generic [ref=e585]:
+              - generic [ref=e586]: Định giá cao nhất thị trường
+              - generic [ref=e591]: Áp dụng cùng Trả góp 0%
+              - generic [ref=e597]: Thu cũ tận nơi tại nhà
+          - link [ref=e605] [cursor=pointer]:
+            - /url: /products
+            - button "Xem chi tiết & Định giá" [ref=e606]
+        - generic [ref=e610]:
+          - generic [ref=e611]:
+            - text: Dịch vụ chuẩn mực
+            - heading "Vì Sao Chọn Mua Tại AuraPhone?" [level=2] [ref=e612]
+            - paragraph [ref=e613]: Chúng tôi luôn đặt quyền lợi và sự hài lòng tuyệt đối của khách hàng lên hàng đầu.
+          - generic [ref=e614]:
+            - generic [ref=e615]:
+              - heading "Chính Hãng 100%" [level=3] [ref=e620]
+              - paragraph [ref=e621]: Tất cả điện thoại đều có nguồn gốc rõ ràng, nguyên seal VNA và bảo hành điện tử chính hãng từ nhà sản xuất.
+            - generic [ref=e622]:
+              - heading "1 Đổi 1 Trong 30 Ngày" [level=3] [ref=e629]
+              - paragraph [ref=e630]: Nếu phát sinh lỗi phần cứng từ nhà sản xuất trong vòng 30 ngày đầu, quý khách được đổi máy mới hoàn toàn miễn phí.
+            - generic [ref=e631]:
+              - heading "Trả Góp 0% Lãi Suất" [level=3] [ref=e637]
+              - paragraph [ref=e638]: Hỗ trợ trả góp lãi suất 0% qua thẻ tín dụng hơn 25 ngân hàng hoặc duyệt hồ sơ online cực nhanh chỉ với CCCD.
+            - generic [ref=e639]:
+              - heading "Hỗ Trợ Kỹ Thuật 24/7" [level=3] [ref=e643]
+              - paragraph [ref=e644]: Đội ngũ chuyên viên kỹ thuật sẵn sàng hỗ trợ cài đặt dữ liệu, dán màn hình miễn phí và tư vấn sử dụng trọn đời.
+    - contentinfo [ref=e97]:
+      - generic [ref=e100]:
+        - generic [ref=e106]:
+          - heading "Chính Hãng 100%" [level=4] [ref=e107]
+          - paragraph [ref=e108]: Bảo hành 12-24 tháng toàn diện từ nhà sản xuất
+        - generic [ref=e116]:
+          - heading "Giao Hàng Siêu Tốc 2H" [level=4] [ref=e117]
+          - paragraph [ref=e118]: Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
+        - generic [ref=e124]:
+          - heading "1 Đổi 1 Trong 30 Ngày" [level=4] [ref=e125]
+          - paragraph [ref=e126]: Đổi mới miễn phí ngay lập tức nếu có lỗi NSX
+      - generic [ref=e127]:
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - link "AuraPhone" [ref=e130] [cursor=pointer]:
+              - /url: /
+            - paragraph [ref=e135]: Hệ thống bán lẻ điện thoại di động thông minh chính hãng Apple, Xiaomi, Samsung hàng đầu Việt Nam. Cam kết chất lượng và dịch vụ tận tâm.
+            - generic [ref=e136]:
+              - generic [ref=e137]: "Hà Nội: 123 Thái Hà, Đống Đa"
+              - generic [ref=e142]: "TP. HCM: 456 Nguyễn Thị Minh Khai, Q.3"
+          - generic [ref=e147]:
+            - heading "Sản phẩm & Thương hiệu" [level=4] [ref=e148]
+            - list [ref=e149]:
+              - listitem [ref=e150]:
+                - link "Tất cả điện thoại" [ref=e151] [cursor=pointer]:
+                  - /url: /products
+              - listitem [ref=e152]:
+                - link "Apple iPhone" [ref=e153] [cursor=pointer]:
+                  - /url: /products?category_id=10000000-0000-0000-0000-000000000001
+              - listitem [ref=e154]:
+                - link "Xiaomi Smartphone" [ref=e155] [cursor=pointer]:
+                  - /url: /products?category_id=10000000-0000-0000-0000-000000000002
+              - listitem [ref=e156]:
+                - link "Hàng có sẵn giao ngay" [ref=e157] [cursor=pointer]:
+                  - /url: /products?in_stock=true
+          - generic [ref=e158]:
+            - heading "Chính sách & Dịch vụ" [level=4] [ref=e159]
+            - list [ref=e160]:
+              - listitem [ref=e161]:
+                - link "Giỏ hàng của bạn" [ref=e162] [cursor=pointer]:
+                  - /url: /cart
+              - listitem [ref=e163]:
+                - link "Đăng nhập tài khoản" [ref=e164] [cursor=pointer]:
+                  - /url: /login
+              - listitem [ref=e165]:
+                - link "Đăng ký thành viên mới" [ref=e166] [cursor=pointer]:
+                  - /url: /register
+              - listitem [ref=e167]: Chính sách bảo hành 1 đổi 1
+              - listitem [ref=e168]: Chính sách trả góp 0%
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - heading "Tổng đài hỗ trợ (Miễn phí)" [level=4] [ref=e171]
+              - paragraph [ref=e172]:
+                - generic [ref=e173]:
+                  - text: "Tư vấn mua hàng:"
+                  - link "1800 6868" [ref=e174] [cursor=pointer]:
+                    - /url: tel:18006868
+                  - text: (8h00 - 21h30)
+                - generic [ref=e175]:
+                  - text: "Hỗ trợ kỹ thuật:"
+                  - link "1800 6869" [ref=e176] [cursor=pointer]:
+                    - /url: tel:18006869
+                - generic [ref=e177]:
+                  - text: "Email:"
+                  - strong [ref=e178]: support@auraphone.vn
+            - generic [ref=e179]:
+              - heading "Phương thức thanh toán" [level=5] [ref=e180]
+              - generic [ref=e181]:
+                - generic [ref=e182]: Visa / Master
+                - generic [ref=e183]: VNPay
+                - generic [ref=e184]: MoMo
+                - generic [ref=e185]: Trả góp 0%
+        - generic [ref=e186]:
+          - generic [ref=e187]: © 2026 AuraPhone Inc. Hệ thống bán lẻ Smartphone chính hãng. Mọi quyền được bảo lưu.
+          - generic [ref=e188]:
+            - generic [ref=e189]: Điều khoản sử dụng
+            - generic [ref=e190]: •
+            - generic [ref=e191]: Chính sách bảo mật
+            - generic [ref=e192]: •
+            - generic [ref=e193]: Quy chế hoạt động
+  - generic [ref=e645]:
+    - generic [ref=e649]:
+      - paragraph [ref=e650]: Đăng nhập thành công!
+      - paragraph [ref=e651]: Chào mừng bạn quay trở lại.
+    - button [ref=e652]

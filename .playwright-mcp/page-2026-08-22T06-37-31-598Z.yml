@@ -1,0 +1,130 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: Hệ thống điện thoại chính hãng 100% VNA
+        - generic [ref=e13]: "|"
+        - generic [ref=e14]: Hà Nội • TP. HCM • Đà Nẵng
+      - generic [ref=e19]:
+        - 'link "Hotline: 1800 6868 (Miễn phí)" [ref=e20] [cursor=pointer]':
+          - /url: tel:18006868
+        - link "Tra cứu bảo hành" [ref=e26] [cursor=pointer]:
+          - /url: /products
+    - generic [ref=e32]:
+      - link "AuraPhone Điện thoại chính hãng" [ref=e33] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e37]:
+          - generic [ref=e38]: AuraPhone
+          - generic [ref=e39]: Điện thoại chính hãng
+      - generic [ref=e40]:
+        - 'textbox "Bạn muốn tìm điện thoại gì? (vd: Tìm theo tên, hãng...)" [ref=e41]'
+        - button "Tìm kiếm" [ref=e45]
+      - generic [ref=e46]:
+        - link "Giỏ hàng" [ref=e47] [cursor=pointer]:
+          - /url: /cart
+        - link [ref=e54] [cursor=pointer]:
+          - /url: /login
+          - button "Đăng nhập" [ref=e55]
+        - button "Toggle menu" [ref=e60]
+  - main [ref=e62]:
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - link "AuraPhone" [ref=e66] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=e71]: Đăng nhập tài khoản để quản lý giỏ hàng
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - heading "Đăng Nhập" [level=3] [ref=e74]
+          - paragraph [ref=e75]: Nhập email và mật khẩu của bạn để tiếp tục
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - text: Email
+            - textbox "name@example.com" [ref=e83]
+          - generic [ref=e84]:
+            - text: Mật khẩu
+            - textbox "••••••••" [ref=e89]
+          - button "Đăng nhập" [ref=e90] [cursor=pointer]
+        - generic [ref=e95]:
+          - text: Chưa có tài khoản?
+          - link "Đăng ký ngay" [ref=e96] [cursor=pointer]:
+            - /url: /register
+  - contentinfo [ref=e97]:
+    - generic [ref=e100]:
+      - generic [ref=e106]:
+        - heading "Chính Hãng 100%" [level=4] [ref=e107]
+        - paragraph [ref=e108]: Bảo hành 12-24 tháng toàn diện từ nhà sản xuất
+      - generic [ref=e116]:
+        - heading "Giao Hàng Siêu Tốc 2H" [level=4] [ref=e117]
+        - paragraph [ref=e118]: Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
+      - generic [ref=e124]:
+        - heading "1 Đổi 1 Trong 30 Ngày" [level=4] [ref=e125]
+        - paragraph [ref=e126]: Đổi mới miễn phí ngay lập tức nếu có lỗi NSX
+    - generic [ref=e127]:
+      - generic [ref=e128]:
+        - generic [ref=e129]:
+          - link "AuraPhone" [ref=e130] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=e135]: Hệ thống bán lẻ điện thoại di động thông minh chính hãng Apple, Xiaomi, Samsung hàng đầu Việt Nam. Cam kết chất lượng và dịch vụ tận tâm.
+          - generic [ref=e136]:
+            - generic [ref=e137]: "Hà Nội: 123 Thái Hà, Đống Đa"
+            - generic [ref=e142]: "TP. HCM: 456 Nguyễn Thị Minh Khai, Q.3"
+        - generic [ref=e147]:
+          - heading "Sản phẩm & Thương hiệu" [level=4] [ref=e148]
+          - list [ref=e149]:
+            - listitem [ref=e150]:
+              - link "Tất cả điện thoại" [ref=e151] [cursor=pointer]:
+                - /url: /products
+            - listitem [ref=e152]:
+              - link "Apple iPhone" [ref=e153] [cursor=pointer]:
+                - /url: /products?category_id=10000000-0000-0000-0000-000000000001
+            - listitem [ref=e154]:
+              - link "Xiaomi Smartphone" [ref=e155] [cursor=pointer]:
+                - /url: /products?category_id=10000000-0000-0000-0000-000000000002
+            - listitem [ref=e156]:
+              - link "Hàng có sẵn giao ngay" [ref=e157] [cursor=pointer]:
+                - /url: /products?in_stock=true
+        - generic [ref=e158]:
+          - heading "Chính sách & Dịch vụ" [level=4] [ref=e159]
+          - list [ref=e160]:
+            - listitem [ref=e161]:
+              - link "Giỏ hàng của bạn" [ref=e162] [cursor=pointer]:
+                - /url: /cart
+            - listitem [ref=e163]:
+              - link "Đăng nhập tài khoản" [ref=e164] [cursor=pointer]:
+                - /url: /login
+            - listitem [ref=e165]:
+              - link "Đăng ký thành viên mới" [ref=e166] [cursor=pointer]:
+                - /url: /register
+            - listitem [ref=e167]: Chính sách bảo hành 1 đổi 1
+            - listitem [ref=e168]: Chính sách trả góp 0%
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - heading "Tổng đài hỗ trợ (Miễn phí)" [level=4] [ref=e171]
+            - paragraph [ref=e172]:
+              - generic [ref=e173]:
+                - text: "Tư vấn mua hàng:"
+                - link "1800 6868" [ref=e174] [cursor=pointer]:
+                  - /url: tel:18006868
+                - text: (8h00 - 21h30)
+              - generic [ref=e175]:
+                - text: "Hỗ trợ kỹ thuật:"
+                - link "1800 6869" [ref=e176] [cursor=pointer]:
+                  - /url: tel:18006869
+              - generic [ref=e177]:
+                - text: "Email:"
+                - strong [ref=e178]: support@auraphone.vn
+          - generic [ref=e179]:
+            - heading "Phương thức thanh toán" [level=5] [ref=e180]
+            - generic [ref=e181]:
+              - generic [ref=e182]: Visa / Master
+              - generic [ref=e183]: VNPay
+              - generic [ref=e184]: MoMo
+              - generic [ref=e185]: Trả góp 0%
+      - generic [ref=e186]:
+        - generic [ref=e187]: © 2026 AuraPhone Inc. Hệ thống bán lẻ Smartphone chính hãng. Mọi quyền được bảo lưu.
+        - generic [ref=e188]:
+          - generic [ref=e189]: Điều khoản sử dụng
+          - generic [ref=e190]: •
+          - generic [ref=e191]: Chính sách bảo mật
+          - generic [ref=e192]: •
+          - generic [ref=e193]: Quy chế hoạt động

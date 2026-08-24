@@ -60,7 +60,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil order use case")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, jwtMgr)
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, nil, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

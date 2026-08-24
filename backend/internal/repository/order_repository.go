@@ -265,6 +265,10 @@ func (r *OrderRepository) Create(ctx context.Context, userID string, addressID s
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -343,6 +347,10 @@ func (r *OrderRepository) GetByID(ctx context.Context, userID, orderID string) (
 	if orderRow.CancelledAt.Valid {
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
+	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
 	}
 
 	return order, nil
@@ -442,6 +450,10 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID string, bucket 
 		if row.CancelledAt.Valid {
 			t := row.CancelledAt.Time
 			orders[i].CancelledAt = &t
+		}
+		if row.DeliveredAt.Valid {
+			t := row.DeliveredAt.Time
+			orders[i].DeliveredAt = &t
 		}
 	}
 
@@ -606,6 +618,10 @@ func (r *OrderRepository) Cancel(ctx context.Context, userID, orderID string) (*
 		t := cancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -712,6 +728,10 @@ func (r *OrderRepository) UndoCancelRequest(ctx context.Context, userID, orderID
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -801,6 +821,10 @@ func (r *OrderRepository) ListByAdmin(ctx context.Context, statuses []string) ([
 			t := row.CancelledAt.Time
 			orders[i].CancelledAt = &t
 		}
+		if row.DeliveredAt.Valid {
+			t := row.DeliveredAt.Time
+			orders[i].DeliveredAt = &t
+		}
 	}
 
 	return orders, nil
@@ -876,6 +900,10 @@ func (r *OrderRepository) GetByAdminID(ctx context.Context, orderID string) (*do
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -927,6 +955,7 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 		cancelledAt = pgtype.Timestamptz{Time: now, Valid: true}
 	}
 	confirmedAt := orderRow.ConfirmedAt
+	deliveredAt := orderRow.DeliveredAt
 
 	if err := q.SetOrderStatus(ctx, sqlc.SetOrderStatusParams{
 		ID:          orderID,
@@ -935,6 +964,13 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 		CancelledAt: cancelledAt,
 	}); err != nil {
 		return nil, err
+	}
+
+	if to == domain.OrderStatusDelivered {
+		if err := q.SetOrderDeliveredAt(ctx, orderID); err != nil {
+			return nil, err
+		}
+		deliveredAt = pgtype.Timestamptz{Time: now, Valid: true}
 	}
 
 	itemRows, err := q.ListOrderItemsByOrderID(ctx, orderID)
@@ -996,6 +1032,10 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 	if cancelledAt.Valid {
 		t := cancelledAt.Time
 		order.CancelledAt = &t
+	}
+	if deliveredAt.Valid {
+		t := deliveredAt.Time
+		order.DeliveredAt = &t
 	}
 
 	return order, nil

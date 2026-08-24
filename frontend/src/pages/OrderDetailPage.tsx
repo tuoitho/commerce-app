@@ -22,6 +22,7 @@ import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
 import { ApiError, type Order, type OrderStatus } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
+import { ReturnRequestsSection } from '@/components/ReturnRequestsSection'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -510,7 +511,10 @@ export function OrderDetailPage() {
               </div>
             </div>
 
-            {/* 3. Payment Method */}
+            {/* 3. Return Requests (delivered / returned orders) */}
+            <ReturnRequestsSection order={order} />
+
+            {/* 4. Payment Method */}
             <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
@@ -658,6 +662,14 @@ export function OrderDetailPage() {
                     <span>Thời gian xác nhận:</span>
                     <span className="font-mono text-slate-700">
                       {formatDateTime(order.confirmedAt)}
+                    </span>
+                  </div>
+                )}
+                {order.deliveredAt && (
+                  <div className="flex justify-between pt-2">
+                    <span>Thời điểm nhận hàng:</span>
+                    <span className="font-mono text-slate-700">
+                      {formatDateTime(order.deliveredAt)}
                     </span>
                   </div>
                 )}

@@ -75,8 +75,8 @@ func TestConfig_Defaults(t *testing.T) {
 	if cfg.AdminBootstrapEmail != "" || cfg.AdminBootstrapPassword != "" {
 		t.Errorf("expected empty admin credentials, got email=%q password=%q", cfg.AdminBootstrapEmail, cfg.AdminBootstrapPassword)
 	}
-	if cfg.OrderConfirmTimeout != 30*time.Minute {
-		t.Errorf("expected OrderConfirmTimeout 30m, got %v", cfg.OrderConfirmTimeout)
+	if cfg.OrderConfirmTimeout != 1*time.Minute {
+		t.Errorf("expected OrderConfirmTimeout 1m, got %v", cfg.OrderConfirmTimeout)
 	}
 	if cfg.ShippingFeeVND != "0" {
 		t.Errorf("expected ShippingFeeVND '0', got %q", string(cfg.ShippingFeeVND))

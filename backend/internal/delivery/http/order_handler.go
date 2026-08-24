@@ -50,6 +50,7 @@ type orderResponse struct {
 	UpdatedAt        time.Time           `json:"updatedAt"`
 	ConfirmedAt      *time.Time          `json:"confirmedAt,omitempty"`
 	CancelledAt      *time.Time          `json:"cancelledAt,omitempty"`
+	DeliveredAt      *time.Time          `json:"deliveredAt,omitempty"`
 	CancellableUntil *time.Time          `json:"cancellableUntil,omitempty"`
 }
 
@@ -89,6 +90,7 @@ func toOrderResponse(order domain.Order) orderResponse {
 		UpdatedAt:        order.UpdatedAt,
 		ConfirmedAt:      order.ConfirmedAt,
 		CancelledAt:      order.CancelledAt,
+		DeliveredAt:      order.DeliveredAt,
 		CancellableUntil: order.CancellableUntil,
 	}
 }
