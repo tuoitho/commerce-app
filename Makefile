@@ -8,15 +8,15 @@ db-up:
 seed:
 	$(MAKE) -C backend seed
 
-## Start backend server for local development (backend on :8080).
+## Start backend server for local development (backend on :18080).
 backend:
 	$(MAKE) -C backend run
 
-## Start frontend server for local development (frontend on :5173).
+## Start frontend server for local development (frontend on :15173).
 frontend:
 	$(MAKE) -C frontend run
 
-## Start admin frontend server for local development (admin on :5174).
+## Start admin frontend server for local development (admin on :15174).
 frontend-admin:
 	$(MAKE) -C frontend-admin run
 

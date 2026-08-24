@@ -25,7 +25,7 @@ Run these from `backend/`:
 ## Runtime And Database
 
 - Both `make run` and `go run ./cmd/server` use the application-owned Viper loader. A local `.env` file is optional; process environment values take precedence.
-- Startup requires PostgreSQL plus `DB_URL` and `JWT_ACCESS_SECRET` (at least 32 characters). `HTTP_PORT` defaults to `8080`, `LOG_LEVEL` defaults to `info`, and durations use Go syntax such as `15m` or `24h`.
+- Startup requires PostgreSQL plus `DB_URL` and `JWT_ACCESS_SECRET` (at least 32 characters). `HTTP_PORT` defaults to `18080`, `LOG_LEVEL` defaults to `info`, and durations use Go syntax such as `15m` or `24h`.
 - Database tasks use external CLIs: `make db-up` / `make db-down` require `migrate` (`golang-migrate`); `make seed` requires `psql`. Run migrations before seeding.
 - Migrations are numbered up/down pairs in `db/migrations`; sqlc reads the entire migration directory as its schema source.
 - Whenever database schema, tables, columns, indexes, or constraints change:

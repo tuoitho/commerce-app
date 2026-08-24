@@ -47,7 +47,7 @@ Go clean-architecture API for the commerce monorepo. PostgreSQL · Gin · sqlc g
 make run
 ```
 
-The server listens on `HTTP_PORT` (default `8080`). Routes live under `/api/v1`:
+The server listens on `HTTP_PORT` (default `18080`). Routes live under `/api/v1`:
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`

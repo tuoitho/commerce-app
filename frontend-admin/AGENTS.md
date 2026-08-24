@@ -21,7 +21,7 @@ Preferred supporting libraries:
 
 Run these from `frontend-admin/`:
 * Install dependencies: `npm install` (or `npm ci`).
-* Start Vite dev server: `npm run dev` (configured on port 5174, proxies `/api` to `http://localhost:${HTTP_PORT:-8080}`).
+* Start Vite dev server: `npm run dev` (configured on port 15174, proxies `/api` to `http://localhost:${HTTP_PORT:-18080}`).
 * Run tests: `npm test` (`vitest run`).
 * Lint: `npm run lint` (`oxlint`).
 * Typecheck and production build: `npm run build` (`tsc -b && vite build`).

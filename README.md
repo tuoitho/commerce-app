@@ -26,11 +26,11 @@ frontend/  React + Vite + TypeScript SPA — auth pages, fetch API client
 
 2. **Backend** — from `backend/`: copy `.env.example` to `.env`, set `DB_URL`
    and `JWT_ACCESS_SECRET` (≥ 32 chars), then `make run`. Listens on
-   `HTTP_PORT` (default `8080`). Routes under `/api/v1`.
+   `HTTP_PORT` (default `18080`). Routes under `/api/v1`.
 
 3. **Frontend** — from `frontend/`: `npm install`, copy `.env.example` to
    `.env`, then `npm run dev`. Vite dev proxy forwards `/api` to the backend,
-   so no CORS in development. SPA on `http://localhost:5173`.
+   so no CORS in development. SPA on `http://localhost:15173`.
 
 ## Environment variables
 

@@ -30,7 +30,7 @@ type Config struct {
 
 const (
 	defaultAppEnv              = "development"
-	defaultHTTPPort            = 8080
+	defaultHTTPPort            = 18080
 	defaultAccessTokenTTL      = 15 * time.Minute
 	defaultRefreshTokenTTL     = 720 * time.Hour
 	defaultLogLevel            = "info"

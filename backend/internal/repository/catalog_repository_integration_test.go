@@ -284,7 +284,7 @@ func integrationDatabaseURL() string {
 	if value := os.Getenv("DB_URL"); value != "" {
 		return value
 	}
-	return "postgres://commerce:commerce@localhost:5432/commerce?sslmode=disable"
+	return "postgres://commerce:commerce@localhost:5432/commercesdd?sslmode=disable"
 }
 
 func createIntegrationCatalog(t *testing.T, ctx context.Context, tx pgx.Tx) {

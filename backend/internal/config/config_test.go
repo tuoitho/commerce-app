@@ -57,8 +57,8 @@ func TestConfig_Defaults(t *testing.T) {
 	if cfg.AppEnv != "development" {
 		t.Errorf("expected AppEnv 'development', got %q", cfg.AppEnv)
 	}
-	if cfg.HTTPPort != 8080 {
-		t.Errorf("expected HTTPPort 8080, got %d", cfg.HTTPPort)
+	if cfg.HTTPPort != 18080 {
+		t.Errorf("expected HTTPPort 18080, got %d", cfg.HTTPPort)
 	}
 	if cfg.AccessTokenTTL != 15*time.Minute {
 		t.Errorf("expected AccessTokenTTL 15m, got %v", cfg.AccessTokenTTL)

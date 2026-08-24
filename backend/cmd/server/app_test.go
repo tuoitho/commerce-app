@@ -13,7 +13,7 @@ import (
 func TestApp_ProvidersUnit(t *testing.T) {
 	cfg := &config.Config{
 		AppEnv:          "development",
-		HTTPPort:        8080,
+		HTTPPort:        18080,
 		DBURL:           "postgres://fake:5432/db",
 		JWTSecret:       "super-secret-key-that-is-at-least-32-chars-long",
 		AccessTokenTTL:  15 * time.Minute,
@@ -66,8 +66,8 @@ func TestApp_ProvidersUnit(t *testing.T) {
 	}
 
 	srv := provideHTTPServer(cfg, router)
-	if srv == nil || srv.Addr != ":8080" {
-		t.Fatalf("expected http server listening on :8080, got %v", srv)
+	if srv == nil || srv.Addr != ":18080" {
+		t.Fatalf("expected http server listening on :18080, got %v", srv)
 	}
 
 	app := provideApp(cfg, log, nil, srv, nil, orderUC)

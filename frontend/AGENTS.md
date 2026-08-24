@@ -509,7 +509,7 @@ Run these from `frontend/`:
 
 * Install exactly from the committed lockfile: `npm ci`.
 * Start Vite: `npm run dev`.
-* `/api` is proxied to `http://localhost:${HTTP_PORT:-8080}`.
+* `/api` is proxied to `http://localhost:${HTTP_PORT:-18080}`.
 * Run one test file: `npm test -- src/pages/CatalogPage.test.tsx`.
 * Run tests once: `npm test` (`vitest run`, jsdom, setup in `src/test/setup.ts`).
 * Tests are colocated as `*.test.ts` / `*.test.tsx`; no backend is required when fetch/API modules are mocked.
@@ -539,7 +539,7 @@ If a required verification step cannot be run, state which step was not complete
 * `VITE_API_BASE_URL` defaults in code to `/api/v1`; `.env.example` sets the same value.
 * API wrappers therefore receive paths such as `/products`, not `/api/v1/products`.
 * Vite's proxy target reads shell variable `HTTP_PORT`, not a Vite-prefixed variable.
-* Keep `HTTP_PORT` aligned with the backend port when it is not `8080`.
+* Keep `HTTP_PORT` aligned with the backend port when it is not `18080`.
 * This is a browser-routed SPA.
 * New pages must be registered in `App.tsx`.
 * Route tests should use `MemoryRouter` rather than requiring a running dev server.
