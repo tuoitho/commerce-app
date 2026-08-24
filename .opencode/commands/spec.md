@@ -1,5 +1,5 @@
 ---
-description: Create or continue a governed feature specification under .kiro/specs
+description: Create or continue a governed feature specification under .dream/specs
 ---
 
 Load the `spec-driven-development` skill and follow it exactly.

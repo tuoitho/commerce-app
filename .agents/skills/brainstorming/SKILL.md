@@ -19,7 +19,7 @@ design is sufficiently clear and the governing workflow's approvals are met.
 
 Complete these in order:
 
-1. Explore repository context and active `.kiro/specs/` features.
+1. Explore repository context and active `.dream/specs/` features.
 2. Decide whether the behavior is already sufficiently specified.
 3. Ask material clarifying questions one logical decision at a time.
 4. Present two or three viable approaches with trade-offs and a recommendation.
@@ -27,7 +27,7 @@ Complete these in order:
 6. Obtain approval for material decisions.
 7. Hand approved decisions back to the `spec-driven-development` workflow.
 
-For initial Kiro spec creation, do not run this checklist before the first
+For initial dream spec creation, do not run this checklist before the first
 requirements draft. `requirements-engineering` drafts from the rough idea
 first; use brainstorming only afterward when targeted clarification or design
 trade-offs remain.
@@ -37,7 +37,7 @@ trade-offs remain.
 Inspect only relevant context:
 
 - root and local repository instructions
-- active `.kiro/specs/` features and existing specifications
+- active `.dream/specs/` features and existing specifications
 - affected contracts, code, and tests
 - relevant architecture or steering documents
 
@@ -94,9 +94,9 @@ Return the clarified scope, observable behavior, alternatives, approved
 decisions, compatibility constraints, and unresolved non-material assumptions
 to `spec-driven-development`. That workflow records the durable result in:
 
-- `.kiro/specs/<feature>/requirements.md`
-- `.kiro/specs/<feature>/design.md`
-- `.kiro/specs/<feature>/tasks.md`
+- `.dream/specs/<feature>/requirements.md`
+- `.dream/specs/<feature>/design.md`
+- `.dream/specs/<feature>/tasks.md`
 
 ## Self-review
 

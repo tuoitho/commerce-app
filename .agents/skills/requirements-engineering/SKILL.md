@@ -1,11 +1,11 @@
 ---
 name: requirements-engineering
-description: Use when defining or revising testable feature requirements in .kiro/specs before technical design begins
+description: Use when defining or revising testable feature requirements in .dream/specs before technical design begins
 ---
 
 # Requirements Engineering
 
-Create `.kiro/specs/<feature>/requirements.md` from the user's rough idea. This
+Create `.dream/specs/<feature>/requirements.md` from the user's rough idea. This
 artifact defines externally observable behavior and contractual constraints,
 not implementation.
 

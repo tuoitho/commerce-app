@@ -1,12 +1,12 @@
 ---
 name: verifying-feature-implementation
-description: Use after all .kiro feature tasks are complete to verify implementation evidence against every requirement before finishing the branch
+description: Use after all .dream feature tasks are complete to verify implementation evidence against every requirement before finishing the branch
 ---
 
 # Verifying A Feature Implementation
 
 Verify the completed implementation against one approved
-`.kiro/specs/<feature>/` artifact set. This is a read-only verification gate;
+`.dream/specs/<feature>/` artifact set. This is a read-only verification gate;
 do not fix findings or edit artifacts.
 
 ## Inputs

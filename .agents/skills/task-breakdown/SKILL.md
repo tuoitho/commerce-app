@@ -1,11 +1,11 @@
 ---
 name: task-breakdown
-description: Use when approved .kiro requirements and design need dependency-ordered, independently verifiable implementation tasks
+description: Use when approved .dream requirements and design need dependency-ordered, independently verifiable implementation tasks
 ---
 
 # Task Breakdown
 
-Create `.kiro/specs/<feature>/tasks.md` from approved `requirements.md` and
+Create `.dream/specs/<feature>/tasks.md` from approved `requirements.md` and
 `design.md`.
 
 This file is the canonical implementation plan. It defines implementation

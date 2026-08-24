@@ -15,7 +15,7 @@ Write the test first. Watch it fail. Write minimal code to pass.
 
 ## Specification source
 
-When a `.kiro/specs/<feature>/` specification governs the work, derive test
+When a `.dream/specs/<feature>/` specification governs the work, derive test
 behavior and acceptance criteria from `requirements.md`, `design.md`, and the
 canonical task. Tests prove specified behavior; they do not silently redefine
 it.

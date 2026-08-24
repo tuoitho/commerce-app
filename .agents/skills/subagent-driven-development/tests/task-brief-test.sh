@@ -6,10 +6,10 @@ test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
 
 repo="$test_root/repo"
-mkdir -p "$repo/.kiro/specs/example"
+mkdir -p "$repo/.dream/specs/example"
 git -C "$repo" init -q
 
-plan="$repo/.kiro/specs/example/tasks.md"
+plan="$repo/.dream/specs/example/tasks.md"
 cat > "$plan" <<'EOF'
 - [ ] 1.1 Implement artifact paths
   - Produce a task brief and implementation report.
@@ -19,7 +19,7 @@ output=$(cd "$repo" && "$skill_dir/scripts/task-brief" "$plan" 1.1)
 brief_file=$(printf '%s\n' "$output" | sed -n 's/^BRIEF_FILE=//p')
 report_file=$(printf '%s\n' "$output" | sed -n 's/^REPORT_FILE=//p')
 
-expected_dir="$repo/.superpowers/sdd/example-tasks"
+expected_dir="$repo/.dream/sdd/example-tasks"
 if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null && command -v wslpath >/dev/null 2>&1; then
   expected_brief=$(wslpath -w "$expected_dir/task-1.1-brief.md")
   expected_report=$(wslpath -w "$expected_dir/task-1.1-report.md")

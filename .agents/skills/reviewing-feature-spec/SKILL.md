@@ -1,11 +1,11 @@
 ---
 name: reviewing-feature-spec
-description: Use for an independent read-only review of completed .kiro requirements, design, and tasks before implementation
+description: Use for an independent read-only review of completed .dream requirements, design, and tasks before implementation
 ---
 
 # Reviewing A Feature Specification
 
-Perform a read-only review of one `.kiro/specs/<feature>/` artifact set. Read
+Perform a read-only review of one `.dream/specs/<feature>/` artifact set. Read
 `requirements.md`, `design.md`, and `tasks.md` together.
 
 Independently apply bounded feature dependency discovery to the domain concepts,

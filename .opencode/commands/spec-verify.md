@@ -1,5 +1,5 @@
 ---
-description: Verify a completed .kiro feature against its approved specification
+description: Verify a completed .dream feature against its approved specification
 ---
 
 Load the `verifying-feature-implementation` skill and follow it exactly.

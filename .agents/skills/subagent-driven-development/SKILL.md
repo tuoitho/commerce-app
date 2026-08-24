@@ -18,7 +18,7 @@ specification.
 
 ## Specification-aware delegation
 
-When a `.kiro/specs/<feature>/` specification governs the work,
+When a `.dream/specs/<feature>/` specification governs the work,
 `requirements.md`, `design.md`, and `tasks.md` are the source of truth. Use
 `tasks.md` as `PLAN_FILE`
 
@@ -61,7 +61,7 @@ governing artifact before resuming delegation.
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.
 
-**Kiro plan execution:** Invoking execution for a plan under `.kiro/specs/`
+**dream plan execution:** Invoking execution for a plan under `.dream/specs/`
 authorizes continuous execution of all incomplete leaf tasks. For each task,
 dispatch a fresh implementer, complete the task review and bounded fix loop,
 update `tasks.md`, then continue automatically. Stop only when blocked by a
@@ -90,9 +90,9 @@ digraph when_to_use {
 - Review after each task (spec compliance + code quality), broad review at the end
 - Continuous progress without a human checkpoint between approved tasks
 
-## Kiro Full-Plan Process
+## dream Full-Plan Process
 
-For `.kiro/specs/<feature>/tasks.md`:
+For `.dream/specs/<feature>/tasks.md`:
 
 1. Read `requirements.md`, `design.md`, and `tasks.md`.
 2. Treat the user's execution request as confirmation that the three artifacts
@@ -114,7 +114,7 @@ For `.kiro/specs/<feature>/tasks.md`:
    `finishing-a-development-branch` only after an explicit user request to
    commit or integrate.
 
-## Batch Process For Non-Kiro Plans
+## Batch Process For Non-dream Plans
 
 ```dot
 digraph process {
@@ -208,7 +208,7 @@ a ledger file, not only in todos.
 
 - Each plan owns a workspace: at skill start, run this skill's
   ` scripts/sdd-workspace PLAN_FILE` — it prints the plan's git-ignored
-  directory (`<repo-root>/.superpowers/sdd/<parent>-<plan-basename>/`), home to
+  directory (`<repo-root>/.dream/sdd/<parent>-<plan-basename>/`), home to
   every artifact for THIS plan: ledger, briefs, reports, review packages.
   Another plan's directory is never yours to read or write.
 - Check for this plan's ledger at `<workspace>/progress.md`. If its first
@@ -216,7 +216,7 @@ a ledger file, not only in todos.
   — do not re-dispatch them; resume at the first task without one. A task
   whose last line is a fix round is mid-loop: resume the loop at the next
   round. A ledger whose first line names a different plan file — or a stray
-  ledger at the old flat path `.superpowers/sdd/progress.md` — is another
+  ledger at the old flat path `.dream/sdd/progress.md` — is another
   plan's progress: leave it in place and start your own, fresh.
 - Create the ledger with its identity as the first line:
   `# SDD ledger — plan: <plan file path>`.
@@ -227,10 +227,10 @@ a ledger file, not only in todos.
 
 Read `PLAN_FILE` once, then read its sibling `requirements.md` and `design.md`.
 Resolve the requested task and its granular requirement references. Create one
-todo for that task. The implementer may read all three context artifacts; Kiro
+todo for that task. The implementer may read all three context artifacts; dream
 tasks assume requirements and design remain available during implementation.
 
-For Kiro plans, the explicit execution request authorizes the approved and
+For dream plans, the explicit execution request authorizes the approved and
 independently reviewed artifact set. Do not repeat plan review unless files are
 missing, contradictory, or materially changed during implementation.
 
@@ -595,7 +595,7 @@ the user asks to commit/integrate, use `finishing-a-development-branch`.
 | "Reviews slow the loop down" | The loop without reviews is just unverified churn. Reviews are the loop's brakes and steering. |
 | "Ledger bookkeeping is overhead" | The ledger is what survives compaction. Controllers without one have re-dispatched entire completed task sequences. |
 
-## Batch Example For Non-Kiro Plans
+## Batch Example For Non-dream Plans
 
 ```
 You: I'm using Subagent-Driven Development to execute this plan.
@@ -611,7 +611,7 @@ Task 1: Hook installation script
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
-You: "User level (~/.config/superpowers/hooks/)"
+You: "User level (~/.config/dream/hooks/)"
 
 Implementer: [Later]
   - Implemented install-hook command

@@ -3,7 +3,7 @@
 # committed, staged, unstaged, and untracked changes.
 #
 # Usage: review-package PLAN_FILE BASE HEAD [OUTFILE]
-# Default OUTFILE: <repo-root>/.superpowers/sdd/<parent>-<plan-basename>/review-<base7>-worktree.diff
+# Default OUTFILE: <repo-root>/.dream/sdd/<parent>-<plan-basename>/review-<base7>-worktree.diff
 set -euo pipefail
 
 if [ $# -lt 3 ] || [ $# -gt 4 ]; then

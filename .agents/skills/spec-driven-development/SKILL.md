@@ -5,7 +5,7 @@ description: Use when creating or continuing a governed feature specification th
 
 # Spec-Driven Development
 
-Coordinate the governed planning workflow under `.kiro/specs/<feature>/`.
+Coordinate the governed planning workflow under `.dream/specs/<feature>/`.
 This workflow creates planning artifacts only and never edits implementation
 code.
 
@@ -15,9 +15,9 @@ Accept a kebab-case feature name or derive one from the user's description.
 Store exactly three canonical artifacts:
 
 ```text
-.kiro/specs/<feature>/requirements.md
-.kiro/specs/<feature>/design.md
-.kiro/specs/<feature>/tasks.md
+.dream/specs/<feature>/requirements.md
+.dream/specs/<feature>/design.md
+.dream/specs/<feature>/tasks.md
 ```
 
 If a feature directory already exists, read it and continue from the first

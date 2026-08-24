@@ -1,12 +1,12 @@
 ---
 name: design-documentation
-description: Use when approved .kiro feature requirements need a traceable technical design before task planning
+description: Use when approved .dream feature requirements need a traceable technical design before task planning
 ---
 
 # Design Documentation
 
-Transform approved `.kiro/specs/<feature>/requirements.md` into
-`.kiro/specs/<feature>/design.md`.
+Transform approved `.dream/specs/<feature>/requirements.md` into
+`.dream/specs/<feature>/design.md`.
 
 The design owns architecture, boundaries, shared contracts, and material
 technical decisions. It does not prescribe private implementation details that
