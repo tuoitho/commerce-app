@@ -12,6 +12,7 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 )
 
@@ -22,6 +23,7 @@ type Dependencies struct {
 	Area         *areauc.UseCase
 	Address      *addressuc.UseCase
 	Order        *orderuc.UseCase
+	Favorite     *favoriteuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -78,6 +80,15 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		cart.PATCH("/items/:itemId/selection", cartHandler.SetSelection)
 		cart.PUT("/selection", cartHandler.SetAllSelection)
 		cart.DELETE("/items/:itemId", cartHandler.RemoveItem)
+	}
+
+	favoriteHandler := newFavoriteHandler(deps.Favorite)
+	favorites := api.Group("/favorites")
+	favorites.Use(guard.AuthRequired)
+	{
+		favorites.GET("", favoriteHandler.List)
+		favorites.PUT("/:productId", favoriteHandler.Add)
+		favorites.DELETE("/:productId", favoriteHandler.Remove)
 	}
 
 	orderHandler := newOrderHandler(deps.Order)

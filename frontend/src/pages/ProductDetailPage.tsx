@@ -34,6 +34,7 @@ import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FavoriteToggleButton } from '@/components/FavoriteToggleButton'
 
 // Currency formatter
 function formatVND(value: string | number): string {
@@ -354,14 +355,20 @@ export function ProductDetailPage() {
               </span>
             </nav>
 
-            <button
-              onClick={handleShare}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:text-emerald-600 hover:border-emerald-300 transition shadow-2xs shrink-0"
-              title="Chia sẻ sản phẩm"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Chia sẻ</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <FavoriteToggleButton
+                productId={product.id}
+                productName={product.name}
+              />
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:text-emerald-600 hover:border-emerald-300 transition shadow-2xs shrink-0"
+                title="Chia sẻ sản phẩm"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Chia sẻ</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -635,6 +642,15 @@ export function ProductDetailPage() {
                 </Button>
               </div>
 
+              <div className="flex items-center gap-3 pt-1">
+                <FavoriteToggleButton
+                  productId={product.id}
+                  productName={product.name}
+                  showText
+                  className="flex-1 h-12 rounded-xl text-xs sm:text-sm font-bold border-slate-200 bg-white hover:bg-slate-50 shadow-2xs"
+                />
+              </div>
+
               <div className="flex items-center justify-between text-xs text-slate-500 pt-1 px-1">
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-emerald-600" />
@@ -778,17 +794,24 @@ export function ProductDetailPage() {
               {displayedPrice}
             </span>
           </div>
-          <Button
-            variant="primary"
-            size="default"
-            onClick={handleAddToCart}
-            isLoading={isAddingToCart}
-            disabled={!isAvailable || isAddingToCart}
-            className="px-5 h-11 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 gap-1.5"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            <span>Thêm giỏ hàng</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <FavoriteToggleButton
+              productId={product.id}
+              productName={product.name}
+              size="sm"
+            />
+            <Button
+              variant="primary"
+              size="default"
+              onClick={handleAddToCart}
+              isLoading={isAddingToCart}
+              disabled={!isAvailable || isAddingToCart}
+              className="px-5 h-11 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 gap-1.5"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              <span>Thêm giỏ hàng</span>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

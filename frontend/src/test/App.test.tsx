@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AppContent } from '@/App'
 import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
+import { FavoritesProvider } from '@/context/FavoritesContext'
 import { CartProvider } from '@/context/CartContext'
 
 // Mock API modules
@@ -14,6 +15,14 @@ vi.mock('@/api/auth', () => ({
     register: vi.fn(),
     logout: vi.fn(),
     getMe: vi.fn(),
+  },
+}))
+
+vi.mock('@/api/favorites', () => ({
+  favoritesApi: {
+    list: vi.fn().mockResolvedValue([]),
+    add: vi.fn().mockResolvedValue([]),
+    remove: vi.fn().mockResolvedValue([]),
   },
 }))
 
@@ -60,11 +69,13 @@ describe('App navigation', () => {
     render(
       <ToastProvider>
         <AuthProvider>
-          <CartProvider>
-            <MemoryRouter initialEntries={['/']}>
-              <AppContent />
-            </MemoryRouter>
-          </CartProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
         </AuthProvider>
       </ToastProvider>
     )
@@ -81,11 +92,13 @@ describe('App navigation', () => {
     render(
       <ToastProvider>
         <AuthProvider>
-          <CartProvider>
-            <MemoryRouter initialEntries={['/']}>
-              <AppContent />
-            </MemoryRouter>
-          </CartProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
         </AuthProvider>
       </ToastProvider>
     )
@@ -103,15 +116,52 @@ describe('App navigation', () => {
     render(
       <ToastProvider>
         <AuthProvider>
-          <CartProvider>
-            <MemoryRouter initialEntries={['/unknown-route']}>
-              <AppContent />
-            </MemoryRouter>
-          </CartProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/unknown-route']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
         </AuthProvider>
       </ToastProvider>
     )
 
     expect(screen.getByText('Trang không tồn tại')).toBeInTheDocument()
   })
+
+  it('renders favorites page at /favorites for authenticated user', async () => {
+    const { authApi } = await import('@/api/auth')
+    const { tokenStore } = await import('@/api/tokenStore')
+    tokenStore.setToken('token-123')
+    vi.mocked(authApi.getMe).mockResolvedValueOnce({
+      id: 'user-1',
+      email: 'test@example.com',
+    })
+
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/favorites']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    const { waitFor } = await import('@testing-library/react')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /sản phẩm yêu thích/i, level: 1 })
+      ).toBeInTheDocument()
+    })
+
+    tokenStore.clearToken()
+  })
 })
+
+

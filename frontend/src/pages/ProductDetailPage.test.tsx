@@ -5,6 +5,7 @@ import { ProductDetailPage } from './ProductDetailPage'
 import { catalogApi } from '@/api/catalog'
 import { ApiError } from '@/api/types'
 import { useAuth } from '@/context/AuthContext'
+import { useFavorites } from '@/context/FavoritesContext'
 import { useCart } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
 
@@ -16,6 +17,10 @@ vi.mock('@/api/catalog', () => ({
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/FavoritesContext', () => ({
+  useFavorites: vi.fn(),
 }))
 
 vi.mock('@/context/CartContext', () => ({
@@ -93,9 +98,12 @@ const mockMultiVariantProduct = {
 
 describe('ProductDetailPage', () => {
   const mockAddItem = vi.fn()
+  const mockToggleFavorite = vi.fn()
+  const mockIsPending = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsPending.mockReturnValue(false)
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 'user-1', email: 'test@example.com' },
       accessToken: 'token-123',
@@ -104,6 +112,17 @@ describe('ProductDetailPage', () => {
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
+    })
+    vi.mocked(useFavorites).mockReturnValue({
+      items: [],
+      favoriteIds: new Set<string>(),
+      isLoading: false,
+      loadError: null,
+      isPending: mockIsPending,
+      refresh: vi.fn(),
+      add: vi.fn(),
+      remove: vi.fn(),
+      toggle: mockToggleFavorite.mockResolvedValue(undefined),
     })
     vi.mocked(useCart).mockReturnValue({
       cart: null,
@@ -363,6 +382,72 @@ describe('ProductDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Trang đăng nhập')).toBeInTheDocument()
+    })
+  })
+
+  it('renders favorite toggle button with correct state on product detail page (Req 1.2, 4.1, 6.1)', async () => {
+    vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'iPhone 16 Pro' })).toBeInTheDocument()
+    })
+
+    const favButtons = screen.getAllByRole('button', { name: /Thêm iPhone 16 Pro vào yêu thích/i })
+    expect(favButtons.length).toBeGreaterThanOrEqual(1)
+    favButtons.forEach((btn) => {
+      expect(btn).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    fireEvent.click(favButtons[0])
+
+    await waitFor(() => {
+      expect(mockToggleFavorite).toHaveBeenCalledWith('p-multi')
+    })
+  })
+
+  it('redirects guest to login when clicking favorite button on product detail page (Req 1.4, 1.5)', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+    vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+            <Route path="/login" element={<div>Trang đăng nhập</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'iPhone 16 Pro' })).toBeInTheDocument()
+    })
+
+    const favButtons = screen.getAllByRole('button', { name: /Thêm iPhone 16 Pro vào yêu thích/i })
+    fireEvent.click(favButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getByText('Trang đăng nhập')).toBeInTheDocument()
+      expect(mockToggleFavorite).not.toHaveBeenCalled()
     })
   })
 })

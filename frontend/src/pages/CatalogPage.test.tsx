@@ -4,6 +4,21 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { CatalogPage } from './CatalogPage'
 import { catalogApi } from '@/api/catalog'
 import type { ProductSummary, ProductFilterParams } from '@/api/types'
+import { useAuth } from '@/context/AuthContext'
+import { useFavorites } from '@/context/FavoritesContext'
+import { useToast } from '@/context/ToastContext'
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/FavoritesContext', () => ({
+  useFavorites: vi.fn(),
+}))
+
+vi.mock('@/context/ToastContext', () => ({
+  useToast: vi.fn(),
+}))
 
 vi.mock('@/api/catalog', () => ({
   catalogApi: {
@@ -33,6 +48,32 @@ function createDummyProducts(count: number): ProductSummary[] {
 describe('CatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+    vi.mocked(useFavorites).mockReturnValue({
+      items: [],
+      favoriteIds: new Set<string>(),
+      isLoading: false,
+      loadError: null,
+      isPending: vi.fn().mockReturnValue(false),
+      refresh: vi.fn(),
+      add: vi.fn(),
+      remove: vi.fn(),
+      toggle: vi.fn(),
+    })
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    })
     vi.mocked(catalogApi.listCategories).mockResolvedValue([
       { id: 'cat-phone', name: 'Điện thoại' },
       { id: 'cat-computer', name: 'Máy tính' },

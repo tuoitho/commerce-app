@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
+import { FavoritesProvider } from '@/context/FavoritesContext'
 import { CartProvider } from '@/context/CartContext'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
@@ -11,6 +12,7 @@ import { CartPage } from '@/pages/CartPage'
 import { CheckoutPage } from '@/pages/CheckoutPage'
 import { OrderHistoryPage } from '@/pages/OrderHistoryPage'
 import { OrderDetailPage } from '@/pages/OrderDetailPage'
+import { FavoritesPage } from '@/pages/FavoritesPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -24,6 +26,7 @@ export function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/products" element={<CatalogPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
@@ -42,11 +45,13 @@ export function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <CartProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </CartProvider>
+        <FavoritesProvider>
+          <CartProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </CartProvider>
+        </FavoritesProvider>
       </AuthProvider>
     </ToastProvider>
   )

@@ -292,3 +292,7 @@ export interface CreateOrderInput {
   lines: OrderLineInput[]
 }
 
+// Favorites
+export type { FavoriteAvailability, FavoriteProduct } from '@/types/favorite'
+
+

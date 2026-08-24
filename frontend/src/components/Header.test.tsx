@@ -118,4 +118,83 @@ describe('Header Component', () => {
       expect(orderLinks.length).toBe(2) // 1 desktop + 1 mobile
     })
   })
+
+  it('does NOT render "Sản phẩm yêu thích" link when user is unauthenticated (Req 1.3)', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(screen.queryByText('Sản phẩm yêu thích')).not.toBeInTheDocument()
+  })
+
+  it('renders "Sản phẩm yêu thích" link when authenticated and links to /favorites without badge count (Req 1.3)', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const favoriteLinks = screen.getAllByRole('link', { name: /Sản phẩm yêu thích/i })
+    expect(favoriteLinks.length).toBeGreaterThanOrEqual(1)
+    expect(favoriteLinks[0]).toHaveAttribute('href', '/favorites')
+
+    // No badge count element within the favorites link
+    expect(favoriteLinks[0].querySelector('.rounded-full')).toBeNull()
+  })
+
+  it('renders "Sản phẩm yêu thích" in mobile drawer when authenticated (Req 1.3)', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    // Open mobile menu
+    const menuButton = screen.getByRole('button', { name: /toggle menu/i })
+    fireEvent.click(menuButton)
+
+    await waitFor(() => {
+      const favoriteLinks = screen.getAllByRole('link', { name: /Sản phẩm yêu thích/i })
+      expect(favoriteLinks.length).toBe(2) // 1 desktop + 1 mobile
+      expect(favoriteLinks[1]).toHaveAttribute('href', '/favorites')
+    })
+  })
 })

@@ -5,6 +5,7 @@ import type { ProductSummary } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { FavoriteToggleButton } from './FavoriteToggleButton'
 
 interface ProductCardProps {
   product: ProductSummary
@@ -91,44 +92,55 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
 
           {/* Studio Image Container with Light Sheen Sweep Effect */}
-          <Link
-            to={`/products/${product.id}`}
-            className="relative my-2.5 flex h-48 sm:h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100/70 p-4 transition-all duration-300 group-hover:border-emerald-200/80 group-hover:bg-gradient-to-b group-hover:from-emerald-50/30 group-hover:to-slate-50"
-          >
-            {/* Single-pass light sheen sweep on hover (Phát tia sáng quét qua khi hover) */}
-            <div
-              className="pointer-events-none absolute -inset-full top-0 block -skew-x-12 bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:translate-x-[260%]"
-              aria-hidden="true"
-            />
-
-            {!imageFailed && product.primaryImageUrl ? (
-              <img
-                src={product.primaryImageUrl}
-                alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
-                className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
-                onError={() => setImageFailed(true)}
-                loading="lazy"
+          <div className="relative my-2.5">
+            <Link
+              to={`/products/${product.id}`}
+              className="relative flex h-48 sm:h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100/70 p-4 transition-all duration-300 group-hover:border-emerald-200/80 group-hover:bg-gradient-to-b group-hover:from-emerald-50/30 group-hover:to-slate-50"
+            >
+              {/* Single-pass light sheen sweep on hover (Phát tia sáng quét qua khi hover) */}
+              <div
+                className="pointer-events-none absolute -inset-full top-0 block -skew-x-12 bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:translate-x-[260%]"
+                aria-hidden="true"
               />
-            ) : (
-              <img
-                src="/iphone-16-pro.jpg"
-                alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
-                className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
-                loading="lazy"
-              />
-            )}
 
-            {/* Color Preview Swatches (Overlay on Image Bottom) */}
-            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 backdrop-blur-xs border border-slate-200/80 shadow-xs">
-              {colors.map((c, i) => (
-                <span
-                  key={i}
-                  className="h-2 w-2 rounded-full border border-black/15 shadow-2xs"
-                  style={{ backgroundColor: c }}
+              {!imageFailed && product.primaryImageUrl ? (
+                <img
+                  src={product.primaryImageUrl}
+                  alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
+                  className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
+                  onError={() => setImageFailed(true)}
+                  loading="lazy"
                 />
-              ))}
+              ) : (
+                <img
+                  src="/iphone-16-pro.jpg"
+                  alt={`${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()}
+                  className="max-h-full max-w-full object-contain transition-transform duration-500 ease-out group-hover:scale-108 group-hover:-translate-y-1"
+                  loading="lazy"
+                />
+              )}
+
+              {/* Color Preview Swatches (Overlay on Image Bottom) */}
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 backdrop-blur-xs border border-slate-200/80 shadow-xs">
+                {colors.map((c, i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full border border-black/15 shadow-2xs"
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </Link>
+
+            {/* Favorite Toggle Button in top-right of image container */}
+            <div className="absolute top-2 right-2 z-20">
+              <FavoriteToggleButton
+                productId={product.id}
+                productName={product.name}
+                size="sm"
+              />
             </div>
-          </Link>
+          </div>
 
           {/* Product Title & Lineage */}
           <div className="pt-1.5">

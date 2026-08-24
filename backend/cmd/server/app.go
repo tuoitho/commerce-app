@@ -20,6 +20,7 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 )
 
@@ -110,6 +111,10 @@ func provideOrderRepository(pool *pgxpool.Pool) *repository.OrderRepository {
 	return repository.NewOrderRepository(pool)
 }
 
+func provideFavoriteRepository(pool *pgxpool.Pool) *repository.FavoriteRepository {
+	return repository.NewFavoriteRepository(pool)
+}
+
 func provideJWTManager(cfg *config.Config) *jwt.Manager {
 	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 }
@@ -156,7 +161,13 @@ func provideOrderUseCase(repo *repository.OrderRepository, cfg *config.Config) *
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.UseCase {
+	return favoriteuc.New(favoriteuc.Dependencies{
+		Favorite: repo,
+	})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -169,6 +180,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Area:         areaUC,
 		Address:      addressUC,
 		Order:        orderUC,
+		Favorite:     favoriteUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,
