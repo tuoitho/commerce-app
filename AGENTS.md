@@ -11,8 +11,8 @@
 
 ## Governed Changes
 
-- Local fixes and explicit behavior changes confined to one bounded context may proceed directly with focused tests. Any API/schema/event, compatibility, persistence/security boundary, cross-package, or materially ambiguous behavior change requires an approved Kiro specification first.
-- Canonical governed artifacts are `.kiro/specs/<feature>/requirements.md`, `design.md`, and `tasks.md`; approve each stage and independently review the complete set before implementation. `tasks.md` is the implementation plan.
+- Local fixes and explicit behavior changes confined to one bounded context may proceed directly with focused tests. Any API/schema/event, compatibility, persistence/security boundary, cross-package, or materially ambiguous behavior change requires an approved dream specification first.
+- Canonical governed artifacts are `.dream/specs/<feature>/requirements.md`, `design.md`, and `tasks.md`; approve each stage and independently review the complete set before implementation. `tasks.md` is the implementation plan.
 - If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. Verify completed governed work against requirement IDs and acceptance criteria.
 - Use the `question` tool for blocking product/architecture choices and approval gates that repository evidence cannot resolve.
 - Whenever database schema, tables, columns, constraints, or queries are modified:

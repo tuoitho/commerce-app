@@ -9,7 +9,9 @@ Every task completes through evidence, not self-assessment.
 
 ## Output
 
-Use `references/verification-report.template.md` as the canonical verification report format when writing `.kiro/specs/<feature>/evidence/task-verification.md`.
+Use `references/verification-report.template.md` as the canonical verification report format when writing `.dream/specs/<feature>/evidence/tasks/<TASK-ID>.md`.
+
+Each task writes its own verification file to preserve incremental evidence across workstreams without overwriting.
 
 ## Gate
 
@@ -19,7 +21,7 @@ Run the task's declared verification plus cheap relevant regression checks. Typi
 - consumer/provider contract tests;
 - compile/typecheck/lint/static analysis;
 - migration/schema validation;
-- focused state assertions.
+- focused database/state assertions.
 
 Record command/check, expected result, actual result, and contract revision where applicable.
 
@@ -30,6 +32,10 @@ verified_against:
   PRODUCT-DETAIL: 4
 checks:
   - name: PRODUCT-DETAIL-004
+    type: provider-contract
+    result: PASS
+  - name: viewer-like-state-unit
+    type: unit
     result: PASS
 ```
 

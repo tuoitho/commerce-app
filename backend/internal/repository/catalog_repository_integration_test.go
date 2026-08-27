@@ -47,7 +47,7 @@ func TestCatalogRepositorySQLIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(categories) != 2 || categories[0].Name != "Apple" || categories[1].Name != "Xiaomi" {
+	if len(categories) != 3 || categories[0].Name != "Apple" || categories[1].Name != "Legacy" || categories[2].Name != "Xiaomi" {
 		t.Fatalf("active categories = %+v", categories)
 	}
 

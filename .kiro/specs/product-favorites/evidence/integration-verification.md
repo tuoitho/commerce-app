@@ -17,7 +17,7 @@
 
 | Scenario/check | Expected | Actual | Result | Evidence |
 |---|---|---|---|---|
-| `FAVORITE-PERSISTENCE-010` (Schema & Integrity) | PostgreSQL schema assertions pass for primary key `(user_id, product_id)`, foreign key cascades, column constraints, and indexes | `persistence.assertions.sql` executed with 0 errors (`DO` succeeded) | PASS | `psql -f .kiro/specs/product-favorites/contracts/persistence.assertions.sql` |
+| `FAVORITE-PERSISTENCE-010` (Schema & Integrity) | PostgreSQL schema assertions pass for primary key `(user_id, product_id)`, foreign key cascades, column constraints, and indexes | `persistence.assertions.sql` executed with 0 errors (`DO` succeeded) | PASS | `psql -f .dream/specs/product-favorites/contracts/persistence.assertions.sql` |
 | `CATALOG-VIEWER-001` (Anonymous List) | Anonymous `GET /api/v1/products` returns `viewer.isFavorite: false` on every product item without favorite lookup | Status 200, 35 items retrieved, all items have `viewer.isFavorite: false` | PASS | Real HTTP request to running backend (`GET /api/v1/products`) |
 | `CATALOG-VIEWER-002` (Anonymous Detail) | Anonymous `GET /api/v1/products/:id` returns product detail with `viewer.isFavorite: false` | Status 200, `viewer: {"isFavorite": false}` | PASS | Real HTTP request to running backend (`GET /api/v1/products/10000000-0000-0001-0000-000000000002`) |
 | `FAVORITES-API-001` (Anonymous Auth Rejection) | Anonymous `GET /api/v1/favorites` returns 401 unauthorized with Vietnamese business message | Status 401, `error.code: "unauthorized"`, `error.message: "Vui lòng đăng nhập để sử dụng danh sách yêu thích"` | PASS | Real HTTP request without Authorization header |

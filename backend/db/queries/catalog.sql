@@ -1,15 +1,7 @@
 -- name: ListCategories :many
-SELECT c.id, c.name
-FROM categories c
-WHERE EXISTS (
-    SELECT 1
-    FROM products p
-    JOIN product_variants v ON v.product_id = p.id
-    WHERE p.category_id = c.id
-      AND p.active
-      AND v.active
-)
-ORDER BY c.name ASC, c.id ASC;
+SELECT id, name
+FROM categories
+ORDER BY name ASC, id ASC;
 
 -- name: ListAdminCategories :many
 SELECT id, name FROM categories ORDER BY name ASC, id ASC;

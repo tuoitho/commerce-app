@@ -5,7 +5,7 @@ description: Use when an approved design identifies APIs, events, UI-provider bo
 
 # Authoring Executable Contracts
 
-Create `.kiro/specs/<feature>/contracts/` from approved requirements and design.
+Create `.dream/specs/<feature>/contracts/` from approved requirements and design.
 
 ## Required Artifacts
 
@@ -16,7 +16,7 @@ Use:
 Create:
 
 ```text
-.kiro/specs/<feature>/contracts/
+.dream/specs/<feature>/contracts/
 ├── manifest.yaml
 ├── api.openapi.yaml        # when applicable (OpenAPI, protobuf, GraphQL, or typed schema)
 └── scenarios.yaml

@@ -72,16 +72,19 @@ export function Footer() {
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-3">Sản phẩm & Thương hiệu</h4>
             <ul className="space-y-2 text-xs font-medium">
               <li>
-                <Link to="/products" className="hover:text-emerald-600 transition">Tất cả điện thoại</Link>
+                <Link to="/products" className="hover:text-emerald-600 transition">Tất cả sản phẩm</Link>
               </li>
               <li>
-                <Link to="/products?category_id=10000000-0000-0000-0000-000000000001" className="hover:text-emerald-600 transition">Apple iPhone</Link>
+                <Link to="/products?category_id=10000000-0000-0000-0000-000000000001" className="hover:text-emerald-600 transition">Điện thoại</Link>
               </li>
               <li>
-                <Link to="/products?category_id=10000000-0000-0000-0000-000000000002" className="hover:text-emerald-600 transition">Xiaomi Smartphone</Link>
+                <Link to="/products?category_id=10000000-0000-0000-0000-000000000002" className="hover:text-emerald-600 transition">Máy tính & Laptop</Link>
               </li>
               <li>
-                <Link to="/products?in_stock=true" className="hover:text-emerald-600 transition">Hàng có sẵn giao ngay</Link>
+                <Link to="/products?category_id=10000000-0000-0000-0000-000000000004" className="hover:text-emerald-600 transition">Tai nghe</Link>
+              </li>
+              <li>
+                <Link to="/products?category_id=10000000-0000-0000-0000-000000000005" className="hover:text-emerald-600 transition">Đồng hồ thông minh</Link>
               </li>
             </ul>
           </div>

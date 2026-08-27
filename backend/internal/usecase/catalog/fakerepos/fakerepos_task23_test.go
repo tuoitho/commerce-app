@@ -40,7 +40,7 @@ func TestTask23_GetProductByIDReturnsPublicActiveVariantGraphCopy(t *testing.T) 
 	}
 }
 
-func TestTask23_ListCategoriesOnlyReturnsPublicCategories(t *testing.T) {
+func TestTask23_ListCategoriesReturnsAllCategories(t *testing.T) {
 	repo := NewCatalog()
 	repo.AddCategory(domain.Category{ID: "public", Name: "Public"})
 	repo.AddCategory(domain.Category{ID: "inactive", Name: "Inactive"})
@@ -53,8 +53,8 @@ func TestTask23_ListCategoriesOnlyReturnsPublicCategories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(categories) != 1 || categories[0].ID != "public" {
-		t.Fatalf("unexpected public categories: %+v", categories)
+	if len(categories) != 3 {
+		t.Fatalf("unexpected categories count: %+v", categories)
 	}
 }
 

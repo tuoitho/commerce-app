@@ -18,8 +18,8 @@ contracts:
     providers: [backend-commerce]
     consumers: [frontend-customer]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/api.openapi.yaml
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/api.openapi.yaml
+      - .dream/specs/product-favorites/contracts/scenarios.yaml
 
   - id: CATALOG-VIEWER
     revision: 1
@@ -33,8 +33,8 @@ contracts:
     providers: [backend-commerce]
     consumers: [frontend-customer]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/api.openapi.yaml
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/api.openapi.yaml
+      - .dream/specs/product-favorites/contracts/scenarios.yaml
 
   - id: FAVORITE-AUTH-REDIRECT
     revision: 1
@@ -47,8 +47,8 @@ contracts:
     providers: [frontend-customer]
     consumers: [frontend-customer]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/frontend.contract.ts
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/frontend.contract.ts
+      - .dream/specs/product-favorites/contracts/scenarios.yaml
 
   - id: FAVORITE-SESSION-STATE
     revision: 1
@@ -61,8 +61,8 @@ contracts:
     providers: [frontend-customer]
     consumers: [frontend-customer]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/frontend.contract.ts
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/frontend.contract.ts
+      - .dream/specs/product-favorites/contracts/scenarios.yaml
 
   - id: FAVORITE-UI
     revision: 1
@@ -75,8 +75,8 @@ contracts:
     providers: [frontend-customer]
     consumers: [customer-browser]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/frontend.contract.ts
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/frontend.contract.ts
+      - .dream/specs/product-favorites/contracts/scenarios.yaml
 
   - id: FAVORITE-PERSISTENCE
     revision: 1
@@ -89,5 +89,5 @@ contracts:
     providers: [backend-commerce]
     consumers: [backend-commerce]
     artifacts:
-      - .kiro/specs/product-favorites/contracts/persistence.assertions.sql
-      - .kiro/specs/product-favorites/contracts/scenarios.yaml
+      - .dream/specs/product-favorites/contracts/persistence.assertions.sql
+      - .dream/specs/product-favorites/contracts/scenarios.yaml

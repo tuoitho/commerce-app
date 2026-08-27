@@ -1,78 +1,71 @@
--- Deterministic phone catalog seed.
+-- Deterministic tech catalog seed.
 --
--- Idempotent: re-running this file updates the same rows and never creates
--- duplicates. Run it after all migrations with `make seed`.
+-- Idempotent: re-running this file updates the same rows and never creates duplicates.
+-- Run it after all migrations with `make seed`.
 
 BEGIN;
 
--- Keep the original catalog rows for rollback compatibility, but hide them
--- from the phone catalog.
-UPDATE products
-SET active = false
-WHERE id IN (
-    '00000000-0000-0001-0000-000000000001',
-    '00000000-0000-0001-0000-000000000002',
-    '00000000-0000-0001-0000-000000000003',
-    '00000000-0000-0001-0000-000000000004',
-    '00000000-0000-0001-0000-000000000005',
-    '00000000-0000-0001-0000-000000000006',
-    '00000000-0000-0001-0000-000000000007',
-    '00000000-0000-0001-0000-000000000008',
-    '00000000-0000-0001-0000-000000000009'
-);
+-- Remove legacy non-tech dummy products and categories
+DELETE FROM product_favorites WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM order_items WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM product_images WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM variant_option_values WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM product_variants WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM product_option_values WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM product_option_groups WHERE product_id IN (SELECT id FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%');
+DELETE FROM products WHERE category_id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004') OR id::text LIKE '00000000-%';
+DELETE FROM categories WHERE id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004');
 
--- Delete all child variant option values first to satisfy foreign keys
-DELETE FROM variant_option_values
-WHERE product_id IN (SELECT id FROM products WHERE id::text LIKE '10000000-%');
-
-DELETE FROM product_variants
-WHERE product_id IN (SELECT id FROM products WHERE id::text LIKE '10000000-%')
-  AND NOT EXISTS (
-      SELECT 1 FROM cart_items WHERE cart_items.variant_id = product_variants.id
-  );
-
-DELETE FROM product_option_values
-WHERE product_id IN (SELECT id FROM products WHERE id::text LIKE '10000000-%');
-
-DELETE FROM product_option_groups
-WHERE product_id IN (SELECT id FROM products WHERE id::text LIKE '10000000-%');
-
-DELETE FROM product_images
-WHERE id::text LIKE '10000000-0000-0002-%';
+-- Clean up old product images for tech catalog to refresh cleanly
+DELETE FROM product_images WHERE id::text LIKE '10000000-0000-0002-%';
 
 INSERT INTO categories (id, name) VALUES
-    ('00000000-0000-0000-0000-000000000001', 'Electronics'),
-    ('00000000-0000-0000-0000-000000000002', 'Books'),
-    ('00000000-0000-0000-0000-000000000003', 'Clothing'),
-    ('00000000-0000-0000-0000-000000000004', 'Home & Kitchen'),
     ('10000000-0000-0000-0000-000000000001', 'Điện thoại'),
     ('10000000-0000-0000-0000-000000000002', 'Máy tính'),
-    ('10000000-0000-0000-0000-000000000003', 'Đồ công nghệ khác')
+    ('10000000-0000-0000-0000-000000000003', 'Đồ công nghệ khác'),
+    ('10000000-0000-0000-0000-000000000004', 'Tai nghe'),
+    ('10000000-0000-0000-0000-000000000005', 'Đồng hồ thông minh')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
-INSERT INTO products
-    (id, category_id, name, model, brand, description, price, currency, stock_quantity, featured, active)
-VALUES
-    ('10000000-0000-0001-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'iPhone 16 Pro', 'A3294', 'Apple', 'Pro camera system and titanium design với chip A18 Pro mạnh mẽ.', 28990000, 'VND', 17, true, true),
-    ('10000000-0000-0001-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'iPhone 16e', 'A3409', 'Apple', 'A compact iPhone with all-day battery life và thiết kế hiện đại.', 16990000, 'VND', 8, false, true),
-    ('10000000-0000-0001-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Xiaomi 15', '24129PN74G', 'Xiaomi', 'Flagship performance with a Leica camera system và viền màn hình siêu mỏng.', 18990000, 'VND', 9, true, true),
+INSERT INTO products (id, category_id, name, model, brand, description, price, currency, stock_quantity, featured, active) VALUES
+    ('10000000-0000-0001-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'iPhone 16 Pro', 'A3294', 'Apple', 'Pro camera system and titanium design với chip A18 Pro mạnh mẽ.', 28990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'iPhone 16e', 'A3409', 'Apple', 'A compact iPhone with all-day battery life và thiết kế hiện đại.', 16990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Xiaomi 15', '24129PN74G', 'Xiaomi', 'Flagship performance with a Leica camera system và viền màn hình siêu mỏng.', 18990000, 'VND', 0, true, true),
     ('10000000-0000-0001-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'Redmi Note 14', '23117RA68G', 'Xiaomi', 'A practical everyday phone with a bright display và pin dung lượng lớn.', 4990000, 'VND', 0, false, true),
-    ('10000000-0000-0001-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'iPhone 16 Pro Max', 'A3297', 'Apple', 'Màn hình Super Retina XDR 6.9 inch, chip A18 Pro và nút Điều Khiển Camera mới.', 34990000, 'VND', 30, true, true),
-    ('10000000-0000-0001-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'iPhone 16', 'A3288', 'Apple', 'Chip A18 thông minh, camera Fusion 48MP và các màu sắc rực rỡ trẻ trung.', 22990000, 'VND', 24, true, true),
-    ('10000000-0000-0001-0000-000000000007', '10000000-0000-0000-0000-000000000001', 'iPhone 15 Pro Max', 'A3106', 'Apple', 'Thiết kế khung viền titan siêu nhẹ, chip A17 Pro cùng camera tele 5x ấn tượng.', 29490000, 'VND', 10, false, true),
-    ('10000000-0000-0001-0000-000000000008', '10000000-0000-0000-0000-000000000001', 'iPhone 15', 'A3090', 'Apple', 'Dynamic Island tiện ích, mặt kính pha màu bền bỉ và cổng sạc USB-C tiện dụng.', 18990000, 'VND', 13, false, true),
-    ('10000000-0000-0001-0000-000000000009', '10000000-0000-0000-0000-000000000001', 'iPhone 13', 'A2633', 'Apple', 'Smartphone quốc dân với màn hình Super Retina XDR OLED cùng chip A15 Bionic bền bỉ.', 13490000, 'VND', 26, false, true),
-    ('10000000-0000-0001-0000-000000000010', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy S25 Ultra', 'SM-S938B', 'Samsung', 'Flagship AI đỉnh cao trang bị Snapdragon 8 Elite, bút S Pen và camera 200MP đột phá.', 33990000, 'VND', 30, true, true),
-    ('10000000-0000-0001-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy S25', 'SM-S931B', 'Samsung', 'Thiết kế thanh lịch gọn gàng, vi xử lý thế hệ mới với bộ công cụ trợ lý Galaxy AI.', 21990000, 'VND', 15, true, true),
-    ('10000000-0000-0001-0000-000000000012', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy Z Fold6', 'SM-F956B', 'Samsung', 'Tuyệt tác màn hình gập cao cấp, hiệu năng đa nhiệm không giới hạn cùng Galaxy AI.', 41990000, 'VND', 9, true, true),
-    ('10000000-0000-0001-0000-000000000013', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy Z Flip6', 'SM-F741B', 'Samsung', 'Gập vỏ sò thời thượng, màn hình ngoài Flex Window 3.4 inch độc đáo và camera sắc nét.', 24990000, 'VND', 15, false, true),
-    ('10000000-0000-0001-0000-000000000014', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy A55 5G', 'SM-A556B', 'Samsung', 'Thiết kế khung kim loại sang trọng, camera chống rung OIS và bảo mật Knox Vault.', 9690000, 'VND', 36, false, true),
-    ('10000000-0000-0001-0000-000000000015', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy A15', 'SM-A155F', 'Samsung', 'Màn hình Super AMOLED 90Hz rực rỡ, pin 5000mAh và sạc nhanh 25W phân khúc phổ thông.', 4490000, 'VND', 43, false, true),
-    ('10000000-0000-0001-0000-000000000016', '10000000-0000-0000-0000-000000000001', 'Xiaomi 15 Ultra', '25010PN30G', 'Xiaomi', 'Siêu phẩm nhiếp ảnh di động Leica thế hệ mới với cảm biến 1 inch và ống kính tele 200MP.', 29990000, 'VND', 10, true, true),
-    ('10000000-0000-0001-0000-000000000017', '10000000-0000-0000-0000-000000000001', 'Xiaomi 14T Pro', '2407FPN8EG', 'Xiaomi', 'Chip MediaTek Dimensity 9300+, camera Leica chuyên nghiệp và sạc siêu tốc 120W.', 15990000, 'VND', 19, false, true),
-    ('10000000-0000-0001-0000-000000000018', '10000000-0000-0000-0000-000000000001', 'Redmi Note 14 Pro+', '24090RA29G', 'Xiaomi', 'Màn hình cong 1.5K AMOLED 120Hz, camera 200MP OIS siêu nét và pin 6200mAh.', 8990000, 'VND', 24, false, true),
-    ('10000000-0000-0001-0000-000000000019', '10000000-0000-0000-0000-000000000001', 'POCO X7 Pro', '24122RKC7G', 'Xiaomi', 'Quái thú hiệu năng tầm trung với chip Dimensity 8400-Ultra và tản nhiệt buồng hơi lớn.', 7890000, 'VND', 28, false, true),
-    ('10000000-0000-0001-0000-000000000020', '10000000-0000-0000-0000-000000000001', 'Redmi 14C', '2409BRN2CG', 'Xiaomi', 'Màn hình cực đại 6.88 inch 120Hz, thiết kế mặt lưng kính sang trọng với mức giá tốt nhất.', 3190000, 'VND', 52, false, true)
+    ('10000000-0000-0001-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'iPhone 16 Pro Max', 'A3297', 'Apple', 'Màn hình Super Retina XDR 6.9 inch, chip A18 Pro và nút Điều Khiển Camera mới.', 34990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'iPhone 16', 'A3288', 'Apple', 'Chip A18 thông minh, camera Fusion 48MP và các màu sắc rực rỡ trẻ trung.', 22990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000007', '10000000-0000-0000-0000-000000000001', 'iPhone 15 Pro Max', 'A3106', 'Apple', 'Thiết kế khung viền titan siêu nhẹ, chip A17 Pro cùng camera tele 5x ấn tượng.', 29490000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000008', '10000000-0000-0000-0000-000000000001', 'iPhone 15', 'A3090', 'Apple', 'Dynamic Island tiện ích, mặt kính pha màu bền bỉ và cổng sạc USB-C tiện dụng.', 18990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000009', '10000000-0000-0000-0000-000000000001', 'iPhone 13', 'A2633', 'Apple', 'Smartphone quốc dân với màn hình Super Retina XDR OLED cùng chip A15 Bionic bền bỉ.', 13490000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000010', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy S25 Ultra', 'SM-S938B', 'Samsung', 'Flagship AI đỉnh cao trang bị Snapdragon 8 Elite, bút S Pen và camera 200MP đột phá.', 33990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy S25', 'SM-S931B', 'Samsung', 'Thiết kế thanh lịch gọn gàng, vi xử lý thế hệ mới với bộ công cụ trợ lý Galaxy AI.', 21990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000012', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy Z Fold6', 'SM-F956B', 'Samsung', 'Tuyệt tác màn hình gập cao cấp, hiệu năng đa nhiệm không giới hạn cùng Galaxy AI.', 41990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000013', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy Z Flip6', 'SM-F741B', 'Samsung', 'Gập vỏ sò thời thượng, màn hình ngoài Flex Window 3.4 inch độc đáo và camera sắc nét.', 24990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000014', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy A55 5G', 'SM-A556B', 'Samsung', 'Thiết kế khung kim loại sang trọng, camera chống rung OIS và bảo mật Knox Vault.', 9690000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000015', '10000000-0000-0000-0000-000000000001', 'Samsung Galaxy A15', 'SM-A155F', 'Samsung', 'Màn hình Super AMOLED 90Hz rực rỡ, pin 5000mAh và sạc nhanh 25W phân khúc phổ thông.', 4490000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000016', '10000000-0000-0000-0000-000000000001', 'Xiaomi 15 Ultra', '25010PN30G', 'Xiaomi', 'Siêu phẩm nhiếp ảnh di động Leica thế hệ mới với cảm biến 1 inch và ống kính tele 200MP.', 29990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000017', '10000000-0000-0000-0000-000000000001', 'Xiaomi 14T Pro', '2407FPN8EG', 'Xiaomi', 'Chip MediaTek Dimensity 9300+, camera Leica chuyên nghiệp và sạc siêu tốc 120W.', 15990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000018', '10000000-0000-0000-0000-000000000001', 'Redmi Note 14 Pro+', '24090RA29G', 'Xiaomi', 'Màn hình cong 1.5K AMOLED 120Hz, camera 200MP OIS siêu nét và pin 6200mAh.', 8990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000019', '10000000-0000-0000-0000-000000000001', 'POCO X7 Pro', '24122RKC7G', 'Xiaomi', 'Quái thú hiệu năng tầm trung với chip Dimensity 8400-Ultra và tản nhiệt buồng hơi lớn.', 7890000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000020', '10000000-0000-0000-0000-000000000001', 'Redmi 14C', '2409BRN2CG', 'Xiaomi', 'Màn hình cực đại 6.88 inch 120Hz, thiết kế mặt lưng kính sang trọng với mức giá tốt nhất.', 3190000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000021', '10000000-0000-0000-0000-000000000002', 'MacBook Pro 14 M4', 'MRX33', 'Apple', 'Sức mạnh đột phá từ chip Apple M4 thế hệ mới, màn hình Liquid Retina XDR độ sáng 1600 nits đỉnh cao.', 39990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000022', '10000000-0000-0000-0000-000000000002', 'MacBook Air 13 M3', 'MRXN3', 'Apple', 'Siêu mỏng nhẹ ấn tượng chỉ 1.24kg, pin trâu đến 18 giờ và chip Apple M3 hỗ trợ đồ họa ray-tracing.', 27490000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000023', '10000000-0000-0000-0000-000000000002', 'ASUS ROG Zephyrus G16', 'GU605MY', 'ASUS', 'Laptop gaming đỉnh cao với màn hình ROG Nebula OLED 2.5K 240Hz, vi xử lý Intel Core Ultra 9 và đồ họa RTX 4080.', 54990000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000024', '10000000-0000-0000-0000-000000000002', 'Dell XPS 14 9440', 'XPS-9440', 'Dell', 'Thiết kế tương lai tuyệt mỹ bằng nhôm CNC nguyên khối, phím chức năng cảm ứng vô hình và màn hình OLED 3.2K.', 46990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000025', '10000000-0000-0000-0000-000000000002', 'Lenovo ThinkPad X1 Carbon Gen 12', '21KC000AVN', 'Lenovo', 'Biểu tượng laptop doanh nhân chuẩn độ bền quân đội, bàn phím ThinkPad trứ danh và chip Intel Core Ultra AI.', 42990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000026', '10000000-0000-0000-0000-000000000002', 'Xiaomi Book Pro 16', 'JYU4489CN', 'Xiaomi', 'Màn hình 4K OLED siêu nét đạt chuẩn màu chuyên nghiệp, viền siêu mỏng và tản nhiệt Hurricane hiệu quả.', 23990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000027', '10000000-0000-0000-0000-000000000004', 'AirPods Pro 2 USB-C', 'MTJV3', 'Apple', 'Chống ồn chủ động ANC gấp 2 lần, âm thanh thích ứng thông minh và hộp sạc MagSafe tiện lợi chuẩn USB-C.', 5690000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000028', '10000000-0000-0000-0000-000000000004', 'Sony WH-1000XM5', 'WH1000XM5', 'Sony', 'Tai nghe chụp tai chống ồn hàng đầu thế giới với bộ xử lý V1 kép, âm thanh Hi-Res Audio chuẩn LDAC đỉnh cao.', 7490000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000029', '10000000-0000-0000-0000-000000000004', 'Samsung Galaxy Buds3 Pro', 'SM-R630', 'Samsung', 'Thiết kế dạng thanh Blade thời thượng với đèn LED Blade Lights, âm thanh 24-bit Hi-Fi và chống ồn thích ứng Galaxy AI.', 4990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000030', '10000000-0000-0000-0000-000000000004', 'Xiaomi Buds 5', 'M2341E1', 'Xiaomi', 'Âm thanh vòm không gian Qualcomm aptX Lossless, chống ồn chủ động và thời lượng pin ấn tượng lên tới 39 giờ.', 1990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000031', '10000000-0000-0000-0000-000000000005', 'Apple Watch Ultra 2', 'MX4H3', 'Apple', 'Đồng hồ thể thao chuyên nghiệp vỏ titan chuẩn quân đội, GPS băng tần kép độ chính xác cực đại và pin đến 72h.', 21490000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000032', '10000000-0000-0000-0000-000000000005', 'Apple Watch Series 10', 'MWW63', 'Apple', 'Màn hình OLED góc nhìn rộng lớn nhất từ trước đến nay, thiết kế siêu mỏng 9.7mm và tính năng theo dõi sức khỏe toàn diện.', 10790000, 'VND', 0, true, true),
+    ('10000000-0000-0001-0000-000000000033', '10000000-0000-0000-0000-000000000005', 'Samsung Galaxy Watch Ultra', 'SM-L705F', 'Samsung', 'Khung viền titan đệm bền bỉ chịu nhiệt độ khắc nghiệt, hỗ trợ theo dõi sức khỏe chuyên sâu Galaxy AI và nút Quick Button.', 15990000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000034', '10000000-0000-0000-0000-000000000005', 'Xiaomi Watch 2 Pro', 'M2234W1', 'Xiaomi', 'Nền tảng Wear OS by Google mượt mà, chip Snapdragon W5+ Gen 1 mạnh mẽ và hỗ trợ eSIM độc lập nghe gọi.', 5490000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000035', '10000000-0000-0000-0000-000000000003', 'Củ sạc nhanh Apple 35W Dual USB-C', 'MNWM3', 'Apple', 'Bộ sạc tường nhỏ gọn với 2 cổng USB-C tiện lợi sạc cùng lúc iPhone, iPad, MacBook Air hoặc Apple Watch.', 1490000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000036', '10000000-0000-0000-0000-000000000003', 'Bàn phím cơ Logitech MX Mechanical', '920-010760', 'Logitech', 'Bàn phím cơ cao cấp switch Low Profile gõ êm ái, đèn nền thông minh tự động sáng khi đưa tay lại gần và kết nối 3 thiết bị.', 3590000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000037', '10000000-0000-0000-0000-000000000003', 'Chuột không dây Logitech MX Master 3S', '910-006561', 'Logitech', 'Chuột công thái học hàng đầu với cảm biến 8000 DPI Darkfield lướt trên mọi bề mặt, con lăn điện từ MagSpeed siêu nhanh.', 2290000, 'VND', 0, false, true),
+    ('10000000-0000-0001-0000-000000000038', '10000000-0000-0000-0000-000000000003', 'Pin sạc dự phòng Anker Prime 20000mAh 200W', 'A1336', 'Anker', 'Pin dự phòng công suất siêu khủng 200W tổng đầu ra, màn hình kỹ thuật số hiển thị công suất thời gian thực và dung lượng 20000mAh.', 2890000, 'VND', 0, false, true)
 ON CONFLICT (id) DO UPDATE SET
     category_id = EXCLUDED.category_id,
     name = EXCLUDED.name,
@@ -81,31 +74,98 @@ ON CONFLICT (id) DO UPDATE SET
     description = EXCLUDED.description,
     price = EXCLUDED.price,
     currency = EXCLUDED.currency,
-    stock_quantity = EXCLUDED.stock_quantity,
     featured = EXCLUDED.featured,
     active = EXCLUDED.active;
 
 INSERT INTO product_images (id, product_id, url, position) VALUES
     ('10000000-0000-0002-0000-000000000001', '10000000-0000-0001-0000-000000000001', 'https://picsum.photos/seed/iphone-16-pro/600/600', 0),
-    ('10000000-0000-0002-0000-000000000002', '10000000-0000-0001-0000-000000000002', 'https://picsum.photos/seed/iphone-16e/600/600', 0),
-    ('10000000-0000-0002-0000-000000000003', '10000000-0000-0001-0000-000000000003', 'https://picsum.photos/seed/xiaomi-15/600/600', 0),
-    ('10000000-0000-0002-0000-000000000004', '10000000-0000-0001-0000-000000000004', 'https://picsum.photos/seed/redmi-note-14/600/600', 0),
-    ('10000000-0000-0002-0000-000000000005', '10000000-0000-0001-0000-000000000005', 'https://picsum.photos/seed/iphone-16-pro-max/600/600', 0),
-    ('10000000-0000-0002-0000-000000000006', '10000000-0000-0001-0000-000000000006', 'https://picsum.photos/seed/iphone-16/600/600', 0),
-    ('10000000-0000-0002-0000-000000000007', '10000000-0000-0001-0000-000000000007', 'https://picsum.photos/seed/iphone-15-pro-max/600/600', 0),
-    ('10000000-0000-0002-0000-000000000008', '10000000-0000-0001-0000-000000000008', 'https://picsum.photos/seed/iphone-15/600/600', 0),
-    ('10000000-0000-0002-0000-000000000009', '10000000-0000-0001-0000-000000000009', 'https://picsum.photos/seed/iphone-13/600/600', 0),
-    ('10000000-0000-0002-0000-000000000010', '10000000-0000-0001-0000-000000000010', 'https://picsum.photos/seed/galaxy-s25-ultra/600/600', 0),
-    ('10000000-0000-0002-0000-000000000011', '10000000-0000-0001-0000-000000000011', 'https://picsum.photos/seed/galaxy-s25/600/600', 0),
-    ('10000000-0000-0002-0000-000000000012', '10000000-0000-0001-0000-000000000012', 'https://picsum.photos/seed/galaxy-z-fold6/600/600', 0),
-    ('10000000-0000-0002-0000-000000000013', '10000000-0000-0001-0000-000000000013', 'https://picsum.photos/seed/galaxy-z-flip6/600/600', 0),
-    ('10000000-0000-0002-0000-000000000014', '10000000-0000-0001-0000-000000000014', 'https://picsum.photos/seed/galaxy-a55/600/600', 0),
-    ('10000000-0000-0002-0000-000000000015', '10000000-0000-0001-0000-000000000015', 'https://picsum.photos/seed/galaxy-a15/600/600', 0),
-    ('10000000-0000-0002-0000-000000000016', '10000000-0000-0001-0000-000000000016', 'https://picsum.photos/seed/xiaomi-15-ultra/600/600', 0),
-    ('10000000-0000-0002-0000-000000000017', '10000000-0000-0001-0000-000000000017', 'https://picsum.photos/seed/xiaomi-14t-pro/600/600', 0),
-    ('10000000-0000-0002-0000-000000000018', '10000000-0000-0001-0000-000000000018', 'https://picsum.photos/seed/redmi-note-14-pro-plus/600/600', 0),
-    ('10000000-0000-0002-0000-000000000019', '10000000-0000-0001-0000-000000000019', 'https://picsum.photos/seed/poco-x7-pro/600/600', 0),
-    ('10000000-0000-0002-0000-000000000020', '10000000-0000-0001-0000-000000000020', 'https://picsum.photos/seed/redmi-14c/600/600', 0)
+    ('10000000-0000-0002-0000-000000000002', '10000000-0000-0001-0000-000000000001', 'https://picsum.photos/seed/iphone-16-pro-back/600/600', 1),
+    ('10000000-0000-0002-0000-000000000003', '10000000-0000-0001-0000-000000000001', 'https://picsum.photos/seed/iphone-16-pro-camera/600/600', 2),
+    ('10000000-0000-0002-0000-000000000004', '10000000-0000-0001-0000-000000000002', 'https://picsum.photos/seed/iphone-16e/600/600', 0),
+    ('10000000-0000-0002-0000-000000000005', '10000000-0000-0001-0000-000000000002', 'https://picsum.photos/seed/iphone-16e-angle/600/600', 1),
+    ('10000000-0000-0002-0000-000000000006', '10000000-0000-0001-0000-000000000003', 'https://picsum.photos/seed/xiaomi-15/600/600', 0),
+    ('10000000-0000-0002-0000-000000000007', '10000000-0000-0001-0000-000000000003', 'https://picsum.photos/seed/xiaomi-15-leica/600/600', 1),
+    ('10000000-0000-0002-0000-000000000008', '10000000-0000-0001-0000-000000000003', 'https://picsum.photos/seed/xiaomi-15-back/600/600', 2),
+    ('10000000-0000-0002-0000-000000000009', '10000000-0000-0001-0000-000000000004', 'https://picsum.photos/seed/redmi-note-14/600/600', 0),
+    ('10000000-0000-0002-0000-000000000010', '10000000-0000-0001-0000-000000000004', 'https://picsum.photos/seed/redmi-note-14-back/600/600', 1),
+    ('10000000-0000-0002-0000-000000000011', '10000000-0000-0001-0000-000000000005', 'https://picsum.photos/seed/iphone-16-pro-max/600/600', 0),
+    ('10000000-0000-0002-0000-000000000012', '10000000-0000-0001-0000-000000000005', 'https://picsum.photos/seed/iphone-16-pro-max-side/600/600', 1),
+    ('10000000-0000-0002-0000-000000000013', '10000000-0000-0001-0000-000000000005', 'https://picsum.photos/seed/iphone-16-pro-max-box/600/600', 2),
+    ('10000000-0000-0002-0000-000000000014', '10000000-0000-0001-0000-000000000006', 'https://picsum.photos/seed/iphone-16/600/600', 0),
+    ('10000000-0000-0002-0000-000000000015', '10000000-0000-0001-0000-000000000006', 'https://picsum.photos/seed/iphone-16-back/600/600', 1),
+    ('10000000-0000-0002-0000-000000000016', '10000000-0000-0001-0000-000000000007', 'https://picsum.photos/seed/iphone-15-pro-max/600/600', 0),
+    ('10000000-0000-0002-0000-000000000017', '10000000-0000-0001-0000-000000000007', 'https://picsum.photos/seed/iphone-15-pro-max-camera/600/600', 1),
+    ('10000000-0000-0002-0000-000000000018', '10000000-0000-0001-0000-000000000008', 'https://picsum.photos/seed/iphone-15/600/600', 0),
+    ('10000000-0000-0002-0000-000000000019', '10000000-0000-0001-0000-000000000008', 'https://picsum.photos/seed/iphone-15-front/600/600', 1),
+    ('10000000-0000-0002-0000-000000000020', '10000000-0000-0001-0000-000000000009', 'https://picsum.photos/seed/iphone-13/600/600', 0),
+    ('10000000-0000-0002-0000-000000000021', '10000000-0000-0001-0000-000000000009', 'https://picsum.photos/seed/iphone-13-white/600/600', 1),
+    ('10000000-0000-0002-0000-000000000022', '10000000-0000-0001-0000-000000000010', 'https://picsum.photos/seed/galaxy-s25-ultra/600/600', 0),
+    ('10000000-0000-0002-0000-000000000023', '10000000-0000-0001-0000-000000000010', 'https://picsum.photos/seed/galaxy-s25-ultra-spen/600/600', 1),
+    ('10000000-0000-0002-0000-000000000024', '10000000-0000-0001-0000-000000000010', 'https://picsum.photos/seed/galaxy-s25-ultra-back/600/600', 2),
+    ('10000000-0000-0002-0000-000000000025', '10000000-0000-0001-0000-000000000011', 'https://picsum.photos/seed/galaxy-s25/600/600', 0),
+    ('10000000-0000-0002-0000-000000000026', '10000000-0000-0001-0000-000000000011', 'https://picsum.photos/seed/galaxy-s25-side/600/600', 1),
+    ('10000000-0000-0002-0000-000000000027', '10000000-0000-0001-0000-000000000012', 'https://picsum.photos/seed/galaxy-z-fold6/600/600', 0),
+    ('10000000-0000-0002-0000-000000000028', '10000000-0000-0001-0000-000000000012', 'https://picsum.photos/seed/galaxy-z-fold6-open/600/600', 1),
+    ('10000000-0000-0002-0000-000000000029', '10000000-0000-0001-0000-000000000012', 'https://picsum.photos/seed/galaxy-z-fold6-hinge/600/600', 2),
+    ('10000000-0000-0002-0000-000000000030', '10000000-0000-0001-0000-000000000013', 'https://picsum.photos/seed/galaxy-z-flip6/600/600', 0),
+    ('10000000-0000-0002-0000-000000000031', '10000000-0000-0001-0000-000000000013', 'https://picsum.photos/seed/galaxy-z-flip6-flex/600/600', 1),
+    ('10000000-0000-0002-0000-000000000032', '10000000-0000-0001-0000-000000000014', 'https://picsum.photos/seed/galaxy-a55/600/600', 0),
+    ('10000000-0000-0002-0000-000000000033', '10000000-0000-0001-0000-000000000014', 'https://picsum.photos/seed/galaxy-a55-back/600/600', 1),
+    ('10000000-0000-0002-0000-000000000034', '10000000-0000-0001-0000-000000000015', 'https://picsum.photos/seed/galaxy-a15/600/600', 0),
+    ('10000000-0000-0002-0000-000000000035', '10000000-0000-0001-0000-000000000015', 'https://picsum.photos/seed/galaxy-a15-screen/600/600', 1),
+    ('10000000-0000-0002-0000-000000000036', '10000000-0000-0001-0000-000000000016', 'https://picsum.photos/seed/xiaomi-15-ultra/600/600', 0),
+    ('10000000-0000-0002-0000-000000000037', '10000000-0000-0001-0000-000000000016', 'https://picsum.photos/seed/xiaomi-15-ultra-leica/600/600', 1),
+    ('10000000-0000-0002-0000-000000000038', '10000000-0000-0001-0000-000000000016', 'https://picsum.photos/seed/xiaomi-15-ultra-back/600/600', 2),
+    ('10000000-0000-0002-0000-000000000039', '10000000-0000-0001-0000-000000000017', 'https://picsum.photos/seed/xiaomi-14t-pro/600/600', 0),
+    ('10000000-0000-0002-0000-000000000040', '10000000-0000-0001-0000-000000000017', 'https://picsum.photos/seed/xiaomi-14t-pro-grey/600/600', 1),
+    ('10000000-0000-0002-0000-000000000041', '10000000-0000-0001-0000-000000000018', 'https://picsum.photos/seed/redmi-note-14-pro-plus/600/600', 0),
+    ('10000000-0000-0002-0000-000000000042', '10000000-0000-0001-0000-000000000018', 'https://picsum.photos/seed/redmi-note-14-pro-plus-curved/600/600', 1),
+    ('10000000-0000-0002-0000-000000000043', '10000000-0000-0001-0000-000000000019', 'https://picsum.photos/seed/poco-x7-pro/600/600', 0),
+    ('10000000-0000-0002-0000-000000000044', '10000000-0000-0001-0000-000000000019', 'https://picsum.photos/seed/poco-x7-pro-yellow/600/600', 1),
+    ('10000000-0000-0002-0000-000000000045', '10000000-0000-0001-0000-000000000020', 'https://picsum.photos/seed/redmi-14c/600/600', 0),
+    ('10000000-0000-0002-0000-000000000046', '10000000-0000-0001-0000-000000000020', 'https://picsum.photos/seed/redmi-14c-blue/600/600', 1),
+    ('10000000-0000-0002-0000-000000000047', '10000000-0000-0001-0000-000000000021', 'https://picsum.photos/seed/macbook-pro-14-m4/600/600', 0),
+    ('10000000-0000-0002-0000-000000000048', '10000000-0000-0001-0000-000000000021', 'https://picsum.photos/seed/macbook-pro-14-m4-keyboard/600/600', 1),
+    ('10000000-0000-0002-0000-000000000049', '10000000-0000-0001-0000-000000000021', 'https://picsum.photos/seed/macbook-pro-14-m4-screen/600/600', 2),
+    ('10000000-0000-0002-0000-000000000050', '10000000-0000-0001-0000-000000000022', 'https://picsum.photos/seed/macbook-air-13-m3/600/600', 0),
+    ('10000000-0000-0002-0000-000000000051', '10000000-0000-0001-0000-000000000022', 'https://picsum.photos/seed/macbook-air-13-m3-side/600/600', 1),
+    ('10000000-0000-0002-0000-000000000052', '10000000-0000-0001-0000-000000000022', 'https://picsum.photos/seed/macbook-air-13-m3-closed/600/600', 2),
+    ('10000000-0000-0002-0000-000000000053', '10000000-0000-0001-0000-000000000023', 'https://picsum.photos/seed/asus-zephyrus-g16/600/600', 0),
+    ('10000000-0000-0002-0000-000000000054', '10000000-0000-0001-0000-000000000023', 'https://picsum.photos/seed/asus-zephyrus-g16-gaming/600/600', 1),
+    ('10000000-0000-0002-0000-000000000055', '10000000-0000-0001-0000-000000000023', 'https://picsum.photos/seed/asus-zephyrus-g16-keyboard/600/600', 2),
+    ('10000000-0000-0002-0000-000000000056', '10000000-0000-0001-0000-000000000024', 'https://picsum.photos/seed/dell-xps-14/600/600', 0),
+    ('10000000-0000-0002-0000-000000000057', '10000000-0000-0001-0000-000000000024', 'https://picsum.photos/seed/dell-xps-14-touch/600/600', 1),
+    ('10000000-0000-0002-0000-000000000058', '10000000-0000-0001-0000-000000000025', 'https://picsum.photos/seed/thinkpad-x1-carbon-gen12/600/600', 0),
+    ('10000000-0000-0002-0000-000000000059', '10000000-0000-0001-0000-000000000025', 'https://picsum.photos/seed/thinkpad-x1-carbon-trackpoint/600/600', 1),
+    ('10000000-0000-0002-0000-000000000060', '10000000-0000-0001-0000-000000000026', 'https://picsum.photos/seed/xiaomi-book-pro-16/600/600', 0),
+    ('10000000-0000-0002-0000-000000000061', '10000000-0000-0001-0000-000000000026', 'https://picsum.photos/seed/xiaomi-book-pro-oled/600/600', 1),
+    ('10000000-0000-0002-0000-000000000062', '10000000-0000-0001-0000-000000000027', 'https://picsum.photos/seed/airpods-pro-2/600/600', 0),
+    ('10000000-0000-0002-0000-000000000063', '10000000-0000-0001-0000-000000000027', 'https://picsum.photos/seed/airpods-pro-2-case/600/600', 1),
+    ('10000000-0000-0002-0000-000000000064', '10000000-0000-0001-0000-000000000027', 'https://picsum.photos/seed/airpods-pro-2-in-ear/600/600', 2),
+    ('10000000-0000-0002-0000-000000000065', '10000000-0000-0001-0000-000000000028', 'https://picsum.photos/seed/sony-wh1000xm5/600/600', 0),
+    ('10000000-0000-0002-0000-000000000066', '10000000-0000-0001-0000-000000000028', 'https://picsum.photos/seed/sony-wh1000xm5-case/600/600', 1),
+    ('10000000-0000-0002-0000-000000000067', '10000000-0000-0001-0000-000000000028', 'https://picsum.photos/seed/sony-wh1000xm5-fold/600/600', 2),
+    ('10000000-0000-0002-0000-000000000068', '10000000-0000-0001-0000-000000000029', 'https://picsum.photos/seed/galaxy-buds3-pro/600/600', 0),
+    ('10000000-0000-0002-0000-000000000069', '10000000-0000-0001-0000-000000000029', 'https://picsum.photos/seed/galaxy-buds3-pro-case/600/600', 1),
+    ('10000000-0000-0002-0000-000000000070', '10000000-0000-0001-0000-000000000030', 'https://picsum.photos/seed/xiaomi-buds-5/600/600', 0),
+    ('10000000-0000-0002-0000-000000000071', '10000000-0000-0001-0000-000000000030', 'https://picsum.photos/seed/xiaomi-buds-5-case/600/600', 1),
+    ('10000000-0000-0002-0000-000000000072', '10000000-0000-0001-0000-000000000031', 'https://picsum.photos/seed/apple-watch-ultra-2/600/600', 0),
+    ('10000000-0000-0002-0000-000000000073', '10000000-0000-0001-0000-000000000031', 'https://picsum.photos/seed/apple-watch-ultra-2-action/600/600', 1),
+    ('10000000-0000-0002-0000-000000000074', '10000000-0000-0001-0000-000000000031', 'https://picsum.photos/seed/apple-watch-ultra-2-strap/600/600', 2),
+    ('10000000-0000-0002-0000-000000000075', '10000000-0000-0001-0000-000000000032', 'https://picsum.photos/seed/apple-watch-series-10/600/600', 0),
+    ('10000000-0000-0002-0000-000000000076', '10000000-0000-0001-0000-000000000032', 'https://picsum.photos/seed/apple-watch-series-10-wrist/600/600', 1),
+    ('10000000-0000-0002-0000-000000000077', '10000000-0000-0001-0000-000000000033', 'https://picsum.photos/seed/galaxy-watch-ultra/600/600', 0),
+    ('10000000-0000-0002-0000-000000000078', '10000000-0000-0001-0000-000000000033', 'https://picsum.photos/seed/galaxy-watch-ultra-side/600/600', 1),
+    ('10000000-0000-0002-0000-000000000079', '10000000-0000-0001-0000-000000000034', 'https://picsum.photos/seed/xiaomi-watch-2-pro/600/600', 0),
+    ('10000000-0000-0002-0000-000000000080', '10000000-0000-0001-0000-000000000034', 'https://picsum.photos/seed/xiaomi-watch-2-pro-dial/600/600', 1),
+    ('10000000-0000-0002-0000-000000000081', '10000000-0000-0001-0000-000000000035', 'https://picsum.photos/seed/apple-35w-charger/600/600', 0),
+    ('10000000-0000-0002-0000-000000000082', '10000000-0000-0001-0000-000000000035', 'https://picsum.photos/seed/apple-35w-charger-ports/600/600', 1),
+    ('10000000-0000-0002-0000-000000000083', '10000000-0000-0001-0000-000000000036', 'https://picsum.photos/seed/logitech-mx-mechanical/600/600', 0),
+    ('10000000-0000-0002-0000-000000000084', '10000000-0000-0001-0000-000000000036', 'https://picsum.photos/seed/logitech-mx-mechanical-switch/600/600', 1),
+    ('10000000-0000-0002-0000-000000000085', '10000000-0000-0001-0000-000000000037', 'https://picsum.photos/seed/logitech-mx-master-3s/600/600', 0),
+    ('10000000-0000-0002-0000-000000000086', '10000000-0000-0001-0000-000000000037', 'https://picsum.photos/seed/logitech-mx-master-3s-side/600/600', 1),
+    ('10000000-0000-0002-0000-000000000087', '10000000-0000-0001-0000-000000000038', 'https://picsum.photos/seed/anker-prime-20000mah/600/600', 0),
+    ('10000000-0000-0002-0000-000000000088', '10000000-0000-0001-0000-000000000038', 'https://picsum.photos/seed/anker-prime-display/600/600', 1)
 ON CONFLICT (id) DO UPDATE SET
     product_id = EXCLUDED.product_id,
     url = EXCLUDED.url,
@@ -152,7 +212,36 @@ INSERT INTO product_option_groups (id, product_id, label, position) VALUES
     ('11000000-0000-0000-0000-000000000038', '10000000-0000-0001-0000-000000000019', 'Dung lượng', 0),
     ('11000000-0000-0000-0000-000000000039', '10000000-0000-0001-0000-000000000019', 'Màu sắc', 1),
     ('11000000-0000-0000-0000-000000000040', '10000000-0000-0001-0000-000000000020', 'Dung lượng', 0),
-    ('11000000-0000-0000-0000-000000000041', '10000000-0000-0001-0000-000000000020', 'Màu sắc', 1)
+    ('11000000-0000-0000-0000-000000000041', '10000000-0000-0001-0000-000000000020', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000042', '10000000-0000-0001-0000-000000000021', 'Dung lượng SSD', 0),
+    ('11000000-0000-0000-0000-000000000043', '10000000-0000-0001-0000-000000000021', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000044', '10000000-0000-0001-0000-000000000022', 'Cấu hình RAM & SSD', 0),
+    ('11000000-0000-0000-0000-000000000045', '10000000-0000-0001-0000-000000000022', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000046', '10000000-0000-0001-0000-000000000023', 'Cấu hình Card đồ họa', 0),
+    ('11000000-0000-0000-0000-000000000047', '10000000-0000-0001-0000-000000000023', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000048', '10000000-0000-0001-0000-000000000024', 'Màn hình & RAM', 0),
+    ('11000000-0000-0000-0000-000000000049', '10000000-0000-0001-0000-000000000024', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000050', '10000000-0000-0001-0000-000000000025', 'Vi xử lý & Bộ nhớ', 0),
+    ('11000000-0000-0000-0000-000000000051', '10000000-0000-0001-0000-000000000025', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000052', '10000000-0000-0001-0000-000000000026', 'Cấu hình', 0),
+    ('11000000-0000-0000-0000-000000000053', '10000000-0000-0001-0000-000000000026', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000054', '10000000-0000-0001-0000-000000000027', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000055', '10000000-0000-0001-0000-000000000027', 'Phiên bản', 1),
+    ('11000000-0000-0000-0000-000000000056', '10000000-0000-0001-0000-000000000028', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000057', '10000000-0000-0001-0000-000000000029', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000058', '10000000-0000-0001-0000-000000000030', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000059', '10000000-0000-0001-0000-000000000031', 'Loại dây đeo', 0),
+    ('11000000-0000-0000-0000-000000000060', '10000000-0000-0001-0000-000000000031', 'Màu vỏ', 1),
+    ('11000000-0000-0000-0000-000000000061', '10000000-0000-0001-0000-000000000032', 'Kích thước mặt', 0),
+    ('11000000-0000-0000-0000-000000000062', '10000000-0000-0001-0000-000000000032', 'Màu sắc', 1),
+    ('11000000-0000-0000-0000-000000000063', '10000000-0000-0001-0000-000000000033', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000064', '10000000-0000-0001-0000-000000000034', 'Phiên bản kết nối', 0),
+    ('11000000-0000-0000-0000-000000000065', '10000000-0000-0001-0000-000000000034', 'Màu sắc & Dây', 1),
+    ('11000000-0000-0000-0000-000000000066', '10000000-0000-0001-0000-000000000035', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000067', '10000000-0000-0001-0000-000000000036', 'Loại Switch', 0),
+    ('11000000-0000-0000-0000-000000000068', '10000000-0000-0001-0000-000000000036', 'Kích thước Layout', 1),
+    ('11000000-0000-0000-0000-000000000069', '10000000-0000-0001-0000-000000000037', 'Màu sắc', 0),
+    ('11000000-0000-0000-0000-000000000070', '10000000-0000-0001-0000-000000000038', 'Màu sắc', 0)
 ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, position = EXCLUDED.position;
 
 INSERT INTO product_option_values (id, product_id, group_id, label, position) VALUES
@@ -234,7 +323,64 @@ INSERT INTO product_option_values (id, product_id, group_id, label, position) VA
     ('12000000-0000-0000-0000-000000000076', '10000000-0000-0001-0000-000000000019', '11000000-0000-0000-0000-000000000039', 'Đen Midnight', 1),
     ('12000000-0000-0000-0000-000000000077', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000040', '128GB', 0),
     ('12000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', 'Xanh Sao Trời', 0),
-    ('12000000-0000-0000-0000-000000000079', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', 'Đen Mộng Mơ', 1)
+    ('12000000-0000-0000-0000-000000000079', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', 'Đen Mộng Mơ', 1),
+    ('12000000-0000-0000-0000-000000000080', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '512GB', 0),
+    ('12000000-0000-0000-0000-000000000081', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '1TB', 1),
+    ('12000000-0000-0000-0000-000000000082', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', 'Space Black Đen Không Gian', 0),
+    ('12000000-0000-0000-0000-000000000083', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', 'Bạc Silver', 1),
+    ('12000000-0000-0000-0000-000000000084', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '16GB / 256GB', 0),
+    ('12000000-0000-0000-0000-000000000085', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '16GB / 512GB', 1),
+    ('12000000-0000-0000-0000-000000000086', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', 'Midnight Đen Huyền Bí', 0),
+    ('12000000-0000-0000-0000-000000000087', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', 'Starlight Vàng Ánh Sao', 1),
+    ('12000000-0000-0000-0000-000000000088', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', 'Space Gray Xám Không Gian', 2),
+    ('12000000-0000-0000-0000-000000000089', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', 'RTX 4070 32GB RAM', 0),
+    ('12000000-0000-0000-0000-000000000090', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', 'RTX 4080 32GB RAM', 1),
+    ('12000000-0000-0000-0000-000000000091', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', 'Eclipse Gray Xám', 0),
+    ('12000000-0000-0000-0000-000000000092', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', 'Platinum White Trắng', 1),
+    ('12000000-0000-0000-0000-000000000093', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', 'FHD+ 16GB / 512GB', 0),
+    ('12000000-0000-0000-0000-000000000094', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', 'OLED 3.2K Touch 32GB / 1TB', 1),
+    ('12000000-0000-0000-0000-000000000095', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', 'Platinum Bạc', 0),
+    ('12000000-0000-0000-0000-000000000096', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', 'Graphite Xám', 1),
+    ('12000000-0000-0000-0000-000000000097', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000050', 'Core Ultra 5 16GB / 512GB', 0),
+    ('12000000-0000-0000-0000-000000000098', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000050', 'Core Ultra 7 32GB / 1TB', 1),
+    ('12000000-0000-0000-0000-000000000099', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000051', 'Eclipse Black Đen', 0),
+    ('12000000-0000-0000-0000-000000000100', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000052', 'Intel Core i5 16GB / 512GB', 0),
+    ('12000000-0000-0000-0000-000000000101', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000052', 'Intel Core i7 32GB / 1TB', 1),
+    ('12000000-0000-0000-0000-000000000102', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000053', 'Xám Titan', 0),
+    ('12000000-0000-0000-0000-000000000103', '10000000-0000-0001-0000-000000000027', '11000000-0000-0000-0000-000000000054', 'Trắng White', 0),
+    ('12000000-0000-0000-0000-000000000104', '10000000-0000-0001-0000-000000000027', '11000000-0000-0000-0000-000000000055', 'Hộp sạc MagSafe USB-C', 0),
+    ('12000000-0000-0000-0000-000000000105', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', 'Đen Black', 0),
+    ('12000000-0000-0000-0000-000000000106', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', 'Bạc Silver', 1),
+    ('12000000-0000-0000-0000-000000000107', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', 'Xanh Midnight Blue', 2),
+    ('12000000-0000-0000-0000-000000000108', '10000000-0000-0001-0000-000000000029', '11000000-0000-0000-0000-000000000057', 'Bạc Titan', 0),
+    ('12000000-0000-0000-0000-000000000109', '10000000-0000-0001-0000-000000000029', '11000000-0000-0000-0000-000000000057', 'Trắng Titan', 1),
+    ('12000000-0000-0000-0000-000000000110', '10000000-0000-0001-0000-000000000030', '11000000-0000-0000-0000-000000000058', 'Titanium Gray Xám', 0),
+    ('12000000-0000-0000-0000-000000000111', '10000000-0000-0001-0000-000000000030', '11000000-0000-0000-0000-000000000058', 'Trắng Ceramic', 1),
+    ('12000000-0000-0000-0000-000000000112', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', 'Dây Alpine Loop', 0),
+    ('12000000-0000-0000-0000-000000000113', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', 'Dây Ocean Band', 1),
+    ('12000000-0000-0000-0000-000000000114', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', 'Dây Trail Loop', 2),
+    ('12000000-0000-0000-0000-000000000115', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', 'Titan Tự Nhiên', 0),
+    ('12000000-0000-0000-0000-000000000116', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', 'Titan Đen', 1),
+    ('12000000-0000-0000-0000-000000000117', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '42mm', 0),
+    ('12000000-0000-0000-0000-000000000118', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '46mm', 1),
+    ('12000000-0000-0000-0000-000000000119', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', 'Đen Bóng Jet Black', 0),
+    ('12000000-0000-0000-0000-000000000120', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', 'Vàng Hồng Rose Gold', 1),
+    ('12000000-0000-0000-0000-000000000121', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', 'Bạc Silver', 2),
+    ('12000000-0000-0000-0000-000000000122', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', 'Xám Titan', 0),
+    ('12000000-0000-0000-0000-000000000123', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', 'Trắng Titan', 1),
+    ('12000000-0000-0000-0000-000000000124', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', 'Bạc Titan', 2),
+    ('12000000-0000-0000-0000-000000000125', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', 'Bluetooth', 0),
+    ('12000000-0000-0000-0000-000000000126', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', 'LTE eSIM', 1),
+    ('12000000-0000-0000-0000-000000000127', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', 'Đen Dây Silicon', 0),
+    ('12000000-0000-0000-0000-000000000128', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', 'Bạc Dây Da Nâu', 1),
+    ('12000000-0000-0000-0000-000000000129', '10000000-0000-0001-0000-000000000035', '11000000-0000-0000-0000-000000000066', 'Trắng White', 0),
+    ('12000000-0000-0000-0000-000000000130', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', 'Tactile Quiet Gõ Êm', 0),
+    ('12000000-0000-0000-0000-000000000131', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', 'Linear Mượt Mà', 1),
+    ('12000000-0000-0000-0000-000000000132', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', 'Fullsize 100%', 0),
+    ('12000000-0000-0000-0000-000000000133', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', 'Mini 75%', 1),
+    ('12000000-0000-0000-0000-000000000134', '10000000-0000-0001-0000-000000000037', '11000000-0000-0000-0000-000000000069', 'Graphite Đen Xám', 0),
+    ('12000000-0000-0000-0000-000000000135', '10000000-0000-0001-0000-000000000037', '11000000-0000-0000-0000-000000000069', 'Pale Gray Trắng Xám', 1),
+    ('12000000-0000-0000-0000-000000000136', '10000000-0000-0001-0000-000000000038', '11000000-0000-0000-0000-000000000070', 'Đen Titan Xám', 0)
 ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, position = EXCLUDED.position;
 
 INSERT INTO product_variants (id, product_id, price_vnd, stock_quantity, active) VALUES
@@ -315,7 +461,64 @@ INSERT INTO product_variants (id, product_id, price_vnd, stock_quantity, active)
     ('13000000-0000-0000-0000-000000000075', '10000000-0000-0001-0000-000000000019', 12890000, 19, true),
     ('13000000-0000-0000-0000-000000000076', '10000000-0000-0001-0000-000000000019', 12890000, 26, true),
     ('13000000-0000-0000-0000-000000000077', '10000000-0000-0001-0000-000000000020', 3190000, 5, true),
-    ('13000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', 3190000, 12, true)
+    ('13000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', 3190000, 12, true),
+    ('13000000-0000-0000-0000-000000000079', '10000000-0000-0001-0000-000000000021', 39990000, 15, true),
+    ('13000000-0000-0000-0000-000000000080', '10000000-0000-0001-0000-000000000021', 39990000, 12, true),
+    ('13000000-0000-0000-0000-000000000081', '10000000-0000-0001-0000-000000000021', 44990000, 8, true),
+    ('13000000-0000-0000-0000-000000000082', '10000000-0000-0001-0000-000000000021', 44990000, 6, true),
+    ('13000000-0000-0000-0000-000000000083', '10000000-0000-0001-0000-000000000022', 27490000, 20, true),
+    ('13000000-0000-0000-0000-000000000084', '10000000-0000-0001-0000-000000000022', 27490000, 15, true),
+    ('13000000-0000-0000-0000-000000000085', '10000000-0000-0001-0000-000000000022', 27490000, 18, true),
+    ('13000000-0000-0000-0000-000000000086', '10000000-0000-0001-0000-000000000022', 32490000, 10, true),
+    ('13000000-0000-0000-0000-000000000087', '10000000-0000-0001-0000-000000000022', 32490000, 8, true),
+    ('13000000-0000-0000-0000-000000000088', '10000000-0000-0001-0000-000000000022', 32490000, 12, true),
+    ('13000000-0000-0000-0000-000000000089', '10000000-0000-0001-0000-000000000023', 54990000, 7, true),
+    ('13000000-0000-0000-0000-000000000090', '10000000-0000-0001-0000-000000000023', 54990000, 5, true),
+    ('13000000-0000-0000-0000-000000000091', '10000000-0000-0001-0000-000000000023', 68990000, 4, true),
+    ('13000000-0000-0000-0000-000000000092', '10000000-0000-0001-0000-000000000023', 68990000, 3, true),
+    ('13000000-0000-0000-0000-000000000093', '10000000-0000-0001-0000-000000000024', 46990000, 6, true),
+    ('13000000-0000-0000-0000-000000000094', '10000000-0000-0001-0000-000000000024', 46990000, 5, true),
+    ('13000000-0000-0000-0000-000000000095', '10000000-0000-0001-0000-000000000024', 58990000, 4, true),
+    ('13000000-0000-0000-0000-000000000096', '10000000-0000-0001-0000-000000000024', 58990000, 3, true),
+    ('13000000-0000-0000-0000-000000000097', '10000000-0000-0001-0000-000000000025', 42990000, 8, true),
+    ('13000000-0000-0000-0000-000000000098', '10000000-0000-0001-0000-000000000025', 52990000, 5, true),
+    ('13000000-0000-0000-0000-000000000099', '10000000-0000-0001-0000-000000000026', 23990000, 14, true),
+    ('13000000-0000-0000-0000-000000000100', '10000000-0000-0001-0000-000000000026', 28990000, 9, true),
+    ('13000000-0000-0000-0000-000000000101', '10000000-0000-0001-0000-000000000027', 5690000, 35, true),
+    ('13000000-0000-0000-0000-000000000102', '10000000-0000-0001-0000-000000000028', 7490000, 18, true),
+    ('13000000-0000-0000-0000-000000000103', '10000000-0000-0001-0000-000000000028', 7490000, 12, true),
+    ('13000000-0000-0000-0000-000000000104', '10000000-0000-0001-0000-000000000028', 7490000, 10, true),
+    ('13000000-0000-0000-0000-000000000105', '10000000-0000-0001-0000-000000000029', 4990000, 22, true),
+    ('13000000-0000-0000-0000-000000000106', '10000000-0000-0001-0000-000000000029', 4990000, 19, true),
+    ('13000000-0000-0000-0000-000000000107', '10000000-0000-0001-0000-000000000030', 1990000, 30, true),
+    ('13000000-0000-0000-0000-000000000108', '10000000-0000-0001-0000-000000000030', 1990000, 25, true),
+    ('13000000-0000-0000-0000-000000000109', '10000000-0000-0001-0000-000000000031', 21490000, 10, true),
+    ('13000000-0000-0000-0000-000000000110', '10000000-0000-0001-0000-000000000031', 21490000, 8, true),
+    ('13000000-0000-0000-0000-000000000111', '10000000-0000-0001-0000-000000000031', 21490000, 7, true),
+    ('13000000-0000-0000-0000-000000000112', '10000000-0000-0001-0000-000000000031', 21490000, 6, true),
+    ('13000000-0000-0000-0000-000000000113', '10000000-0000-0001-0000-000000000031', 21490000, 9, true),
+    ('13000000-0000-0000-0000-000000000114', '10000000-0000-0001-0000-000000000031', 21490000, 5, true),
+    ('13000000-0000-0000-0000-000000000115', '10000000-0000-0001-0000-000000000032', 10790000, 15, true),
+    ('13000000-0000-0000-0000-000000000116', '10000000-0000-0001-0000-000000000032', 10790000, 12, true),
+    ('13000000-0000-0000-0000-000000000117', '10000000-0000-0001-0000-000000000032', 10790000, 10, true),
+    ('13000000-0000-0000-0000-000000000118', '10000000-0000-0001-0000-000000000032', 11990000, 14, true),
+    ('13000000-0000-0000-0000-000000000119', '10000000-0000-0001-0000-000000000032', 11990000, 11, true),
+    ('13000000-0000-0000-0000-000000000120', '10000000-0000-0001-0000-000000000032', 11990000, 9, true),
+    ('13000000-0000-0000-0000-000000000121', '10000000-0000-0001-0000-000000000033', 15990000, 12, true),
+    ('13000000-0000-0000-0000-000000000122', '10000000-0000-0001-0000-000000000033', 15990000, 10, true),
+    ('13000000-0000-0000-0000-000000000123', '10000000-0000-0001-0000-000000000033', 15990000, 8, true),
+    ('13000000-0000-0000-0000-000000000124', '10000000-0000-0001-0000-000000000034', 5490000, 16, true),
+    ('13000000-0000-0000-0000-000000000125', '10000000-0000-0001-0000-000000000034', 5790000, 12, true),
+    ('13000000-0000-0000-0000-000000000126', '10000000-0000-0001-0000-000000000034', 6290000, 10, true),
+    ('13000000-0000-0000-0000-000000000127', '10000000-0000-0001-0000-000000000034', 6590000, 8, true),
+    ('13000000-0000-0000-0000-000000000128', '10000000-0000-0001-0000-000000000035', 1490000, 50, true),
+    ('13000000-0000-0000-0000-000000000129', '10000000-0000-0001-0000-000000000036', 3790000, 15, true),
+    ('13000000-0000-0000-0000-000000000130', '10000000-0000-0001-0000-000000000036', 3590000, 18, true),
+    ('13000000-0000-0000-0000-000000000131', '10000000-0000-0001-0000-000000000036', 3790000, 12, true),
+    ('13000000-0000-0000-0000-000000000132', '10000000-0000-0001-0000-000000000036', 3590000, 14, true),
+    ('13000000-0000-0000-0000-000000000133', '10000000-0000-0001-0000-000000000037', 2290000, 28, true),
+    ('13000000-0000-0000-0000-000000000134', '10000000-0000-0001-0000-000000000037', 2290000, 22, true),
+    ('13000000-0000-0000-0000-000000000135', '10000000-0000-0001-0000-000000000038', 2890000, 32, true)
 ON CONFLICT (id) DO UPDATE SET
     product_id = EXCLUDED.product_id,
     price_vnd = EXCLUDED.price_vnd,
@@ -487,9 +690,108 @@ INSERT INTO variant_option_values (variant_id, product_id, group_id, option_valu
     ('13000000-0000-0000-0000-000000000077', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000040', '12000000-0000-0000-0000-000000000077'),
     ('13000000-0000-0000-0000-000000000077', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', '12000000-0000-0000-0000-000000000078'),
     ('13000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000040', '12000000-0000-0000-0000-000000000077'),
-    ('13000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', '12000000-0000-0000-0000-000000000079')
-ON CONFLICT (variant_id, group_id) DO UPDATE SET
-    option_value_id = EXCLUDED.option_value_id;
+    ('13000000-0000-0000-0000-000000000078', '10000000-0000-0001-0000-000000000020', '11000000-0000-0000-0000-000000000041', '12000000-0000-0000-0000-000000000079'),
+    ('13000000-0000-0000-0000-000000000079', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '12000000-0000-0000-0000-000000000080'),
+    ('13000000-0000-0000-0000-000000000079', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', '12000000-0000-0000-0000-000000000082'),
+    ('13000000-0000-0000-0000-000000000080', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '12000000-0000-0000-0000-000000000080'),
+    ('13000000-0000-0000-0000-000000000080', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', '12000000-0000-0000-0000-000000000083'),
+    ('13000000-0000-0000-0000-000000000081', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '12000000-0000-0000-0000-000000000081'),
+    ('13000000-0000-0000-0000-000000000081', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', '12000000-0000-0000-0000-000000000082'),
+    ('13000000-0000-0000-0000-000000000082', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000042', '12000000-0000-0000-0000-000000000081'),
+    ('13000000-0000-0000-0000-000000000082', '10000000-0000-0001-0000-000000000021', '11000000-0000-0000-0000-000000000043', '12000000-0000-0000-0000-000000000083'),
+    ('13000000-0000-0000-0000-000000000083', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000084'),
+    ('13000000-0000-0000-0000-000000000083', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000086'),
+    ('13000000-0000-0000-0000-000000000084', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000084'),
+    ('13000000-0000-0000-0000-000000000084', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000087'),
+    ('13000000-0000-0000-0000-000000000085', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000084'),
+    ('13000000-0000-0000-0000-000000000085', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000088'),
+    ('13000000-0000-0000-0000-000000000086', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000085'),
+    ('13000000-0000-0000-0000-000000000086', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000086'),
+    ('13000000-0000-0000-0000-000000000087', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000085'),
+    ('13000000-0000-0000-0000-000000000087', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000087'),
+    ('13000000-0000-0000-0000-000000000088', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000044', '12000000-0000-0000-0000-000000000085'),
+    ('13000000-0000-0000-0000-000000000088', '10000000-0000-0001-0000-000000000022', '11000000-0000-0000-0000-000000000045', '12000000-0000-0000-0000-000000000088'),
+    ('13000000-0000-0000-0000-000000000089', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', '12000000-0000-0000-0000-000000000089'),
+    ('13000000-0000-0000-0000-000000000089', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', '12000000-0000-0000-0000-000000000091'),
+    ('13000000-0000-0000-0000-000000000090', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', '12000000-0000-0000-0000-000000000089'),
+    ('13000000-0000-0000-0000-000000000090', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', '12000000-0000-0000-0000-000000000092'),
+    ('13000000-0000-0000-0000-000000000091', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', '12000000-0000-0000-0000-000000000090'),
+    ('13000000-0000-0000-0000-000000000091', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', '12000000-0000-0000-0000-000000000091'),
+    ('13000000-0000-0000-0000-000000000092', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000046', '12000000-0000-0000-0000-000000000090'),
+    ('13000000-0000-0000-0000-000000000092', '10000000-0000-0001-0000-000000000023', '11000000-0000-0000-0000-000000000047', '12000000-0000-0000-0000-000000000092'),
+    ('13000000-0000-0000-0000-000000000093', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', '12000000-0000-0000-0000-000000000093'),
+    ('13000000-0000-0000-0000-000000000093', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', '12000000-0000-0000-0000-000000000095'),
+    ('13000000-0000-0000-0000-000000000094', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', '12000000-0000-0000-0000-000000000093'),
+    ('13000000-0000-0000-0000-000000000094', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', '12000000-0000-0000-0000-000000000096'),
+    ('13000000-0000-0000-0000-000000000095', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', '12000000-0000-0000-0000-000000000094'),
+    ('13000000-0000-0000-0000-000000000095', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', '12000000-0000-0000-0000-000000000095'),
+    ('13000000-0000-0000-0000-000000000096', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000048', '12000000-0000-0000-0000-000000000094'),
+    ('13000000-0000-0000-0000-000000000096', '10000000-0000-0001-0000-000000000024', '11000000-0000-0000-0000-000000000049', '12000000-0000-0000-0000-000000000096'),
+    ('13000000-0000-0000-0000-000000000097', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000050', '12000000-0000-0000-0000-000000000097'),
+    ('13000000-0000-0000-0000-000000000097', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000051', '12000000-0000-0000-0000-000000000099'),
+    ('13000000-0000-0000-0000-000000000098', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000050', '12000000-0000-0000-0000-000000000098'),
+    ('13000000-0000-0000-0000-000000000098', '10000000-0000-0001-0000-000000000025', '11000000-0000-0000-0000-000000000051', '12000000-0000-0000-0000-000000000099'),
+    ('13000000-0000-0000-0000-000000000099', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000052', '12000000-0000-0000-0000-000000000100'),
+    ('13000000-0000-0000-0000-000000000099', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000053', '12000000-0000-0000-0000-000000000102'),
+    ('13000000-0000-0000-0000-000000000100', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000052', '12000000-0000-0000-0000-000000000101'),
+    ('13000000-0000-0000-0000-000000000100', '10000000-0000-0001-0000-000000000026', '11000000-0000-0000-0000-000000000053', '12000000-0000-0000-0000-000000000102'),
+    ('13000000-0000-0000-0000-000000000101', '10000000-0000-0001-0000-000000000027', '11000000-0000-0000-0000-000000000054', '12000000-0000-0000-0000-000000000103'),
+    ('13000000-0000-0000-0000-000000000101', '10000000-0000-0001-0000-000000000027', '11000000-0000-0000-0000-000000000055', '12000000-0000-0000-0000-000000000104'),
+    ('13000000-0000-0000-0000-000000000102', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', '12000000-0000-0000-0000-000000000105'),
+    ('13000000-0000-0000-0000-000000000103', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', '12000000-0000-0000-0000-000000000106'),
+    ('13000000-0000-0000-0000-000000000104', '10000000-0000-0001-0000-000000000028', '11000000-0000-0000-0000-000000000056', '12000000-0000-0000-0000-000000000107'),
+    ('13000000-0000-0000-0000-000000000105', '10000000-0000-0001-0000-000000000029', '11000000-0000-0000-0000-000000000057', '12000000-0000-0000-0000-000000000108'),
+    ('13000000-0000-0000-0000-000000000106', '10000000-0000-0001-0000-000000000029', '11000000-0000-0000-0000-000000000057', '12000000-0000-0000-0000-000000000109'),
+    ('13000000-0000-0000-0000-000000000107', '10000000-0000-0001-0000-000000000030', '11000000-0000-0000-0000-000000000058', '12000000-0000-0000-0000-000000000110'),
+    ('13000000-0000-0000-0000-000000000108', '10000000-0000-0001-0000-000000000030', '11000000-0000-0000-0000-000000000058', '12000000-0000-0000-0000-000000000111'),
+    ('13000000-0000-0000-0000-000000000109', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000112'),
+    ('13000000-0000-0000-0000-000000000109', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000115'),
+    ('13000000-0000-0000-0000-000000000110', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000112'),
+    ('13000000-0000-0000-0000-000000000110', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000116'),
+    ('13000000-0000-0000-0000-000000000111', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000113'),
+    ('13000000-0000-0000-0000-000000000111', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000115'),
+    ('13000000-0000-0000-0000-000000000112', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000113'),
+    ('13000000-0000-0000-0000-000000000112', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000116'),
+    ('13000000-0000-0000-0000-000000000113', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000114'),
+    ('13000000-0000-0000-0000-000000000113', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000115'),
+    ('13000000-0000-0000-0000-000000000114', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000059', '12000000-0000-0000-0000-000000000114'),
+    ('13000000-0000-0000-0000-000000000114', '10000000-0000-0001-0000-000000000031', '11000000-0000-0000-0000-000000000060', '12000000-0000-0000-0000-000000000116'),
+    ('13000000-0000-0000-0000-000000000115', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000117'),
+    ('13000000-0000-0000-0000-000000000115', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000119'),
+    ('13000000-0000-0000-0000-000000000116', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000117'),
+    ('13000000-0000-0000-0000-000000000116', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000120'),
+    ('13000000-0000-0000-0000-000000000117', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000117'),
+    ('13000000-0000-0000-0000-000000000117', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000121'),
+    ('13000000-0000-0000-0000-000000000118', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000118'),
+    ('13000000-0000-0000-0000-000000000118', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000119'),
+    ('13000000-0000-0000-0000-000000000119', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000118'),
+    ('13000000-0000-0000-0000-000000000119', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000120'),
+    ('13000000-0000-0000-0000-000000000120', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000061', '12000000-0000-0000-0000-000000000118'),
+    ('13000000-0000-0000-0000-000000000120', '10000000-0000-0001-0000-000000000032', '11000000-0000-0000-0000-000000000062', '12000000-0000-0000-0000-000000000121'),
+    ('13000000-0000-0000-0000-000000000121', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', '12000000-0000-0000-0000-000000000122'),
+    ('13000000-0000-0000-0000-000000000122', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', '12000000-0000-0000-0000-000000000123'),
+    ('13000000-0000-0000-0000-000000000123', '10000000-0000-0001-0000-000000000033', '11000000-0000-0000-0000-000000000063', '12000000-0000-0000-0000-000000000124'),
+    ('13000000-0000-0000-0000-000000000124', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', '12000000-0000-0000-0000-000000000125'),
+    ('13000000-0000-0000-0000-000000000124', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', '12000000-0000-0000-0000-000000000127'),
+    ('13000000-0000-0000-0000-000000000125', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', '12000000-0000-0000-0000-000000000125'),
+    ('13000000-0000-0000-0000-000000000125', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', '12000000-0000-0000-0000-000000000128'),
+    ('13000000-0000-0000-0000-000000000126', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', '12000000-0000-0000-0000-000000000126'),
+    ('13000000-0000-0000-0000-000000000126', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', '12000000-0000-0000-0000-000000000127'),
+    ('13000000-0000-0000-0000-000000000127', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000064', '12000000-0000-0000-0000-000000000126'),
+    ('13000000-0000-0000-0000-000000000127', '10000000-0000-0001-0000-000000000034', '11000000-0000-0000-0000-000000000065', '12000000-0000-0000-0000-000000000128'),
+    ('13000000-0000-0000-0000-000000000128', '10000000-0000-0001-0000-000000000035', '11000000-0000-0000-0000-000000000066', '12000000-0000-0000-0000-000000000129'),
+    ('13000000-0000-0000-0000-000000000129', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', '12000000-0000-0000-0000-000000000130'),
+    ('13000000-0000-0000-0000-000000000129', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', '12000000-0000-0000-0000-000000000132'),
+    ('13000000-0000-0000-0000-000000000130', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', '12000000-0000-0000-0000-000000000130'),
+    ('13000000-0000-0000-0000-000000000130', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', '12000000-0000-0000-0000-000000000133'),
+    ('13000000-0000-0000-0000-000000000131', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', '12000000-0000-0000-0000-000000000131'),
+    ('13000000-0000-0000-0000-000000000131', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', '12000000-0000-0000-0000-000000000132'),
+    ('13000000-0000-0000-0000-000000000132', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000067', '12000000-0000-0000-0000-000000000131'),
+    ('13000000-0000-0000-0000-000000000132', '10000000-0000-0001-0000-000000000036', '11000000-0000-0000-0000-000000000068', '12000000-0000-0000-0000-000000000133'),
+    ('13000000-0000-0000-0000-000000000133', '10000000-0000-0001-0000-000000000037', '11000000-0000-0000-0000-000000000069', '12000000-0000-0000-0000-000000000134'),
+    ('13000000-0000-0000-0000-000000000134', '10000000-0000-0001-0000-000000000037', '11000000-0000-0000-0000-000000000069', '12000000-0000-0000-0000-000000000135'),
+    ('13000000-0000-0000-0000-000000000135', '10000000-0000-0001-0000-000000000038', '11000000-0000-0000-0000-000000000070', '12000000-0000-0000-0000-000000000136')
+ON CONFLICT (variant_id, group_id) DO UPDATE SET option_value_id = EXCLUDED.option_value_id;
 
 UPDATE products SET price = 28990000, stock_quantity = 136 WHERE id = '10000000-0000-0001-0000-000000000001';
 UPDATE products SET price = 16990000, stock_quantity = 62 WHERE id = '10000000-0000-0001-0000-000000000002';
@@ -511,4 +813,22 @@ UPDATE products SET price = 17990000, stock_quantity = 62 WHERE id = '10000000-0
 UPDATE products SET price = 10990000, stock_quantity = 62 WHERE id = '10000000-0000-0001-0000-000000000018';
 UPDATE products SET price = 9890000, stock_quantity = 62 WHERE id = '10000000-0000-0001-0000-000000000019';
 UPDATE products SET price = 3190000, stock_quantity = 17 WHERE id = '10000000-0000-0001-0000-000000000020';
+UPDATE products SET price = 39990000, stock_quantity = 41 WHERE id = '10000000-0000-0001-0000-000000000021';
+UPDATE products SET price = 27490000, stock_quantity = 83 WHERE id = '10000000-0000-0001-0000-000000000022';
+UPDATE products SET price = 54990000, stock_quantity = 19 WHERE id = '10000000-0000-0001-0000-000000000023';
+UPDATE products SET price = 46990000, stock_quantity = 18 WHERE id = '10000000-0000-0001-0000-000000000024';
+UPDATE products SET price = 42990000, stock_quantity = 13 WHERE id = '10000000-0000-0001-0000-000000000025';
+UPDATE products SET price = 23990000, stock_quantity = 23 WHERE id = '10000000-0000-0001-0000-000000000026';
+UPDATE products SET price = 5690000, stock_quantity = 35 WHERE id = '10000000-0000-0001-0000-000000000027';
+UPDATE products SET price = 7490000, stock_quantity = 40 WHERE id = '10000000-0000-0001-0000-000000000028';
+UPDATE products SET price = 4990000, stock_quantity = 41 WHERE id = '10000000-0000-0001-0000-000000000029';
+UPDATE products SET price = 1990000, stock_quantity = 55 WHERE id = '10000000-0000-0001-0000-000000000030';
+UPDATE products SET price = 21490000, stock_quantity = 45 WHERE id = '10000000-0000-0001-0000-000000000031';
+UPDATE products SET price = 10790000, stock_quantity = 71 WHERE id = '10000000-0000-0001-0000-000000000032';
+UPDATE products SET price = 15990000, stock_quantity = 30 WHERE id = '10000000-0000-0001-0000-000000000033';
+UPDATE products SET price = 5490000, stock_quantity = 46 WHERE id = '10000000-0000-0001-0000-000000000034';
+UPDATE products SET price = 1490000, stock_quantity = 50 WHERE id = '10000000-0000-0001-0000-000000000035';
+UPDATE products SET price = 3590000, stock_quantity = 59 WHERE id = '10000000-0000-0001-0000-000000000036';
+UPDATE products SET price = 2290000, stock_quantity = 50 WHERE id = '10000000-0000-0001-0000-000000000037';
+UPDATE products SET price = 2890000, stock_quantity = 32 WHERE id = '10000000-0000-0001-0000-000000000038';
 COMMIT;

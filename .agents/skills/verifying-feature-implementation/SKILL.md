@@ -1,148 +1,95 @@
 ---
 name: verifying-feature-implementation
-description: Use after all .kiro feature tasks are complete to verify implementation evidence against every requirement before finishing the branch
+description: Use after all feature tasks and integration checks are complete to verify implementation and test evidence against every approved requirement before final acceptance.
 ---
 
-# Verifying A Feature Implementation
+# Verifying Feature Implementation
 
-Verify the completed implementation against one approved
-`.kiro/specs/<feature>/` artifact set. This is a read-only verification gate;
-do not fix findings or edit artifacts.
+Verify the completed implementation against the approved `.dream/specs/<feature>/` specification.
+
+This is a read-only verification gate; do not fix findings or edit artifacts directly during verification.
+
+## Role in Lifecycle
+
+```text
+verifying-runtime-integration
+    Evidence producer: Executes runtime HTTP/browser/DB interactions.
+           ↓
+verifying-feature-implementation
+    Traceability & completeness verifier: Validates that every REQ / AC has proof.
+           ↓
+accepting-contract-first-features
+    Decision gate: Issues the final ACCEPTED / BLOCKED verdict.
+```
 
 ## Inputs
 
 Read:
 
-- `requirements.md`
-- `design.md`
-- `tasks.md`
-- the cumulative working-tree review package containing committed, staged,
-  unstaged, and untracked implementation changes
-- relevant production code and tests
-- fresh deterministic test, build, lint, and runtime evidence
+- `requirements.md` (with stable REQ, INV, and AC IDs)
+- `design.md` (with boundaries and proof obligations)
+- `contracts/` (manifest, schemas, scenarios)
+- `tasks.md` (with completed status, roles, and verified revisions)
+- Task evidence files under `evidence/tasks/*.md`
+- Workstream review files under `evidence/workstreams/*.yaml`
+- Runtime integration report under `evidence/integration-verification.md` (when required)
+- Cumulative working-tree changes (committed, staged, unstaged, untracked)
+- Fresh deterministic test execution output
 
 ## Checks
 
-1. Map every requirement ID and acceptance criterion to implementation and test
-   evidence with exact file references.
-2. Confirm every task is complete and its stated outcome exists.
-3. Confirm the implementation follows material design decisions, interfaces,
-   ownership boundaries, error semantics, and migration strategy.
-4. Run focused verification first, then the broader affected checks. Record
-   exact commands and outcomes.
-5. Identify behavior that is missing, incorrect, untested, incompatible, or
-   outside the approved specification.
+1. **Derive Requirement Traceability Matrix (RTM):** Map every requirement ID (`REQ-<DOMAIN>-<NUM>`) and acceptance criterion (`AC-<DOMAIN>-<NUM>-<SEQ>`) to:
+   - concrete implementation files and line ranges;
+   - corresponding unit, component, contract, DB, or browser test files and line ranges;
+   - deterministic execution results (Pass / Fail).
+2. **Confirm Task Completion:** Verify all tasks in `tasks.md` are marked `completed` and verified against current frozen contract revisions.
+3. **Verify Design Compliance:** Confirm the implementation adheres to declared architecture, boundaries, invariants, and security/failure semantics.
+4. **Execute Verification Commands:** Run relevant test suites and record exact commands and outcomes.
+5. **Identify Gaps:** Identify any requirement or acceptance criterion lacking deterministic proof, failing tests, or violating specification invariants.
 
-Do not infer completion from task checkboxes, reports, or prior test claims.
-Inspect the implementation and obtain fresh evidence.
+Do not infer completion from task checkboxes or prior agent claims. Inspect the code and execute fresh checks.
 
 ## Finding Gate
 
 Before reporting a Blocking Implementation Issue, verify all of the following:
 
-1. It maps to a specific approved requirement or acceptance criterion.
+1. It maps to a specific approved requirement, invariant, or acceptance criterion.
 2. Implementation or test evidence demonstrates a concrete failure.
-3. The affected scenario is reachable through an approved or supported system
-   path, or the approved design explicitly requires the violated invariant at
-   that boundary.
-4. The defect is present in the implementation under verification.
-5. Correcting it does not require inventing new product or design behavior.
+3. The affected scenario is reachable through an approved system path or explicitly required invariant.
+4. The defect is present in the current implementation.
+5. Correcting it does not require inventing new product behavior.
 
-If any condition is false, do not report it as a blocking implementation
-issue.
-
-Do not report optional hardening, speculative risks, unrelated pre-existing
-problems, style preferences, or alternative implementations as blockers.
-
-Do not treat states reachable only by bypassing established application
-validation, ad hoc direct database manipulation, unsupported callers, or
-fabricated invalid internal states as blocking unless the path is supported or
-the approved specification or design explicitly requires that boundary to
-reject them.
-
-## Re-verification Mode
-
-When invoked after a verification repair round, perform a scoped
-re-verification, not a new broad feature audit.
-
-Require these inputs:
-
-- the previous verification report
-- the open requirement IDs
-- the repair diff
-- the tests run for the repair
-
-Re-verify only:
-
-1. previously failing or unverified requirement IDs,
-2. requirements whose implementation is directly changed by the repair, and
-3. concrete regressions introduced by the repair diff.
-
-Keep requirements previously verified as Pass unless the repair changed code
-or contracts they directly depend on. Do not search unchanged implementation
-for new issues.
-
-Admit a new blocking finding into the repair loop only when it is a concrete
-regression introduced by the repair or is necessary to evaluate an open
-requirement ID. Treat out-of-scope observations as non-blocking; they never
-extend the verification repair loop.
-
-## Repair Loop Limit
-
-Feature verification has one bounded repair cycle:
-
-1. Perform one broad verification of the completed feature.
-2. If the result is `Needs Fix`, allow one implementation repair wave.
-3. After that repair, perform one scoped re-verification using the rules above.
-4. Do not start another autonomous repair and re-verification cycle.
-
-If blocking implementation issues remain after scoped re-verification, return
-control to the caller with the remaining evidence:
-
-- report `Needs Fix` for concrete defects within the approved specification;
-- report `Blocked` when resolution requires a specification, architecture,
-  environment, dependency, or user decision.
-
-Do not continue repairing until clean merely because a verifier can still
-identify findings.
+Do not report speculative risks, style preferences, or optional hardening as blockers.
 
 ## Output
+
+Write report to `.dream/specs/<feature>/evidence/feature-verification.md`:
 
 ```markdown
 ## Feature Verification
 
 **Status:** Verified | Needs Fix | Blocked
 
-### Coverage
-| Requirement | Implementation | Tests | Result |
-|---|---|---|---|
-| 1.1 | `path:line` | `test-path:line` | Pass |
+### Requirement Traceability Matrix (RTM)
+| Requirement | Invariant / AC | Implementation | Tests / Evidence | Result |
+|---|---|---|---|---|
+| REQ-PRODUCT-07 | INV-PRODUCT-07-01 | `internal/product/service.go:45-60` | `internal/product/service_test.go:88` | Pass |
+| REQ-PRODUCT-07 | AC-PRODUCT-07-01 | `frontend/src/views/Product.tsx:32-40` | `frontend/src/views/Product.spec.tsx:55` | Pass |
 
-### Commands
-- `exact command` - Pass/Fail
+### Commands Run
+- `go test ./...` — PASS
+- `npm run test` — PASS
 
 ### Blocking Implementation Issues
-- [requirement ID] `path:line`: Concrete implementation defect and why the
-  approved requirement is not satisfied.
+- [requirement ID] `path:line`: Concrete defect description and why the requirement is violated.
 
 ### Unverified Items
-- [requirement ID]: Missing evidence and why it could not be obtained.
+- [requirement ID]: Missing test or evidence and reason.
 
-### Out-of-Scope Observations
-- Non-blocking observations not required to establish feature correctness.
+### Non-blocking Observations
+- Observations not affecting correctness.
 ```
 
-Use `Verified` only when every approved requirement and acceptance criterion
-has sufficient deterministic evidence for the verification level defined by
-the approved design and testing strategy, and no blocking issue remains.
-
-Use `Needs Fix` only when at least one concrete implementation or test defect
-prevents an approved requirement from being satisfied and that defect can be
-corrected without changing the approved specification.
-
-Use `Blocked` when verification cannot complete because required evidence
-cannot be obtained, the environment or a dependency prevents verification, or
-resolution requires a product, specification, architecture, or user decision.
-
-An Unverified Item is not automatically an implementation defect. Do not
-convert inability to obtain evidence into `Needs Fix`.
+- **`Verified`:** Every approved requirement, invariant, and acceptance criterion has verifiable implementation and deterministic test evidence, and no blocking issue remains.
+- **`Needs Fix`:** At least one concrete implementation or test defect prevents an approved requirement from being satisfied.
+- **`Blocked`:** Verification cannot complete due to missing environment/dependency or required specification/architecture decision.

@@ -5,11 +5,11 @@ description: Use when frozen feature contracts need to be decomposed into indepe
 
 # Planning Contract Workstreams
 
-Create `.kiro/specs/<feature>/tasks.md` as an execution DAG.
+Create `.dream/specs/<feature>/tasks.md` as an execution DAG.
 
 ## Output
 
-Create `.kiro/specs/<feature>/tasks.md`.
+Create `.dream/specs/<feature>/tasks.md`.
 
 Use `references/tasks.template.md` as the required structural shape.
 
@@ -17,35 +17,88 @@ Use `references/tasks.template.md` as the required structural shape.
 
 A task is a bounded observable outcome, not a coding recipe. Each task MUST contain:
 
-- `id`: unique task identifier;
-- `owner`: coherent workstream owner (e.g., `backend-account`, `frontend-ui`);
+- `id`: unique task identifier (e.g., `BE-03`, `FE-02`);
+- `owner`: coherent workstream owner (e.g., `backend-product`, `frontend-ui`);
 - `outcome`: bounded observable outcome;
-- `contracts`: map of contract IDs to their frozen revisions;
+- `requirements`: list of stable requirement IDs (e.g., `REQ-PRODUCT-07`);
+- `acceptance_criteria`: list of stable acceptance criteria IDs (e.g., `AC-PRODUCT-07-01`);
+- `contracts`: list of contract references with role (`provider`, `consumer`, `verifier`), or `[]` if no shared contract applies;
 - `depends_on`: list of task IDs that must complete first;
 - `risk`: `normal` or `high`;
-- `verification`: list of deterministic checks (provider-contract, unit, typecheck);
-- `acceptance scenarios`: declared scenario IDs from `scenarios.yaml`;
+- `verification`: list of deterministic checks matching the design's proof strategy;
 - `status`: `pending`, `in_progress`, `completed`, `stale`, or `reopened`;
 - `verified_against`: map of contract revisions verified upon completion.
 
-Example task entry:
+### Example Task Entries
 
+**Provider Task:**
 ```yaml
 id: BE-03
-owner: backend-account
-outcome: Provide product-detail viewer like state
+owner: backend-product
+outcome: Provide viewer-aware product detail
+requirements:
+  - REQ-PRODUCT-07
+acceptance_criteria:
+  - AC-PRODUCT-07-01
+  - AC-PRODUCT-07-02
 contracts:
-  PRODUCT-DETAIL: 4
+  - id: PRODUCT-DETAIL
+    revision: 4
+    role: provider
 depends_on: []
 risk: normal
 verification:
-  - provider-contract: PRODUCT-DETAIL-004
-  - unit: relevant account/product tests
+  - type: provider-contract
+    scenario: PRODUCT-DETAIL-004
+  - type: unit
+    scope: viewer-like-state
 status: pending
 verified_against: {}
 ```
 
-Group related tasks under a stable `owner`. The orchestrator should reuse one persistent agent for tasks owned by the same coherent workstream.
+**Consumer Task:**
+```yaml
+id: FE-02
+owner: frontend-product
+outcome: Render viewer like state in product detail view
+requirements:
+  - REQ-PRODUCT-07
+acceptance_criteria:
+  - AC-PRODUCT-07-01
+  - AC-PRODUCT-07-02
+contracts:
+  - id: PRODUCT-DETAIL
+    revision: 4
+    role: consumer
+depends_on: []
+risk: normal
+verification:
+  - type: component
+    scope: ProductDetailView.spec.tsx
+status: pending
+verified_against: {}
+```
+
+**Internal Domain Task (No shared contract):**
+```yaml
+id: BE-01
+owner: backend-product
+outcome: Apply product inventory reservation invariants
+requirements:
+  - REQ-PRODUCT-02
+acceptance_criteria:
+  - AC-PRODUCT-02-01
+contracts: []
+depends_on: []
+risk: normal
+verification:
+  - type: unit
+    scope: inventory-reservation
+status: pending
+verified_against: {}
+```
+
+Group related tasks under a stable `owner`. The orchestrator reuses one persistent agent for tasks owned by the same coherent workstream.
 
 ## Do not decompose by private layers
 
@@ -71,4 +124,4 @@ Tasks can run under different agents concurrently when their contracts are indep
 
 ## Completion semantics
 
-Record `verified_against` contract revisions. A completed task becomes `STALE` when `managing-contract-revisions` changes a contract revision it provides, consumes, or verifies.
+Record `verified_against` contract revisions upon completion. A completed task becomes `STALE` or `REOPENED` when `managing-contract-revisions` changes a contract revision it provides, consumes, or verifies.

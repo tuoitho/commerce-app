@@ -26,7 +26,7 @@ For every contract revision verify:
 
 Classify findings as `contract_defect`, `requirement_gap`, `design_gap`, or `non_blocking_suggestion`. Do not resolve a requirement/design ambiguity by silently inventing contract behavior.
 
-When blocking findings are resolved, update the manifest entry in `.kiro/specs/<feature>/contracts/manifest.yaml` to mark the contract `FROZEN`:
+When blocking findings are resolved, update the manifest entry in `.dream/specs/<feature>/contracts/manifest.yaml` to mark the contract `FROZEN`:
 
 ```yaml
 id: PRODUCT-DETAIL

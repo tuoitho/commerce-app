@@ -39,7 +39,7 @@ contracts:
 depends_on: []
 risk: high
 verification:
-  - migration-contract: apply the up migration and execute ../.kiro/specs/product-favorites/contracts/persistence.assertions.sql
+  - migration-contract: apply the up migration and execute ../.dream/specs/product-favorites/contracts/persistence.assertions.sql
   - migration-reversal: apply the down migration and verify the prior schema, then reapply up
   - generation: run sqlc generate and inspect committed generated output
   - repository-contract: execute FAVORITE-PERSISTENCE revision 1 repository scenarios

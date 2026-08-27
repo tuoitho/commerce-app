@@ -129,23 +129,7 @@ func (f *Catalog) DeleteCategory(ctx context.Context, id string) (*domain.Catego
 }
 
 func (f *Catalog) ListCategories(ctx context.Context) ([]domain.Category, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	byID := make(map[string]domain.Category)
-	for _, product := range f.products {
-		if !publicEligible(product) {
-			continue
-		}
-		if product.Category.ID != "" {
-			byID[product.Category.ID] = product.Category
-		}
-	}
-	out := make([]domain.Category, 0, len(byID))
-	for _, category := range byID {
-		out = append(out, category)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
+	return f.ListAdminCategories(ctx)
 }
 
 func (f *Catalog) ListBrands(ctx context.Context) ([]string, error) {

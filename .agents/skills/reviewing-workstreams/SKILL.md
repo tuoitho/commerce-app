@@ -9,7 +9,7 @@ Use a fresh reviewer context. Supply relevant requirements, design, frozen contr
 
 ## Output
 
-Record findings in `.kiro/specs/<feature>/evidence/workstream-review.md` using `references/review-findings.template.yaml` as the structured findings format.
+Record findings in `.dream/specs/<feature>/evidence/workstreams/<owner>-review-<seq>.yaml` using `references/review-findings.template.yaml` as the structured findings format.
 
 ## Reviewer authority
 
