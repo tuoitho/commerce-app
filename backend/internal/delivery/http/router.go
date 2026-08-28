@@ -166,7 +166,12 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminReturns.POST("/:returnId/receive", adminReturnHandler.Receive)
 			adminReturns.POST("/:returnId/refund", adminReturnHandler.Refund)
 		}
+		adminReviews := admin.Group("/reviews")
+		{
+			adminReviewHandler := NewAdminReviewHandler(deps.Review)
+			adminReviews.GET("", adminReviewHandler.ListReviews)
+			adminReviews.PUT("/:id/reply", adminReviewHandler.UpdateReply)
+			adminReviews.DELETE("/:id/reply", adminReviewHandler.DeleteReply)
+		}
 	}
 }
-
-
