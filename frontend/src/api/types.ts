@@ -367,6 +367,8 @@ export interface PublicReview {
   purchase: PublicPurchase
   media: ReviewMedia[]
   createdAt: string
+  adminReply?: string | null
+  adminRepliedAt?: string | null
 }
 
 export interface ProductReviewSummary {
@@ -407,8 +409,8 @@ export interface UserReview {
   media: ReviewMedia[]
   createdAt: string
   updatedAt: string
-  adminReply?: string
-  adminRepliedAt?: string
+  adminReply?: string | null
+  adminRepliedAt?: string | null
 }
 
 export interface UserReviewsResponse {

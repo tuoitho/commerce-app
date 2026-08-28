@@ -316,6 +316,29 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                         ))}
                       </div>
                     )}
+
+                    {/* Admin Reply */}
+                    {rev.adminReply && (
+                      <div className="mt-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 p-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-50 text-blue-700 border-blue-200 font-semibold gap-1 text-[11px] py-0.5 px-2"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Phản hồi từ người bán</span>
+                          </Badge>
+                          {rev.adminRepliedAt && (
+                            <span className="text-[11px] text-slate-400">
+                              {formatDateTime(rev.adminRepliedAt)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                          {rev.adminReply}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )
               })}
