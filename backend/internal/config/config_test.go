@@ -22,6 +22,11 @@ func clearEnv() func() {
 		"LOG_LEVEL",
 		"ORDER_CONFIRM_TIMEOUT",
 		"SHIPPING_FEE_VND",
+		"MINIO_ENDPOINT",
+		"MINIO_ACCESS_KEY",
+		"MINIO_SECRET_KEY",
+		"MINIO_BUCKET",
+		"MINIO_USE_SSL",
 	}
 
 	saved := make(map[string]string)
@@ -48,6 +53,9 @@ func TestConfig_Defaults(t *testing.T) {
 
 	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
 	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+	os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+	os.Setenv("MINIO_SECRET_KEY", "miniopassword")
 
 	cfg, err := LoadWithFile("")
 	if err != nil {
@@ -81,6 +89,21 @@ func TestConfig_Defaults(t *testing.T) {
 	if cfg.ShippingFeeVND != "0" {
 		t.Errorf("expected ShippingFeeVND '0', got %q", string(cfg.ShippingFeeVND))
 	}
+	if cfg.MinioEndpoint != "localhost:19000" {
+		t.Errorf("expected MinioEndpoint 'localhost:19000', got %q", cfg.MinioEndpoint)
+	}
+	if cfg.MinioAccessKey != "minioadmin" {
+		t.Errorf("expected MinioAccessKey 'minioadmin', got %q", cfg.MinioAccessKey)
+	}
+	if cfg.MinioSecretKey != "miniopassword" {
+		t.Errorf("expected MinioSecretKey 'miniopassword', got %q", cfg.MinioSecretKey)
+	}
+	if cfg.MinioBucket != "product-review-media" {
+		t.Errorf("expected MinioBucket 'product-review-media', got %q", cfg.MinioBucket)
+	}
+	if cfg.MinioUseSSL != false {
+		t.Errorf("expected MinioUseSSL false, got %v", cfg.MinioUseSSL)
+	}
 }
 
 func TestConfig_ProductionCookieSecureDefault(t *testing.T) {
@@ -90,6 +113,9 @@ func TestConfig_ProductionCookieSecureDefault(t *testing.T) {
 	os.Setenv("APP_ENV", "production")
 	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
 	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+	os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+	os.Setenv("MINIO_SECRET_KEY", "miniopassword")
 
 	cfg, err := LoadWithFile("")
 	if err != nil {
@@ -113,6 +139,11 @@ HTTP_PORT=9090
 DB_URL=postgres://file-url:5432/db
 JWT_ACCESS_SECRET=file-secret-key-that-is-at-least-32-chars-long
 LOG_LEVEL=debug
+MINIO_ENDPOINT=file-minio:9000
+MINIO_ACCESS_KEY=file-access-key
+MINIO_SECRET_KEY=file-secret-key
+MINIO_BUCKET=file-bucket
+MINIO_USE_SSL=true
 `
 	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
 		t.Fatalf("failed to write temp .env: %v", err)
@@ -121,6 +152,8 @@ LOG_LEVEL=debug
 	// Environment variable overrides file value
 	os.Setenv("HTTP_PORT", "3000")
 	os.Setenv("LOG_LEVEL", "warn")
+	os.Setenv("MINIO_ENDPOINT", "env-minio:9000")
+	os.Setenv("MINIO_BUCKET", "env-bucket")
 
 	cfg, err := LoadWithFile(envPath)
 	if err != nil {
@@ -139,6 +172,21 @@ LOG_LEVEL=debug
 	if cfg.DBURL != "postgres://file-url:5432/db" {
 		t.Errorf("expected DBURL from file, got %q", cfg.DBURL)
 	}
+	if cfg.MinioEndpoint != "env-minio:9000" {
+		t.Errorf("expected MinioEndpoint 'env-minio:9000' from env override, got %q", cfg.MinioEndpoint)
+	}
+	if cfg.MinioAccessKey != "file-access-key" {
+		t.Errorf("expected MinioAccessKey 'file-access-key' from file, got %q", cfg.MinioAccessKey)
+	}
+	if cfg.MinioSecretKey != "file-secret-key" {
+		t.Errorf("expected MinioSecretKey 'file-secret-key' from file, got %q", cfg.MinioSecretKey)
+	}
+	if cfg.MinioBucket != "env-bucket" {
+		t.Errorf("expected MinioBucket 'env-bucket' from env override, got %q", cfg.MinioBucket)
+	}
+	if cfg.MinioUseSSL != true {
+		t.Errorf("expected MinioUseSSL true from file, got %v", cfg.MinioUseSSL)
+	}
 }
 
 func TestConfig_MissingDotEnvFileContinues(t *testing.T) {
@@ -147,6 +195,9 @@ func TestConfig_MissingDotEnvFileContinues(t *testing.T) {
 
 	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
 	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+	os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+	os.Setenv("MINIO_SECRET_KEY", "miniopassword")
 
 	cfg, err := LoadWithFile("non_existent_file.env")
 	if err != nil {
@@ -167,13 +218,19 @@ func TestConfig_ValidationFailures(t *testing.T) {
 			name: "missing DB_URL",
 			env: map[string]string{
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "DB_URL is required",
 		},
 		{
 			name: "missing JWT_ACCESS_SECRET",
 			env: map[string]string{
-				"DB_URL": "postgres://localhost:5432/commerce",
+				"DB_URL":           "postgres://localhost:5432/commerce",
+				"MINIO_ENDPOINT":   "localhost:19000",
+				"MINIO_ACCESS_KEY":  "minioadmin",
+				"MINIO_SECRET_KEY":  "miniopassword",
 			},
 			errContains: "JWT_ACCESS_SECRET is required",
 		},
@@ -182,6 +239,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 			env: map[string]string{
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "short-secret",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "JWT_ACCESS_SECRET must be at least 32 characters",
 		},
@@ -191,6 +251,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"HTTP_PORT":         "not-a-number",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "HTTP_PORT must be an integer",
 		},
@@ -200,6 +263,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"ACCESS_TOKEN_TTL":  "invalid-duration",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "ACCESS_TOKEN_TTL must be a duration",
 		},
@@ -209,6 +275,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"REFRESH_TOKEN_TTL": "100xyz",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "REFRESH_TOKEN_TTL must be a duration",
 		},
@@ -218,6 +287,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"COOKIE_SECURE":     "not-a-bool",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "COOKIE_SECURE must be a boolean",
 		},
@@ -227,6 +299,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"LOG_LEVEL":         "verbose",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "LOG_LEVEL must be one of debug, info, warn, error",
 		},
@@ -236,6 +311,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":                "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET":     "super-secret-key-that-is-at-least-32-chars-long",
 				"ORDER_CONFIRM_TIMEOUT": "invalid-duration",
+				"MINIO_ENDPOINT":        "localhost:19000",
+				"MINIO_ACCESS_KEY":       "minioadmin",
+				"MINIO_SECRET_KEY":       "miniopassword",
 			},
 			errContains: "ORDER_CONFIRM_TIMEOUT must be a duration",
 		},
@@ -245,6 +323,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"SHIPPING_FEE_VND":  "-5000",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
 		},
@@ -254,6 +335,9 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"SHIPPING_FEE_VND":  "15000.50",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
 		},
@@ -263,8 +347,53 @@ func TestConfig_ValidationFailures(t *testing.T) {
 				"DB_URL":            "postgres://localhost:5432/commerce",
 				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
 				"SHIPPING_FEE_VND":  "015000",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
 			},
 			errContains: "SHIPPING_FEE_VND must be a valid canonical VND amount",
+		},
+		{
+			name: "missing MINIO_ENDPOINT",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
+			},
+			errContains: "MINIO_ENDPOINT is required",
+		},
+		{
+			name: "missing MINIO_ACCESS_KEY",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_SECRET_KEY":   "miniopassword",
+			},
+			errContains: "MINIO_ACCESS_KEY is required",
+		},
+		{
+			name: "missing MINIO_SECRET_KEY",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+			},
+			errContains: "MINIO_SECRET_KEY is required",
+		},
+		{
+			name: "invalid MINIO_USE_SSL",
+			env: map[string]string{
+				"DB_URL":            "postgres://localhost:5432/commerce",
+				"JWT_ACCESS_SECRET": "super-secret-key-that-is-at-least-32-chars-long",
+				"MINIO_ENDPOINT":    "localhost:19000",
+				"MINIO_ACCESS_KEY":   "minioadmin",
+				"MINIO_SECRET_KEY":   "miniopassword",
+				"MINIO_USE_SSL":     "not-a-bool",
+			},
+			errContains: "MINIO_USE_SSL must be a boolean",
 		},
 	}
 
@@ -297,6 +426,9 @@ func TestConfig_LogLevelParsing(t *testing.T) {
 
 			os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
 			os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+			os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+			os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+			os.Setenv("MINIO_SECRET_KEY", "miniopassword")
 			os.Setenv("LOG_LEVEL", lvl)
 
 			cfg, err := LoadWithFile("")
@@ -316,6 +448,9 @@ func TestConfig_OrderPlacementConfigs(t *testing.T) {
 
 	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
 	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+	os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+	os.Setenv("MINIO_SECRET_KEY", "miniopassword")
 	os.Setenv("ORDER_CONFIRM_TIMEOUT", "45m")
 	os.Setenv("SHIPPING_FEE_VND", "30000")
 
@@ -331,4 +466,39 @@ func TestConfig_OrderPlacementConfigs(t *testing.T) {
 		t.Errorf("expected ShippingFeeVND '30000', got %q", string(cfg.ShippingFeeVND))
 	}
 }
+
+func TestConfig_MinioCustomSettings(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+
+	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
+	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "custom-s3.example.com:9000")
+	os.Setenv("MINIO_ACCESS_KEY", "custom-access")
+	os.Setenv("MINIO_SECRET_KEY", "custom-secret")
+	os.Setenv("MINIO_BUCKET", "custom-review-bucket")
+	os.Setenv("MINIO_USE_SSL", "true")
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.MinioEndpoint != "custom-s3.example.com:9000" {
+		t.Errorf("expected MinioEndpoint 'custom-s3.example.com:9000', got %q", cfg.MinioEndpoint)
+	}
+	if cfg.MinioAccessKey != "custom-access" {
+		t.Errorf("expected MinioAccessKey 'custom-access', got %q", cfg.MinioAccessKey)
+	}
+	if cfg.MinioSecretKey != "custom-secret" {
+		t.Errorf("expected MinioSecretKey 'custom-secret', got %q", cfg.MinioSecretKey)
+	}
+	if cfg.MinioBucket != "custom-review-bucket" {
+		t.Errorf("expected MinioBucket 'custom-review-bucket', got %q", cfg.MinioBucket)
+	}
+	if cfg.MinioUseSSL != true {
+		t.Errorf("expected MinioUseSSL true, got %v", cfg.MinioUseSSL)
+	}
+}
+
 

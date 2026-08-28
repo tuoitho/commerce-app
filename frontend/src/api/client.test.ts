@@ -150,4 +150,37 @@ describe('apiClient', () => {
       expect(apiErr.isBusinessError()).toBe(true)
     }
   })
+
+  it('sends FormData without Content-Type application/json header', async () => {
+    const mockResponse = {
+      success: true,
+      message: 'OK',
+      data: { id: 'rev-1', rating: 5 },
+      error: null,
+      meta: { timestamp: '2026-08-16T00:00:00.000Z' },
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockResponse,
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const formData = new FormData()
+    formData.append('rating', '5')
+    formData.append('comment', 'Good')
+
+    const result = await apiClient('/orders/1/items/2/review', {
+      method: 'POST',
+      body: formData,
+    })
+
+    expect(result).toEqual({ id: 'rev-1', rating: 5 })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const callArgs = fetchMock.mock.calls[0]
+    const headers = callArgs[1].headers
+    expect(headers['Content-Type']).toBeUndefined()
+    expect(callArgs[1].body).toBe(formData)
+  })
 })

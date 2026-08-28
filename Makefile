@@ -1,4 +1,12 @@
-.PHONY: backend frontend frontend-admin admin db-up seed run test build
+.PHONY: backend frontend frontend-admin admin db-up seed minio-up minio-down run test build
+
+## Start MinIO object storage container and initialize private bucket.
+minio-up:
+	docker compose -f compose.minio.yml up -d
+
+## Stop MinIO object storage container.
+minio-down:
+	docker compose -f compose.minio.yml down
 
 ## Apply database migrations against the local backend DB.
 db-up:

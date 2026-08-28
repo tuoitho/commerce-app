@@ -12,15 +12,24 @@ import {
   RefreshCw,
   Smartphone,
   ChevronRight,
+  Star,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { ordersApi } from '@/api/orders'
-import type { Order, OrderStats, OrderStatus, OrderStatusBucket } from '@/api/types'
+import type {
+  Order,
+  OrderStats,
+  OrderStatus,
+  OrderStatusBucket,
+  OrderItem,
+  Review,
+} from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { ReviewFormDialog } from '@/components/ReviewFormDialog'
 
 interface StatusBadgeConfig {
   label: string
@@ -87,6 +96,7 @@ const TABS: TabConfig[] = [
   { key: 'pickup', label: 'Chờ lấy hàng' },
   { key: 'delivery', label: 'Chờ giao hàng' },
   { key: 'delivered', label: 'Đã giao' },
+  { key: 'reviewable', label: 'Chờ đánh giá' },
   { key: 'returns', label: 'Trả hàng' },
   { key: 'cancelled', label: 'Đã hủy' },
 ]
@@ -106,6 +116,19 @@ export function OrderHistoryPage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true)
   const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [errorOrders, setErrorOrders] = useState<string | null>(null)
+
+  // Review dialog state
+  const [reviewDialogState, setReviewDialogState] = useState<{
+    isOpen: boolean
+    orderId: string
+    item: OrderItem | null
+    existingReview?: Review | null
+  }>({
+    isOpen: false,
+    orderId: '',
+    item: null,
+    existingReview: null,
+  })
 
   // Redirect if not logged in
   useEffect(() => {
@@ -142,6 +165,34 @@ export function OrderHistoryPage() {
       setIsLoadingOrders(false)
     }
   }, [isAuthenticated])
+
+  const handleReviewSuccess = (savedReview: Review) => {
+    if (!reviewDialogState.item) return
+    const orderId = reviewDialogState.orderId
+    const itemId = reviewDialogState.item.id
+
+    setOrders((prevOrders) =>
+      prevOrders.map((ord) => {
+        if (ord.id !== orderId) return ord
+        return {
+          ...ord,
+          items: ord.items.map((it) => {
+            if (it.id !== itemId) return it
+            return {
+              ...it,
+              reviewStatus: 'reviewed',
+              review: savedReview,
+            }
+          }),
+        }
+      })
+    )
+
+    fetchStats()
+    if (activeTab === 'reviewable') {
+      fetchOrders('reviewable')
+    }
+  }
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -298,15 +349,15 @@ export function OrderHistoryPage() {
           {/* 4. Chờ đánh giá */}
           <button
             type="button"
-            onClick={() => handleTabChange('delivered')}
+            onClick={() => handleTabChange('reviewable')}
             className={`flex items-center gap-3.5 p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer ${
-              activeTab === 'delivered'
-                ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400/30 shadow-xs'
-                : 'bg-white border-slate-200/90 hover:border-emerald-300 hover:shadow-xs'
+              activeTab === 'reviewable'
+                ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/30 shadow-xs'
+                : 'bg-white border-slate-200/90 hover:border-amber-300 hover:shadow-xs'
             }`}
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100/70 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100/70 text-amber-700">
+              <Star className="h-5 w-5 fill-amber-400 text-amber-500" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-slate-500 truncate">Chờ đánh giá</p>
@@ -494,6 +545,64 @@ export function OrderHistoryPage() {
                                 ))}
                               </div>
                             )}
+
+                            {/* Review status and actions */}
+                            <div className="flex items-center gap-2 pt-1.5 flex-wrap">
+                              {item.reviewStatus === 'eligible' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    setReviewDialogState({
+                                      isOpen: true,
+                                      orderId: order.id,
+                                      item,
+                                      existingReview: null,
+                                    })
+                                  }
+                                  className="text-xs h-7 rounded-lg border-amber-300 bg-amber-50/60 text-amber-900 hover:bg-amber-100 font-semibold gap-1"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                                  <span>Đánh giá</span>
+                                </Button>
+                              )}
+                              {item.reviewStatus === 'reviewed' && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 py-0.5 font-medium"
+                                  >
+                                    <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                    <span>Đã đánh giá ({item.review?.rating}★)</span>
+                                  </Badge>
+                                  {item.review?.canEdit && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        setReviewDialogState({
+                                          isOpen: true,
+                                          orderId: order.id,
+                                          item,
+                                          existingReview: item.review,
+                                        })
+                                      }
+                                      className="text-xs h-6 px-2 text-slate-600 hover:text-slate-900 font-medium"
+                                    >
+                                      Sửa đánh giá
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                              {item.reviewStatus === 'refunded' && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[11px] bg-slate-100 text-slate-600 border-slate-200 font-medium"
+                                >
+                                  Đã hoàn tiền
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -543,6 +652,19 @@ export function OrderHistoryPage() {
               )
             })}
           </div>
+        )}
+
+        {reviewDialogState.item && (
+          <ReviewFormDialog
+            isOpen={reviewDialogState.isOpen}
+            onClose={() =>
+              setReviewDialogState((prev) => ({ ...prev, isOpen: false, item: null }))
+            }
+            orderId={reviewDialogState.orderId}
+            item={reviewDialogState.item}
+            existingReview={reviewDialogState.existingReview}
+            onSuccess={handleReviewSuccess}
+          />
         )}
       </div>
     </div>

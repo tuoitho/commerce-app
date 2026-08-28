@@ -38,13 +38,20 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	addressUseCase := provideAddressUseCase(addressRepository, areaRepository)
 	orderRepository := provideOrderRepository(pool)
 	returnRepository := provideReturnRepository(pool)
-	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, cfg)
+	reviewRepository := provideReviewRepository(pool)
+	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, cfg)
 	returnsUseCase := provideReturnUseCase(returnRepository)
+	store, err := provideReviewMediaStore(cfg)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	reviewUseCase := provideReviewUseCase(reviewRepository, store, catalogRepository)
 	favoriteRepository := provideFavoriteRepository(pool)
 	favoriteUseCase := provideFavoriteUseCase(favoriteRepository)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, favoriteUseCase, manager)
+	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, manager)
 	server := provideHTTPServer(cfg, engine)
-	app := provideApp(cfg, log, pool, server, useCase, orderUseCase)
+	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, store)
 	return app, func() {
 		cleanup()
 	}, nil
@@ -62,6 +69,8 @@ var appProviderSet = wire.NewSet(
 	provideAddressRepository,
 	provideOrderRepository,
 	provideReturnRepository,
+	provideReviewRepository,
+	provideReviewMediaStore,
 	provideFavoriteRepository,
 	provideJWTManager,
 	provideAuthUseCase,
@@ -71,6 +80,7 @@ var appProviderSet = wire.NewSet(
 	provideAddressUseCase,
 	provideOrderUseCase,
 	provideReturnUseCase,
+	provideReviewUseCase,
 	provideFavoriteUseCase,
 	provideGinRouter,
 	provideHTTPServer,

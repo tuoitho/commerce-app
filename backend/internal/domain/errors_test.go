@@ -47,6 +47,12 @@ func TestSentinelErrors_Defined(t *testing.T) {
 		{"ErrOrderNotFound", ErrOrderNotFound},
 		{"ErrOrderNotCancellable", ErrOrderNotCancellable},
 		{"ErrOrderNotCancelRequested", ErrOrderNotCancelRequested},
+		{"ErrOrderItemNotFound", ErrOrderItemNotFound},
+		{"ErrReviewNotFound", ErrReviewNotFound},
+		{"ErrReviewNotEligible", ErrReviewNotEligible},
+		{"ErrReviewAlreadyExists", ErrReviewAlreadyExists},
+		{"ErrReviewEditLimitReached", ErrReviewEditLimitReached},
+		{"ErrReviewMediaNotFound", ErrReviewMediaNotFound},
 	}
 
 	for _, s := range sentinels {

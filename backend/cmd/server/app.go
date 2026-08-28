@@ -23,21 +23,31 @@ import (
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
+	reviewuc "commerce-backend/internal/usecase/review"
+	"commerce-backend/internal/storage/reviewmedia"
 )
 
 type App struct {
-	Config  *config.Config
-	Logger  *slog.Logger
-	Pool    *pgxpool.Pool
-	Server  *http.Server
-	AuthUC  *authuc.UseCase
-	OrderUC *orderuc.UseCase
+	Config     *config.Config
+	Logger     *slog.Logger
+	Pool       *pgxpool.Pool
+	Server     *http.Server
+	AuthUC     *authuc.UseCase
+	OrderUC    *orderuc.UseCase
+	MediaStore *reviewmedia.Store
 }
 
 func (a *App) Run(ctx context.Context) error {
 	if err := a.Pool.Ping(ctx); err != nil {
 		a.Logger.Error("database ping failed", "category", "db_ping")
 		return fmt.Errorf("ping database: %w", err)
+	}
+
+	if a.MediaStore != nil {
+		if err := a.MediaStore.ValidateBucketPrivate(ctx); err != nil {
+			a.Logger.Error("minio validation failed", "category", "storage_init", "error", err)
+			return fmt.Errorf("validate minio bucket: %w", err)
+		}
 	}
 
 	if a.Config.AdminBootstrapEmail != "" && a.Config.AdminBootstrapPassword != "" {
@@ -116,6 +126,14 @@ func provideReturnRepository(pool *pgxpool.Pool) *repository.ReturnRepository {
 	return repository.NewReturnRepository(pool)
 }
 
+func provideReviewRepository(pool *pgxpool.Pool) *repository.ReviewRepository {
+	return repository.NewReviewRepository(pool)
+}
+
+func provideReviewMediaStore(cfg *config.Config) (*reviewmedia.Store, error) {
+	return reviewmedia.New(cfg)
+}
+
 func provideFavoriteRepository(pool *pgxpool.Pool) *repository.FavoriteRepository {
 	return repository.NewFavoriteRepository(pool)
 }
@@ -158,10 +176,11 @@ func provideAddressUseCase(repo *repository.AddressRepository, areaRepo *reposit
 	})
 }
 
-func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, cfg *config.Config) *orderuc.UseCase {
+func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
 		Order:               repo,
 		Return:              returnRepo,
+		Review:              reviewRepo,
 		ShippingFeeVND:      cfg.ShippingFeeVND,
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
 	})
@@ -173,13 +192,17 @@ func provideReturnUseCase(repo *repository.ReturnRepository) *returnuc.UseCase {
 	})
 }
 
+func provideReviewUseCase(repo *repository.ReviewRepository, mediaStore *reviewmedia.Store, catalogRepo *repository.CatalogRepository) *reviewuc.ReviewUseCase {
+	return reviewuc.NewReviewUseCase(repo, mediaStore, catalogRepo)
+}
+
 func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.UseCase {
 	return favoriteuc.New(favoriteuc.Dependencies{
 		Favorite: repo,
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnUC *returnuc.UseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnUC *returnuc.UseCase, reviewUC *reviewuc.ReviewUseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -193,6 +216,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Address:      addressUC,
 		Order:        orderUC,
 		Return:       returnUC,
+		Review:       reviewUC,
 		Favorite:     favoriteUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
@@ -209,13 +233,14 @@ func provideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	}
 }
 
-func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase, orderUC *orderuc.UseCase) *App {
+func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase, orderUC *orderuc.UseCase, mediaStore *reviewmedia.Store) *App {
 	return &App{
-		Config:  cfg,
-		Logger:  log,
-		Pool:    pool,
-		Server:  srv,
-		AuthUC:  authUC,
-		OrderUC: orderUC,
+		Config:     cfg,
+		Logger:     log,
+		Pool:       pool,
+		Server:     srv,
+		AuthUC:     authUC,
+		OrderUC:    orderUC,
+		MediaStore: mediaStore,
 	}
 }

@@ -120,13 +120,47 @@ func (f *fakeOrderUsecaseRepo) AdminTransition(_ context.Context, orderID string
 }
 
 
+type fakeReviewRepoForHandler struct {
+	listByItemIDsFn func(ctx context.Context, itemIDs []string) (map[string]*domain.Review, error)
+}
+
+func (f *fakeReviewRepoForHandler) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) UpdateReview(ctx context.Context, input domain.UpdateReviewInput) (*domain.Review, []string, error) {
+	return nil, nil, nil
+}
+func (f *fakeReviewRepoForHandler) GetReviewByID(ctx context.Context, reviewID string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) GetReviewByOrderItemID(ctx context.Context, orderItemID string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) ListReviewsByOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error) {
+	if f.listByItemIDsFn != nil {
+		return f.listByItemIDsFn(ctx, orderItemIDs)
+	}
+	return make(map[string]*domain.Review), nil
+}
+func (f *fakeReviewRepoForHandler) GetReviewMediaByID(ctx context.Context, mediaID string) (*domain.ReviewMedia, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+	return nil, nil
+}
+
 func newOrderTestRouter(orderRepo *fakeOrderUsecaseRepo) (*gin.Engine, string) {
+	return newOrderTestRouterWithReview(orderRepo, nil)
+}
+
+func newOrderTestRouterWithReview(orderRepo *fakeOrderUsecaseRepo, reviewRepo domain.ReviewRepository) (*gin.Engine, string) {
 	gin.SetMode(gin.TestMode)
 	manager := jwt.NewManager(testSecret, "commerce-backend")
 	token, _ := manager.GenerateAccessToken(orderTestUser, domain.RoleCustomer, 15*time.Minute)
 
 	uc := orderuc.New(orderuc.Dependencies{
 		Order:               orderRepo,
+		Review:              reviewRepo,
 		ShippingFeeVND:      "30000",
 		OrderConfirmTimeout: 30 * time.Minute,
 	})
@@ -460,6 +494,95 @@ func TestOrderHTTP_GetByID(t *testing.T) {
 			t.Errorf("expected CancellableUntil to be populated for pending_confirmation")
 		}
 	})
+
+	t.Run("success returns Order with review states on items", func(t *testing.T) {
+		reviewID := "55555555-5555-5555-5555-555555555555"
+		order := &domain.Order{
+			ID:             validOrderID,
+			UserID:         orderTestUser,
+			Status:         domain.OrderStatusDelivered,
+			PaymentMethod:  domain.PaymentMethodCOD,
+			SubtotalVND:    "200000",
+			ShippingFeeVND: "0",
+			TotalVND:       "200000",
+			Items: []domain.OrderItem{
+				{
+					ID:           "item-reviewed",
+					OrderID:      validOrderID,
+					VariantID:    "33333333-3333-3333-3333-333333333333",
+					ProductID:    "44444444-4444-4444-4444-444444444444",
+					BrandName:    "Apple",
+					ProductName:  "iPhone 15",
+					UnitPriceVND: "100000",
+					Quantity:     1,
+					LineTotalVND: "100000",
+					ReviewStatus: domain.ReviewStatusReviewed,
+					Review: &domain.Review{
+						ID:          reviewID,
+						OrderItemID: "item-reviewed",
+						Rating:      5,
+						Comment:     "Tuyệt vời",
+						CanEdit:     true,
+						Edited:      false,
+					},
+				},
+				{
+					ID:           "item-eligible",
+					OrderID:      validOrderID,
+					VariantID:    "33333333-3333-3333-3333-333333333334",
+					ProductID:    "44444444-4444-4444-4444-444444444444",
+					BrandName:    "Apple",
+					ProductName:  "iPhone 15",
+					UnitPriceVND: "100000",
+					Quantity:     1,
+					LineTotalVND: "100000",
+					ReviewStatus: domain.ReviewStatusEligible,
+				},
+			},
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+
+		reviewRepo := &fakeReviewRepoForHandler{
+			listByItemIDsFn: func(ctx context.Context, itemIDs []string) (map[string]*domain.Review, error) {
+				return map[string]*domain.Review{
+					"item-reviewed": {
+						ID:          reviewID,
+						OrderItemID: "item-reviewed",
+						Rating:      5,
+						Comment:     "Tuyệt vời",
+						CanEdit:     true,
+						Edited:      false,
+					},
+				}, nil
+			},
+		}
+
+		repo := &fakeOrderUsecaseRepo{getByIDOrder: order}
+		router, token := newOrderTestRouterWithReview(repo, reviewRepo)
+
+		w := execOrderRequest(router, token, http.MethodGet, "/api/v1/orders/"+validOrderID, "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d, body: %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Success bool          `json:"success"`
+			Data    orderResponse `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to unmarshal: %v", err)
+		}
+		if len(resp.Data.Items) != 2 {
+			t.Fatalf("expected 2 items, got %d", len(resp.Data.Items))
+		}
+		if resp.Data.Items[0].ReviewStatus != "reviewed" || resp.Data.Items[0].Review == nil || resp.Data.Items[0].Review.ID != reviewID {
+			t.Errorf("unexpected item[0] review state: %+v", resp.Data.Items[0])
+		}
+		if resp.Data.Items[1].ReviewStatus != "eligible" || resp.Data.Items[1].Review != nil {
+			t.Errorf("unexpected item[1] review state: %+v", resp.Data.Items[1])
+		}
+	})
 }
 
 func TestOrderHTTP_List(t *testing.T) {
@@ -527,6 +650,19 @@ func TestOrderHTTP_List(t *testing.T) {
 		}
 		if repo.lastListBucket != domain.OrderStatusBucketPickup {
 			t.Errorf("expected bucket %s, got %s", domain.OrderStatusBucketPickup, repo.lastListBucket)
+		}
+	})
+
+	t.Run("filtered by reviewable status bucket", func(t *testing.T) {
+		repo := &fakeOrderUsecaseRepo{listOrders: []domain.Order{}}
+		router, token := newOrderTestRouter(repo)
+
+		w := execOrderRequest(router, token, http.MethodGet, "/api/v1/orders?status=reviewable", "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d, body: %s", w.Code, w.Body.String())
+		}
+		if repo.lastListBucket != domain.OrderStatusBucketReviewable {
+			t.Errorf("expected bucket %s, got %s", domain.OrderStatusBucketReviewable, repo.lastListBucket)
 		}
 	})
 

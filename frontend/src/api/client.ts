@@ -58,8 +58,10 @@ export async function fetchEnvelope<T>(path: string, options: RequestOptions = {
   const formattedPath = path.startsWith('/') ? path : `/${path}`
   const url = `${BASE_URL}${formattedPath}`
 
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+
   const requestHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(headers as Record<string, string>),
   }
 
@@ -75,7 +77,7 @@ export async function fetchEnvelope<T>(path: string, options: RequestOptions = {
   }
 
   if (body !== undefined) {
-    fetchOptions.body = JSON.stringify(body)
+    fetchOptions.body = isFormData ? body : JSON.stringify(body)
   }
 
   let response = await fetch(url, fetchOptions)

@@ -164,13 +164,14 @@ describe('OrderHistoryPage', () => {
       expect(screen.getByText('5')).toBeInTheDocument() // awaitingReview
     })
 
-    // 7 tabs
+    // 8 tabs
     const tabLabels = [
       'Tất cả',
       'Chờ xác nhận',
       'Chờ lấy hàng',
       'Chờ giao hàng',
       'Đã giao',
+      'Chờ đánh giá',
       'Trả hàng',
       'Đã hủy',
     ]
@@ -359,6 +360,93 @@ describe('OrderHistoryPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Mã đơn: ord-001/i)).toBeInTheDocument()
+    })
+  })
+
+  it('clicking card 4 switches to reviewable tab and filters orders', async () => {
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders']}>
+          <Routes>
+            <Route path="/orders" element={<OrderHistoryPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Mã đơn: ord-001/i)).toBeInTheDocument()
+    })
+
+    const reviewStatBtn = screen.getByRole('button', { name: /Chờ đánh giá/i })
+    fireEvent.click(reviewStatBtn)
+
+    await waitFor(() => {
+      expect(ordersApi.listOrders).toHaveBeenCalledWith('reviewable')
+      const reviewTab = screen.getByRole('tab', { name: 'Chờ đánh giá' })
+      expect(reviewTab).toHaveAttribute('aria-selected', 'true')
+    })
+  })
+
+  it('renders review buttons according to reviewStatus on order items', async () => {
+    const ordersWithReviewStates: Order[] = [
+      {
+        ...mockOrders[1],
+        id: 'ord-review-1',
+        items: [
+          {
+            ...mockOrders[1].items[0],
+            id: 'item-eligible',
+            productName: 'Eligible Item',
+            reviewStatus: 'eligible',
+          },
+          {
+            ...mockOrders[1].items[0],
+            id: 'item-reviewed',
+            productName: 'Reviewed Item',
+            reviewStatus: 'reviewed',
+            review: {
+              id: 'rev-1',
+              rating: 5,
+              comment: 'Great',
+              editCount: 0,
+              media: [],
+              createdAt: '2026-08-28T00:00:00Z',
+              updatedAt: '2026-08-28T00:00:00Z',
+              edited: false,
+              canEdit: true,
+            },
+          },
+          {
+            ...mockOrders[1].items[0],
+            id: 'item-refunded',
+            productName: 'Refunded Item',
+            reviewStatus: 'refunded',
+          },
+        ],
+      },
+    ]
+
+    vi.mocked(ordersApi.listOrders).mockResolvedValue(ordersWithReviewStates)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders?status=reviewable']}>
+          <Routes>
+            <Route path="/orders" element={<OrderHistoryPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Eligible Item')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Đánh giá' })).toBeInTheDocument()
+      expect(screen.getByText('Reviewed Item')).toBeInTheDocument()
+      expect(screen.getByText(/Đã đánh giá \(5★\)/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Sửa đánh giá' })).toBeInTheDocument()
+      expect(screen.getByText('Refunded Item')).toBeInTheDocument()
+      expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
     })
   })
 })

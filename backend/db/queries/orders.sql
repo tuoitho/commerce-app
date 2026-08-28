@@ -179,3 +179,55 @@ JOIN users u ON u.id = o.user_id
 WHERE o.id = $1
 FOR UPDATE;
 
+-- name: ListReviewableOrdersByUser :many
+SELECT o.id, o.user_id, o.status, o.payment_method,
+       o.subtotal_vnd::text AS subtotal_vnd,
+       o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.total_vnd::text AS total_vnd,
+       o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at
+FROM orders o
+WHERE o.user_id = @user_id
+  AND o.status IN ('delivered', 'partially_returned')
+  AND EXISTS (
+      SELECT 1
+      FROM order_items oi
+      WHERE oi.order_id = o.id
+        AND NOT EXISTS (
+            SELECT 1
+            FROM product_reviews pr
+            WHERE pr.order_item_id = oi.id
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM return_request_items rri
+            JOIN return_requests rr ON rr.id = rri.return_request_id
+            WHERE rri.order_item_id = oi.id
+              AND rr.status = 'refunded'
+        )
+  )
+ORDER BY o.created_at DESC, o.id DESC;
+
+-- name: CountReviewableOrdersByUser :one
+SELECT COUNT(*)::bigint AS count
+FROM orders o
+WHERE o.user_id = $1
+  AND o.status IN ('delivered', 'partially_returned')
+  AND EXISTS (
+      SELECT 1
+      FROM order_items oi
+      WHERE oi.order_id = o.id
+        AND NOT EXISTS (
+            SELECT 1
+            FROM product_reviews pr
+            WHERE pr.order_item_id = oi.id
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM return_request_items rri
+            JOIN return_requests rr ON rr.id = rri.return_request_id
+            WHERE rri.order_item_id = oi.id
+              AND rr.status = 'refunded'
+        )
+  );
+

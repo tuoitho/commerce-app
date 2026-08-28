@@ -1032,6 +1032,31 @@ func (r *ReturnRepository) IsOrderItemRefunded(ctx context.Context, orderItemID 
 	return q.IsOrderItemRefunded(ctx, orderItemID)
 }
 
+func (r *ReturnRepository) ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	if len(orderItemIDs) == 0 {
+		return result, nil
+	}
+	validIDs := make([]string, 0, len(orderItemIDs))
+	for _, id := range orderItemIDs {
+		if _, err := uuid.Parse(id); err == nil {
+			validIDs = append(validIDs, id)
+		}
+	}
+	if len(validIDs) == 0 {
+		return result, nil
+	}
+	q := sqlc.New(r.db)
+	refundedRows, err := q.ListRefundedOrderItemIDs(ctx, validIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range refundedRows {
+		result[id] = true
+	}
+	return result, nil
+}
+
 func mapReturnItemRows(rows []sqlc.ListReturnRequestItemsByRequestIDRow) []domain.ReturnRequestItem {
 	items := make([]domain.ReturnRequestItem, len(rows))
 	for i, r := range rows {

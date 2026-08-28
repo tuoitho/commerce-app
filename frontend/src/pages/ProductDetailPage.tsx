@@ -27,7 +27,11 @@ import {
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
 import { ApiError } from '@/api/types'
-import type { ProductDetail, ProductVariant } from '@/api/types'
+import type {
+  ProductDetail,
+  ProductVariant,
+  ProductReviewSummary,
+} from '@/api/types'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
@@ -35,6 +39,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FavoriteToggleButton } from '@/components/FavoriteToggleButton'
+import { ProductReviewsSection } from '@/components/ProductReviewsSection'
 
 // Currency formatter
 function formatVND(value: string | number): string {
@@ -114,6 +119,7 @@ export function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [activeTab, setActiveTab] = useState<'specs' | 'highlights' | 'warranty'>('specs')
+  const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary | null>(null)
 
   // Load product data
   useEffect(() => {
@@ -482,9 +488,19 @@ export function ProductDetailPage() {
                   </span>
                 )}
                 <div className="flex items-center gap-1 text-xs text-amber-500 font-bold ml-auto">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span>5.0</span>
-                  <span className="text-slate-400 font-normal">(128 đánh giá)</span>
+                  {reviewSummary && reviewSummary.totalReviews > 0 ? (
+                    <>
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <span>{reviewSummary.averageRating}</span>
+                      <span className="text-slate-400 font-normal">
+                        ({reviewSummary.totalReviews} đánh giá)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-normal text-xs">
+                      Chưa có đánh giá
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -783,6 +799,12 @@ export function ProductDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Product Reviews Section */}
+        <ProductReviewsSection
+          productId={product.id}
+          onSummaryLoaded={setReviewSummary}
+        />
       </div>
 
       {/* Floating Mobile Sticky Purchase Bar */}

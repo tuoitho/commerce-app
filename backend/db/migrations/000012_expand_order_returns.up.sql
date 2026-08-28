@@ -25,10 +25,10 @@ SET expected_refund_amount_vnd = CASE
     WHEN isum.returned_count = oic.total_count THEN isum.items_total + o.shipping_fee_vnd
     ELSE isum.items_total
 END
-FROM item_sums isum
-JOIN orders o ON o.id = rr.order_id
-JOIN order_item_counts oic ON oic.order_id = rr.order_id
-WHERE rr.id = isum.return_request_id;
+FROM item_sums isum, orders o, order_item_counts oic
+WHERE rr.id = isum.return_request_id
+  AND o.id = rr.order_id
+  AND oic.order_id = rr.order_id;
 
 -- Fallback for any legacy return row without items
 UPDATE return_requests

@@ -104,6 +104,17 @@ func (f *fakeReturnUsecaseRepo) IsOrderItemRefunded(ctx context.Context, orderIt
 	}
 	return false, nil
 }
+func (f *fakeReturnUsecaseRepo) ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error) {
+	res := make(map[string]bool)
+	for _, id := range orderItemIDs {
+		if f.isRefundedFn != nil {
+			if ref, _ := f.isRefundedFn(ctx, id); ref {
+				res[id] = true
+			}
+		}
+	}
+	return res, nil
+}
 
 const returnTestCustomer = "11111111-1111-1111-1111-111111111111"
 const returnTestAdmin = "22222222-2222-2222-2222-222222222222"

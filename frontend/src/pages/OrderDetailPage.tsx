@@ -16,17 +16,25 @@ import {
   RefreshCw,
   ShoppingBag,
   ShieldCheck,
+  Star,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
 import { cancelReturn } from '@/api/returns'
-import { ApiError, type Order, type OrderStatus } from '@/api/types'
+import {
+  ApiError,
+  type Order,
+  type OrderStatus,
+  type OrderItem,
+  type Review,
+} from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReturnRequestDialog } from '@/components/ReturnRequestDialog'
+import { ReviewFormDialog } from '@/components/ReviewFormDialog'
 import {
   Dialog,
   DialogContent,
@@ -193,6 +201,37 @@ export function OrderDetailPage() {
   const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
   const [isCancelReturnDialogOpen, setIsCancelReturnDialogOpen] = useState(false)
   const [isSubmittingReturnCancel, setIsSubmittingReturnCancel] = useState(false)
+
+  // Review dialog state
+  const [reviewDialogState, setReviewDialogState] = useState<{
+    isOpen: boolean
+    item: OrderItem | null
+    existingReview?: Review | null
+  }>({
+    isOpen: false,
+    item: null,
+    existingReview: null,
+  })
+
+  const handleReviewSuccess = (savedReview: Review) => {
+    if (!order || !reviewDialogState.item) return
+    const itemId = reviewDialogState.item.id
+
+    setOrder((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        items: prev.items.map((it) => {
+          if (it.id !== itemId) return it
+          return {
+            ...it,
+            reviewStatus: 'reviewed',
+            review: savedReview,
+          }
+        }),
+      }
+    })
+  }
 
   // Redirect if not logged in
   useEffect(() => {
@@ -656,6 +695,62 @@ export function OrderDetailPage() {
                               ))}
                             </div>
                           )}
+
+                          {/* Review status and actions */}
+                          <div className="flex items-center gap-2 pt-1.5 flex-wrap">
+                            {item.reviewStatus === 'eligible' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setReviewDialogState({
+                                    isOpen: true,
+                                    item,
+                                    existingReview: null,
+                                  })
+                                }
+                                className="text-xs h-7 rounded-lg border-amber-300 bg-amber-50/60 text-amber-900 hover:bg-amber-100 font-semibold gap-1"
+                              >
+                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                                <span>Đánh giá</span>
+                              </Button>
+                            )}
+                            {item.reviewStatus === 'reviewed' && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 py-0.5 font-medium"
+                                >
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                  <span>Đã đánh giá ({item.review?.rating}★)</span>
+                                </Badge>
+                                {item.review?.canEdit && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      setReviewDialogState({
+                                        isOpen: true,
+                                        item,
+                                        existingReview: item.review,
+                                      })
+                                    }
+                                    className="text-xs h-6 px-2 text-slate-600 hover:text-slate-900 font-medium"
+                                  >
+                                    Sửa đánh giá
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                            {item.reviewStatus === 'refunded' && (
+                              <Badge
+                                variant="outline"
+                                className="text-[11px] bg-slate-100 text-slate-600 border-slate-200 font-medium"
+                              >
+                                Đã hoàn tiền
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1042,6 +1137,20 @@ export function OrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Review Form Dialog */}
+      {order && reviewDialogState.item && (
+        <ReviewFormDialog
+          isOpen={reviewDialogState.isOpen}
+          onClose={() =>
+            setReviewDialogState((prev) => ({ ...prev, isOpen: false, item: null }))
+          }
+          orderId={order.id}
+          item={reviewDialogState.item}
+          existingReview={reviewDialogState.existingReview}
+          onSuccess={handleReviewSuccess}
+        />
+      )}
     </div>
   )
 }

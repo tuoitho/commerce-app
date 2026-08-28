@@ -186,4 +186,5 @@ type ReturnRepository interface {
 
 	// Item refunded predicate
 	IsOrderItemRefunded(ctx context.Context, orderItemID string) (bool, error)
+	ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error)
 }

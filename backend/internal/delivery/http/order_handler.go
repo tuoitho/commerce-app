@@ -30,6 +30,8 @@ type orderItemResponse struct {
 	UnitPriceVND string              `json:"unitPriceVnd"`
 	Quantity     int64               `json:"quantity"`
 	LineTotalVND string              `json:"lineTotalVnd"`
+	ReviewStatus string              `json:"reviewStatus"`
+	Review       *domain.Review      `json:"review"`
 }
 
 type returnEligibilityResponse struct {
@@ -157,6 +159,10 @@ type orderResponse struct {
 func toOrderResponse(order domain.Order) orderResponse {
 	items := make([]orderItemResponse, len(order.Items))
 	for i, item := range order.Items {
+		reviewStatus := string(item.ReviewStatus)
+		if reviewStatus == "" {
+			reviewStatus = string(domain.ReviewStatusIneligible)
+		}
 		items[i] = orderItemResponse{
 			ID:           item.ID,
 			VariantID:    item.VariantID,
@@ -169,6 +175,8 @@ func toOrderResponse(order domain.Order) orderResponse {
 			UnitPriceVND: string(item.UnitPriceVND),
 			Quantity:     item.Quantity,
 			LineTotalVND: string(item.LineTotalVND),
+			ReviewStatus: reviewStatus,
+			Review:       item.Review,
 		}
 	}
 

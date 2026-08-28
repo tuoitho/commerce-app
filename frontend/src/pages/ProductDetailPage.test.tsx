@@ -450,4 +450,23 @@ describe('ProductDetailPage', () => {
       expect(mockToggleFavorite).not.toHaveBeenCalled()
     })
   })
+
+  it('renders ProductReviewsSection and reflects dynamic review rating in header', async () => {
+    vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'iPhone 16 Pro' })).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Đánh giá từ khách hàng' })).toBeInTheDocument()
+    })
+  })
 })

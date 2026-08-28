@@ -476,4 +476,64 @@ describe('OrderDetailPage', () => {
       expect(ordersApi.cancelOrder).toHaveBeenCalledWith('ord-123456')
     })
   })
+
+  it('renders review actions and badges on items based on reviewStatus', async () => {
+    const orderWithReviews: Order = {
+      ...baseMockOrder,
+      status: 'delivered',
+      items: [
+        {
+          ...baseMockOrder.items[0],
+          id: 'item-el',
+          productName: 'Delivered Eligible Item',
+          reviewStatus: 'eligible',
+        },
+        {
+          ...baseMockOrder.items[0],
+          id: 'item-rev',
+          productName: 'Delivered Reviewed Item',
+          reviewStatus: 'reviewed',
+          review: {
+            id: 'rev-1',
+            rating: 5,
+            comment: 'Great phone',
+            editCount: 0,
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            updatedAt: '2026-08-28T00:00:00Z',
+            edited: false,
+            canEdit: true,
+          },
+        },
+        {
+          ...baseMockOrder.items[0],
+          id: 'item-ref',
+          productName: 'Delivered Refunded Item',
+          reviewStatus: 'refunded',
+        },
+      ],
+    }
+
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(orderWithReviews)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Delivered Eligible Item')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Đánh giá' })).toBeInTheDocument()
+      expect(screen.getByText('Delivered Reviewed Item')).toBeInTheDocument()
+      expect(screen.getByText(/Đã đánh giá \(5★\)/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Sửa đánh giá' })).toBeInTheDocument()
+      expect(screen.getByText('Delivered Refunded Item')).toBeInTheDocument()
+      expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
+    })
+  })
 })

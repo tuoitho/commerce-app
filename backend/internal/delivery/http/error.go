@@ -84,6 +84,18 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "return_already_refunded", "Đơn hàng đã được hoàn tiền trả hàng", nil)
 	case errors.Is(err, domain.ErrReturnTransitionNotAllowed):
 		respondError(c, 409, "return_transition_not_allowed", "Không thể thực hiện thao tác ở trạng thái hiện tại", nil)
+	case errors.Is(err, domain.ErrOrderItemNotFound):
+		respondError(c, 404, "order_item_not_found", "Không tìm thấy sản phẩm trong đơn hàng", nil)
+	case errors.Is(err, domain.ErrReviewNotFound):
+		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewNotEligible):
+		respondError(c, 409, "review_not_eligible", "Sản phẩm chưa đủ điều kiện đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewAlreadyExists):
+		respondError(c, 409, "review_already_exists", "Sản phẩm trong đơn hàng đã được đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewEditLimitReached):
+		respondError(c, 409, "review_edit_limit_reached", "Đánh giá chỉ được chỉnh sửa một lần", nil)
+	case errors.Is(err, domain.ErrReviewMediaNotFound):
+		respondError(c, 404, "review_media_not_found", "Không tìm thấy tệp đính kèm", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

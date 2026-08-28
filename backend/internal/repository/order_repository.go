@@ -357,22 +357,54 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID string, bucket 
 		return []domain.Order{}, nil
 	}
 
-	statuses := bucket.Statuses()
-	var statusStrings []string
-	if len(statuses) > 0 {
-		statusStrings = make([]string, len(statuses))
-		for i, s := range statuses {
-			statusStrings[i] = string(s)
-		}
-	}
-
 	q := sqlc.New(r.db)
-	orderRows, err := q.ListOrdersByUser(ctx, sqlc.ListOrdersByUserParams{
-		UserID:   userID,
-		Statuses: statusStrings,
-	})
-	if err != nil {
-		return nil, err
+
+	var orderRows []sqlc.ListOrdersByUserRow
+	if bucket == domain.OrderStatusBucketReviewable {
+		reviewableRows, err := q.ListReviewableOrdersByUser(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		orderRows = make([]sqlc.ListOrdersByUserRow, len(reviewableRows))
+		for i, row := range reviewableRows {
+			orderRows[i] = sqlc.ListOrdersByUserRow{
+				ID:             row.ID,
+				UserID:         row.UserID,
+				Status:         row.Status,
+				PaymentMethod:  row.PaymentMethod,
+				SubtotalVnd:    row.SubtotalVnd,
+				ShippingFeeVnd: row.ShippingFeeVnd,
+				TotalVnd:       row.TotalVnd,
+				RecipientName:  row.RecipientName,
+				Phone:          row.Phone,
+				ProvinceName:   row.ProvinceName,
+				WardName:       row.WardName,
+				DetailAddress:  row.DetailAddress,
+				CreatedAt:      row.CreatedAt,
+				UpdatedAt:      row.UpdatedAt,
+				ConfirmedAt:    row.ConfirmedAt,
+				CancelledAt:    row.CancelledAt,
+				DeliveredAt:    row.DeliveredAt,
+			}
+		}
+	} else {
+		statuses := bucket.Statuses()
+		var statusStrings []string
+		if len(statuses) > 0 {
+			statusStrings = make([]string, len(statuses))
+			for i, s := range statuses {
+				statusStrings[i] = string(s)
+			}
+		}
+
+		rows, err := q.ListOrdersByUser(ctx, sqlc.ListOrdersByUserParams{
+			UserID:   userID,
+			Statuses: statusStrings,
+		})
+		if err != nil {
+			return nil, err
+		}
+		orderRows = rows
 	}
 
 	if len(orderRows) == 0 {
@@ -477,10 +509,14 @@ func (r *OrderRepository) StatsByUser(ctx context.Context, userID string) (domai
 			stats.AwaitingPickup += count
 		case domain.OrderStatusShipped:
 			stats.AwaitingDelivery += count
-		case domain.OrderStatusDelivered:
-			stats.AwaitingReview += count
 		}
 	}
+
+	awaitingReviewCount, err := q.CountReviewableOrdersByUser(ctx, userID)
+	if err != nil {
+		return domain.OrderStats{}, err
+	}
+	stats.AwaitingReview = int(awaitingReviewCount)
 
 	return stats, nil
 }

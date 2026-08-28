@@ -39,13 +39,14 @@ func (s OrderStatus) IsValid() bool {
 type OrderStatusBucket string
 
 const (
-	OrderStatusBucketAll       OrderStatusBucket = "all"
-	OrderStatusBucketPending   OrderStatusBucket = "pending"
-	OrderStatusBucketPickup    OrderStatusBucket = "pickup"
-	OrderStatusBucketDelivery  OrderStatusBucket = "delivery"
-	OrderStatusBucketDelivered OrderStatusBucket = "delivered"
-	OrderStatusBucketReturns   OrderStatusBucket = "returns"
-	OrderStatusBucketCancelled OrderStatusBucket = "cancelled"
+	OrderStatusBucketAll        OrderStatusBucket = "all"
+	OrderStatusBucketPending    OrderStatusBucket = "pending"
+	OrderStatusBucketPickup     OrderStatusBucket = "pickup"
+	OrderStatusBucketDelivery   OrderStatusBucket = "delivery"
+	OrderStatusBucketDelivered  OrderStatusBucket = "delivered"
+	OrderStatusBucketReviewable OrderStatusBucket = "reviewable"
+	OrderStatusBucketReturns    OrderStatusBucket = "returns"
+	OrderStatusBucketCancelled  OrderStatusBucket = "cancelled"
 )
 
 func (b OrderStatusBucket) IsValid() bool {
@@ -55,6 +56,7 @@ func (b OrderStatusBucket) IsValid() bool {
 		OrderStatusBucketPickup,
 		OrderStatusBucketDelivery,
 		OrderStatusBucketDelivered,
+		OrderStatusBucketReviewable,
 		OrderStatusBucketReturns,
 		OrderStatusBucketCancelled:
 		return true
@@ -73,6 +75,8 @@ func (b OrderStatusBucket) Statuses() []OrderStatus {
 		return []OrderStatus{OrderStatusShipped}
 	case OrderStatusBucketDelivered:
 		return []OrderStatus{OrderStatusDelivered}
+	case OrderStatusBucketReviewable:
+		return []OrderStatus{OrderStatusDelivered, OrderStatusPartiallyReturned}
 	case OrderStatusBucketReturns:
 		return []OrderStatus{OrderStatusPartiallyReturned, OrderStatusReturned}
 	case OrderStatusBucketCancelled:
@@ -105,6 +109,8 @@ type OrderItem struct {
 	UnitPriceVND MoneyVND
 	Quantity     int64
 	LineTotalVND MoneyVND
+	ReviewStatus OrderItemReviewStatus
+	Review       *Review
 }
 
 type Order struct {

@@ -236,6 +236,7 @@ export type OrderStatusBucket =
   | 'pickup'
   | 'delivery'
   | 'delivered'
+  | 'reviewable'
   | 'returns'
   | 'cancelled'
 
@@ -301,6 +302,80 @@ export interface CreateReturnInput {
   description?: string
 }
 
+// Reviews
+export type ReviewMediaType = 'image' | 'video'
+
+export interface ReviewMedia {
+  id: string
+  reviewId?: string
+  type: ReviewMediaType
+  url: string
+  mimeType: string
+  sizeBytes?: number
+  position: number
+  createdAt?: string
+}
+
+export interface Review {
+  id: string
+  orderItemId?: string
+  rating: number
+  comment: string
+  editCount: number
+  media: ReviewMedia[]
+  createdAt: string
+  updatedAt: string
+  edited: boolean
+  canEdit: boolean
+}
+
+export type OrderItemReviewStatus = 'eligible' | 'reviewed' | 'refunded' | 'ineligible'
+
+export interface CreateReviewInput {
+  rating: number
+  comment?: string
+  images?: File[]
+  video?: File
+}
+
+export interface UpdateReviewInput {
+  rating: number
+  comment?: string
+  retainedMediaIds?: string[]
+  images?: File[]
+  video?: File
+}
+
+export interface PublicReviewer {
+  maskedEmail: string | null
+}
+
+export interface PublicPurchase {
+  model: string
+  options: CartOption[]
+}
+
+export interface PublicReview {
+  id: string
+  rating: number
+  comment: string
+  reviewer: PublicReviewer
+  purchase: PublicPurchase
+  media: ReviewMedia[]
+  createdAt: string
+}
+
+export interface ProductReviewSummary {
+  totalReviews: number
+  averageRating: string
+  ratingCounts: Record<string, number>
+}
+
+export interface ProductReviewsResponse {
+  reviews: PublicReview[]
+  summary: ProductReviewSummary
+}
+
 export interface OrderItem {
   id: string
   variantId: string
@@ -313,6 +388,8 @@ export interface OrderItem {
   unitPriceVnd: string
   quantity: number
   lineTotalVnd: string
+  reviewStatus?: OrderItemReviewStatus
+  review?: Review | null
 }
 
 export interface Order {

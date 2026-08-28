@@ -171,6 +171,12 @@ SELECT EXISTS (
     WHERE rr.status = 'refunded' AND rri.order_item_id = $1
 ) AS is_refunded;
 
+-- name: ListRefundedOrderItemIDs :many
+SELECT DISTINCT rri.order_item_id
+FROM return_request_items rri
+JOIN return_requests rr ON rr.id = rri.return_request_id
+WHERE rr.status = 'refunded' AND rri.order_item_id = ANY(@order_item_ids::uuid[]);
+
 -- name: SearchVariantOptionsAdmin :many
 SELECT v.id AS variant_id,
        v.product_id,

@@ -1,0 +1,39 @@
+services:
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: miniopassword
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":19001" --address ":19000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19000/minio/health/live"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set myminio http://minio:19000 minioadmin miniopassword; do
+        echo 'Waiting for MinIO...'
+        sleep 1
+      done;
+      mc mb --ignore-existing myminio/product-review-media;
+      mc anonymous set none myminio/product-review-media;
+      echo 'MinIO bucket product-review-media initialized as private';
+      exit 0;
+      "
+
+volumes:
+  minio-data:
+    name: minio-data

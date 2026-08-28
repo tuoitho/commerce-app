@@ -363,6 +363,33 @@ func (q *Queries) ListLatestReturnRequestsByOrderIDs(ctx context.Context, orderI
 	return items, nil
 }
 
+const listRefundedOrderItemIDs = `-- name: ListRefundedOrderItemIDs :many
+SELECT DISTINCT rri.order_item_id
+FROM return_request_items rri
+JOIN return_requests rr ON rr.id = rri.return_request_id
+WHERE rr.status = 'refunded' AND rri.order_item_id = ANY($1::uuid[])
+`
+
+func (q *Queries) ListRefundedOrderItemIDs(ctx context.Context, orderItemIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRefundedOrderItemIDs, orderItemIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var order_item_id string
+		if err := rows.Scan(&order_item_id); err != nil {
+			return nil, err
+		}
+		items = append(items, order_item_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReturnRequestItemsByRequestID = `-- name: ListReturnRequestItemsByRequestID :many
 SELECT rri.id, rri.return_request_id, rri.order_item_id, rri.quantity, rri.received_variant_id,
        oi.variant_id, oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url,

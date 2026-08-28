@@ -1230,6 +1230,38 @@ func (f *fakeReturnRepoForOrder) SearchVariantOptionsAdmin(ctx context.Context, 
 func (f *fakeReturnRepoForOrder) IsOrderItemRefunded(ctx context.Context, orderItemID string) (bool, error) {
 	return false, nil
 }
+func (f *fakeReturnRepoForOrder) ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error) {
+	return make(map[string]bool), nil
+}
+
+type fakeReviewRepoForOrder struct {
+	listByItemIDsFn func(ctx context.Context, itemIDs []string) (map[string]*domain.Review, error)
+}
+
+func (f *fakeReviewRepoForOrder) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) UpdateReview(ctx context.Context, input domain.UpdateReviewInput) (*domain.Review, []string, error) {
+	return nil, nil, nil
+}
+func (f *fakeReviewRepoForOrder) GetReviewByID(ctx context.Context, reviewID string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) GetReviewByOrderItemID(ctx context.Context, orderItemID string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) ListReviewsByOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error) {
+	if f.listByItemIDsFn != nil {
+		return f.listByItemIDsFn(ctx, orderItemIDs)
+	}
+	return make(map[string]*domain.Review), nil
+}
+func (f *fakeReviewRepoForOrder) GetReviewMediaByID(ctx context.Context, mediaID string) (*domain.ReviewMedia, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+	return nil, nil
+}
 
 func TestOrderUseCase_ReturnProjection(t *testing.T) {
 	ctx := context.Background()
@@ -1318,6 +1350,127 @@ func TestOrderUseCase_ReturnProjection(t *testing.T) {
 			t.Errorf("expected return eligibility = true for cancelled return, got %v", orders[0].ReturnEligibility)
 		}
 	})
+}
+
+func TestOrderUseCase_ReviewStateHydration(t *testing.T) {
+	ctx := context.Background()
+	validUserID := "00000000-0000-0000-0000-000000000001"
+	orderID1 := "00000000-0000-0000-0000-000000000011"
+	orderID2 := "00000000-0000-0000-0000-000000000012"
+	orderID3 := "00000000-0000-0000-0000-000000000013"
+
+	itemReviewedID := "00000000-0000-0000-0000-000000000101"
+	itemEligibleID := "00000000-0000-0000-0000-000000000102"
+	itemRefundedID := "00000000-0000-0000-0000-000000000103"
+	itemIneligibleID := "00000000-0000-0000-0000-000000000104"
+
+	fakeOrder := &fakeOrderRepo{
+		listOrders: []domain.Order{
+			{
+				ID:     orderID1,
+				UserID: validUserID,
+				Status: domain.OrderStatusDelivered,
+				Items: []domain.OrderItem{
+					{ID: itemReviewedID, OrderID: orderID1},
+					{ID: itemEligibleID, OrderID: orderID1},
+				},
+			},
+			{
+				ID:     orderID2,
+				UserID: validUserID,
+				Status: domain.OrderStatusPartiallyReturned,
+				Items: []domain.OrderItem{
+					{ID: itemRefundedID, OrderID: orderID2},
+				},
+			},
+			{
+				ID:     orderID3,
+				UserID: validUserID,
+				Status: domain.OrderStatusShipped,
+				Items: []domain.OrderItem{
+					{ID: itemIneligibleID, OrderID: orderID3},
+				},
+			},
+		},
+	}
+
+	reviewMap := map[string]*domain.Review{
+		itemReviewedID: {
+			ID:          "rev-1",
+			OrderItemID: itemReviewedID,
+			Rating:      5,
+			Comment:     "Great item!",
+			CanEdit:     true,
+		},
+	}
+
+	refundedMap := map[string]bool{
+		itemRefundedID: true,
+	}
+
+	batchReviewsCalled := 0
+	fakeReview := &fakeReviewRepoForOrder{
+		listByItemIDsFn: func(ctx context.Context, itemIDs []string) (map[string]*domain.Review, error) {
+			batchReviewsCalled++
+			return reviewMap, nil
+		},
+	}
+
+	fakeReturn := &fakeReturnRepoForOrder{
+		listLatestFn: func(ctx context.Context, orderIDs []string) (map[string]*domain.ReturnRequest, error) {
+			return make(map[string]*domain.ReturnRequest), nil
+		},
+	}
+
+	// Override return repo's list refunded
+	ucRefunded := orderuc.New(orderuc.Dependencies{
+		Order: fakeOrder,
+		Return: &mockReturnForListRefunded{
+			fakeReturnRepoForOrder: fakeReturn,
+			refundedMap:            refundedMap,
+		},
+		Review: fakeReview,
+	})
+
+	orders, err := ucRefunded.List(ctx, validUserID, domain.OrderStatusBucketAll)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if batchReviewsCalled != 1 {
+		t.Fatalf("expected batchReviewsCalled == 1, got %d", batchReviewsCalled)
+	}
+
+	if len(orders) != 3 {
+		t.Fatalf("expected 3 orders, got %d", len(orders))
+	}
+
+	// Order 1 items
+	if orders[0].Items[0].ReviewStatus != domain.ReviewStatusReviewed || orders[0].Items[0].Review == nil {
+		t.Errorf("expected itemReviewed to have status reviewed with non-nil review, got %v", orders[0].Items[0].ReviewStatus)
+	}
+	if orders[0].Items[1].ReviewStatus != domain.ReviewStatusEligible || orders[0].Items[1].Review != nil {
+		t.Errorf("expected itemEligible to have status eligible with nil review, got %v", orders[0].Items[1].ReviewStatus)
+	}
+
+	// Order 2 item (refunded)
+	if orders[1].Items[0].ReviewStatus != domain.ReviewStatusRefunded || orders[1].Items[0].Review != nil {
+		t.Errorf("expected itemRefunded to have status refunded with nil review, got %v", orders[1].Items[0].ReviewStatus)
+	}
+
+	// Order 3 item (shipped -> ineligible)
+	if orders[2].Items[0].ReviewStatus != domain.ReviewStatusIneligible || orders[2].Items[0].Review != nil {
+		t.Errorf("expected itemIneligible to have status ineligible with nil review, got %v", orders[2].Items[0].ReviewStatus)
+	}
+}
+
+type mockReturnForListRefunded struct {
+	*fakeReturnRepoForOrder
+	refundedMap map[string]bool
+}
+
+func (m *mockReturnForListRefunded) ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error) {
+	return m.refundedMap, nil
 }
 
 

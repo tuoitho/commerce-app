@@ -26,6 +26,11 @@ type Config struct {
 	LogLevel               string
 	OrderConfirmTimeout    time.Duration
 	ShippingFeeVND         domain.MoneyVND
+	MinioEndpoint          string
+	MinioAccessKey         string
+	MinioSecretKey         string
+	MinioBucket            string
+	MinioUseSSL            bool
 }
 
 const (
@@ -36,6 +41,8 @@ const (
 	defaultLogLevel            = "info"
 	defaultOrderConfirmTimeout = 30 * time.Minute
 	defaultShippingFeeVND      = domain.MoneyVND("0")
+	defaultMinioBucket         = "product-review-media"
+	defaultMinioUseSSL         = false
 )
 
 var allowedLogLevels = map[string]bool{
@@ -67,6 +74,11 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"LOG_LEVEL",
 		"ORDER_CONFIRM_TIMEOUT",
 		"SHIPPING_FEE_VND",
+		"MINIO_ENDPOINT",
+		"MINIO_ACCESS_KEY",
+		"MINIO_SECRET_KEY",
+		"MINIO_BUCKET",
+		"MINIO_USE_SSL",
 	}
 
 	for _, key := range keys {
@@ -222,6 +234,51 @@ func LoadWithFile(envFile string) (*Config, error) {
 		}
 	} else {
 		cfg.ShippingFeeVND = defaultShippingFeeVND
+	}
+
+	// 12. MINIO_ENDPOINT (Required)
+	minioEndpoint := strings.TrimSpace(v.GetString("MINIO_ENDPOINT"))
+	if minioEndpoint == "" {
+		return nil, fmt.Errorf("config: MINIO_ENDPOINT is required")
+	}
+	cfg.MinioEndpoint = minioEndpoint
+
+	// 13. MINIO_ACCESS_KEY (Required)
+	minioAccessKey := strings.TrimSpace(v.GetString("MINIO_ACCESS_KEY"))
+	if minioAccessKey == "" {
+		return nil, fmt.Errorf("config: MINIO_ACCESS_KEY is required")
+	}
+	cfg.MinioAccessKey = minioAccessKey
+
+	// 14. MINIO_SECRET_KEY (Required)
+	minioSecretKey := strings.TrimSpace(v.GetString("MINIO_SECRET_KEY"))
+	if minioSecretKey == "" {
+		return nil, fmt.Errorf("config: MINIO_SECRET_KEY is required")
+	}
+	cfg.MinioSecretKey = minioSecretKey
+
+	// 15. MINIO_BUCKET
+	minioBucket := strings.TrimSpace(v.GetString("MINIO_BUCKET"))
+	if minioBucket == "" {
+		cfg.MinioBucket = defaultMinioBucket
+	} else {
+		cfg.MinioBucket = minioBucket
+	}
+
+	// 16. MINIO_USE_SSL
+	if v.IsSet("MINIO_USE_SSL") {
+		rawMinioSSL := strings.TrimSpace(v.GetString("MINIO_USE_SSL"))
+		if rawMinioSSL != "" {
+			useSSL, err := strconv.ParseBool(rawMinioSSL)
+			if err != nil {
+				return nil, fmt.Errorf("config: MINIO_USE_SSL must be a boolean, got %q", rawMinioSSL)
+			}
+			cfg.MinioUseSSL = useSSL
+		} else {
+			cfg.MinioUseSSL = defaultMinioUseSSL
+		}
+	} else {
+		cfg.MinioUseSSL = defaultMinioUseSSL
 	}
 
 	return cfg, nil

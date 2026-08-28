@@ -97,6 +97,17 @@ func (m *mockReturnRepo) IsOrderItemRefunded(ctx context.Context, orderItemID st
 	}
 	return false, nil
 }
+func (m *mockReturnRepo) ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error) {
+	res := make(map[string]bool)
+	for _, id := range orderItemIDs {
+		if m.isRefundedFn != nil {
+			if ref, _ := m.isRefundedFn(ctx, id); ref {
+				res[id] = true
+			}
+		}
+	}
+	return res, nil
+}
 
 func TestReturnUseCase_Create_Validation(t *testing.T) {
 	uc := New(Dependencies{Return: &mockReturnRepo{}})

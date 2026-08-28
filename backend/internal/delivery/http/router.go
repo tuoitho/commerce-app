@@ -15,6 +15,7 @@ import (
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
+	reviewuc "commerce-backend/internal/usecase/review"
 )
 
 type Dependencies struct {
@@ -25,6 +26,7 @@ type Dependencies struct {
 	Address      *addressuc.UseCase
 	Order        *orderuc.UseCase
 	Return       *returnuc.UseCase
+	Review       *reviewuc.ReviewUseCase
 	Favorite     *favoriteuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
@@ -47,6 +49,12 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		auth.GET("/me", guard.AuthRequired, authHandler.Me)
 	}
 
+	reviewHandler := newReviewHandler(deps.Review)
+
+	// Media binary routes outside /api/v1
+	router.GET("/media/reviews/:mediaId", reviewHandler.getMedia)
+	router.HEAD("/media/reviews/:mediaId", reviewHandler.getMedia)
+
 	catalogHandler := newCatalogHandler(deps.Catalog)
 	api.GET("/categories", catalogHandler.ListCategories)
 	api.GET("/brands", catalogHandler.ListBrands)
@@ -55,6 +63,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		products.GET("", catalogHandler.ListProducts)
 		products.GET("/featured", catalogHandler.ListFeaturedProducts)
 		products.GET("/:id", catalogHandler.GetProduct)
+		products.GET("/:id/reviews", reviewHandler.getPublicReviews)
 	}
 
 	areaHandler := newAreaHandler(deps.Area)
@@ -106,6 +115,8 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.POST("/:id/cancel/undo", orderHandler.UndoCancel)
 		orders.POST("/:id/returns", returnHandler.Create)
 		orders.POST("/:id/returns/:returnId/cancel", returnHandler.Cancel)
+		orders.POST("/:id/items/:itemId/review", reviewHandler.createReview)
+		orders.PUT("/:id/items/:itemId/review", reviewHandler.updateReview)
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)
