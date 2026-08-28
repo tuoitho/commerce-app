@@ -244,6 +244,13 @@ func (uc *UseCase) GetOwnedReview(ctx context.Context, reviewID, userID string) 
 	return uc.reviews.GetReviewForUser(ctx, reviewID, userID)
 }
 
+func (uc *UseCase) ListOwnedReviews(ctx context.Context, userID string, page, limit int) ([]domain.OwnedReviewHistoryItem, int64, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return []domain.OwnedReviewHistoryItem{}, 0, nil
+	}
+	return uc.reviews.ListOwnerReviews(ctx, userID, page, limit)
+}
+
 func (uc *UseCase) EditReview(ctx context.Context, in EditInput) (*domain.Review, error) {
 	if _, err := uuid.Parse(in.ReviewID); err != nil {
 		return nil, domain.ErrReviewNotFound

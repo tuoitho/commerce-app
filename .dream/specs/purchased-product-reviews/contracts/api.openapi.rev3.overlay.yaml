@@ -1,0 +1,98 @@
+overlay: 1.0.0
+info:
+  title: Purchased Product Reviews API Revision 3
+  version: 3.0.0
+actions:
+  - target: $.paths
+    description: Add the authenticated owner's paginated review history.
+    update:
+      /api/v1/reviews:
+        get:
+          tags: [Review mutations]
+          operationId: listOwnedReviews
+          summary: List the authenticated customer's current reviews
+          description: Results are ordered by updatedAt descending, then id descending. The authenticated customer identity is authoritative; no user ID is accepted from the caller.
+          security:
+            - bearerAuth: []
+          parameters:
+            - $ref: '#/components/parameters/Page'
+            - $ref: '#/components/parameters/Limit'
+          responses:
+            '200':
+              description: Current reviews owned by the authenticated customer
+              content:
+                application/json:
+                  schema: { $ref: '#/components/schemas/OwnedReviewHistoryEnvelope' }
+            '400':
+              $ref: '#/components/responses/ReviewHistoryBadRequest'
+            '401':
+              $ref: '#/components/responses/Unauthorized'
+            '403':
+              $ref: '#/components/responses/CustomerForbidden'
+            '500':
+              $ref: '#/components/responses/InternalError'
+
+  - target: $.components.schemas
+    description: Add owner history item and envelope schemas.
+    update:
+      ReviewHistoryProduct:
+        type: object
+        additionalProperties: false
+        required: [id, name, publicPath]
+        properties:
+          id: { type: string, format: uuid }
+          name:
+            type: string
+            minLength: 1
+            description: Product identity retained from purchase data and available even when the catalog product is no longer public.
+          publicPath:
+            oneOf:
+              - type: 'null'
+              - type: string
+                pattern: '^/products/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+            description: Null exactly when the product is not currently publicly available; otherwise it must equal /products/{id} using this product object's id. This id must equal review.productId in the containing history item.
+      OwnedReviewHistoryItem:
+        type: object
+        additionalProperties: false
+        required: [review, product]
+        properties:
+          review: { $ref: '#/components/schemas/OwnedReview' }
+          product: { $ref: '#/components/schemas/ReviewHistoryProduct' }
+      OwnedReviewHistoryEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data:
+            type: array
+            items: { $ref: '#/components/schemas/OwnedReviewHistoryItem' }
+          error: { type: 'null' }
+          meta:
+            allOf:
+              - $ref: '#/components/schemas/ResponseMeta'
+              - type: object
+                required: [pagination]
+      ReviewHistoryBadRequestEnvelope:
+        $ref: '#/components/schemas/ErrorEnvelope'
+
+  - target: $.components.responses
+    description: Add pagination validation for owner history.
+    update:
+      ReviewHistoryBadRequest:
+        description: Invalid page or limit
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewHistoryBadRequestEnvelope' }
+            example:
+              success: false
+              message: Dữ liệu không hợp lệ
+              data: null
+              error:
+                code: validation_error
+                message: Dữ liệu không hợp lệ
+                fields:
+                  page: Trang phải là số nguyên dương
+              meta:
+                timestamp: '2026-08-28T10:00:00Z'

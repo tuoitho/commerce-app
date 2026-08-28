@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Package,
   Heart,
+  Star,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
 import type { Category } from '@/api/types'
@@ -309,6 +310,16 @@ export function Header() {
                 >
                   Lịch sử mua hàng
                 </Link>
+                <Link
+                  to="/reviews"
+                  className={`px-3 py-2 rounded-lg transition-colors ${
+                    location.pathname.startsWith('/reviews') || location.pathname.startsWith('/account/reviews')
+                      ? 'text-emerald-700 bg-emerald-50 font-bold'
+                      : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                  }`}
+                >
+                  Đánh giá của tôi
+                </Link>
               </>
             )}
           </nav>
@@ -458,6 +469,18 @@ export function Header() {
                 >
                   <Package className="h-4 w-4 text-emerald-600" />
                   <span>Lịch sử mua hàng</span>
+                </Link>
+                <Link
+                  to="/reviews"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
+                    location.pathname.startsWith('/reviews') || location.pathname.startsWith('/account/reviews')
+                      ? 'text-emerald-700 bg-emerald-50 font-bold'
+                      : 'text-slate-800 hover:bg-slate-50'
+                  }`}
+                >
+                  <Star className="h-4 w-4 text-amber-500" />
+                  <span>Đánh giá của tôi</span>
                 </Link>
               </>
             )}

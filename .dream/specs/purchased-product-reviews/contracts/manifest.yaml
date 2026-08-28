@@ -77,3 +77,35 @@ contracts:
       - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev2.overlay.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
+
+  - id: PURCHASED-REVIEW-API
+    revision: 3
+    status: FROZEN
+    requirements:
+      - REQ-REVIEW-01
+      - REQ-REVIEW-02
+      - REQ-REVIEW-03
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-06
+      - REQ-REVIEW-07
+      - REQ-REVIEW-08
+      - REQ-REVIEW-09
+    providers: [backend]
+    consumers: [frontend]
+    compatibility:
+      classification: additive-new-authenticated-collection
+      inherits: PURCHASED-REVIEW-API@2
+      consumer_unknown_fields: ignore
+      compatible_changes:
+        - providers and consumers supporting revision 2 remain compatible when the new operation is unused
+      breaking_changes:
+        - remove or rename the owner-history operation or fields
+        - change owner isolation, ordering, pagination, product-link, or viewer-state semantics
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev2.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev3.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev3.yaml

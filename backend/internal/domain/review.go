@@ -80,6 +80,17 @@ type ReviewSummary struct {
 	ReviewCount   int64    `json:"reviewCount"`
 }
 
+type ReviewHistoryProduct struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	PublicPath *string `json:"publicPath"`
+}
+
+type OwnedReviewHistoryItem struct {
+	Review  Review               `json:"review"`
+	Product ReviewHistoryProduct `json:"product"`
+}
+
 type OrderItemReviewStatus string
 
 const (

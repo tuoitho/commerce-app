@@ -4,7 +4,8 @@
 
 | Contract | Revision | Status |
 |---|---:|---|
-| PURCHASED-REVIEW-API | 2 | DRAFT |
+| PURCHASED-REVIEW-API | 2 | FROZEN |
+| PURCHASED-REVIEW-API | 3 | FROZEN |
 | PURCHASED-REVIEW-MEDIA | 1 | FROZEN |
 
 ## Execution DAG
@@ -13,6 +14,10 @@
 BE-01 -> BE-02 -> BE-03 --\
                           -> INT-01
 FE-01 -> FE-02 -> FE-03 --/
+
+BE-03 -> BE-04 --\
+                -> INT-02
+FE-03 -> FE-04 --/
 ```
 
 `BE-01`, `BE-02`, `BE-03` dùng cùng một persistent owner vì chia sẻ schema, transaction, MinIO lifecycle và read model. `FE-01`, `FE-02`, `FE-03` dùng cùng một persistent owner vì chia sẻ API types, mutation state và UI review. Hai workstream có thể bắt đầu song song từ contract revision 1 đã đóng băng.
@@ -448,3 +453,123 @@ verified_against:
 **Acceptance scenarios:** toàn bộ scenario trong `contracts/scenarios.yaml` revision 1.
 
 **Architectural constraints:** dùng process/runtime thật với timeout hữu hạn và cleanup; không thay thế DB/MinIO bằng mock cho proof xuyên boundary; dừng mọi process sau xác minh và lưu evidence ở workflow implementation.
+
+## Revision 3 Extension: Lịch Sử Đánh Giá Cá Nhân
+
+### BE-04 — Cung cấp collection lịch sử đánh giá theo owner
+
+```yaml
+id: BE-04
+owner: backend-review
+outcome: Khách hàng đã xác thực đọc được collection phân trang chỉ gồm review hiện tại của chính mình, với product identity/link state và owner viewer state đúng revision 3.
+requirements:
+  - REQ-REVIEW-09
+acceptance_criteria:
+  - AC-REVIEW-09-01
+  - AC-REVIEW-09-02
+  - AC-REVIEW-09-03
+  - AC-REVIEW-09-04
+  - AC-REVIEW-09-05
+  - AC-REVIEW-09-07
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 3
+    role: provider
+depends_on:
+  - BE-03
+risk: normal
+verification:
+  - type: provider-contract
+    scope: PURCHASED-REVIEW-API-R3-001 through PURCHASED-REVIEW-API-R3-010
+  - type: integration-db
+    scope: owner isolation, updatedAt/id ordering, pagination boundaries, current post-edit state and hidden-product identity
+  - type: typecheck
+    scope: make -C backend test && make -C backend vet
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 3
+```
+
+### FE-04 — Cung cấp trang tài khoản "Đánh giá của tôi"
+
+```yaml
+id: FE-04
+owner: frontend-review
+outcome: Khu vực tài khoản có trang lịch sử review responsive, phân trang, chỉ đọc hoặc chỉnh sửa theo owner state, với login return và đầy đủ loading/empty/error states.
+requirements:
+  - REQ-REVIEW-09
+acceptance_criteria:
+  - AC-REVIEW-09-01
+  - AC-REVIEW-09-02
+  - AC-REVIEW-09-03
+  - AC-REVIEW-09-04
+  - AC-REVIEW-09-05
+  - AC-REVIEW-09-06
+  - AC-REVIEW-09-07
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 3
+    role: consumer
+  - id: PURCHASED-REVIEW-MEDIA
+    revision: 1
+    role: consumer
+depends_on:
+  - FE-03
+risk: normal
+verification:
+  - type: consumer-contract
+    scope: PURCHASED-REVIEW-API-R3-001 through PURCHASED-REVIEW-API-R3-010
+  - type: component
+    scope: auth redirect, ordering/pagination, product links, editable/final review, post-edit replacement, loading/empty/error/retry and session data clearing
+  - type: browser
+    scope: safe login return and edit flow from owner history
+  - type: visual
+    scope: representative mobile and desktop account-history widths
+  - type: typecheck
+    scope: npm run lint && npm test && npm run build in frontend
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 3
+  PURCHASED-REVIEW-MEDIA: 1
+```
+
+### INT-02 — Xác minh revision 3 xuyên backend và browser
+
+```yaml
+id: INT-02
+owner: review-integration
+outcome: Runtime lắp ráp chứng minh owner isolation, pagination, product link availability và create/edit reflection của lịch sử đánh giá cá nhân.
+requirements:
+  - REQ-REVIEW-09
+acceptance_criteria:
+  - AC-REVIEW-09-01
+  - AC-REVIEW-09-02
+  - AC-REVIEW-09-03
+  - AC-REVIEW-09-04
+  - AC-REVIEW-09-05
+  - AC-REVIEW-09-06
+  - AC-REVIEW-09-07
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 3
+    role: verifier
+depends_on:
+  - BE-04
+  - FE-04
+risk: normal
+verification:
+  - type: provider-contract
+    scope: execute all PURCHASED-REVIEW-API revision 3 scenarios
+  - type: runtime-http
+    scope: two-customer isolation, stable multi-page ordering, hidden/public product link state and post-edit current state
+  - type: browser
+    scope: login return, empty history, pagination and edit from account history
+  - type: visual
+    scope: account history at representative mobile and desktop widths
+  - type: typecheck
+    scope: root make test && root make build
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 3
+  PURCHASED-REVIEW-MEDIA: 1
+```

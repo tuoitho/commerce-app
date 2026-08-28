@@ -285,3 +285,58 @@ func (h *reviewHandler) ListProductReviews(c *gin.Context) {
 		HasPrev:    page > 1,
 	})
 }
+
+func (h *reviewHandler) ListOwnedReviews(c *gin.Context) {
+	userID := c.GetString(contextUserKey)
+	if userID == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để đánh giá sản phẩm", nil)
+		return
+	}
+
+	page := 1
+	limit := 10
+
+	fields := make(map[string]string)
+	if rawPage := c.Query("page"); rawPage != "" {
+		p, err := strconv.Atoi(rawPage)
+		if err != nil || p <= 0 {
+			fields["page"] = "Trang phải là số nguyên dương"
+		} else {
+			page = p
+		}
+	}
+
+	if rawLimit := c.Query("limit"); rawLimit != "" {
+		l, err := strconv.Atoi(rawLimit)
+		if err != nil || l < 1 || l > 50 {
+			fields["limit"] = "Số lượng trên mỗi trang phải từ 1 đến 50"
+		} else {
+			limit = l
+		}
+	}
+
+	if len(fields) > 0 {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", fields)
+		return
+	}
+
+	items, total, err := h.uc.ListOwnedReviews(c.Request.Context(), userID, page, limit)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(limit)))
+	}
+
+	writePaginatedSuccess(c, http.StatusOK, "Danh sách đánh giá của tôi", items, PaginationMeta{
+		Page:       page,
+		Limit:      limit,
+		Total:      int(total),
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	})
+}

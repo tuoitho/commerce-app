@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createOrderItemReview, editOwnedReview, getOwnedReview, listProductReviews } from './reviews'
+import { createOrderItemReview, editOwnedReview, getOwnedReview, listProductReviews, listOwnedReviews } from './reviews'
 import { tokenStore } from './tokenStore'
 
 describe('Reviews API Client', () => {
@@ -124,5 +124,50 @@ describe('Reviews API Client', () => {
     expect(fetchSpy).toHaveBeenCalledWith('/api/v1/products/prod-1/reviews?page=1&limit=10', expect.objectContaining({ method: 'GET' }))
     expect(res.data).toEqual(mockList)
     expect(res.meta.pagination?.total).toBe(1)
+  })
+
+  it('listOwnedReviews sends GET request with page & limit pagination params and returns owned review items', async () => {
+    tokenStore.setToken('test-token')
+    const mockOwnedList = [
+      {
+        review: {
+          id: 'rev-1',
+          rating: 5,
+          comment: 'Rất tốt',
+          viewer: { isOwner: true, canEdit: true, remainingEdits: 1 },
+        },
+        product: {
+          id: 'prod-1',
+          name: 'iPhone 16 Pro',
+          publicPath: '/products/prod-1',
+        },
+      },
+    ]
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: mockOwnedList,
+        message: 'Danh sách đánh giá của tôi',
+        error: null,
+        meta: {
+          timestamp: '2026-08-28T00:00:00Z',
+          pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+        },
+      }),
+    } as unknown as Response)
+
+    const result = await listOwnedReviews(1, 10)
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/reviews?page=1&limit=10', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-token',
+      }),
+    }))
+    expect(result.data).toEqual(mockOwnedList)
+    expect(result.meta.pagination?.total).toBe(1)
   })
 })

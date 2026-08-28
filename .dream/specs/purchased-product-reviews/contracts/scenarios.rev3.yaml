@@ -1,0 +1,101 @@
+contract: PURCHASED-REVIEW-API
+revision: 3
+inherits:
+  contract: PURCHASED-REVIEW-API
+  revision: 2
+
+scenarios:
+  - id: PURCHASED-REVIEW-API-R3-001
+    requirement: REQ-REVIEW-09
+    given: authenticated customer C owns multiple reviews and another customer owns other reviews
+    when: C requests GET /api/v1/reviews?page=1&limit=10
+    then:
+      status: 200
+      assertions:
+        - every data item belongs to C and appears exactly once
+        - items are ordered by review.updatedAt descending then review.id descending
+        - every review.viewer is a non-null owner state
+        - meta.pagination describes the owner-filtered collection
+
+  - id: PURCHASED-REVIEW-API-R3-002
+    requirement: REQ-REVIEW-09
+    given: authenticated customer C owns no reviews
+    when: C requests the first owner-history page
+    then:
+      status: 200
+      assertions:
+        - data is an empty array
+        - meta.pagination.total is 0 and totalPages is 0
+
+  - id: PURCHASED-REVIEW-API-R3-003
+    requirement: REQ-REVIEW-09
+    given: the request has no Authorization header and no customer session
+    when: GET /api/v1/reviews is requested
+    then:
+      status: 401
+      errorCode: unauthorized
+
+  - id: PURCHASED-REVIEW-API-R3-009
+    requirement: REQ-REVIEW-09
+    given: the request carries a malformed, invalid, or expired customer access token
+    when: GET /api/v1/reviews is requested
+    then:
+      status: 401
+      errorCode: invalid_token
+
+  - id: PURCHASED-REVIEW-API-R3-004
+    requirement: REQ-REVIEW-09
+    given: an authenticated administrator or other non-customer principal
+    when: GET /api/v1/reviews is requested
+    then:
+      status: 403
+      errorCode: forbidden
+
+  - id: PURCHASED-REVIEW-API-R3-005
+    requirement: REQ-REVIEW-09
+    given: an invalid page or limit query value
+    when: the owner history is requested
+    then:
+      status: 400
+      errorCode: validation_error
+      assertions:
+        - error.fields identifies each invalid query field
+
+  - id: PURCHASED-REVIEW-API-R3-006
+    requirement: REQ-REVIEW-09
+    given: C owns a review whose product is no longer public
+    when: C reads owner history
+    then:
+      status: 200
+      assertions:
+        - the review remains present with product id and retained product name
+        - product.publicPath is null
+
+  - id: PURCHASED-REVIEW-API-R3-010
+    requirement: REQ-REVIEW-09
+    given: C owns a review for a product that is currently public
+    when: C reads owner history
+    then:
+      status: 200
+      assertions:
+        - product.id equals review.productId
+        - product.publicPath equals /products/{product.id}
+
+  - id: PURCHASED-REVIEW-API-R3-007
+    requirement: REQ-REVIEW-09
+    given: C owns an editable review shown in owner history
+    when: C edits it successfully and reads owner history again
+    then:
+      status: 200
+      assertions:
+        - the same review id appears once with current content
+        - review.viewer.canEdit is false and review.viewer.remainingEdits is 0
+
+  - id: PURCHASED-REVIEW-API-R3-008
+    requirement: REQ-REVIEW-09
+    given: C owns reviews with equal updatedAt values spanning pages
+    when: C repeatedly reads unchanged owner-history pages
+    then:
+      status: 200
+      assertions:
+        - id descending provides stable tie-breaking without duplicates between pages

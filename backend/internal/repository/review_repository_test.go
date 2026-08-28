@@ -58,4 +58,14 @@ func TestReviewRepository_InvalidUUIDHandling(t *testing.T) {
 			t.Errorf("expected ErrOrderNotFound, got %v", err)
 		}
 	})
+
+	t.Run("ListOwnerReviews returns empty list for invalid UUID", func(t *testing.T) {
+		items, total, err := repo.ListOwnerReviews(ctx, "invalid-user-id", 1, 10)
+		if err != nil {
+			t.Errorf("expected nil error, got %v", err)
+		}
+		if total != 0 || len(items) != 0 {
+			t.Errorf("expected 0 total and empty items, got %d total and %d items", total, len(items))
+		}
+	})
 }

@@ -411,4 +411,15 @@ export interface EditReviewPayload {
   media?: EditReviewMediaItem[]
 }
 
+export interface ReviewHistoryProduct {
+  id: string
+  name: string
+  publicPath: string | null
+}
+
+export interface OwnedReviewHistoryItem {
+  review: Review
+  product: ReviewHistoryProduct
+}
+
 

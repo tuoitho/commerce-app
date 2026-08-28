@@ -1,6 +1,7 @@
 import { apiClient, apiClientWithMeta, type ApiResponseWithMeta } from './client'
 import type {
   Review,
+  OwnedReviewHistoryItem,
   CreateReviewPayload,
   CreateReviewMediaItem,
   EditReviewPayload,
@@ -104,6 +105,15 @@ export async function listProductReviews(
   limit: number = 10
 ): Promise<ApiResponseWithMeta<Review[]>> {
   return apiClientWithMeta<Review[]>(`/products/${productId}/reviews?page=${page}&limit=${limit}`, {
+    method: 'GET',
+  })
+}
+
+export async function listOwnedReviews(
+  page: number = 1,
+  limit: number = 10
+): Promise<ApiResponseWithMeta<OwnedReviewHistoryItem[]>> {
+  return apiClientWithMeta<OwnedReviewHistoryItem[]>(`/reviews?page=${page}&limit=${limit}`, {
     method: 'GET',
   })
 }

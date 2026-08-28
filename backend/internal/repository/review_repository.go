@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -450,6 +451,10 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 	}
 	offset := (page - 1) * limit
 
+	if r.db == nil {
+		return []domain.Review{}, 0, nil
+	}
+
 	q := sqlc.New(r.db)
 	total, err := q.CountProductReviews(ctx, productID)
 	if err != nil {
@@ -622,4 +627,133 @@ func (r *ReviewRepository) IsObjectKeyReferenced(ctx context.Context, objectKey 
 func (r *ReviewRepository) ListAllReferencedObjectKeys(ctx context.Context) ([]string, error) {
 	q := sqlc.New(r.db)
 	return q.ListAllReferencedObjectKeys(ctx)
+}
+
+func (r *ReviewRepository) ListOwnerReviews(ctx context.Context, userID string, page, limit int) ([]domain.OwnedReviewHistoryItem, int64, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return []domain.OwnedReviewHistoryItem{}, 0, nil
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	if r.db == nil {
+		return []domain.OwnedReviewHistoryItem{}, 0, nil
+	}
+
+	q := sqlc.New(r.db)
+	total, err := q.CountOwnerReviews(ctx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if total == 0 {
+		return []domain.OwnedReviewHistoryItem{}, 0, nil
+	}
+
+	reviewRows, err := q.ListOwnerReviews(ctx, sqlc.ListOwnerReviewsParams{
+		UserID:      userID,
+		LimitCount:  int32(limit),
+		OffsetCount: int32(offset),
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if len(reviewRows) == 0 {
+		return []domain.OwnedReviewHistoryItem{}, total, nil
+	}
+
+	reviewIDs := make([]string, len(reviewRows))
+	for i, row := range reviewRows {
+		reviewIDs[i] = row.ID
+	}
+
+	mediaRows, err := q.ListReviewMediaByReviewIDs(ctx, reviewIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	mediaByReview := make(map[string][]domain.ReviewMedia)
+	for _, m := range mediaRows {
+		mediaByReview[m.ReviewID] = append(mediaByReview[m.ReviewID], domain.ReviewMedia{
+			ID:        m.ID,
+			ReviewID:  m.ReviewID,
+			ObjectKey: m.ObjectKey,
+			Type:      domain.MediaType(m.Type),
+			MimeType:  m.MimeType,
+			SizeBytes: m.SizeBytes,
+			Position:  int(m.Position),
+			URL:       domain.FormatMediaURL(m.ID),
+			CreatedAt: m.CreatedAt,
+		})
+	}
+
+	items := make([]domain.OwnedReviewHistoryItem, len(reviewRows))
+	for i, row := range reviewRows {
+		mediaList := mediaByReview[row.ID]
+		if mediaList == nil {
+			mediaList = []domain.ReviewMedia{}
+		}
+
+		var purchasedOptions []domain.PurchasedOption
+		if row.PurchasedOptions != "" {
+			_ = json.Unmarshal([]byte(row.PurchasedOptions), &purchasedOptions)
+		}
+		if purchasedOptions == nil {
+			purchasedOptions = []domain.PurchasedOption{}
+		}
+
+		var editedAt *time.Time
+		if row.EditedAt.Valid {
+			t := row.EditedAt.Time
+			editedAt = &t
+		}
+
+		canEdit := editedAt == nil
+		remainingEdits := 0
+		if canEdit {
+			remainingEdits = 1
+		}
+
+		var publicPath *string
+		if row.IsProductPublic {
+			path := fmt.Sprintf("/products/%s", row.ProductID)
+			publicPath = &path
+		}
+
+		items[i] = domain.OwnedReviewHistoryItem{
+			Review: domain.Review{
+				ID:               row.ID,
+				OrderItemID:      row.OrderItemID,
+				ProductID:        row.ProductID,
+				VariantID:        row.VariantID,
+				PurchasedOptions: purchasedOptions,
+				Rating:           int(row.Rating),
+				Comment:          row.Comment,
+				Media:            mediaList,
+				VerifiedPurchase: true,
+				AuthorLabel:      domain.DefaultAuthorLabel,
+				CreatedAt:        row.CreatedAt,
+				UpdatedAt:        row.UpdatedAt,
+				EditedAt:         editedAt,
+				Viewer: &domain.ReviewViewerState{
+					IsOwner:        true,
+					CanEdit:        canEdit,
+					RemainingEdits: remainingEdits,
+				},
+			},
+			Product: domain.ReviewHistoryProduct{
+				ID:         row.ProductID,
+				Name:       row.PurchasedProductName,
+				PublicPath: publicPath,
+			},
+		}
+	}
+
+	return items, total, nil
 }

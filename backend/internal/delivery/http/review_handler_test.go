@@ -196,3 +196,102 @@ func TestReviewHandler_ListProductReviewsValidation(t *testing.T) {
 	})
 }
 
+func TestReviewHandler_ListOwnedReviews(t *testing.T) {
+	jwtMgr := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+	customerToken, _ := jwtMgr.GenerateAccessToken("11111111-1111-1111-1111-111111111111", domain.RoleCustomer, 15*time.Minute)
+	adminToken, _ := jwtMgr.GenerateAccessToken("99999999-9999-9999-9999-999999999999", domain.RoleAdmin, 15*time.Minute)
+
+	store := storage.NewMemoryStorage("test-bucket")
+	uc := reviewuc.New(reviewuc.Dependencies{
+		Reviews: repository.NewReviewRepository(nil),
+		Storage: store,
+	})
+	engine := setupReviewTestEngine(uc, jwtMgr)
+
+	t.Run("PURCHASED-REVIEW-API-R3-003: missing auth returns 401 unauthorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews", nil)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "unauthorized") {
+			t.Fatalf("expected unauthorized error code, got %s", w.Body.String())
+		}
+	})
+
+	t.Run("PURCHASED-REVIEW-API-R3-009: invalid token returns 401 invalid_token", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews", nil)
+		req.Header.Set("Authorization", "Bearer invalid-or-malformed-token")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "invalid_token") {
+			t.Fatalf("expected invalid_token error code, got %s", w.Body.String())
+		}
+	})
+
+	t.Run("PURCHASED-REVIEW-API-R3-004: admin token returns 403 forbidden", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "forbidden") {
+			t.Fatalf("expected forbidden error code, got %s", w.Body.String())
+		}
+	})
+
+	t.Run("PURCHASED-REVIEW-API-R3-005: invalid page returns 400 validation_error", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews?page=0", nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "validation_error") || !strings.Contains(w.Body.String(), "page") {
+			t.Fatalf("expected validation_error on page, got %s", w.Body.String())
+		}
+	})
+
+	t.Run("PURCHASED-REVIEW-API-R3-005: invalid limit returns 400 validation_error", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews?limit=51", nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "validation_error") || !strings.Contains(w.Body.String(), "limit") {
+			t.Fatalf("expected validation_error on limit, got %s", w.Body.String())
+		}
+	})
+
+	t.Run("PURCHASED-REVIEW-API-R3-002: authenticated customer with no reviews returns 200 with empty list", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews?page=1&limit=10", nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"data":[]`) {
+			t.Fatalf("expected empty data array, got %s", w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"total":0`) || !strings.Contains(w.Body.String(), `"totalPages":0`) {
+			t.Fatalf("expected total 0 and totalPages 0 in meta pagination, got %s", w.Body.String())
+		}
+	})
+}
+

@@ -13,6 +13,7 @@ Thiết kế phải bảo đảm:
 - đánh giá và media công khai luôn phản ánh cùng một phiên bản đã hoàn tất;
 - MinIO hoặc PostgreSQL lỗi không làm lộ media mồ côi;
 - tổng quan sản phẩm, section đánh giá và trạng thái trong đơn hàng dùng cùng nguồn dữ liệu;
+- khách hàng có một read model phân trang để xem toàn bộ đánh giá của chính mình mà không tạo nguồn sự thật hoặc lịch sử phiên bản mới;
 - không thay đổi hành vi của frontend quản trị vì kiểm duyệt đánh giá nằm ngoài phạm vi.
 
 ## 2. Kiến Trúc Tổng Thể
@@ -20,6 +21,7 @@ Thiết kế phải bảo đảm:
 ```text
 Frontend khách hàng
   |  JSON: đọc tổng quan, danh sách, trạng thái trong đơn
+  |  JSON: đọc danh sách đánh giá cá nhân
   |  multipart: tạo/sửa đánh giá + media
   v
 Backend HTTP /api/v1
@@ -122,6 +124,12 @@ Read model mỗi order item bổ sung review state cá nhân hóa:
 
 `awaitingReview` giữ tên field API hiện có nhưng đổi semantics có chủ đích từ số đơn `delivered` sang số order item chưa đánh giá trong các đơn đang `delivered`. Frontend hiện tại đã đọc field này nên không cần field song song.
 
+### 4.5 Read Model Lịch Sử Đánh Giá Cá Nhân
+
+Lịch sử cá nhân là projection chỉ đọc từ `product_reviews` theo `user_id`, không phải thực thể hoặc bảng audit mới. Truy vấn dùng thứ tự `(updated_at DESC, id DESC)` và phân trang cùng quy tắc ổn định với danh sách công khai.
+
+Mỗi mục dùng trạng thái review hiện tại và bổ sung thông tin nhận biết sản phẩm cần cho trang tài khoản. Tên sản phẩm phải lấy từ dữ liệu mua hàng đã lưu để đánh giá vẫn nhận biết được khi catalog không còn công khai; trạng thái hiển thị công khai hiện tại của sản phẩm chỉ quyết định có cung cấp liên kết tới trang chi tiết hay không. Viewer state luôn là state của owner và là nguồn quyết định hành động chỉnh sửa.
+
 ## 5. Luồng Hành Vi
 
 ### 5.1 Đọc Trang Chi Tiết Sản Phẩm
@@ -170,6 +178,14 @@ Object key do tính năng tạo có operation prefix và timestamp có thể suy
 Reconciler là cơ chế khôi phục sau crash giữa hai hệ thống; tính công khai vẫn nhất quán ngay lập tức nhờ database gate.
 
 Khi MinIO hoạt động liên tục, mọi object không tham chiếu phải hội tụ về trạng thái đã xóa trong tối đa 90 phút từ khi mất reference. Nếu MinIO gián đoạn, object phải được xóa trong tối đa 90 phút từ khi kết nối phục hồi. Runtime verification dùng thời gian cấu hình rút ngắn nhưng giữ cùng quan hệ grace period, interval và convergence bound.
+
+### 5.6 Đọc Lịch Sử Đánh Giá Cá Nhân
+
+1. Route tài khoản yêu cầu customer auth và giữ safe return URL khi chuyển sang đăng nhập.
+2. Frontend gọi collection đánh giá cá nhân phân trang; backend luôn suy ra owner từ phiên xác thực, không nhận user ID có thẩm quyền từ client.
+3. Backend đọc review hiện tại theo owner, ghép thông tin nhận biết sản phẩm và trạng thái catalog để quyết định product link, rồi trả owner viewer state không null.
+4. Frontend hiển thị content/media hiện tại, trạng thái chỉnh sửa, empty/error/retry và liên kết về lịch sử đơn hàng khi chưa có đánh giá.
+5. Sau khi chỉnh sửa thành công, frontend thay mục tương ứng bằng review mới hoặc tải lại trang hiện tại; không thêm một mục lịch sử mới.
 
 ## 6. Validation Và Bảo Mật
 
@@ -220,7 +236,7 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 **Authentication / caller context:** Customer auth cho mutation và order state; public với optional customer auth cho product reviews  
 **Material state or failure semantics:** Eligibility theo order item, concurrency, one-edit limit, validation media, pagination, Full Status Envelope
 **Contract artifact required:** Yes  
-**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08  
+**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09
 **Verification / Proof level:** provider-contract, runtime-http, component, browser
 
 ### Boundary ID: BND-REVIEW-MEDIA-CONTENT
@@ -238,11 +254,11 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** PostgreSQL review repository  
 **Consumer(s):** Backend review, order stats và catalog read use cases  
-**Purpose:** Sở hữu review metadata, unique order-item invariant, edit limit, media references và aggregate queries
+**Purpose:** Sở hữu review metadata, unique order-item invariant, edit limit, media references, aggregate queries và truy vấn lịch sử theo owner
 **Authentication / caller context:** Internal backend context với user ID đã xác thực  
 **Material state or failure semantics:** Transaction lock/conditional update, deterministic pagination, no partial metadata  
 **Contract artifact required:** No  
-**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-06, REQ-REVIEW-07  
+**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-09
 **Verification / Proof level:** unit, integration-db
 
 ### Boundary ID: BND-REVIEW-MINIO
@@ -260,11 +276,11 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** Frontend review UI  
 **Consumer(s):** Khách hàng và người xem sản phẩm  
-**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section và responsive media viewer  
+**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section, lịch sử đánh giá cá nhân và responsive media viewer
 **Authentication / caller context:** Authenticated mutations; public read; safe login return  
 **Material state or failure semantics:** Loading/empty/error/success, preserve form on retry, accessible controls, desktop/mobile layout  
 **Contract artifact required:** No, tiêu thụ BND-REVIEW-HTTP và BND-REVIEW-MEDIA-CONTENT  
-**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08  
+**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09
 **Verification / Proof level:** component, browser, visual
 
 ## 10. Chiến Lược Chứng Minh
@@ -279,6 +295,7 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 | REQ-REVIEW-06 | Count/average đúng và cập nhật sau edit | integration-db + provider-contract + component | Aggregate query tests, response contract, summary rendering |
 | REQ-REVIEW-07 | Review state theo từng order item và awaitingReview semantics | integration-db + component + browser | Join/count tests, order page tests, create-review user flow |
 | REQ-REVIEW-08 | Auth, envelope, safe return, keyboard, retry state | provider-contract + component + browser + visual | Auth/error contract tests, keyboard tests, full login-return/upload flow, desktop/mobile inspection |
+| REQ-REVIEW-09 | Collection chỉ thuộc owner, phân trang ổn định, product identity/link state, edit và empty/error/login-return | integration-db + provider-contract + component + browser | Owner-filtered query tests, API contract, account-page render tests và authenticated routing/edit flow |
 
 Không dùng browser test để chứng minh unique constraint, aggregate math hoặc transaction semantics vì integration test ở boundary tương ứng đủ mạnh. Browser automation chỉ bao phủ các flow thực sự cần routing, file input, native media và tương tác responsive.
 
@@ -293,6 +310,7 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 5. Hai edit đồng thời; đúng một thành công, request còn lại nhận edit-limit, sau đó frontend tải lại review có thẩm quyền.
 6. Đơn có hai order item cùng product nhưng variant khác; tạo hai review và summary count tăng hai.
 7. Media proxy trả range đúng, 404 cho media không tham chiếu và 503 không lộ thông tin MinIO khi storage dừng.
+8. Hai khách hàng có nhiều review, xác nhận lịch sử của mỗi người chỉ trả review thuộc owner theo thứ tự ổn định; review của sản phẩm đã ẩn vẫn nhận biết được nhưng không có product link.
 
 ## 12. Tác Động Và Tương Thích
 
@@ -301,6 +319,7 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 - Order item response được mở rộng bằng review state; `awaitingReview` giữ field nhưng đổi semantics có chủ đích.
 - Frontend API client cần hỗ trợ `FormData` mà không tự đặt JSON `Content-Type`, đồng thời vẫn giữ auth refresh và envelope handling.
 - Frontend chi tiết đơn thêm form/action theo từng dòng; trang sản phẩm thêm section public có pagination và media viewer.
+- Backend bổ sung collection có customer auth cho lịch sử review cá nhân; frontend bổ sung route và điểm truy cập "Đánh giá của tôi" trong khu vực tài khoản.
 - Frontend admin không thay đổi vì moderation và quản trị review ngoài phạm vi.
 - Existing product, order, return, favorite và catalog visibility behavior phải được giữ ngoài các phần mở rộng đã nêu.
 
@@ -315,5 +334,6 @@ Tính năng có shared boundary giữa backend và frontend nên phải author e
 - validation fields, business error codes và retry scenarios;
 - raw media content route, Range/404/503 semantics;
 - scenarios cho duplicate, one-edit limit, returned order và nhiều order item cùng product.
+- collection lịch sử review cá nhân, owner isolation, pagination, product identity/link availability và owner edit state.
 
 Chi tiết field, endpoint, status, example và scenario ID không được coi là ổn định cho tới khi contract được review và chuyển sang `FROZEN`.

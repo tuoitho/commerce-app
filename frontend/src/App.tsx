@@ -15,6 +15,7 @@ import { OrderDetailPage } from '@/pages/OrderDetailPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
+import { MyReviewsPage } from '@/pages/MyReviewsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function AppContent() {
@@ -31,6 +32,8 @@ export function AppContent() {
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/reviews" element={<MyReviewsPage />} />
+          <Route path="/account/reviews" element={<MyReviewsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />

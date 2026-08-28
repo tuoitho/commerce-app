@@ -70,6 +70,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	reviews := api.Group("/reviews")
 	reviews.Use(guard.RequireCustomerAuthForReviews)
 	{
+		reviews.GET("", reviewHandler.ListOwnedReviews)
 		reviews.GET("/:reviewId", reviewHandler.GetOwnedReview)
 		reviews.PUT("/:reviewId", reviewHandler.EditOwnedReview)
 	}

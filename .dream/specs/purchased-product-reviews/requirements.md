@@ -19,6 +19,7 @@ Tính năng phục vụ hai nhóm người dùng:
 - **Lượt chỉnh sửa**: Một lần cập nhật đánh giá hoàn tất thành công sau khi tạo; thao tác thất bại không tiêu hao lượt chỉnh sửa.
 - **Tổng quan đánh giá**: Điểm trung bình và tổng số đánh giá hiện có của một sản phẩm.
 - **Dòng hàng chờ đánh giá**: Dòng hàng đủ điều kiện đánh giá của một khách hàng.
+- **Lịch sử đánh giá cá nhân**: Danh sách trạng thái hiện tại của mọi đánh giá do khách hàng đang đăng nhập đã gửi; đây không phải lịch sử các phiên bản trước và sau khi chỉnh sửa.
 
 ## Phạm Vi
 
@@ -32,6 +33,7 @@ Tính năng phục vụ hai nhóm người dùng:
 - Hiển thị trạng thái đánh giá theo từng sản phẩm trong chi tiết đơn hàng.
 - Tính đúng số sản phẩm "Chờ đánh giá" trong lịch sử đơn hàng.
 - Giữ tính đúng đắn khi một sản phẩm được mua nhiều lần hoặc một đơn hàng thay đổi sang trạng thái trả hàng sau khi đã đánh giá.
+- Cho phép khách hàng xem danh sách phân trang toàn bộ đánh giá mình đã gửi từ khu vực tài khoản.
 
 ### Ngoài Phạm Vi
 
@@ -44,6 +46,7 @@ Tính năng phục vụ hai nhóm người dùng:
 - Upload trực tiếp từ trình duyệt tới MinIO bằng presigned URL.
 - Chuyển mã, nén hoặc biên tập ảnh/video sau khi tải lên.
 - Tạo trang công khai mới cho sản phẩm đang không được hiển thị trong danh mục.
+- Lưu hoặc hiển thị các phiên bản cũ của đánh giá trước khi chỉnh sửa.
 
 ## Yêu Cầu
 
@@ -415,3 +418,67 @@ Cho trước một lỗi tạm thời khi gửi đánh giá, khi lỗi được 
 **AC-REVIEW-08-04**
 
 Cho trước người dùng chỉ sử dụng bàn phím, khi mở và hoàn thành biểu mẫu đánh giá, thì họ có thể chọn điểm, nhập nhận xét, gửi hoặc hủy và nhận biết trạng thái focus cùng kết quả thao tác.
+
+### REQ-REVIEW-09 — Xem Lịch Sử Đánh Giá Cá Nhân
+
+**Câu Chuyện Người Dùng**
+
+Là một khách hàng đã gửi đánh giá,
+tôi muốn xem lại toàn bộ đánh giá của mình tại một nơi trong khu vực tài khoản,
+để dễ dàng tìm lại nội dung đã chia sẻ và tiếp tục thao tác khi còn quyền chỉnh sửa.
+
+#### Yêu Cầu Hành Vi
+
+Khi khách hàng đã đăng nhập mở mục "Đánh giá của tôi" trong khu vực tài khoản, hệ thống phải hiển thị danh sách phân trang mọi đánh giá hiện tại thuộc khách hàng đó theo thứ tự cập nhật gần nhất trước; thứ tự giữa các đánh giá có cùng thời điểm cập nhật phải ổn định khi dữ liệu không thay đổi.
+
+Với mỗi đánh giá, hệ thống phải hiển thị đủ thông tin để nhận biết sản phẩm đã đánh giá, gồm tên sản phẩm, phân loại đã mua, điểm sao, nhận xét, media theo đúng thứ tự, thời điểm tạo, thời điểm cập nhật và trạng thái còn quyền chỉnh sửa. Khi sản phẩm vẫn được hiển thị công khai, khách hàng phải có thể mở trang chi tiết sản phẩm từ mục tương ứng.
+
+Khi một đánh giá còn quyền chỉnh sửa, khách hàng phải có thể bắt đầu chỉnh sửa đánh giá đó từ lịch sử; khi không còn quyền chỉnh sửa, giao diện phải hiển thị trạng thái chỉ đọc và không cung cấp hành động chỉnh sửa.
+
+#### Bất Biến
+
+- `INV-REVIEW-09-01` — Lịch sử cá nhân chỉ chứa đánh giá thuộc khách hàng đang đăng nhập và không làm lộ đánh giá riêng theo danh tính của khách hàng khác.
+- `INV-REVIEW-09-02` — Mỗi đánh giá xuất hiện đúng một lần trong lịch sử cá nhân, kể cả khi sản phẩm được mua hoặc đánh giá ở nhiều dòng hàng khác nhau.
+- `INV-REVIEW-09-03` — Lịch sử cá nhân phản ánh trạng thái hiện tại của đánh giá và không biểu diễn các lần chỉnh sửa như những đánh giá hoặc phiên bản riêng biệt.
+
+#### Hành Vi Lỗi / Phụ Thuộc Trạng Thái
+
+Nếu người chưa đăng nhập mở mục "Đánh giá của tôi", giao diện phải đưa người dùng đến đăng nhập và giữ đích quay lại an toàn tới lịch sử đánh giá.
+
+Nếu khách hàng chưa gửi đánh giá nào, hệ thống phải trả danh sách rỗng và giao diện phải hiển thị trạng thái chưa có đánh giá cùng hành động đi tới lịch sử đơn hàng để tìm sản phẩm chờ đánh giá.
+
+Nếu sản phẩm nguồn không còn được hiển thị công khai, đánh giá vẫn phải xuất hiện trong lịch sử với thông tin nhận biết đã lưu, nhưng giao diện không được cung cấp liên kết tới một trang sản phẩm công khai không khả dụng.
+
+Nếu không tải được lịch sử, giao diện phải hiển thị trạng thái lỗi có thể thử lại và không được hiển thị dữ liệu của phiên người dùng trước đó.
+
+Nếu yêu cầu phân trang không hợp lệ, hệ thống phải trả lỗi xác thực trường tương ứng và không trả một trang kết quả mơ hồ.
+
+#### Tiêu Chí Chấp Nhận
+
+**AC-REVIEW-09-01**
+
+Cho trước khách hàng đã gửi nhiều đánh giá, khi mở "Đánh giá của tôi", thì chỉ các đánh giá của khách hàng đó được hiển thị theo thứ tự cập nhật giảm dần và có phân trang ổn định.
+
+**AC-REVIEW-09-02**
+
+Cho trước một đánh giá hiện tại, khi hiển thị trong lịch sử, thì khách hàng thấy sản phẩm, phân loại đã mua, điểm sao, nhận xét, media, thời điểm tạo/cập nhật và trạng thái quyền chỉnh sửa tương ứng.
+
+**AC-REVIEW-09-03**
+
+Cho trước một đánh giá còn một lượt chỉnh sửa, khi khách hàng bắt đầu chỉnh sửa từ lịch sử và lưu thành công, thì cùng đánh giá đó phản ánh nội dung mới, chuyển sang trạng thái chỉ đọc và không xuất hiện thêm bản ghi lịch sử riêng.
+
+**AC-REVIEW-09-04**
+
+Cho trước khách hàng chưa có đánh giá, khi mở lịch sử, thì giao diện hiển thị trạng thái chưa có đánh giá và liên kết tới lịch sử đơn hàng.
+
+**AC-REVIEW-09-05**
+
+Cho trước một đánh giá của sản phẩm không còn hiển thị công khai, khi khách hàng mở lịch sử, thì đánh giá vẫn xuất hiện với thông tin nhận biết nhưng không có liên kết tới trang sản phẩm không khả dụng.
+
+**AC-REVIEW-09-06**
+
+Cho trước người dùng chưa đăng nhập mở URL nội bộ hợp lệ của lịch sử đánh giá, khi hoàn tất đăng nhập, thì người dùng quay lại đúng trang "Đánh giá của tôi".
+
+**AC-REVIEW-09-07**
+
+Cho trước một lỗi tạm thời khi tải lịch sử, khi lỗi được hiển thị, thì người dùng có thể thử lại và không thấy dữ liệu đánh giá còn sót lại từ phiên đăng nhập trước.

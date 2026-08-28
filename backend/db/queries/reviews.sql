@@ -103,3 +103,25 @@ FROM review_media;
 SELECT EXISTS (
     SELECT 1 FROM review_media WHERE object_key = $1
 ) AS is_referenced;
+
+-- name: ListOwnerReviews :many
+SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
+       pr.rating, pr.comment, pr.created_at, pr.updated_at, pr.edited_at,
+       oi.product_name AS purchased_product_name,
+       oi.options::text AS purchased_options,
+       EXISTS (
+           SELECT 1 FROM products p
+           WHERE p.id = pr.product_id
+             AND p.active
+             AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+       ) AS is_product_public
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+WHERE pr.user_id = @user_id
+ORDER BY pr.updated_at DESC, pr.id DESC
+LIMIT @limit_count OFFSET @offset_count;
+
+-- name: CountOwnerReviews :one
+SELECT count(*)::bigint AS count
+FROM product_reviews
+WHERE user_id = $1;

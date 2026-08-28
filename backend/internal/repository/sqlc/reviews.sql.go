@@ -12,6 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countOwnerReviews = `-- name: CountOwnerReviews :one
+SELECT count(*)::bigint AS count
+FROM product_reviews
+WHERE user_id = $1
+`
+
+func (q *Queries) CountOwnerReviews(ctx context.Context, userID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countOwnerReviews, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countProductReviews = `-- name: CountProductReviews :one
 SELECT count(*)::bigint AS count
 FROM product_reviews
@@ -257,6 +270,80 @@ func (q *Queries) ListAllReferencedObjectKeys(ctx context.Context) ([]string, er
 			return nil, err
 		}
 		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOwnerReviews = `-- name: ListOwnerReviews :many
+SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
+       pr.rating, pr.comment, pr.created_at, pr.updated_at, pr.edited_at,
+       oi.product_name AS purchased_product_name,
+       oi.options::text AS purchased_options,
+       EXISTS (
+           SELECT 1 FROM products p
+           WHERE p.id = pr.product_id
+             AND p.active
+             AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+       ) AS is_product_public
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+WHERE pr.user_id = $1
+ORDER BY pr.updated_at DESC, pr.id DESC
+LIMIT $3 OFFSET $2
+`
+
+type ListOwnerReviewsParams struct {
+	UserID      string
+	OffsetCount int32
+	LimitCount  int32
+}
+
+type ListOwnerReviewsRow struct {
+	ID                   string
+	OrderItemID          string
+	UserID               string
+	ProductID            string
+	VariantID            string
+	Rating               int32
+	Comment              string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	EditedAt             pgtype.Timestamptz
+	PurchasedProductName string
+	PurchasedOptions     string
+	IsProductPublic      bool
+}
+
+func (q *Queries) ListOwnerReviews(ctx context.Context, arg ListOwnerReviewsParams) ([]ListOwnerReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listOwnerReviews, arg.UserID, arg.OffsetCount, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOwnerReviewsRow
+	for rows.Next() {
+		var i ListOwnerReviewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderItemID,
+			&i.UserID,
+			&i.ProductID,
+			&i.VariantID,
+			&i.Rating,
+			&i.Comment,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EditedAt,
+			&i.PurchasedProductName,
+			&i.PurchasedOptions,
+			&i.IsProductPublic,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
