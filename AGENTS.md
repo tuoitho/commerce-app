@@ -12,7 +12,16 @@
 ## Governed Changes
 
 - Local fixes and explicit behavior changes confined to one bounded context may proceed directly with focused tests. Any API/schema/event, compatibility, persistence/security boundary, cross-package, or materially ambiguous behavior change requires an approved dream specification first.
-- Canonical governed artifacts are `.dream/specs/<feature>/requirements.md`, `design.md`, and `tasks.md`; approve each stage and independently review the complete set before implementation. `tasks.md` is the implementation plan.
+- Canonical planning documents are
+  `.dream/specs/<feature>/requirements.md`,
+  `.dream/specs/<feature>/design.md`, and
+  `.dream/specs/<feature>/tasks.md`.
+
+  Governed features may additionally contain executable shared contracts,
+  contract revisions, and verification evidence under the same feature
+  directory. Requirements define behavioral authority, design defines
+  architectural authority, frozen contracts define shared implementation
+  authority, tasks define execution responsibility, and evidence records proof.
 - If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. Verify completed governed work against requirement IDs and acceptance criteria.
 - Use the `question` tool for blocking product/architecture choices and approval gates that repository evidence cannot resolve.
 - Whenever database schema, tables, columns, constraints, or queries are modified:
@@ -35,5 +44,8 @@
 
 ## Process Safety
 
-- Use systematic debugging and test-driven development for behavior fixes. Prefer one agent for coupled frontend/backend work; delegate only independent work after shared contracts are stable.
+- Use systematic debugging and test-driven development for behavior fixes. - Use one persistent implementation owner per coherent workstream. Frontend,
+  backend, admin, or service workstreams may execute independently only after
+  their shared contracts are stable. Keep work in one owner when the work
+  materially shares mutable domain abstractions, files, or unresolved behavior.
 - Never run dev servers, watch tests, or other long-lived commands unbounded in the foreground. Use a background/session mechanism or an explicit timeout, verify readiness, capture logs/PID where applicable, and stop the process afterward.

@@ -1,0 +1,615 @@
+scenarios:
+  - id: PURCHASED-REVIEW-API-001
+    requirement: REQ-REVIEW-01
+    given: customer C owns delivered order O containing unreviewed order item I
+    when: C creates a review through POST /api/v1/orders/O/items/I/review
+    then:
+      status: 201
+      assertions:
+        - response data productId and variantId are derived from I
+        - response data verifiedPurchase is true
+        - the order item reviewState becomes reviewed on the next read
+
+  - id: PURCHASED-REVIEW-API-002
+    requirement: REQ-REVIEW-01
+    given: order item I belongs to an order in pending_confirmation, confirmed, preparing, cancel_requested, shipped, cancelled, or returned
+    when: its owner attempts to create a review for I
+    then:
+      status: 409
+      assertions:
+        - error.code is review_not_eligible
+        - no review is created
+
+  - id: PURCHASED-REVIEW-API-003
+    requirement: REQ-REVIEW-01
+    given: order O and order item I exist but belong to another customer
+    when: customer C attempts POST /api/v1/orders/O/items/I/review
+    then:
+      status: 409
+      assertions:
+        - error.code is review_not_eligible
+        - no review is created
+
+  - id: PURCHASED-REVIEW-API-004
+    requirement: REQ-REVIEW-01
+    given: delivered order O contains two order items for the same product with different variants
+    when: the owner creates one review for each item
+    then:
+      responses:
+        firstItem: { status: 201 }
+        secondItem: { status: 201 }
+      assertions:
+        - two different review IDs exist
+        - each review exposes the purchasedOptions snapshot of its own item
+
+  - id: PURCHASED-REVIEW-API-005
+    requirement: REQ-REVIEW-02
+    given: an eligible order item and a multipart request with rating 5, blank comment, three valid images, and two valid videos
+    when: the customer creates the review
+    then:
+      status: 201
+      assertions:
+        - response data comment is an empty string
+        - response data media has five entries in manifest order
+        - exactly two media entries have type video
+
+  - id: PURCHASED-REVIEW-API-006
+    requirement: REQ-REVIEW-02
+    given: a multipart create request has six media entries
+    when: the request is submitted
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains media
+        - no review or public media is created
+
+  - id: PURCHASED-REVIEW-API-007
+    requirement: REQ-REVIEW-02
+    given: a file name and declared Content-Type indicate JPEG but detected content is not JPEG
+    when: the customer submits the review
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - no review or public media is created
+
+  - id: PURCHASED-REVIEW-API-008
+    requirement: REQ-REVIEW-02
+    given: MinIO fails while the backend is streaming the second file
+    when: the create request completes
+    then:
+      status: 500
+      assertions:
+        - error.code is internal
+        - no review exists
+        - no object from the failed operation is publicly readable
+
+  - id: PURCHASED-REVIEW-API-009
+    requirement: REQ-REVIEW-03
+    given: two concurrent create requests target the same eligible order item
+    when: both requests complete
+    then:
+      responses:
+        successfulCreate: { status: 201, count: 1 }
+        rejectedCreate: { status: 409, count: 1, errorCode: review_already_exists }
+      assertions:
+        - exactly one review exists for the order item
+
+  - id: PURCHASED-REVIEW-API-010
+    requirement: REQ-REVIEW-03
+    given: the frontend times out while creating a review and does not know the result
+    when: connectivity returns and the frontend reloads the order-item review state
+    then:
+      status: 200
+      assertions:
+        - reviewed state prevents another create and exposes the created review when the first request committed
+        - eligible state permits a user-initiated retry when the first request did not commit
+        - the frontend never automatically resubmits before this state read
+
+  - id: PURCHASED-REVIEW-API-012
+    requirement: REQ-REVIEW-04
+    given: owner C has an unedited review with media M1 and M2
+    when: C submits one edit that retains M2, removes M1, and inserts upload U before M2
+    then:
+      status: 200
+      assertions:
+        - response media order is U then M2
+        - response viewer canEdit is false and remainingEdits is 0
+        - M1 is no longer publicly readable after commit
+
+  - id: PURCHASED-REVIEW-API-013
+    requirement: REQ-REVIEW-04
+    given: review R already has one successful edit
+    when: its owner submits another edit
+    then:
+      status: 409
+      assertions:
+        - error.code is review_edit_limit_reached
+        - rating, comment, media, and updatedAt remain unchanged
+
+  - id: PURCHASED-REVIEW-API-014
+    requirement: REQ-REVIEW-04
+    given: the frontend times out during the single edit and does not know the result
+    when: connectivity returns and the frontend reloads the owned review
+    then:
+      status: 200
+      assertions:
+        - remainingEdits 0 shows that the first edit committed and prevents retry
+        - remainingEdits 1 permits a user-initiated retry when the first edit did not commit
+        - the frontend never automatically resubmits before this state read
+
+  - id: PURCHASED-REVIEW-API-015
+    requirement: REQ-REVIEW-04
+    given: review R is unedited and MinIO or database fails during an edit
+    when: the failed edit completes and R is read again
+    then:
+      responses:
+        edit: { status: 500, errorCode: internal }
+        ownedReviewRead: { status: 200 }
+      assertions:
+        - R retains its prior rating, comment, media, and updatedAt
+        - R viewer remainingEdits is 1
+        - newly uploaded objects are not publicly readable
+
+  - id: PURCHASED-REVIEW-API-016
+    requirement: REQ-REVIEW-04
+    given: two different edits race for the same unedited review
+    when: both complete
+    then:
+      responses:
+        successfulEdit: { status: 200, count: 1 }
+        rejectedEdit: { status: 409, count: 1, errorCode: review_edit_limit_reached }
+      assertions:
+        - exactly one complete edited state is public
+
+  - id: PURCHASED-REVIEW-API-017
+    requirement: REQ-REVIEW-04
+    given: a review was created from a delivered order item and the order later becomes returned
+    when: the owner reads and edits the review before using the edit allowance
+    then:
+      responses:
+        ownedReviewRead: { status: 200 }
+        edit: { status: 200 }
+      assertions:
+        - the review remains public
+        - the single edit is accepted
+        - order item reviewState remains reviewed and reflects the remaining edit allowance
+
+  - id: PURCHASED-REVIEW-API-018
+    requirement: REQ-REVIEW-05
+    given: anonymous viewer reads a product with multiple reviews
+    when: GET /api/v1/products/{productId}/reviews is called without auth
+    then:
+      status: 200
+      assertions:
+        - every review authorLabel is Khách hàng đã mua hàng
+        - every review viewer is null
+        - no email, user ID, original filename, bucket, or object key is present
+        - reviews are ordered by updatedAt descending then id descending
+
+  - id: PURCHASED-REVIEW-API-019
+    requirement: REQ-REVIEW-05
+    given: authenticated customer C reads a page containing C's review and another customer's review
+    when: the product review collection is requested with valid auth
+    then:
+      status: 200
+      assertions:
+        - C's review viewer contains isOwner true and its edit allowance
+        - the other review viewer is null
+
+  - id: PURCHASED-REVIEW-API-020
+    requirement: REQ-REVIEW-05
+    given: a public product has no reviews
+    when: its detail and first review page are requested
+    then:
+      responses:
+        productDetail: { status: 200 }
+        reviewCollection: { status: 200 }
+      assertions:
+        - product detail reviewSummary reviewCount is 0
+        - product detail reviewSummary averageRating is null
+        - review collection data is an empty array
+        - pagination total and totalPages are 0
+
+  - id: PURCHASED-REVIEW-API-021
+    requirement: REQ-REVIEW-06
+    given: a product has ratings 5, 4, and 2 from three order items
+    when: product detail is requested
+    then:
+      status: 200
+      assertions:
+        - reviewSummary reviewCount is 3
+        - reviewSummary averageRating is 3.7
+
+  - id: PURCHASED-REVIEW-API-022
+    requirement: REQ-REVIEW-06
+    given: one of three product reviews changes rating from 2 to 5 in its allowed edit
+    when: product detail is requested after the edit
+    then:
+      status: 200
+      assertions:
+        - reviewSummary reviewCount remains 3
+        - reviewSummary averageRating reflects ratings 5, 4, and 5 rounded to one decimal
+
+  - id: PURCHASED-REVIEW-API-023
+    requirement: REQ-REVIEW-07
+    given: a delivered order has three items and one item is reviewed
+    when: order detail and order stats are requested
+    then:
+      responses:
+        orderDetail: { status: 200 }
+        orderStats: { status: 200 }
+      assertions:
+        - the reviewed item reviewState status is reviewed
+        - each unreviewed item reviewState status is eligible
+        - awaitingReview includes exactly two items from this order
+
+  - id: PURCHASED-REVIEW-API-024
+    requirement: REQ-REVIEW-07
+    given: the same product appears as two unreviewed items in delivered orders
+    when: order stats are requested
+    then:
+      status: 200
+      assertions:
+        - awaitingReview counts both order items
+
+  - id: PURCHASED-REVIEW-API-025
+    requirement: REQ-REVIEW-07
+    given: an unreviewed delivered order becomes returned
+    when: order stats and order detail are read
+    then:
+      responses:
+        orderStats: { status: 200 }
+        orderDetail: { status: 200 }
+      assertions:
+        - its unreviewed items no longer contribute to awaitingReview
+        - each unreviewed item reviewState status is ineligible
+
+  - id: PURCHASED-REVIEW-API-026
+    requirement: REQ-REVIEW-08
+    given: an unauthenticated caller
+    when: the caller reads reviews and then attempts a review mutation
+    then:
+      responses:
+        publicReviewRead: { status: 200 }
+        mutation: { status: 401, errorCode: unauthorized }
+      assertions:
+        - public review data is available
+
+  - id: PURCHASED-REVIEW-API-027
+    requirement: REQ-REVIEW-02
+    given: an eligible order item
+    when: create requests use rating 0, 6, 1.5, or a string value
+    then:
+      status: 400
+      assertions:
+        - every response error.code is validation_error
+        - every response error.fields contains rating
+        - no review is created
+
+  - id: PURCHASED-REVIEW-API-028
+    requirement: REQ-REVIEW-02
+    given: an eligible order item and a comment with surrounding whitespace and 1000 characters after trim
+    when: the review is created
+    then:
+      status: 201
+      assertions:
+        - the request succeeds and stores exactly the trimmed 1000-character value
+
+  - id: PURCHASED-REVIEW-API-029
+    requirement: REQ-REVIEW-02
+    given: an eligible order item and comment <script>alert(1)</script>
+    when: the review is created and then listed publicly
+    then:
+      responses:
+        create: { status: 201 }
+        publicReviewRead: { status: 200 }
+      assertions:
+        - the public read returns the exact literal comment text
+        - the consumer renders the comment as text and does not execute HTML or script
+
+  - id: PURCHASED-REVIEW-API-030
+    requirement: REQ-REVIEW-02
+    given: a create manifest references three valid video files
+    when: the request is submitted
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains media
+        - no review or public media is created
+
+  - id: PURCHASED-REVIEW-API-031
+    requirement: REQ-REVIEW-02
+    given: independent eligible order items and valid JPEG and MP4 content exactly at each byte limit
+    when: one request uploads an image of 5242880 bytes and another uploads a video of 52428800 bytes
+    then:
+      responses:
+        exactLimitImage: { status: 201 }
+        exactLimitVideo: { status: 201 }
+      assertions:
+        - the exact-limit image and video are accepted
+
+  - id: PURCHASED-REVIEW-API-032
+    requirement: REQ-REVIEW-02
+    given: an upload entry declares an incorrect sha256 or sizeBytes for its actual file
+    when: the request is submitted
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains files.0
+        - no review or public media is created
+
+  - id: PURCHASED-REVIEW-API-033
+    requirement: REQ-REVIEW-02
+    given: a manifest repeats an uploadIndex, omits a supplied file, references a missing file, or repeats an existing media ID
+    when: the mutation is submitted
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains media
+        - no partial mutation is visible
+
+  - id: PURCHASED-REVIEW-API-052
+    requirement: REQ-REVIEW-02
+    given: an eligible order item and a comment with 1001 characters after trim
+    when: the review is submitted
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains comment
+
+  - id: PURCHASED-REVIEW-API-053
+    requirement: REQ-REVIEW-02
+    given: independent eligible order items and otherwise valid files one byte above each byte limit
+    when: one request uploads an image of 5242881 bytes and another uploads a video of 52428801 bytes
+    then:
+      responses:
+        oversizedImage: { status: 400, errorCode: validation_error, field: files.0 }
+        oversizedVideo: { status: 400, errorCode: validation_error, field: files.0 }
+      assertions:
+        - neither request creates a review or public media
+
+  - id: PURCHASED-REVIEW-API-054
+    requirement: REQ-REVIEW-04
+    given: edit manifest for review R references an existing media ID owned by another review
+    when: the owner submits the edit
+    then:
+      status: 400
+      assertions:
+        - error.code is validation_error
+        - error.fields contains media
+        - R and both reviews' media remain unchanged
+
+  - id: PURCHASED-REVIEW-API-034
+    requirement: REQ-REVIEW-04
+    given: review R belongs to another customer
+    when: customer C reads or edits R
+    then:
+      responses:
+        ownedReviewRead: { status: 404, errorCode: review_not_found }
+        edit: { status: 404, errorCode: review_not_found }
+      assertions:
+        - ownership information and review content are not disclosed
+
+  - id: PURCHASED-REVIEW-API-035
+    requirement: REQ-REVIEW-04
+    given: owner C has an unedited review R
+    when: C successfully changes rating, comment, and media
+    then:
+      status: 200
+      assertions:
+        - id, productId, variantId, purchasedOptions, authorLabel, and createdAt are unchanged
+        - updatedAt is later than its prior value
+        - viewer isOwner is true, canEdit is false, and remainingEdits is 0
+
+  - id: PURCHASED-REVIEW-API-036
+    requirement: REQ-REVIEW-07
+    given: a delivered order has one unreviewed order item with quantity 3
+    when: order stats are requested
+    then:
+      status: 200
+      assertions:
+        - awaitingReview increases by exactly 1 rather than 3
+
+  - id: PURCHASED-REVIEW-API-037
+    requirement: REQ-REVIEW-07
+    given: customer C has a baseline awaitingReview count N and creates a review for one eligible item
+    when: order stats are read after the successful create
+    then:
+      status: 200
+      assertions:
+        - awaitingReview is N minus 1
+        - other order items retain their prior independent reviewState
+
+  - id: PURCHASED-REVIEW-API-038
+    requirement: REQ-REVIEW-01
+    given: customer C owns a delivered order item whose product is now inactive and absent from public catalog reads
+    when: C creates a review from that order item
+    then:
+      status: 201
+      assertions:
+        - the review is created for the order item's product and variant
+        - the public product detail remains 404 while the product is inactive
+
+  - id: PURCHASED-REVIEW-API-039
+    requirement: REQ-REVIEW-08
+    given: a malformed productId path value
+    when: product detail or product reviews are requested
+    then:
+      responses:
+        productDetail: { status: 400, errorCode: invalid_product_id }
+        reviewCollection: { status: 400, errorCode: invalid_product_id }
+
+  - id: PURCHASED-REVIEW-API-040
+    requirement: REQ-REVIEW-08
+    given: a public product request includes a malformed or expired bearer token
+    when: product detail or product reviews are requested
+    then:
+      responses:
+        productDetail: { status: 401, errorCode: invalid_token }
+        reviewCollection: { status: 401, errorCode: invalid_token }
+      assertions:
+        - no personalized viewer state is returned
+
+  - id: PURCHASED-REVIEW-API-041
+    requirement: REQ-REVIEW-08
+    given: an authenticated admin or other non-customer caller
+    when: the caller requests order review state or a review mutation
+    then:
+      responses:
+        orderReviewState: { status: 403, errorCode: forbidden }
+        mutation: { status: 403, errorCode: forbidden }
+      assertions:
+        - no review mutation occurs
+
+  - id: PURCHASED-REVIEW-API-044
+    requirement: REQ-REVIEW-06
+    given: a product rating mean is exactly 4.25 before presentation rounding
+    when: product detail is requested
+    then:
+      status: 200
+      assertions:
+        - reviewSummary averageRating is 4.3
+
+  - id: PURCHASED-REVIEW-API-045
+    requirement: REQ-REVIEW-02
+    given: an uploaded object loses its database reference and MinIO remains continuously available
+    when: immediate cleanup fails and the reconciliation bound elapses
+    then:
+      status: physically_deleted
+      assertions:
+        - the object is never publicly readable after losing its reference
+        - the object is physically absent from MinIO no later than 90 minutes after losing its reference
+
+  - id: PURCHASED-REVIEW-API-046
+    requirement: REQ-REVIEW-02
+    given: an unreferenced object remains while MinIO is unavailable
+    when: MinIO connectivity recovers
+    then:
+      status: physically_deleted
+      assertions:
+        - the object is physically absent no later than 90 minutes after recovery
+
+  - id: PURCHASED-REVIEW-API-047
+    requirement: REQ-REVIEW-05
+    given: a product review request uses page 0 or limit 51
+    when: the collection is requested
+    then:
+      responses:
+        pageZero: { status: 400, errorCode: validation_error, field: page }
+        limitFiftyOne: { status: 400, errorCode: validation_error, field: limit }
+
+  - id: PURCHASED-REVIEW-API-048
+    requirement: REQ-REVIEW-08
+    given: a malformed orderId or orderItemId path value
+    when: order detail or create review is requested
+    then:
+      responses:
+        orderDetail: { status: 404, errorCode: order_not_found }
+        createReview: { status: 404, errorCode: order_not_found }
+
+  - id: PURCHASED-REVIEW-API-049
+    requirement: REQ-REVIEW-08
+    given: a malformed reviewId path value
+    when: owned review read or edit is requested
+    then:
+      responses:
+        ownedReviewRead: { status: 404, errorCode: review_not_found }
+        edit: { status: 404, errorCode: review_not_found }
+
+  - id: PURCHASED-REVIEW-MEDIA-005
+    requirement: REQ-REVIEW-08
+    given: a malformed mediaId path value
+    when: the public media route is requested
+    then:
+      status: 404
+      assertions:
+        - no response body or MinIO detail is returned
+
+  - id: PURCHASED-REVIEW-MEDIA-001
+    requirement: REQ-REVIEW-05
+    given: media M is referenced by a public review and stored as video/mp4 with 5242880 bytes
+    when: GET /media/reviews/M is requested without Range
+    then:
+      status: 200
+      assertions:
+        - Content-Type is video/mp4
+        - Content-Length is 5242880
+        - Accept-Ranges is bytes
+
+  - id: PURCHASED-REVIEW-MEDIA-002
+    requirement: REQ-REVIEW-05
+    given: public video media M has 5242880 bytes
+    when: GET /media/reviews/M is requested with Range bytes=0-1048575
+    then:
+      status: 206
+      assertions:
+        - Content-Range is bytes 0-1048575/5242880
+        - Content-Length is 1048576
+        - response body contains only the requested bytes
+
+  - id: PURCHASED-REVIEW-MEDIA-003
+    requirement: REQ-REVIEW-04
+    given: an object exists in MinIO but has no review_media reference
+    when: its guessed or former media ID is requested through the public media route
+    then:
+      status: 404
+      assertions:
+        - no object bytes are returned
+        - MinIO object key is not disclosed
+
+  - id: PURCHASED-REVIEW-MEDIA-004
+    requirement: REQ-REVIEW-08
+    given: media M is referenced but MinIO is unavailable
+    when: GET /media/reviews/M is requested
+    then:
+      status: 503
+      assertions:
+        - no endpoint, bucket, credential, or object key is disclosed
+
+  - id: PURCHASED-REVIEW-MEDIA-006
+    requirement: REQ-REVIEW-05
+    given: public image media M has 5242880 bytes
+    when: GET /media/reviews/M is requested with Range bytes=0-1023
+    then:
+      status: 206
+      assertions:
+        - Content-Range is bytes 0-1023/5242880
+        - Content-Length is 1024
+        - the original image MIME is preserved
+
+  - id: PURCHASED-REVIEW-MEDIA-007
+    requirement: REQ-REVIEW-05
+    given: public media M has length L
+    when: a malformed, multiple, or unsatisfiable Range is requested
+    then:
+      status: 416
+      assertions:
+        - Content-Range is bytes */L
+        - no MinIO object key is disclosed
+
+  - id: PURCHASED-REVIEW-MEDIA-008
+    requirement: REQ-REVIEW-05
+    given: a prior media response returned ETag E
+    when: GET /media/reviews/M is requested with If-None-Match E
+    then:
+      status: 304
+      assertions:
+        - the response has no body
+        - Cache-Control is public, max-age=0, must-revalidate
+        - ETag remains E
+
+  - id: PURCHASED-REVIEW-MEDIA-009
+    requirement: REQ-REVIEW-04
+    given: media M previously returned ETag E and its database reference is now removed by a successful edit
+    when: GET /media/reviews/M is requested with If-None-Match E
+    then:
+      status: 404
+      assertions:
+        - the provider checks the current database reference before ETag matching
+        - the response is not 304 and contains no media bytes

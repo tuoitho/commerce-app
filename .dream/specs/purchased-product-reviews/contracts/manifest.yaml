@@ -1,0 +1,79 @@
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 1
+    status: FROZEN
+    requirements:
+      - REQ-REVIEW-01
+      - REQ-REVIEW-02
+      - REQ-REVIEW-03
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-06
+      - REQ-REVIEW-07
+      - REQ-REVIEW-08
+    providers: [backend]
+    consumers: [frontend]
+    compatibility:
+      classification: additive-existing-api-and-new-endpoints
+      consumer_unknown_fields: ignore
+      compatible_changes:
+        - add optional response fields in a later revision
+        - add optional request fields in a later revision
+      breaking_changes:
+        - remove or rename a field or operation
+        - change field meaning, requiredness, status, or error code
+        - add an enum value consumed exhaustively
+        - change eligibility, concurrency, edit-limit, or pagination semantics
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+
+  - id: PURCHASED-REVIEW-MEDIA
+    revision: 1
+    status: FROZEN
+    requirements:
+      - REQ-REVIEW-02
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-08
+    providers: [backend]
+    consumers: [frontend-browser]
+    compatibility:
+      classification: new-public-raw-content-route
+      consumer_unknown_headers: ignore
+      compatible_changes:
+        - add optional response headers in a later revision
+      breaking_changes:
+        - change MIME, range, cache, status, or URL semantics
+        - expose MinIO object identity or require authentication
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+
+  - id: PURCHASED-REVIEW-API
+    revision: 2
+    status: DRAFT
+    requirements:
+      - REQ-REVIEW-01
+      - REQ-REVIEW-02
+      - REQ-REVIEW-03
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-06
+      - REQ-REVIEW-07
+      - REQ-REVIEW-08
+    providers: [backend]
+    consumers: [frontend]
+    compatibility:
+      classification: breaking-semantic-coordinated-rollout
+      rollout: backend-provider-and-frontend-consumer-must-deploy-together
+      breaking_changes:
+        - awaitingReview now counts unreviewed delivered order items instead of delivered orders
+        - malformed productId now uses validation_error with fields.productId
+        - owned-review and successful mutation responses require non-null owner viewer state
+      consumer_unknown_fields: ignore
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev2.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml

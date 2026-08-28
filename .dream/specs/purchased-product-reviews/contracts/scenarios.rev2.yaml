@@ -1,0 +1,58 @@
+contract: PURCHASED-REVIEW-API
+revision: 2
+inherits:
+  contract: PURCHASED-REVIEW-API
+  revision: 1
+supersedes:
+  - PURCHASED-REVIEW-API-039
+
+scenarios:
+  - id: PURCHASED-REVIEW-API-R2-001
+    requirement: REQ-REVIEW-08
+    given: a malformed productId path value
+    when: product detail or product reviews are requested
+    then:
+      responses:
+        productDetail: { status: 400, errorCode: validation_error, field: productId }
+        reviewCollection: { status: 400, errorCode: validation_error, field: productId }
+
+  - id: PURCHASED-REVIEW-API-R2-002
+    requirement: REQ-REVIEW-04
+    given: authenticated owner C has an existing review R
+    when: C requests GET /api/v1/reviews/R
+    then:
+      status: 200
+      assertions:
+        - data.viewer is non-null and data.viewer.isOwner is true
+        - data.viewer is exactly editable with remainingEdits 1 or final with remainingEdits 0
+
+  - id: PURCHASED-REVIEW-API-R2-003
+    requirement: REQ-REVIEW-03
+    given: frontend timed out during create and reloads the resulting owned review
+    when: the authoritative owned-review response is read
+    then:
+      status: 200
+      assertions:
+        - data.viewer is non-null and carries the current remainingEdits
+
+  - id: PURCHASED-REVIEW-API-R2-004
+    requirement: REQ-REVIEW-04
+    given: authenticated owner C successfully creates or edits a review
+    when: the mutation response is returned
+    then:
+      responses:
+        successfulCreate: { status: 201, viewer: editable-owner, remainingEdits: 1 }
+        successfulEdit: { status: 200, viewer: final-owner, remainingEdits: 0 }
+      assertions:
+        - neither successful mutation response permits viewer null
+
+  - id: PURCHASED-REVIEW-API-R2-005
+    requirement: REQ-REVIEW-07
+    given: revision 1 consumers interpret awaitingReview as delivered-order count while revision 2 defines unreviewed delivered order-item count
+    when: PURCHASED-REVIEW-API revision 2 is released
+    then:
+      status: coordinated_rollout_required
+      assertions:
+        - backend provider and frontend consumer deploy revision 2 together
+        - no supported deployment pairs a revision 2 provider with a revision 1 consumer
+        - verifier asserts awaitingReview against order-item semantics after rollout

@@ -1,0 +1,1259 @@
+openapi: 3.1.0
+info:
+  title: Purchased Product Reviews Contract
+  version: 1.0.0
+  description: Shared HTTP contract for verified product reviews and review media.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+
+servers:
+  - url: /
+
+tags:
+  - name: Product reviews
+    description: Public review summary and paginated verified reviews.
+  - name: Review mutations
+    description: Authenticated create, read-own, and single-edit operations.
+  - name: Order review state
+    description: Personalized review eligibility and pending item count.
+  - name: Review media
+    description: Public raw media bytes proxied from private MinIO storage.
+
+paths:
+  /api/v1/products/{productId}:
+    get:
+      tags: [Product reviews]
+      operationId: getProductDetailWithReviewSummary
+      summary: Read product detail with the current review summary
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Existing product detail fields plus reviewSummary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidProductId'
+        '401':
+          $ref: '#/components/responses/InvalidOptionalToken'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/products/{productId}/reviews:
+    get:
+      tags: [Product reviews]
+      operationId: listProductReviews
+      summary: List verified reviews for a public product
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Reviews ordered by updatedAt descending and id descending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewListEnvelope'
+        '400':
+          $ref: '#/components/responses/ProductReviewBadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidOptionalToken'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags: [Order review state]
+      operationId: getOrderWithItemReviewState
+      summary: Read an owned order with review state on every item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Existing order fields plus reviewState on every item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/CustomerForbidden'
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/orders/stats:
+    get:
+      tags: [Order review state]
+      operationId: getOrderStatsWithAwaitingReviewItems
+      summary: Read order stats where awaitingReview counts unreviewed delivered order items
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Order stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatsEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/CustomerForbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/orders/{orderId}/items/{orderItemId}/review:
+    post:
+      tags: [Review mutations]
+      operationId: createOrderItemReview
+      summary: Create the one review allowed for an eligible delivered order item
+      description: |
+        The payload part is application/json. Every upload media entry references one
+        zero-based files index. Create requests may only use source=upload. Each file
+        index must be referenced exactly once and every file must be referenced.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/OrderItemId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateReviewMutationForm'
+            encoding:
+              payload:
+                contentType: application/json
+              files:
+                contentType: image/jpeg, image/png, image/webp, video/mp4, video/webm
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewEnvelope'
+        '400':
+          $ref: '#/components/responses/ReviewValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/CustomerForbidden'
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '409':
+          description: Not eligible or duplicate review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                notEligible:
+                  value:
+                    success: false
+                    message: Sản phẩm trong đơn hàng chưa đủ điều kiện đánh giá
+                    data: null
+                    error:
+                      code: review_not_eligible
+                      message: Sản phẩm trong đơn hàng chưa đủ điều kiện đánh giá
+                    meta:
+                      timestamp: '2026-08-27T10:00:00Z'
+                alreadyExists:
+                  value:
+                    success: false
+                    message: Sản phẩm trong dòng hàng này đã được đánh giá
+                    data: null
+                    error:
+                      code: review_already_exists
+                      message: Sản phẩm trong dòng hàng này đã được đánh giá
+                    meta:
+                      timestamp: '2026-08-27T10:00:00Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/reviews/{reviewId}:
+    get:
+      tags: [Review mutations]
+      operationId: getOwnedReview
+      summary: Read a review for its authenticated owner
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Owned review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/CustomerForbidden'
+        '404':
+          $ref: '#/components/responses/ReviewNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Review mutations]
+      operationId: editOwnedReviewOnce
+      summary: Apply the review owner's single successful edit
+      description: |
+        The media manifest is the complete desired ordered media state. Existing entries
+        must belong to this review and may occur once. Upload entries reference zero-based
+        files indexes. Every file index must be referenced exactly once. The update is
+        atomic from the public reader's perspective.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EditReviewMutationForm'
+            encoding:
+              payload:
+                contentType: application/json
+              files:
+                contentType: image/jpeg, image/png, image/webp, video/mp4, video/webm
+      responses:
+        '200':
+          description: Review edited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewEnvelope'
+        '400':
+          $ref: '#/components/responses/ReviewValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/CustomerForbidden'
+        '404':
+          $ref: '#/components/responses/ReviewNotFound'
+        '409':
+          description: Edit limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                editLimit:
+                  value:
+                    success: false
+                    message: Đánh giá này đã hết lượt chỉnh sửa
+                    data: null
+                    error:
+                      code: review_edit_limit_reached
+                      message: Đánh giá này đã hết lượt chỉnh sửa
+                    meta:
+                      timestamp: '2026-08-27T10:00:00Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /media/reviews/{mediaId}:
+    get:
+      tags: [Review media]
+      operationId: getPublicReviewMedia
+      summary: Stream a referenced review image or video through the backend
+      description: |
+        Supports one RFC 9110 byte range for every allowed image or video MIME.
+        Multiple ranges, malformed ranges, and unsatisfiable ranges return 416.
+        A media ID is immutable: replacing an upload creates a new media ID.
+        The provider checks the current database reference before evaluating Range,
+        If-None-Match, or reading MinIO. A revoked reference always returns 404,
+        including when If-None-Match equals an ETag returned before revocation.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/MediaId'
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+          example: bytes=0-1048575
+        - name: If-None-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Complete image or video
+          headers:
+            Accept-Ranges:
+              schema:
+                type: string
+                const: bytes
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+            Cache-Control:
+              schema:
+                type: string
+                const: public, max-age=0, must-revalidate
+            ETag:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema: { type: string, contentEncoding: binary }
+            image/png:
+              schema: { type: string, contentEncoding: binary }
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+            video/mp4:
+              schema: { type: string, contentEncoding: binary }
+            video/webm:
+              schema: { type: string, contentEncoding: binary }
+        '206':
+          description: Requested byte range
+          headers:
+            Accept-Ranges:
+              schema:
+                type: string
+                const: bytes
+            Content-Range:
+              schema:
+                type: string
+              example: bytes 0-1048575/5242880
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+            Cache-Control:
+              schema:
+                type: string
+                const: public, max-age=0, must-revalidate
+            ETag:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema: { type: string, contentEncoding: binary }
+            image/png:
+              schema: { type: string, contentEncoding: binary }
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+            video/mp4:
+              schema: { type: string, contentEncoding: binary }
+            video/webm:
+              schema: { type: string, contentEncoding: binary }
+        '304':
+          description: The immutable media matches If-None-Match; no response body
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: public, max-age=0, must-revalidate
+            ETag:
+              schema:
+                type: string
+        '404':
+          description: Media ID is absent or no longer referenced; no response body is required
+        '416':
+          description: Requested range is not satisfiable
+          headers:
+            Content-Range:
+              required: true
+              schema:
+                type: string
+                pattern: '^bytes \*/[0-9]+$'
+        '503':
+          description: Referenced media is temporarily unavailable from MinIO; no internal details
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrderItemId:
+      name: orderItemId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+
+  schemas:
+    CreateReviewMutationForm:
+      type: object
+      additionalProperties: false
+      required: [payload]
+      properties:
+        payload:
+          $ref: '#/components/schemas/CreateReviewMutationPayload'
+        files:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            contentEncoding: binary
+
+    EditReviewMutationForm:
+      type: object
+      additionalProperties: false
+      required: [payload]
+      properties:
+        payload:
+          $ref: '#/components/schemas/EditReviewMutationPayload'
+        files:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            contentEncoding: binary
+
+    CreateReviewMutationPayload:
+      type: object
+      additionalProperties: false
+      required: [rating, media]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          default: ''
+          description: Trimmed before validation and storage; the trimmed value must be at most 1000 characters and is plain text.
+        media:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/UploadMediaInput'
+
+    EditReviewMutationPayload:
+      type: object
+      additionalProperties: false
+      required: [rating, media]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          default: ''
+          description: Trimmed before validation and storage; the trimmed value must be at most 1000 characters and is plain text.
+        media:
+          type: array
+          maxItems: 5
+          description: Complete desired order; positions are assigned contiguously from array index 0.
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/ExistingMediaInput'
+              - $ref: '#/components/schemas/UploadMediaInput'
+
+    ExistingMediaInput:
+      type: object
+      additionalProperties: false
+      required: [source, mediaId]
+      properties:
+        source:
+          type: string
+          const: existing
+        mediaId:
+          type: string
+          format: uuid
+
+    UploadMediaInput:
+      type: object
+      additionalProperties: false
+      required: [source, uploadIndex, sha256, sizeBytes]
+      properties:
+        source:
+          type: string
+          const: upload
+        uploadIndex:
+          type: integer
+          minimum: 0
+          maximum: 4
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Lowercase SHA-256 digest computed by the client and verified by the backend while streaming.
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 52428800
+          description: Exact client-observed byte size, verified by the backend while streaming.
+
+    Review:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - productId
+        - variantId
+        - purchasedOptions
+        - rating
+        - comment
+        - media
+        - verifiedPurchase
+        - authorLabel
+        - createdAt
+        - updatedAt
+        - viewer
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        variantId: { type: string, format: uuid }
+        purchasedOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchasedOption'
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+          description: Trimmed plain text; consumers must render it as text, never as HTML.
+        media:
+          type: array
+          maxItems: 5
+          description: Ordered contiguously; each item's position equals its zero-based array index and URL equals /media/reviews/{id}.
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/ImageReviewMedia'
+              - $ref: '#/components/schemas/VideoReviewMedia'
+          contains:
+            $ref: '#/components/schemas/VideoReviewMedia'
+          minContains: 0
+          maxContains: 2
+        verifiedPurchase:
+          type: boolean
+          const: true
+        authorLabel:
+          type: string
+          const: Khách hàng đã mua hàng
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        viewer:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/EditableReviewViewerState'
+            - $ref: '#/components/schemas/FinalReviewViewerState'
+
+    PurchasedOption:
+      type: object
+      additionalProperties: false
+      required: [groupLabel, valueLabel]
+      properties:
+        groupLabel: { type: string }
+        valueLabel: { type: string }
+
+    ImageReviewMedia:
+      type: object
+      additionalProperties: false
+      required: [id, type, mimeType, sizeBytes, position, url]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          const: image
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 5242880
+        position:
+          type: integer
+          minimum: 0
+          maximum: 4
+        url:
+          type: string
+          pattern: '^/media/reviews/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+          description: Must equal /media/reviews/ followed by this object's id.
+
+    VideoReviewMedia:
+      type: object
+      additionalProperties: false
+      required: [id, type, mimeType, sizeBytes, position, url]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          const: video
+        mimeType:
+          type: string
+          enum: [video/mp4, video/webm]
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 52428800
+        position:
+          type: integer
+          minimum: 0
+          maximum: 4
+        url:
+          type: string
+          pattern: '^/media/reviews/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+          description: Must equal /media/reviews/ followed by this object's id.
+
+    EditableReviewViewerState:
+      type: object
+      additionalProperties: false
+      required: [isOwner, canEdit, remainingEdits]
+      properties:
+        isOwner: { type: boolean, const: true }
+        canEdit: { type: boolean, const: true }
+        remainingEdits: { type: integer, const: 1 }
+
+    FinalReviewViewerState:
+      type: object
+      additionalProperties: false
+      required: [isOwner, canEdit, remainingEdits]
+      properties:
+        isOwner: { type: boolean, const: true }
+        canEdit: { type: boolean, const: false }
+        remainingEdits: { type: integer, const: 0 }
+
+    ReviewSummary:
+      type: object
+      additionalProperties: false
+      required: [averageRating, reviewCount]
+      properties:
+        averageRating:
+          oneOf:
+            - type: 'null'
+            - type: number
+              minimum: 1
+              maximum: 5
+              multipleOf: 0.1
+              description: Arithmetic mean rounded to one decimal with round-half-up.
+        reviewCount:
+          type: integer
+          minimum: 0
+
+    OrderItemReviewState:
+      oneOf:
+        - $ref: '#/components/schemas/IneligibleOrderItemReviewState'
+        - $ref: '#/components/schemas/EligibleOrderItemReviewState'
+        - $ref: '#/components/schemas/EditableOrderItemReviewState'
+        - $ref: '#/components/schemas/FinalOrderItemReviewState'
+
+    IneligibleOrderItemReviewState:
+      type: object
+      additionalProperties: false
+      required: [status, reviewId, canEdit, remainingEdits]
+      properties:
+        status: { type: string, const: ineligible }
+        reviewId: { type: 'null' }
+        canEdit: { type: boolean, const: false }
+        remainingEdits: { type: integer, const: 0 }
+
+    EligibleOrderItemReviewState:
+      type: object
+      additionalProperties: false
+      required: [status, reviewId, canEdit, remainingEdits]
+      properties:
+        status: { type: string, const: eligible }
+        reviewId: { type: 'null' }
+        canEdit: { type: boolean, const: false }
+        remainingEdits: { type: integer, const: 0 }
+
+    EditableOrderItemReviewState:
+      type: object
+      additionalProperties: false
+      required: [status, reviewId, canEdit, remainingEdits]
+      properties:
+        status: { type: string, const: reviewed }
+        reviewId: { type: string, format: uuid }
+        canEdit: { type: boolean, const: true }
+        remainingEdits: { type: integer, const: 1 }
+
+    FinalOrderItemReviewState:
+      type: object
+      additionalProperties: false
+      required: [status, reviewId, canEdit, remainingEdits]
+      properties:
+        status: { type: string, const: reviewed }
+        reviewId: { type: string, format: uuid }
+        canEdit: { type: boolean, const: false }
+        remainingEdits: { type: integer, const: 0 }
+
+    PaginationMeta:
+      type: object
+      additionalProperties: false
+      required: [page, limit, total, totalPages, hasNext, hasPrev]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        hasNext: { type: boolean }
+        hasPrev: { type: boolean }
+
+    ResponseMeta:
+      type: object
+      additionalProperties: false
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorMeta:
+      type: object
+      additionalProperties: false
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+
+    Category:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    CatalogViewerState:
+      type: object
+      additionalProperties: false
+      required: [isFavorite]
+      properties:
+        isFavorite: { type: boolean }
+
+    ProductOptionValue:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+
+    ProductOptionGroup:
+      type: object
+      additionalProperties: false
+      required: [id, label, position, values]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        position: { type: integer }
+        values:
+          type: array
+          items: { $ref: '#/components/schemas/ProductOptionValue' }
+
+    ProductVariant:
+      type: object
+      additionalProperties: false
+      required: [id, optionValueIds, priceVnd, stockQuantity, active]
+      properties:
+        id: { type: string, format: uuid }
+        optionValueIds:
+          type: object
+          additionalProperties: { type: string, format: uuid }
+        priceVnd: { type: string, pattern: '^[0-9]+$' }
+        stockQuantity: { type: integer, format: int64, minimum: 0 }
+        active: { type: boolean }
+
+    ProductDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - model
+        - description
+        - brand
+        - category
+        - minPriceVnd
+        - maxPriceVnd
+        - price
+        - currency
+        - imageUrls
+        - stockQuantity
+        - inStock
+        - featured
+        - active
+        - optionGroups
+        - variants
+        - createdAt
+        - updatedAt
+        - viewer
+        - reviewSummary
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        model: { type: string }
+        description: { type: string }
+        brand: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        minPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        maxPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        price: { type: string, pattern: '^[0-9]+$' }
+        currency: { type: string, const: VND }
+        imageUrls:
+          type: array
+          items: { type: string }
+        stockQuantity: { type: integer, format: int64, minimum: 0 }
+        inStock: { type: boolean }
+        featured: { type: boolean }
+        active: { type: boolean }
+        optionGroups:
+          type: array
+          items: { $ref: '#/components/schemas/ProductOptionGroup' }
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/ProductVariant' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        viewer: { $ref: '#/components/schemas/CatalogViewerState' }
+        reviewSummary: { $ref: '#/components/schemas/ReviewSummary' }
+
+    OrderStatus:
+      type: string
+      enum:
+        - pending_confirmation
+        - confirmed
+        - preparing
+        - cancel_requested
+        - shipped
+        - delivered
+        - cancelled
+        - returned
+
+    OrderItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - variantId
+        - productId
+        - brandName
+        - productName
+        - model
+        - imageUrl
+        - options
+        - unitPriceVnd
+        - quantity
+        - lineTotalVnd
+        - reviewState
+      properties:
+        id: { type: string, format: uuid }
+        variantId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        brandName: { type: string }
+        productName: { type: string }
+        model: { type: string }
+        imageUrl: { type: string }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/PurchasedOption' }
+        unitPriceVnd: { type: string, pattern: '^[0-9]+$' }
+        quantity: { type: integer, format: int64, minimum: 1 }
+        lineTotalVnd: { type: string, pattern: '^[0-9]+$' }
+        reviewState: { $ref: '#/components/schemas/OrderItemReviewState' }
+
+    Order:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - userId
+        - status
+        - paymentMethod
+        - recipientName
+        - phone
+        - provinceName
+        - wardName
+        - detailAddress
+        - subtotalVnd
+        - shippingFeeVnd
+        - totalVnd
+        - items
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentMethod: { type: string, const: cod }
+        recipientName: { type: string }
+        phone: { type: string }
+        provinceName: { type: string }
+        wardName: { type: string }
+        detailAddress: { type: string }
+        subtotalVnd: { type: string, pattern: '^[0-9]+$' }
+        shippingFeeVnd: { type: string, pattern: '^[0-9]+$' }
+        totalVnd: { type: string, pattern: '^[0-9]+$' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time }
+        cancelledAt: { type: string, format: date-time }
+        deliveredAt: { type: string, format: date-time }
+        cancellableUntil: { type: string, format: date-time }
+
+    ReviewEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/Review' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+    ReviewListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Review' }
+        error: { type: 'null' }
+        meta:
+          allOf:
+            - $ref: '#/components/schemas/ResponseMeta'
+          required: [timestamp, pagination]
+
+    ProductDetailEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/ProductDetail' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+    OrderDetailEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/Order' }
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+    OrderStatsEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data:
+          type: object
+          additionalProperties: false
+          required: [pendingConfirmation, awaitingPickup, awaitingDelivery, awaitingReview]
+          properties:
+            pendingConfirmation: { type: integer, minimum: 0 }
+            awaitingPickup: { type: integer, minimum: 0 }
+            awaitingDelivery: { type: integer, minimum: 0 }
+            awaitingReview:
+              type: integer
+              minimum: 0
+              description: Number of unreviewed order items in currently delivered owned orders
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+    ValidationErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, fields]
+      properties:
+        code: { type: string, const: validation_error }
+        message: { type: string }
+        fields:
+          type: object
+          minProperties: 1
+          additionalProperties: { type: string }
+
+    BusinessOrSystemErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          not: { const: validation_error }
+        message: { type: string }
+
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, message, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        data: { type: 'null' }
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ValidationErrorDetail'
+            - $ref: '#/components/schemas/BusinessOrSystemErrorDetail'
+        meta: { $ref: '#/components/schemas/ErrorMeta' }
+
+  responses:
+    ReviewValidationError:
+      description: |
+        Invalid review input. Stable field keys are rating, comment, media, payload,
+        and files.{zero-based-index}. Count, video-count, duplicate
+        manifest reference, or missing file reference errors use media. Detected
+        MIME, digest, declared/actual size, or per-file byte-limit errors use
+        files.{index}.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            mediaCount:
+              value:
+                success: false
+                message: Dữ liệu không hợp lệ
+                data: null
+                error:
+                  code: validation_error
+                  message: Dữ liệu không hợp lệ
+                  fields:
+                    media: Tối đa 5 tệp và không quá 2 video
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+            fileMime:
+              value:
+                success: false
+                message: Dữ liệu không hợp lệ
+                data: null
+                error:
+                  code: validation_error
+                  message: Dữ liệu không hợp lệ
+                  fields:
+                    files.0: Định dạng tệp không được hỗ trợ
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+    ProductReviewBadRequest:
+      description: Invalid productId, page, or limit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            invalidProductId:
+              value:
+                success: false
+                message: Mã sản phẩm không hợp lệ
+                data: null
+                error:
+                  code: invalid_product_id
+                  message: Mã sản phẩm không hợp lệ
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+            invalidPage:
+              value:
+                success: false
+                message: Dữ liệu không hợp lệ
+                data: null
+                error:
+                  code: validation_error
+                  message: Dữ liệu không hợp lệ
+                  fields:
+                    page: Trang phải là số nguyên dương
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+    Unauthorized:
+      description: Missing or invalid customer session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            missing:
+              value:
+                success: false
+                message: Vui lòng đăng nhập để đánh giá sản phẩm
+                data: null
+                error:
+                  code: unauthorized
+                  message: Vui lòng đăng nhập để đánh giá sản phẩm
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+            invalid:
+              value:
+                success: false
+                message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+                data: null
+                error:
+                  code: invalid_token
+                  message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+                meta:
+                  timestamp: '2026-08-27T10:00:00Z'
+    InvalidOptionalToken:
+      description: An Authorization header was supplied but is malformed, invalid, or expired
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+            data: null
+            error:
+              code: invalid_token
+              message: Phiên đăng nhập không hợp lệ hoặc đã hết hạn
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    CustomerForbidden:
+      description: Authenticated caller is not a customer
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Bạn không có quyền đánh giá sản phẩm
+            data: null
+            error:
+              code: forbidden
+              message: Bạn không có quyền đánh giá sản phẩm
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    InvalidProductId:
+      description: Product path ID is not a valid UUID
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Mã sản phẩm không hợp lệ
+            data: null
+            error:
+              code: invalid_product_id
+              message: Mã sản phẩm không hợp lệ
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    ProductNotFound:
+      description: Product is absent or not public
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh
+            data: null
+            error:
+              code: product_not_found
+              message: Sản phẩm không tồn tại hoặc đã ngừng kinh doanh
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    OrderNotFound:
+      description: |
+        For order detail, the order is absent, malformed, or not owned. For create review,
+        the order/item path is absent or malformed; an existing foreign item instead
+        returns 409 review_not_eligible as required by the review eligibility contract.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Không tìm thấy đơn hàng
+            data: null
+            error:
+              code: order_not_found
+              message: Không tìm thấy đơn hàng
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    ReviewNotFound:
+      description: Review is absent or is not owned by the caller
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Không tìm thấy đánh giá
+            data: null
+            error:
+              code: review_not_found
+              message: Không tìm thấy đánh giá
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'
+    InternalError:
+      description: Internal or MinIO operation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            message: Đã xảy ra lỗi hệ thống
+            data: null
+            error:
+              code: internal
+              message: Đã xảy ra lỗi hệ thống
+            meta:
+              timestamp: '2026-08-27T10:00:00Z'

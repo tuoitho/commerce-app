@@ -1,0 +1,138 @@
+overlay: 1.0.0
+info:
+  title: Purchased Product Reviews API Revision 2
+  version: 2.0.0
+actions:
+  - target: $.components.schemas
+    description: Add authoritative owned-review response schemas.
+    update:
+      OwnedReview:
+        allOf:
+          - $ref: '#/components/schemas/Review'
+          - type: object
+            required: [viewer]
+            properties:
+              viewer:
+                oneOf:
+                  - $ref: '#/components/schemas/EditableReviewViewerState'
+                  - $ref: '#/components/schemas/FinalReviewViewerState'
+      OwnedReviewEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data: { $ref: '#/components/schemas/OwnedReview' }
+          error: { type: 'null' }
+          meta: { $ref: '#/components/schemas/ResponseMeta' }
+      EditableOwnedReviewEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data:
+            allOf:
+              - $ref: '#/components/schemas/Review'
+              - type: object
+                required: [viewer]
+                properties:
+                  viewer: { $ref: '#/components/schemas/EditableReviewViewerState' }
+          error: { type: 'null' }
+          meta: { $ref: '#/components/schemas/ResponseMeta' }
+      FinalOwnedReviewEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data:
+            allOf:
+              - $ref: '#/components/schemas/Review'
+              - type: object
+                required: [viewer]
+                properties:
+                  viewer: { $ref: '#/components/schemas/FinalReviewViewerState' }
+          error: { type: 'null' }
+          meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+  - target: $.components.responses
+    description: Add field-bearing malformed product ID validation response.
+    update:
+      InvalidProductIdV2:
+        description: Product path ID is not a valid UUID
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+            example:
+              success: false
+              message: Dữ liệu không hợp lệ
+              data: null
+              error:
+                code: validation_error
+                message: Dữ liệu không hợp lệ
+                fields:
+                  productId: Mã sản phẩm không hợp lệ
+              meta:
+                timestamp: '2026-08-27T10:00:00Z'
+
+  - target: $.paths['/api/v1/products/{productId}'].get.responses['400']
+    description: Use repository-standard validation fields for malformed productId.
+    update:
+      $ref: '#/components/responses/InvalidProductIdV2'
+
+  - target: $.paths['/api/v1/products/{productId}/reviews'].get.responses['400']
+    description: Remove the revision-1 reference before installing the revision-2 response.
+    remove: true
+
+  - target: $.paths['/api/v1/products/{productId}/reviews'].get.responses
+    description: Preserve pagination validation and standardize malformed productId without reference siblings.
+    update:
+      '400':
+        description: Invalid productId, page, or limit
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+            examples:
+              invalidProductId:
+                value:
+                  success: false
+                  message: Dữ liệu không hợp lệ
+                  data: null
+                  error:
+                    code: validation_error
+                    message: Dữ liệu không hợp lệ
+                    fields:
+                      productId: Mã sản phẩm không hợp lệ
+                  meta:
+                    timestamp: '2026-08-27T10:00:00Z'
+              invalidPage:
+                value:
+                  success: false
+                  message: Dữ liệu không hợp lệ
+                  data: null
+                  error:
+                    code: validation_error
+                    message: Dữ liệu không hợp lệ
+                    fields:
+                      page: Trang phải là số nguyên dương
+                  meta:
+                    timestamp: '2026-08-27T10:00:00Z'
+
+  - target: $.paths['/api/v1/orders/{orderId}/items/{orderItemId}/review'].post.responses['201'].content['application/json'].schema
+    description: Successful create is always owned by the authenticated caller.
+    update:
+      $ref: '#/components/schemas/EditableOwnedReviewEnvelope'
+
+  - target: $.paths['/api/v1/reviews/{reviewId}'].get.responses['200'].content['application/json'].schema
+    description: Owned-review reads always expose authoritative edit state.
+    update:
+      $ref: '#/components/schemas/OwnedReviewEnvelope'
+
+  - target: $.paths['/api/v1/reviews/{reviewId}'].put.responses['200'].content['application/json'].schema
+    description: Successful edit is always owned and has no remaining edit.
+    update:
+      $ref: '#/components/schemas/FinalOwnedReviewEnvelope'
