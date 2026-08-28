@@ -227,6 +227,7 @@ export type OrderStatus =
   | 'shipped'
   | 'delivered'
   | 'cancelled'
+  | 'partially_returned'
   | 'returned'
 
 export type OrderStatusBucket =
@@ -237,6 +238,68 @@ export type OrderStatusBucket =
   | 'delivered'
   | 'returns'
   | 'cancelled'
+
+export type ReturnStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'received'
+  | 'refunded'
+  | 'rejected'
+  | 'cancelled'
+
+export type ReturnReasonCode =
+  | 'defective'
+  | 'not_as_described'
+  | 'wrong_or_missing'
+  | 'changed_mind'
+
+export interface ReturnEligibility {
+  eligible: boolean
+  deadline: string | null
+}
+
+export interface ReturnRequestItem {
+  orderItemId: string
+  variantId: string
+  productId?: string
+  brandName?: string
+  productName: string
+  model?: string
+  imageUrl?: string
+  options?: CartOption[]
+  quantity: number
+  unitPriceVnd: string
+  lineTotalVnd: string
+  receivedVariantId?: string | null
+}
+
+export interface ReturnRequest {
+  id: string
+  orderId: string
+  userId?: string
+  buyerEmail?: string
+  status: ReturnStatus
+  reasonCode: ReturnReasonCode
+  description?: string
+  rejectReason?: string
+  expectedRefundVnd: string
+  refundAmountVnd?: string | null
+  refundedByUserId?: string | null
+  items?: ReturnRequestItem[]
+  createdAt: string
+  updatedAt: string
+  approvedAt?: string | null
+  rejectedAt?: string | null
+  receivedAt?: string | null
+  refundedAt?: string | null
+  cancelledAt?: string | null
+}
+
+export interface CreateReturnInput {
+  orderItemIds: string[]
+  reasonCode: ReturnReasonCode
+  description?: string
+}
 
 export interface OrderItem {
   id: string
@@ -270,7 +333,10 @@ export interface Order {
   updatedAt: string
   confirmedAt?: string | null
   cancelledAt?: string | null
+  deliveredAt?: string | null
   cancellableUntil?: string | null
+  returnEligibility?: ReturnEligibility | null
+  latestReturnRequest?: ReturnRequest | null
 }
 
 export interface OrderStats {

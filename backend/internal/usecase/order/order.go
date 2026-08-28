@@ -11,12 +11,14 @@ import (
 
 type Dependencies struct {
 	Order               domain.OrderRepository
+	Return              domain.ReturnRepository
 	ShippingFeeVND      domain.MoneyVND
 	OrderConfirmTimeout time.Duration
 }
 
 type UseCase struct {
 	order               domain.OrderRepository
+	returnRepo          domain.ReturnRepository
 	shippingFeeVND      domain.MoneyVND
 	orderConfirmTimeout time.Duration
 }
@@ -32,6 +34,7 @@ func New(deps Dependencies) *UseCase {
 	}
 	return &UseCase{
 		order:               deps.Order,
+		returnRepo:          deps.Return,
 		shippingFeeVND:      shippingFee,
 		orderConfirmTimeout: timeout,
 	}
@@ -83,6 +86,15 @@ func (uc *UseCase) GetByID(ctx context.Context, userID, orderID string) (*domain
 		order.CancellableUntil = &cancellableUntil
 	}
 
+	if order != nil && uc.returnRepo != nil {
+		latest, err := uc.returnRepo.GetLatestByOrderID(ctx, order.ID)
+		if err == nil {
+			eligibility := domain.CalculateReturnEligibility(*order, latest, time.Now().UTC())
+			order.ReturnEligibility = &eligibility
+			order.LatestReturnRequest = latest
+		}
+	}
+
 	return order, nil
 }
 
@@ -103,6 +115,23 @@ func (uc *UseCase) List(ctx context.Context, userID string, bucket domain.OrderS
 		if orders[i].Status == domain.OrderStatusPendingConfirmation {
 			cancellableUntil := orders[i].CreatedAt.Add(uc.orderConfirmTimeout)
 			orders[i].CancellableUntil = &cancellableUntil
+		}
+	}
+
+	if len(orders) > 0 && uc.returnRepo != nil {
+		orderIDs := make([]string, len(orders))
+		for i := range orders {
+			orderIDs[i] = orders[i].ID
+		}
+		latestMap, err := uc.returnRepo.ListLatestByOrderIDs(ctx, orderIDs)
+		if err == nil {
+			now := time.Now().UTC()
+			for i := range orders {
+				latest := latestMap[orders[i].ID]
+				eligibility := domain.CalculateReturnEligibility(orders[i], latest, now)
+				orders[i].ReturnEligibility = &eligibility
+				orders[i].LatestReturnRequest = latest
+			}
 		}
 	}
 

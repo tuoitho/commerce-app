@@ -344,6 +344,10 @@ func (r *OrderRepository) GetByID(ctx context.Context, userID, orderID string) (
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -442,6 +446,10 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID string, bucket 
 		if row.CancelledAt.Valid {
 			t := row.CancelledAt.Time
 			orders[i].CancelledAt = &t
+		}
+		if row.DeliveredAt.Valid {
+			t := row.DeliveredAt.Time
+			orders[i].DeliveredAt = &t
 		}
 	}
 
@@ -543,6 +551,7 @@ func (r *OrderRepository) Cancel(ctx context.Context, userID, orderID string) (*
 		Status:      string(newStatus),
 		ConfirmedAt: confirmedAt,
 		CancelledAt: cancelledAt,
+		DeliveredAt: orderRow.DeliveredAt,
 	}); err != nil {
 		return nil, err
 	}
@@ -606,6 +615,10 @@ func (r *OrderRepository) Cancel(ctx context.Context, userID, orderID string) (*
 		t := cancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -649,6 +662,7 @@ func (r *OrderRepository) UndoCancelRequest(ctx context.Context, userID, orderID
 		Status:      string(newStatus),
 		ConfirmedAt: orderRow.ConfirmedAt,
 		CancelledAt: orderRow.CancelledAt,
+		DeliveredAt: orderRow.DeliveredAt,
 	}); err != nil {
 		return nil, err
 	}
@@ -711,6 +725,10 @@ func (r *OrderRepository) UndoCancelRequest(ctx context.Context, userID, orderID
 	if orderRow.CancelledAt.Valid {
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
+	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
 	}
 
 	return order, nil
@@ -801,6 +819,10 @@ func (r *OrderRepository) ListByAdmin(ctx context.Context, statuses []string) ([
 			t := row.CancelledAt.Time
 			orders[i].CancelledAt = &t
 		}
+		if row.DeliveredAt.Valid {
+			t := row.DeliveredAt.Time
+			orders[i].DeliveredAt = &t
+		}
 	}
 
 	return orders, nil
@@ -876,6 +898,10 @@ func (r *OrderRepository) GetByAdminID(ctx context.Context, orderID string) (*do
 		t := orderRow.CancelledAt.Time
 		order.CancelledAt = &t
 	}
+	if orderRow.DeliveredAt.Valid {
+		t := orderRow.DeliveredAt.Time
+		order.DeliveredAt = &t
+	}
 
 	return order, nil
 }
@@ -927,12 +953,17 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 		cancelledAt = pgtype.Timestamptz{Time: now, Valid: true}
 	}
 	confirmedAt := orderRow.ConfirmedAt
+	deliveredAt := orderRow.DeliveredAt
+	if to == domain.OrderStatusDelivered && !deliveredAt.Valid {
+		deliveredAt = pgtype.Timestamptz{Time: now, Valid: true}
+	}
 
 	if err := q.SetOrderStatus(ctx, sqlc.SetOrderStatusParams{
 		ID:          orderID,
 		Status:      string(to),
 		ConfirmedAt: confirmedAt,
 		CancelledAt: cancelledAt,
+		DeliveredAt: deliveredAt,
 	}); err != nil {
 		return nil, err
 	}
@@ -996,6 +1027,10 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 	if cancelledAt.Valid {
 		t := cancelledAt.Time
 		order.CancelledAt = &t
+	}
+	if deliveredAt.Valid {
+		t := deliveredAt.Time
+		order.DeliveredAt = &t
 	}
 
 	return order, nil

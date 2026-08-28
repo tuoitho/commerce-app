@@ -64,6 +64,11 @@ const statusBadgeMap: Record<OrderStatus, StatusBadgeConfig> = {
     badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
     icon: XCircle,
   },
+  partially_returned: {
+    label: 'Trả một phần',
+    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200/80',
+    icon: RotateCcw,
+  },
   returned: {
     label: 'Trả hàng',
     badgeClass: 'bg-slate-100 text-slate-800 border-slate-200/80',
@@ -405,13 +410,34 @@ export function OrderHistoryPage() {
                       </span>
                     </div>
 
-                    <Badge
-                      variant="outline"
-                      className={`text-xs font-bold px-2.5 py-1 ${statusInfo.badgeClass}`}
-                    >
-                      <StatusIcon className="h-3.5 w-3.5 mr-1 inline" />
-                      {statusInfo.label}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs font-bold px-2.5 py-1 ${statusInfo.badgeClass}`}
+                      >
+                        <StatusIcon className="h-3.5 w-3.5 mr-1 inline" />
+                        {statusInfo.label}
+                      </Badge>
+                      {order.latestReturnRequest && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-700 border-indigo-200"
+                        >
+                          Trả hàng:{' '}
+                          {order.latestReturnRequest.status === 'pending_approval'
+                            ? 'Chờ duyệt'
+                            : order.latestReturnRequest.status === 'approved'
+                            ? 'Đã duyệt'
+                            : order.latestReturnRequest.status === 'received'
+                            ? 'Đã nhận'
+                            : order.latestReturnRequest.status === 'refunded'
+                            ? 'Đã hoàn tiền'
+                            : order.latestReturnRequest.status === 'rejected'
+                            ? 'Bị từ chối'
+                            : 'Đã hủy'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   {/* Items Preview List */}

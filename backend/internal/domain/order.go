@@ -15,6 +15,7 @@ const (
 	OrderStatusShipped             OrderStatus = "shipped"
 	OrderStatusDelivered           OrderStatus = "delivered"
 	OrderStatusCancelled           OrderStatus = "cancelled"
+	OrderStatusPartiallyReturned   OrderStatus = "partially_returned"
 	OrderStatusReturned            OrderStatus = "returned"
 )
 
@@ -27,6 +28,7 @@ func (s OrderStatus) IsValid() bool {
 		OrderStatusShipped,
 		OrderStatusDelivered,
 		OrderStatusCancelled,
+		OrderStatusPartiallyReturned,
 		OrderStatusReturned:
 		return true
 	default:
@@ -72,7 +74,7 @@ func (b OrderStatusBucket) Statuses() []OrderStatus {
 	case OrderStatusBucketDelivered:
 		return []OrderStatus{OrderStatusDelivered}
 	case OrderStatusBucketReturns:
-		return []OrderStatus{OrderStatusReturned}
+		return []OrderStatus{OrderStatusPartiallyReturned, OrderStatusReturned}
 	case OrderStatusBucketCancelled:
 		return []OrderStatus{OrderStatusCancelled}
 	default:
@@ -106,21 +108,24 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID               string
-	UserID           string
-	BuyerEmail       string
-	Status           OrderStatus
-	PaymentMethod    string
-	SubtotalVND      MoneyVND
-	ShippingFeeVND   MoneyVND
-	TotalVND         MoneyVND
-	ShippingInfo     ShippingInfo
-	Items            []OrderItem
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ConfirmedAt      *time.Time
-	CancelledAt      *time.Time
-	CancellableUntil *time.Time
+	ID                  string
+	UserID              string
+	BuyerEmail          string
+	Status              OrderStatus
+	PaymentMethod       string
+	SubtotalVND         MoneyVND
+	ShippingFeeVND      MoneyVND
+	TotalVND            MoneyVND
+	ShippingInfo        ShippingInfo
+	Items               []OrderItem
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ConfirmedAt         *time.Time
+	CancelledAt         *time.Time
+	DeliveredAt         *time.Time
+	CancellableUntil    *time.Time
+	ReturnEligibility   *ReturnEligibility
+	LatestReturnRequest *ReturnRequest
 }
 
 type OrderAdminAction string

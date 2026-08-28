@@ -20,11 +20,13 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
+import { cancelReturn } from '@/api/returns'
 import { ApiError, type Order, type OrderStatus } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ReturnRequestDialog } from '@/components/ReturnRequestDialog'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,49 @@ interface StatusInfo {
   badgeClass: string
   icon: React.ComponentType<{ className?: string }>
   description: string
+}
+
+const returnStatusMap: Record<
+  string,
+  { label: string; badgeClass: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  pending_approval: {
+    label: 'Chờ xét duyệt',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
+    icon: Clock,
+  },
+  approved: {
+    label: 'Đã duyệt trả hàng',
+    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200/80',
+    icon: CheckCircle2,
+  },
+  received: {
+    label: 'Shop đã nhận hàng',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200/80',
+    icon: Package,
+  },
+  refunded: {
+    label: 'Đã hoàn tiền',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: 'Từ chối trả hàng',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
+    icon: XCircle,
+  },
+  cancelled: {
+    label: 'Đã hủy yêu cầu',
+    badgeClass: 'bg-slate-100 text-slate-800 border-slate-200/80',
+    icon: RotateCcw,
+  },
+}
+
+const returnReasonLabels: Record<string, string> = {
+  defective: 'Sản phẩm lỗi / hư hỏng',
+  not_as_described: 'Không giống mô tả',
+  wrong_or_missing: 'Giao sai sản phẩm / thiếu phụ kiện',
+  changed_mind: 'Không còn nhu cầu sử dụng',
 }
 
 const statusMap: Record<OrderStatus, StatusInfo> = {
@@ -84,6 +129,12 @@ const statusMap: Record<OrderStatus, StatusInfo> = {
     badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
     icon: XCircle,
     description: 'Đơn hàng đã bị hủy.',
+  },
+  partially_returned: {
+    label: 'Trả hàng một phần',
+    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200/80',
+    icon: RotateCcw,
+    description: 'Đơn hàng đã được hoàn tiền một phần các sản phẩm đã trả.',
   },
   returned: {
     label: 'Trả hàng',
@@ -139,6 +190,9 @@ export function OrderDetailPage() {
   // Dialog state for actions
   const [dialogType, setDialogType] = useState<'cancel' | 'request_cancel' | 'undo_cancel' | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
+  const [isCancelReturnDialogOpen, setIsCancelReturnDialogOpen] = useState(false)
+  const [isSubmittingReturnCancel, setIsSubmittingReturnCancel] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -219,6 +273,26 @@ export function OrderDetailPage() {
       }
     } finally {
       setIsSubmittingAction(false)
+    }
+  }
+
+  // Handle Cancel Return Request action
+  const handleConfirmCancelReturn = async () => {
+    if (!order || !order.latestReturnRequest) return
+    try {
+      setIsSubmittingReturnCancel(true)
+      await cancelReturn(order.id, order.latestReturnRequest.id)
+      setIsCancelReturnDialogOpen(false)
+      success('Hủy yêu cầu thành công', 'Yêu cầu trả hàng của bạn đã được rút lại.')
+      fetchOrderDetail()
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        toastError('Thao tác thất bại', err.message)
+      } else {
+        toastError('Lỗi', 'Không thể hủy yêu cầu trả hàng.')
+      }
+    } finally {
+      setIsSubmittingReturnCancel(false)
     }
   }
 
@@ -394,6 +468,83 @@ export function OrderDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Details, Products & Shipping */}
           <div className="lg:col-span-8 space-y-6">
+            {/* Return Request Banner / Card if exists */}
+            {order.latestReturnRequest && (
+              <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-indigo-100 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                      <RotateCcw className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">
+                        Thông tin trả hàng & hoàn tiền
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Cập nhật ngày {formatDateTime(order.latestReturnRequest.updatedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`font-bold text-xs px-2.5 py-1 ${
+                      returnStatusMap[order.latestReturnRequest.status]?.badgeClass || 'bg-slate-100'
+                    }`}
+                  >
+                    {returnStatusMap[order.latestReturnRequest.status]?.label ||
+                      order.latestReturnRequest.status}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500">Lý do trả hàng:</span>
+                    <p className="font-semibold text-slate-800 mt-0.5">
+                      {returnReasonLabels[order.latestReturnRequest.reasonCode] ||
+                        order.latestReturnRequest.reasonCode}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Tiền hoàn:</span>
+                    <p className="font-bold text-indigo-700 text-sm mt-0.5">
+                      {order.latestReturnRequest.refundAmountVnd
+                        ? formatVND(order.latestReturnRequest.refundAmountVnd)
+                        : formatVND(order.latestReturnRequest.expectedRefundVnd) + ' (dự kiến)'}
+                    </p>
+                  </div>
+                  {order.latestReturnRequest.description && (
+                    <div className="sm:col-span-2">
+                      <span className="text-slate-500">Ghi chú của bạn:</span>
+                      <p className="text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-0.5">
+                        {order.latestReturnRequest.description}
+                      </p>
+                    </div>
+                  )}
+                  {order.latestReturnRequest.rejectReason && (
+                    <div className="sm:col-span-2">
+                      <span className="text-rose-600 font-semibold">Lý do từ chối của người bán:</span>
+                      <p className="text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200 mt-0.5 font-medium">
+                        {order.latestReturnRequest.rejectReason}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {order.latestReturnRequest.status === 'pending_approval' && (
+                  <div className="pt-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCancelReturnDialogOpen(true)}
+                      className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 rounded-xl"
+                    >
+                      Hủy yêu cầu trả hàng
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 1. Recipient & Shipping Information */}
             <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
@@ -438,75 +589,88 @@ export function OrderDetailPage() {
               </div>
 
               <div className="divide-y divide-slate-100">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="py-4 first:pt-1 last:pb-1 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      {/* Image */}
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 p-1.5 overflow-hidden">
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.productName}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        ) : (
-                          <Smartphone className="h-6 w-6 text-slate-300" />
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-semibold text-slate-400 uppercase">
-                            {item.brandName}
-                          </span>
-                          {item.model && (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              ({item.model})
-                            </span>
+                {order.items.map((item) => {
+                  const isReturnedItem = order.latestReturnRequest?.items?.some(
+                    (ri) => ri.orderItemId === item.id
+                  )
+                  return (
+                    <div
+                      key={item.id}
+                      className="py-4 first:pt-1 last:pb-1 flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        {/* Image */}
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 p-1.5 overflow-hidden">
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.productName}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          ) : (
+                            <Smartphone className="h-6 w-6 text-slate-300" />
                           )}
                         </div>
-                        <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
-                          <Link
-                            to={`/products/${item.productId}`}
-                            className="hover:text-emerald-600 transition"
-                          >
-                            {item.productName}
-                          </Link>
-                        </h3>
 
-                        {/* Options */}
-                        {item.options && item.options.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-0.5">
-                            {item.options.map((opt, idx) => (
+                        {/* Info */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase">
+                              {item.brandName}
+                            </span>
+                            {item.model && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ({item.model})
+                              </span>
+                            )}
+                            {isReturnedItem && (
                               <Badge
-                                key={idx}
-                                variant="secondary"
-                                className="text-[10px] font-normal"
+                                variant="outline"
+                                className="text-[10px] text-indigo-700 border-indigo-200 bg-indigo-50 font-medium"
                               >
-                                {opt.groupLabel}:{' '}
-                                <span className="font-semibold ml-0.5">{opt.valueLabel}</span>
+                                Đã yêu cầu trả
                               </Badge>
-                            ))}
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
+                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                            <Link
+                              to={`/products/${item.productId}`}
+                              className="hover:text-emerald-600 transition"
+                            >
+                              {item.productName}
+                            </Link>
+                          </h3>
 
-                    {/* Price and Quantity */}
-                    <div className="text-right shrink-0">
-                      <div className="font-bold text-slate-900 text-sm sm:text-base tabular-nums">
-                        {formatVND(item.lineTotalVnd)}
+                          {/* Options */}
+                          {item.options && item.options.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {item.options.map((opt, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="secondary"
+                                  className="text-[10px] font-normal"
+                                >
+                                  {opt.groupLabel}:{' '}
+                                  <span className="font-semibold ml-0.5">{opt.valueLabel}</span>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 tabular-nums mt-0.5">
-                        {formatVND(item.unitPriceVnd)} x {item.quantity}
+
+                      {/* Price and Quantity */}
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-slate-900 text-sm sm:text-base tabular-nums">
+                          {formatVND(item.lineTotalVnd)}
+                        </div>
+                        <div className="text-xs text-slate-500 tabular-nums mt-0.5">
+                          {formatVND(item.unitPriceVnd)} x {item.quantity}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
@@ -636,8 +800,33 @@ export function OrderDetailPage() {
                   </div>
                 )}
 
-                {/* 5. Terminal / In-transit statuses: No action buttons */}
-                {['shipped', 'delivered', 'cancelled', 'returned'].includes(order.status) && (
+                {/* Return Action button when eligible */}
+                {order.returnEligibility?.eligible && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setIsReturnDialogOpen(true)}
+                    className="w-full rounded-2xl font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 gap-2"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Yêu cầu trả hàng</span>
+                  </Button>
+                )}
+
+                {/* Notice when delivered but return expired */}
+                {order.status === 'delivered' &&
+                  order.returnEligibility &&
+                  !order.returnEligibility.eligible &&
+                  !order.latestReturnRequest && (
+                    <div className="text-center py-2 text-xs text-slate-400">
+                      Đã hết thời hạn 7 ngày để yêu cầu trả hàng
+                    </div>
+                  )}
+
+                {/* 5. Terminal / In-transit statuses: No cancel button */}
+                {['shipped', 'cancelled', 'returned', 'partially_returned'].includes(
+                  order.status
+                ) && (
                   <div className="text-center py-2 text-xs text-slate-400">
                     Đơn hàng ở trạng thái không thể hủy
                   </div>
@@ -661,6 +850,14 @@ export function OrderDetailPage() {
                     </span>
                   </div>
                 )}
+                {order.deliveredAt && (
+                  <div className="flex justify-between pt-2">
+                    <span>Thời gian giao hàng:</span>
+                    <span className="font-mono text-emerald-600">
+                      {formatDateTime(order.deliveredAt)}
+                    </span>
+                  </div>
+                )}
                 {order.cancelledAt && (
                   <div className="flex justify-between pt-2">
                     <span>Thời gian hủy:</span>
@@ -674,6 +871,56 @@ export function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Return Request Dialog */}
+      {order && (
+        <ReturnRequestDialog
+          order={order}
+          isOpen={isReturnDialogOpen}
+          onClose={() => setIsReturnDialogOpen(false)}
+          onSuccess={() => fetchOrderDetail()}
+        />
+      )}
+
+      {/* Cancel Return Request Confirmation Dialog */}
+      <Dialog
+        open={isCancelReturnDialogOpen}
+        onOpenChange={(open) => !open && setIsCancelReturnDialogOpen(false)}
+      >
+        <DialogContent className="sm:max-w-md rounded-3xl p-6">
+          <DialogHeader>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-2">
+              <RotateCcw className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-slate-900">
+              Hủy yêu cầu trả hàng
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Bạn có chắc chắn muốn rút lại yêu cầu trả hàng này không? Sau khi hủy, bạn vẫn có thể gửi lại yêu cầu nếu còn trong thời hạn 7 ngày.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsCancelReturnDialogOpen(false)}
+              disabled={isSubmittingReturnCancel}
+              className="rounded-xl font-semibold"
+            >
+              Đóng
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancelReturn}
+              isLoading={isSubmittingReturnCancel}
+              disabled={isSubmittingReturnCancel}
+              className="rounded-xl font-semibold gap-1.5"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Xác nhận hủy yêu cầu</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Order Dialog */}
       <Dialog

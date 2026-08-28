@@ -1183,5 +1183,142 @@ func TestOrderUseCase_AdminTransition(t *testing.T) {
 	})
 }
 
+type fakeReturnRepoForOrder struct {
+	getLatestFn  func(ctx context.Context, orderID string) (*domain.ReturnRequest, error)
+	listLatestFn func(ctx context.Context, orderIDs []string) (map[string]*domain.ReturnRequest, error)
+}
+
+func (f *fakeReturnRepoForOrder) CreateReturnRequest(ctx context.Context, input domain.CreateReturnInput) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) CancelReturnRequest(ctx context.Context, userID, orderID, returnID string) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) GetLatestByOrderID(ctx context.Context, orderID string) (*domain.ReturnRequest, error) {
+	if f.getLatestFn != nil {
+		return f.getLatestFn(ctx, orderID)
+	}
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) ListLatestByOrderIDs(ctx context.Context, orderIDs []string) (map[string]*domain.ReturnRequest, error) {
+	if f.listLatestFn != nil {
+		return f.listLatestFn(ctx, orderIDs)
+	}
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) ListAdmin(ctx context.Context, status string, page, limit int) ([]domain.ReturnRequest, int, error) {
+	return nil, 0, nil
+}
+func (f *fakeReturnRepoForOrder) GetAdminByID(ctx context.Context, returnID string) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) ApproveAdmin(ctx context.Context, returnID string) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) RejectAdmin(ctx context.Context, returnID, rejectReason string) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) ReceiveAdmin(ctx context.Context, returnID string, mappings []domain.ReceiveItemMapping) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) RefundAdmin(ctx context.Context, returnID, adminUserID string) (*domain.ReturnRequest, error) {
+	return nil, nil
+}
+func (f *fakeReturnRepoForOrder) SearchVariantOptionsAdmin(ctx context.Context, query string, page, limit int) ([]domain.VariantOptionInfo, int, error) {
+	return nil, 0, nil
+}
+func (f *fakeReturnRepoForOrder) IsOrderItemRefunded(ctx context.Context, orderItemID string) (bool, error) {
+	return false, nil
+}
+
+func TestOrderUseCase_ReturnProjection(t *testing.T) {
+	ctx := context.Background()
+	validUserID := "00000000-0000-0000-0000-000000000001"
+	validOrderID := "00000000-0000-0000-0000-000000000002"
+	now := time.Now().UTC()
+	deliveredAt := now.Add(-24 * time.Hour)
+
+	t.Run("GetByID projects eligibility and latest return", func(t *testing.T) {
+		fakeOrder := &fakeOrderRepo{
+			getByIDOrder: &domain.Order{
+				ID:          validOrderID,
+				UserID:      validUserID,
+				Status:      domain.OrderStatusDelivered,
+				DeliveredAt: &deliveredAt,
+			},
+		}
+		fakeReturn := &fakeReturnRepoForOrder{
+			getLatestFn: func(ctx context.Context, orderID string) (*domain.ReturnRequest, error) {
+				return &domain.ReturnRequest{
+					ID:         "00000000-0000-0000-0000-000000000003",
+					OrderID:    orderID,
+					Status:     domain.ReturnStatusPendingApproval,
+					ReasonCode: domain.ReturnReasonDefective,
+				}, nil
+			},
+		}
+
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:  fakeOrder,
+			Return: fakeReturn,
+		})
+
+		order, err := uc.GetByID(ctx, validUserID, validOrderID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if order.LatestReturnRequest == nil || order.LatestReturnRequest.ID != "00000000-0000-0000-0000-000000000003" {
+			t.Errorf("expected latest return request projected, got %v", order.LatestReturnRequest)
+		}
+		if order.ReturnEligibility == nil || order.ReturnEligibility.Eligible {
+			t.Errorf("expected return eligibility = false due to pending_approval, got %v", order.ReturnEligibility)
+		}
+	})
+
+	t.Run("List projects eligibility and latest returns in batch", func(t *testing.T) {
+		fakeOrder := &fakeOrderRepo{
+			listOrders: []domain.Order{
+				{
+					ID:          validOrderID,
+					UserID:      validUserID,
+					Status:      domain.OrderStatusDelivered,
+					DeliveredAt: &deliveredAt,
+				},
+			},
+		}
+		batchCalled := false
+		fakeReturn := &fakeReturnRepoForOrder{
+			listLatestFn: func(ctx context.Context, orderIDs []string) (map[string]*domain.ReturnRequest, error) {
+				batchCalled = true
+				return map[string]*domain.ReturnRequest{
+					validOrderID: {
+						ID:     "00000000-0000-0000-0000-000000000003",
+						Status: domain.ReturnStatusCancelled,
+					},
+				}, nil
+			},
+		}
+
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:  fakeOrder,
+			Return: fakeReturn,
+		})
+
+		orders, err := uc.List(ctx, validUserID, domain.OrderStatusBucketAll)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !batchCalled {
+			t.Fatal("expected batch loading ListLatestByOrderIDs to be called")
+		}
+		if len(orders) != 1 || orders[0].LatestReturnRequest == nil {
+			t.Fatalf("expected latest return request attached to order in list")
+		}
+		if orders[0].ReturnEligibility == nil || !orders[0].ReturnEligibility.Eligible {
+			t.Errorf("expected return eligibility = true for cancelled return, got %v", orders[0].ReturnEligibility)
+		}
+	})
+}
+
 
 

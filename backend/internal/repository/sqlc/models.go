@@ -146,29 +146,31 @@ type RefreshToken struct {
 }
 
 type ReturnRequest struct {
-	ID               string
-	OrderID          string
-	UserID           string
-	Status           string
-	ReasonCode       string
-	Description      string
-	RejectReason     string
-	RefundAmountVnd  pgtype.Numeric
-	RefundedByUserID pgtype.UUID
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ApprovedAt       pgtype.Timestamptz
-	RejectedAt       pgtype.Timestamptz
-	ReceivedAt       pgtype.Timestamptz
-	RefundedAt       pgtype.Timestamptz
-	CancelledAt      pgtype.Timestamptz
+	ID                      string
+	OrderID                 string
+	UserID                  string
+	Status                  string
+	ReasonCode              string
+	Description             string
+	RejectReason            string
+	RefundAmountVnd         pgtype.Numeric
+	RefundedByUserID        pgtype.UUID
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ApprovedAt              pgtype.Timestamptz
+	RejectedAt              pgtype.Timestamptz
+	ReceivedAt              pgtype.Timestamptz
+	RefundedAt              pgtype.Timestamptz
+	CancelledAt             pgtype.Timestamptz
+	ExpectedRefundAmountVnd pgtype.Numeric
 }
 
 type ReturnRequestItem struct {
-	ID              string
-	ReturnRequestID string
-	OrderItemID     string
-	Quantity        int64
+	ID                string
+	ReturnRequestID   string
+	OrderItemID       string
+	Quantity          int64
+	ReceivedVariantID pgtype.UUID
 }
 
 type User struct {

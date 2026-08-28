@@ -32,25 +32,126 @@ type orderItemResponse struct {
 	LineTotalVND string              `json:"lineTotalVnd"`
 }
 
+type returnEligibilityResponse struct {
+	Eligible bool       `json:"eligible"`
+	Deadline *time.Time `json:"deadline"`
+}
+
+type returnRequestItemResponse struct {
+	OrderItemID       string              `json:"orderItemId"`
+	VariantID         string              `json:"variantId"`
+	ProductID         string              `json:"productId"`
+	BrandName         string              `json:"brandName"`
+	ProductName       string              `json:"productName"`
+	Model             string              `json:"model"`
+	ImageURL          string              `json:"imageUrl"`
+	Options           []domain.CartOption `json:"options"`
+	Quantity          int64               `json:"quantity"`
+	UnitPriceVND      string              `json:"unitPriceVnd"`
+	LineTotalVND      string              `json:"lineTotalVnd"`
+	ReceivedVariantID *string             `json:"receivedVariantId,omitempty"`
+}
+
+type returnRequestResponse struct {
+	ID                string                      `json:"id"`
+	OrderID           string                      `json:"orderId"`
+	UserID            string                      `json:"userId,omitempty"`
+	BuyerEmail        string                      `json:"buyerEmail,omitempty"`
+	Status            string                      `json:"status"`
+	ReasonCode        string                      `json:"reasonCode"`
+	Description       string                      `json:"description"`
+	RejectReason      string                      `json:"rejectReason"`
+	ExpectedRefundVND string                      `json:"expectedRefundVnd"`
+	RefundAmountVND   *string                     `json:"refundAmountVnd"`
+	RefundedByUserID  *string                     `json:"refundedByUserId,omitempty"`
+	Items             []returnRequestItemResponse `json:"items"`
+	CreatedAt         time.Time                   `json:"createdAt"`
+	UpdatedAt         time.Time                   `json:"updatedAt"`
+	ApprovedAt        *time.Time                  `json:"approvedAt"`
+	RejectedAt        *time.Time                  `json:"rejectedAt"`
+	ReceivedAt        *time.Time                  `json:"receivedAt"`
+	RefundedAt        *time.Time                  `json:"refundedAt"`
+	CancelledAt       *time.Time                  `json:"cancelledAt"`
+}
+
+func toReturnRequestResponse(rr *domain.ReturnRequest, isAdmin bool) *returnRequestResponse {
+	if rr == nil {
+		return nil
+	}
+	items := make([]returnRequestItemResponse, len(rr.Items))
+	for i, item := range rr.Items {
+		items[i] = returnRequestItemResponse{
+			OrderItemID:  item.OrderItemID,
+			VariantID:    item.VariantID,
+			ProductID:    item.ProductID,
+			BrandName:    item.BrandName,
+			ProductName:  item.ProductName,
+			Model:        item.Model,
+			ImageURL:     item.ImageURL,
+			Options:      item.Options,
+			Quantity:     item.Quantity,
+			UnitPriceVND: string(item.UnitPriceVND),
+			LineTotalVND: string(item.LineTotalVND),
+		}
+		if isAdmin {
+			items[i].ReceivedVariantID = item.ReceivedVariantID
+		}
+	}
+
+	var refundAmountStr *string
+	if rr.RefundAmountVND != nil {
+		s := string(*rr.RefundAmountVND)
+		refundAmountStr = &s
+	}
+
+	resp := &returnRequestResponse{
+		ID:                rr.ID,
+		OrderID:           rr.OrderID,
+		Status:            string(rr.Status),
+		ReasonCode:        string(rr.ReasonCode),
+		Description:       rr.Description,
+		RejectReason:      rr.RejectReason,
+		ExpectedRefundVND: string(rr.ExpectedRefundVND),
+		RefundAmountVND:   refundAmountStr,
+		Items:             items,
+		CreatedAt:         rr.CreatedAt,
+		UpdatedAt:         rr.UpdatedAt,
+		ApprovedAt:        rr.ApprovedAt,
+		RejectedAt:        rr.RejectedAt,
+		ReceivedAt:        rr.ReceivedAt,
+		RefundedAt:        rr.RefundedAt,
+		CancelledAt:       rr.CancelledAt,
+	}
+	if isAdmin {
+		resp.UserID = rr.UserID
+		resp.BuyerEmail = rr.BuyerEmail
+		resp.RefundedByUserID = rr.RefundedByUserID
+	}
+	return resp
+}
+
 type orderResponse struct {
-	ID               string              `json:"id"`
-	UserID           string              `json:"userId"`
-	Status           string              `json:"status"`
-	PaymentMethod    string              `json:"paymentMethod"`
-	RecipientName    string              `json:"recipientName"`
-	Phone            string              `json:"phone"`
-	ProvinceName     string              `json:"provinceName"`
-	WardName         string              `json:"wardName"`
-	DetailAddress    string              `json:"detailAddress"`
-	SubtotalVND      string              `json:"subtotalVnd"`
-	ShippingFeeVND   string              `json:"shippingFeeVnd"`
-	TotalVND         string              `json:"totalVnd"`
-	Items            []orderItemResponse `json:"items"`
-	CreatedAt        time.Time           `json:"createdAt"`
-	UpdatedAt        time.Time           `json:"updatedAt"`
-	ConfirmedAt      *time.Time          `json:"confirmedAt,omitempty"`
-	CancelledAt      *time.Time          `json:"cancelledAt,omitempty"`
-	CancellableUntil *time.Time          `json:"cancellableUntil,omitempty"`
+	ID                  string                     `json:"id"`
+	UserID              string                     `json:"userId"`
+	Status              string                     `json:"status"`
+	PaymentMethod       string                     `json:"paymentMethod"`
+	RecipientName       string                     `json:"recipientName"`
+	Phone               string                     `json:"phone"`
+	ProvinceName        string                     `json:"provinceName"`
+	WardName            string                     `json:"wardName"`
+	DetailAddress       string                     `json:"detailAddress"`
+	SubtotalVND         string                     `json:"subtotalVnd"`
+	ShippingFeeVND      string                     `json:"shippingFeeVnd"`
+	TotalVND            string                     `json:"totalVnd"`
+	Items               []orderItemResponse        `json:"items"`
+	CreatedAt           time.Time                  `json:"createdAt"`
+	UpdatedAt           time.Time                  `json:"updatedAt"`
+	ConfirmedAt         *time.Time                 `json:"confirmedAt,omitempty"`
+	CancelledAt         *time.Time                 `json:"cancelledAt,omitempty"`
+	DeliveredAt         *time.Time                 `json:"deliveredAt,omitempty"`
+	CancellableUntil    *time.Time                 `json:"cancellableUntil,omitempty"`
+	ReturnEligibility   *returnEligibilityResponse `json:"returnEligibility,omitempty"`
+	LatestReturnRequest *returnRequestResponse     `json:"latestReturnRequest"`
 }
 
 func toOrderResponse(order domain.Order) orderResponse {
@@ -71,25 +172,36 @@ func toOrderResponse(order domain.Order) orderResponse {
 		}
 	}
 
+	var returnEligibility *returnEligibilityResponse
+	if order.ReturnEligibility != nil {
+		returnEligibility = &returnEligibilityResponse{
+			Eligible: order.ReturnEligibility.Eligible,
+			Deadline: order.ReturnEligibility.Deadline,
+		}
+	}
+
 	return orderResponse{
-		ID:               order.ID,
-		UserID:           order.UserID,
-		Status:           string(order.Status),
-		PaymentMethod:    order.PaymentMethod,
-		RecipientName:    order.ShippingInfo.RecipientName,
-		Phone:            order.ShippingInfo.Phone,
-		ProvinceName:     order.ShippingInfo.ProvinceName,
-		WardName:         order.ShippingInfo.WardName,
-		DetailAddress:    order.ShippingInfo.DetailAddress,
-		SubtotalVND:      string(order.SubtotalVND),
-		ShippingFeeVND:   string(order.ShippingFeeVND),
-		TotalVND:         string(order.TotalVND),
-		Items:            items,
-		CreatedAt:        order.CreatedAt,
-		UpdatedAt:        order.UpdatedAt,
-		ConfirmedAt:      order.ConfirmedAt,
-		CancelledAt:      order.CancelledAt,
-		CancellableUntil: order.CancellableUntil,
+		ID:                  order.ID,
+		UserID:              order.UserID,
+		Status:              string(order.Status),
+		PaymentMethod:       order.PaymentMethod,
+		RecipientName:       order.ShippingInfo.RecipientName,
+		Phone:               order.ShippingInfo.Phone,
+		ProvinceName:        order.ShippingInfo.ProvinceName,
+		WardName:            order.ShippingInfo.WardName,
+		DetailAddress:       order.ShippingInfo.DetailAddress,
+		SubtotalVND:         string(order.SubtotalVND),
+		ShippingFeeVND:      string(order.ShippingFeeVND),
+		TotalVND:            string(order.TotalVND),
+		Items:               items,
+		CreatedAt:           order.CreatedAt,
+		UpdatedAt:           order.UpdatedAt,
+		ConfirmedAt:         order.ConfirmedAt,
+		CancelledAt:         order.CancelledAt,
+		DeliveredAt:         order.DeliveredAt,
+		CancellableUntil:    order.CancellableUntil,
+		ReturnEligibility:   returnEligibility,
+		LatestReturnRequest: toReturnRequestResponse(order.LatestReturnRequest, false),
 	}
 }
 

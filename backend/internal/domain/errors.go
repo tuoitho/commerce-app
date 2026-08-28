@@ -28,9 +28,14 @@ var (
 	ErrCartEmpty           = errors.New("cart empty")
 	ErrAddressNotFound     = errors.New("address not found")
 	ErrOrderNotFound       = errors.New("order not found")
-	ErrOrderNotCancellable = errors.New("order not cancellable")
+	ErrOrderNotCancellable     = errors.New("order not cancellable")
 	ErrOrderNotCancelRequested = errors.New("order not cancel requested")
 	ErrOrderActionNotAllowed   = errors.New("order action not allowed")
+	ErrReturnNotEligible       = errors.New("return not eligible")
+	ErrReturnRequestOpen       = errors.New("return request open")
+	ErrReturnAlreadyRefunded   = errors.New("return already refunded")
+	ErrReturnRequestNotFound   = errors.New("return request not found")
+	ErrReturnTransitionNotAllowed = errors.New("return transition not allowed")
 )
 
 type ValidationError struct {

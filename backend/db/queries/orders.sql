@@ -46,7 +46,7 @@ RETURNING id, user_id, status, payment_method,
           shipping_fee_vnd::text AS shipping_fee_vnd,
           total_vnd::text AS total_vnd,
           recipient_name, phone, province_name, ward_name, detail_address,
-          created_at, updated_at, confirmed_at, cancelled_at;
+          created_at, updated_at, confirmed_at, cancelled_at, delivered_at;
 
 -- name: InsertOrderItem :exec
 INSERT INTO order_items (
@@ -70,7 +70,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2;
 
@@ -102,7 +102,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE user_id = @user_id
   AND (COALESCE(cardinality(@statuses::text[]), 0) = 0 OR status = ANY(@statuses::text[]))
@@ -120,7 +120,7 @@ SELECT id, user_id, status, payment_method,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at
+       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2
 FOR UPDATE;
@@ -130,6 +130,7 @@ UPDATE orders
 SET status = $2,
     confirmed_at = $3,
     cancelled_at = $4,
+    delivered_at = $5,
     updated_at = now()
 WHERE id = $1;
 
@@ -146,7 +147,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -159,7 +160,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -171,7 +172,7 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id

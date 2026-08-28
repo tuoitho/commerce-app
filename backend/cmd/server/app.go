@@ -22,6 +22,7 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
+	returnuc "commerce-backend/internal/usecase/returns"
 )
 
 type App struct {
@@ -111,6 +112,10 @@ func provideOrderRepository(pool *pgxpool.Pool) *repository.OrderRepository {
 	return repository.NewOrderRepository(pool)
 }
 
+func provideReturnRepository(pool *pgxpool.Pool) *repository.ReturnRepository {
+	return repository.NewReturnRepository(pool)
+}
+
 func provideFavoriteRepository(pool *pgxpool.Pool) *repository.FavoriteRepository {
 	return repository.NewFavoriteRepository(pool)
 }
@@ -153,11 +158,18 @@ func provideAddressUseCase(repo *repository.AddressRepository, areaRepo *reposit
 	})
 }
 
-func provideOrderUseCase(repo *repository.OrderRepository, cfg *config.Config) *orderuc.UseCase {
+func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
 		Order:               repo,
+		Return:              returnRepo,
 		ShippingFeeVND:      cfg.ShippingFeeVND,
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
+	})
+}
+
+func provideReturnUseCase(repo *repository.ReturnRepository) *returnuc.UseCase {
+	return returnuc.New(returnuc.Dependencies{
+		Return: repo,
 	})
 }
 
@@ -167,7 +179,7 @@ func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.Use
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnUC *returnuc.UseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -180,6 +192,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Area:         areaUC,
 		Address:      addressUC,
 		Order:        orderUC,
+		Return:       returnUC,
 		Favorite:     favoriteUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,

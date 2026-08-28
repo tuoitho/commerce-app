@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestOrderStatus_AllEightStatuses(t *testing.T) {
+func TestOrderStatus_AllNineStatuses(t *testing.T) {
 	statuses := []OrderStatus{
 		OrderStatusPendingConfirmation,
 		OrderStatusConfirmed,
@@ -14,6 +14,7 @@ func TestOrderStatus_AllEightStatuses(t *testing.T) {
 		OrderStatusShipped,
 		OrderStatusDelivered,
 		OrderStatusCancelled,
+		OrderStatusPartiallyReturned,
 		OrderStatusReturned,
 	}
 
@@ -25,11 +26,12 @@ func TestOrderStatus_AllEightStatuses(t *testing.T) {
 		"shipped",
 		"delivered",
 		"cancelled",
+		"partially_returned",
 		"returned",
 	}
 
-	if len(statuses) != 8 {
-		t.Fatalf("expected exactly 8 order statuses, got %d", len(statuses))
+	if len(statuses) != 9 {
+		t.Fatalf("expected exactly 9 order statuses, got %d", len(statuses))
 	}
 
 	seen := make(map[OrderStatus]bool)
@@ -88,7 +90,7 @@ func TestOrderStatusBucket_Mapping(t *testing.T) {
 		{
 			bucket:           OrderStatusBucketReturns,
 			valid:            true,
-			expectedStatuses: []OrderStatus{OrderStatusReturned},
+			expectedStatuses: []OrderStatus{OrderStatusPartiallyReturned, OrderStatusReturned},
 		},
 		{
 			bucket:           OrderStatusBucketCancelled,

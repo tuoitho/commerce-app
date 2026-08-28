@@ -60,6 +60,7 @@ const statusBadgeClasses: Record<OrderStatus, string> = {
   shipped: 'bg-sky-50 text-sky-800 border-sky-200',
   delivered: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   cancelled: 'bg-rose-50 text-rose-800 border-rose-200',
+  partially_returned: 'bg-purple-50 text-purple-800 border-purple-200',
   returned: 'bg-purple-50 text-purple-800 border-purple-200',
 }
 

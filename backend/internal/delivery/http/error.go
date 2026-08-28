@@ -74,6 +74,16 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "order_not_cancel_request", "Đơn hàng không có yêu cầu hủy đang chờ", nil)
 	case errors.Is(err, domain.ErrOrderActionNotAllowed):
 		respondError(c, 409, "order_action_not_allowed", "Không thể thực hiện thao tác này trên đơn hàng ở trạng thái hiện tại", nil)
+	case errors.Is(err, domain.ErrReturnRequestNotFound):
+		respondError(c, 404, "return_request_not_found", "Không tìm thấy yêu cầu trả hàng", nil)
+	case errors.Is(err, domain.ErrReturnNotEligible):
+		respondError(c, 409, "return_not_eligible", "Đơn hàng không đủ điều kiện trả hàng", nil)
+	case errors.Is(err, domain.ErrReturnRequestOpen):
+		respondError(c, 409, "return_request_open", "Đơn hàng đang có yêu cầu trả hàng được xử lý", nil)
+	case errors.Is(err, domain.ErrReturnAlreadyRefunded):
+		respondError(c, 409, "return_already_refunded", "Đơn hàng đã được hoàn tiền trả hàng", nil)
+	case errors.Is(err, domain.ErrReturnTransitionNotAllowed):
+		respondError(c, 409, "return_transition_not_allowed", "Không thể thực hiện thao tác ở trạng thái hiện tại", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

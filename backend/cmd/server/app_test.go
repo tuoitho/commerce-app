@@ -55,7 +55,17 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil order repo")
 	}
 
-	orderUC := provideOrderUseCase(orderRepo, cfg)
+	returnRepo := provideReturnRepository(nil)
+	if returnRepo == nil {
+		t.Fatal("expected non-nil return repo")
+	}
+
+	returnUC := provideReturnUseCase(returnRepo)
+	if returnUC == nil {
+		t.Fatal("expected non-nil return use case")
+	}
+
+	orderUC := provideOrderUseCase(orderRepo, returnRepo, cfg)
 	if orderUC == nil {
 		t.Fatal("expected non-nil order use case")
 	}
@@ -70,7 +80,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil favorite use case")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, favUC, jwtMgr)
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, favUC, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

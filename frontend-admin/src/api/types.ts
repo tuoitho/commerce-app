@@ -176,6 +176,7 @@ export type OrderStatus =
   | 'shipped'
   | 'delivered'
   | 'cancelled'
+  | 'partially_returned'
   | 'returned'
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -186,7 +187,38 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   shipped: 'Đã giao cho ĐVVC',
   delivered: 'Đã giao',
   cancelled: 'Đã hủy',
+  partially_returned: 'Trả hàng một phần',
   returned: 'Đã trả hàng',
+}
+
+export type ReturnStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'received'
+  | 'refunded'
+  | 'rejected'
+  | 'cancelled'
+
+export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+  pending_approval: 'Chờ duyệt',
+  approved: 'Đã duyệt',
+  received: 'Đã nhận hàng',
+  refunded: 'Đã hoàn tiền',
+  rejected: 'Đã từ chối',
+  cancelled: 'Đã hủy',
+}
+
+export type ReturnReasonCode =
+  | 'defective'
+  | 'not_as_described'
+  | 'wrong_or_missing'
+  | 'changed_mind'
+
+export const RETURN_REASON_LABELS: Record<ReturnReasonCode, string> = {
+  defective: 'Sản phẩm lỗi/hư hỏng',
+  not_as_described: 'Không giống mô tả',
+  wrong_or_missing: 'Sai sản phẩm hoặc thiếu phụ kiện',
+  changed_mind: 'Không còn nhu cầu',
 }
 
 export interface CartOption {
@@ -226,9 +258,70 @@ export interface Order {
   updatedAt: string
   confirmedAt?: string | null
   cancelledAt?: string | null
+  deliveredAt?: string | null
 }
 
 export interface AdminOrder extends Order {
   buyerEmail: string
+}
+
+export interface ReturnRequestItem {
+  orderItemId: string
+  variantId: string
+  productId: string
+  brandName: string
+  productName: string
+  model: string
+  imageUrl: string
+  options: CartOption[]
+  quantity: number
+  unitPriceVnd: string
+  lineTotalVnd: string
+  receivedVariantId?: string | null
+}
+
+export interface ReturnRequestSummary {
+  id: string
+  orderId: string
+  userId: string
+  buyerEmail: string
+  status: ReturnStatus
+  reasonCode: ReturnReasonCode
+  expectedRefundVnd: string
+  createdAt: string
+}
+
+export interface ReturnRequestDetail {
+  id: string
+  orderId: string
+  userId: string
+  buyerEmail: string
+  status: ReturnStatus
+  reasonCode: ReturnReasonCode
+  description: string
+  rejectReason: string
+  expectedRefundVnd: string
+  refundAmountVnd: string | null
+  refundedByUserId?: string | null
+  items: ReturnRequestItem[]
+  createdAt: string
+  updatedAt: string
+  approvedAt: string | null
+  rejectedAt: string | null
+  receivedAt: string | null
+  refundedAt: string | null
+  cancelledAt: string | null
+}
+
+export interface VariantOptionItem {
+  variantId: string
+  productId: string
+  brandName: string
+  productName: string
+  model: string
+  options: CartOption[]
+  stockQuantity: number
+  productActive: boolean
+  variantActive: boolean
 }
 
