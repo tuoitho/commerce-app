@@ -22,6 +22,7 @@ type mockReviewRepo struct {
 	listByItemsFn  func(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error)
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
 	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
+	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
 }
 
 func (m *mockReviewRepo) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -69,6 +70,13 @@ func (m *mockReviewRepo) GetReviewMediaByID(ctx context.Context, mediaID string)
 func (m *mockReviewRepo) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
 	if m.getPublicFn != nil {
 		return m.getPublicFn(ctx, productID, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepo) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	if m.getUserReviewsFn != nil {
+		return m.getUserReviewsFn(ctx, userID, ratingFilter, page, limit)
 	}
 	return nil, nil
 }
@@ -318,5 +326,55 @@ func TestUpdateReview_ValidationAndLifecycle(t *testing.T) {
 		assert.Equal(t, domain.ErrReviewEditLimitReached, err)
 		// Uploaded new objects must be compensated/deleted
 		assert.Equal(t, 0, store.ObjectCount())
+	})
+}
+
+func TestGetUserReviews_UseCase(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.NewString()
+
+	t.Run("Invalid User ID", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.GetUserReviews(ctx, "invalid-uuid", 0, 1, 10)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrInvalidToken, err)
+	})
+
+	t.Run("Invalid Rating Filter", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.GetUserReviews(ctx, userID, -1, 1, 10)
+		require.Error(t, err)
+		var valErr *domain.ValidationError
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "rating")
+
+		_, err = uc.GetUserReviews(ctx, userID, 6, 1, 10)
+		require.Error(t, err)
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "rating")
+	})
+
+	t.Run("Normalizes page and limit", func(t *testing.T) {
+		var capturedPage, capturedLimit int
+		var capturedRating int16
+		repo := &mockReviewRepo{
+			getUserReviewsFn: func(ctx context.Context, uID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+				capturedPage = page
+				capturedLimit = limit
+				capturedRating = ratingFilter
+				return &domain.UserReviewsResult{
+					Reviews: []domain.UserReview{},
+					Total:   0,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+
+		res, err := uc.GetUserReviews(ctx, userID, 5, 0, 99)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, 1, capturedPage)
+		assert.Equal(t, 10, capturedLimit)
+		assert.Equal(t, int16(5), capturedRating)
 	})
 }

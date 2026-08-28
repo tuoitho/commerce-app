@@ -443,4 +443,115 @@ func TestReviewRepositoryIntegration(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("GetUserReviews_PaginationAndFiltering", func(t *testing.T) {
+		// Clean up
+		_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE order_item_id IN ($1, $2, $3)", testOrderItemA, testOrderItemB, testOrderItemC)
+
+		// Create 3 reviews for testUserID
+		revA, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Review A 5 stars",
+			Media: []domain.CreateReviewMediaInput{
+				{
+					MediaType: domain.ReviewMediaTypeImage,
+					MimeType:  "image/jpeg",
+					ObjectKey: "reviews/test/imgA.jpg",
+					SizeBytes: 1024,
+					Position:  0,
+				},
+			},
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", revA.ID)
+		}()
+
+		revB, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemB,
+			Rating:      4,
+			Comment:     "Review B 4 stars",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", revB.ID)
+		}()
+
+		revC, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemC,
+			Rating:      5,
+			Comment:     "Review C 5 stars",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", revC.ID)
+		}()
+
+		// 1. Get all reviews for testUserID (ratingFilter = 0)
+		resAll, err := repo.GetUserReviews(ctx, testUserID, 0, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), resAll.Total)
+		assert.Len(t, resAll.Reviews, 3)
+		assert.Equal(t, testOrderID, resAll.Reviews[0].Order.ID)
+		assert.NotEmpty(t, resAll.Reviews[0].Product.Name)
+
+		// Find revA in results and check media
+		var foundRevA *domain.UserReview
+		for i := range resAll.Reviews {
+			if resAll.Reviews[i].ID == revA.ID {
+				foundRevA = &resAll.Reviews[i]
+				break
+			}
+		}
+		require.NotNil(t, foundRevA)
+		assert.True(t, foundRevA.CanEdit)
+		assert.False(t, foundRevA.Edited)
+		assert.Len(t, foundRevA.Media, 1)
+
+		// 2. Filter by 5 stars
+		res5, err := repo.GetUserReviews(ctx, testUserID, 5, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), res5.Total)
+		assert.Len(t, res5.Reviews, 2)
+		for _, r := range res5.Reviews {
+			assert.Equal(t, int16(5), r.Rating)
+		}
+
+		// 3. Filter by 4 stars
+		res4, err := repo.GetUserReviews(ctx, testUserID, 4, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), res4.Total)
+		assert.Len(t, res4.Reviews, 1)
+		assert.Equal(t, int16(4), res4.Reviews[0].Rating)
+
+		// 4. Filter by 1 star (empty)
+		res1, err := repo.GetUserReviews(ctx, testUserID, 1, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), res1.Total)
+		assert.Empty(t, res1.Reviews)
+
+		// 5. Pagination (page 1, limit 2)
+		resPage1, err := repo.GetUserReviews(ctx, testUserID, 0, 1, 2)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), resPage1.Total)
+		assert.Len(t, resPage1.Reviews, 2)
+
+		resPage2, err := repo.GetUserReviews(ctx, testUserID, 0, 2, 2)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), resPage2.Total)
+		assert.Len(t, resPage2.Reviews, 1)
+
+		// 6. Other user cannot see testUserID's reviews
+		resOther, err := repo.GetUserReviews(ctx, otherUserID, 0, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), resOther.Total)
+		assert.Empty(t, resOther.Reviews)
+	})
 }

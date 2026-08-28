@@ -55,6 +55,12 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	router.GET("/media/reviews/:mediaId", reviewHandler.getMedia)
 	router.HEAD("/media/reviews/:mediaId", reviewHandler.getMedia)
 
+	reviews := api.Group("/reviews")
+	reviews.Use(guard.AuthRequired)
+	{
+		reviews.GET("/me", reviewHandler.getUserReviews)
+	}
+
 	catalogHandler := newCatalogHandler(deps.Catalog)
 	api.GET("/categories", catalogHandler.ListCategories)
 	api.GET("/brands", catalogHandler.ListBrands)

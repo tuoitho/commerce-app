@@ -30,6 +30,7 @@ type mockReviewRepoForHTTP struct {
 	listByItemsFn  func(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error)
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
 	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
+	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
 }
 
 func (m *mockReviewRepoForHTTP) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -77,6 +78,13 @@ func (m *mockReviewRepoForHTTP) GetReviewMediaByID(ctx context.Context, mediaID 
 func (m *mockReviewRepoForHTTP) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
 	if m.getPublicFn != nil {
 		return m.getPublicFn(ctx, productID, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepoForHTTP) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	if m.getUserReviewsFn != nil {
+		return m.getUserReviewsFn(ctx, userID, ratingFilter, page, limit)
 	}
 	return nil, nil
 }
@@ -501,5 +509,99 @@ func TestGetMedia_HTTPHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestGetUserReviews_HTTPHandler(t *testing.T) {
+	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
+	userID := uuid.NewString()
+	token, _ := jwtMgr.GenerateAccessToken(userID, "customer", 15*time.Minute)
+
+	store := reviewmedia.NewFakeStore()
+
+	t.Run("401 Unauthorized when missing token", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews/me", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("400 Bad Request on invalid rating query param", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews/me?rating=9", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("200 OK returns Full Status Envelope with user reviews and pagination", func(t *testing.T) {
+		var capturedRating int16
+		var capturedPage, capturedLimit int
+		repo := &mockReviewRepoForHTTP{
+			getUserReviewsFn: func(ctx context.Context, uID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+				capturedRating = ratingFilter
+				capturedPage = page
+				capturedLimit = limit
+				return &domain.UserReviewsResult{
+					Reviews: []domain.UserReview{
+						{
+							ID:          "rev-1",
+							OrderItemID: "item-1",
+							Rating:      5,
+							Comment:     "Tuyệt vời",
+							CanEdit:     true,
+							Edited:      false,
+							Product: domain.UserReviewProduct{
+								ID:        "prod-1",
+								Name:      "iPhone 15 Pro",
+								BrandName: "Apple",
+							},
+							Order: domain.UserReviewOrder{
+								ID: "ord-1",
+							},
+						},
+					},
+					Total: 1,
+				}, nil
+			},
+		}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews/me?rating=5&page=1&limit=10", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, int16(5), capturedRating)
+		assert.Equal(t, 1, capturedPage)
+		assert.Equal(t, 10, capturedLimit)
+
+		var resp struct {
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+			Data    struct {
+				Reviews []domain.UserReview `json:"reviews"`
+			} `json:"data"`
+			Meta struct {
+				Pagination PaginationMeta `json:"pagination"`
+			} `json:"meta"`
+		}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		assert.Equal(t, "Lấy lịch sử đánh giá thành công", resp.Message)
+		require.Len(t, resp.Data.Reviews, 1)
+		assert.Equal(t, "rev-1", resp.Data.Reviews[0].ID)
+		assert.Equal(t, 1, resp.Meta.Pagination.Total)
+		assert.Equal(t, 1, resp.Meta.Pagination.Page)
 	})
 }

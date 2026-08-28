@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createOrderItemReview, updateOrderItemReview, getProductReviews } from './reviews'
+import { createOrderItemReview, updateOrderItemReview, getProductReviews, getUserReviews } from './reviews'
 import * as client from './client'
-import type { Review, ProductReviewsResponse } from './types'
+import type { Review, ProductReviewsResponse, UserReviewsResponse } from './types'
 
 describe('reviews API module', () => {
   beforeEach(() => {
@@ -122,5 +122,53 @@ describe('reviews API module', () => {
     const result = await getProductReviews('prod-1', { page: 2, limit: 5 })
     expect(result).toEqual(mockResponse)
     expect(spy).toHaveBeenCalledWith('/products/prod-1/reviews?page=2&limit=5')
+  })
+
+  it('getUserReviews calls apiClientWithMeta with query params', async () => {
+    const mockResponse: client.ApiResponseWithMeta<UserReviewsResponse> = {
+      data: {
+        reviews: [
+          {
+            id: 'rev-1',
+            orderItemId: 'item-1',
+            order: { id: 'ord-1', createdAt: '2026-08-28T00:00:00Z' },
+            product: {
+              id: 'prod-1',
+              name: 'iPhone 15 Pro',
+              brandName: 'Apple',
+              model: 'Natural Titanium',
+              imageUrl: 'https://example.com/img.jpg',
+              options: [],
+            },
+            rating: 5,
+            comment: 'Great phone',
+            editCount: 0,
+            canEdit: true,
+            edited: false,
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            updatedAt: '2026-08-28T00:00:00Z',
+          },
+        ],
+      },
+      message: 'Lấy lịch sử đánh giá thành công',
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+    }
+
+    const spy = vi.spyOn(client, 'apiClientWithMeta').mockResolvedValue(mockResponse)
+
+    const result = await getUserReviews({ rating: 5, page: 2, limit: 10 })
+    expect(result).toEqual(mockResponse)
+    expect(spy).toHaveBeenCalledWith('/reviews/me?rating=5&page=2&limit=10')
   })
 })

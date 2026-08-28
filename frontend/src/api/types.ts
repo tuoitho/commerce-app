@@ -376,6 +376,39 @@ export interface ProductReviewsResponse {
   summary: ProductReviewSummary
 }
 
+export interface UserReviewProduct {
+  id: string
+  name: string
+  brandName: string
+  model: string
+  imageUrl: string
+  options: CartOption[]
+}
+
+export interface UserReviewOrder {
+  id: string
+  createdAt: string
+}
+
+export interface UserReview {
+  id: string
+  orderItemId: string
+  order: UserReviewOrder
+  product: UserReviewProduct
+  rating: number
+  comment: string
+  editCount: number
+  canEdit: boolean
+  edited: boolean
+  media: ReviewMedia[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UserReviewsResponse {
+  reviews: UserReview[]
+}
+
 export interface OrderItem {
   id: string
   variantId: string

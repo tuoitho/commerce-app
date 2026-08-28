@@ -4,6 +4,7 @@ import type {
   UpdateReviewInput,
   Review,
   ProductReviewsResponse,
+  UserReviewsResponse,
 } from './types'
 
 export async function createOrderItemReview(
@@ -84,4 +85,24 @@ export async function getProductReviews(
   const path = `/products/${productId}/reviews${queryString ? `?${queryString}` : ''}`
 
   return apiClientWithMeta<ProductReviewsResponse>(path)
+}
+
+export async function getUserReviews(
+  params: { rating?: number; page?: number; limit?: number } = {}
+): Promise<ApiResponseWithMeta<UserReviewsResponse>> {
+  const searchParams = new URLSearchParams()
+  if (params.rating !== undefined && params.rating > 0) {
+    searchParams.set('rating', String(params.rating))
+  }
+  if (params.page !== undefined) {
+    searchParams.set('page', String(params.page))
+  }
+  if (params.limit !== undefined) {
+    searchParams.set('limit', String(params.limit))
+  }
+
+  const queryString = searchParams.toString()
+  const path = `/reviews/me${queryString ? `?${queryString}` : ''}`
+
+  return apiClientWithMeta<UserReviewsResponse>(path)
 }

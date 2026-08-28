@@ -146,6 +146,40 @@ type ProductReviewsResult struct {
 	Total   int64                `json:"total"`
 }
 
+type UserReviewProduct struct {
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	BrandName string       `json:"brandName"`
+	Model     string       `json:"model"`
+	ImageURL  string       `json:"imageUrl"`
+	Options   []CartOption `json:"options"`
+}
+
+type UserReviewOrder struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type UserReview struct {
+	ID          string            `json:"id"`
+	OrderItemID string            `json:"orderItemId"`
+	Order       UserReviewOrder   `json:"order"`
+	Product     UserReviewProduct `json:"product"`
+	Rating      int16             `json:"rating"`
+	Comment     string            `json:"comment"`
+	EditCount   int16             `json:"editCount"`
+	CanEdit     bool              `json:"canEdit"`
+	Edited      bool              `json:"edited"`
+	Media       []ReviewMedia     `json:"media"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
+}
+
+type UserReviewsResult struct {
+	Reviews []UserReview `json:"reviews"`
+	Total   int64        `json:"total"`
+}
+
 type CreateReviewMediaInput struct {
 	MediaType ReviewMediaType
 	MimeType  string
@@ -182,6 +216,7 @@ type ReviewRepository interface {
 	ListReviewsByOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]*Review, error)
 	GetReviewMediaByID(ctx context.Context, mediaID string) (*ReviewMedia, error)
 	GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*ProductReviewsResult, error)
+	GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*UserReviewsResult, error)
 }
 
 type ReviewObjectInfo struct {

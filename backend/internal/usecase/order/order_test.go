@@ -1262,6 +1262,9 @@ func (f *fakeReviewRepoForOrder) GetReviewMediaByID(ctx context.Context, mediaID
 func (f *fakeReviewRepoForOrder) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
 	return nil, nil
 }
+func (f *fakeReviewRepoForOrder) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	return nil, nil
+}
 
 func TestOrderUseCase_ReturnProjection(t *testing.T) {
 	ctx := context.Background()

@@ -251,6 +251,62 @@ func (h *reviewHandler) getPublicReviews(c *gin.Context) {
 	writePaginatedSuccess(c, http.StatusOK, "Lấy danh sách đánh giá thành công", data, pagination)
 }
 
+func (h *reviewHandler) getUserReviews(c *gin.Context) {
+	userID := callerUserID(c)
+	if userID == "" {
+		writeError(c, domain.ErrInvalidToken)
+		return
+	}
+
+	var ratingFilter int16 = 0
+	if r := c.Query("rating"); r != "" {
+		val, err := strconv.ParseInt(r, 10, 16)
+		if err != nil || val < 0 || val > 5 {
+			writeError(c, domain.NewValidationError(map[string]string{
+				"rating": "Số sao lọc không hợp lệ, phải là số nguyên từ 0 đến 5",
+			}))
+			return
+		}
+		ratingFilter = int16(val)
+	}
+
+	page := 1
+	if p, err := strconv.Atoi(c.Query("page")); err == nil && p > 0 {
+		page = p
+	}
+
+	limit := 10
+	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 && l <= 10 {
+		limit = l
+	}
+
+	res, err := h.uc.GetUserReviews(c.Request.Context(), userID, ratingFilter, page, limit)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	totalPages := 0
+	if res.Total > 0 {
+		totalPages = int((res.Total + int64(limit) - 1) / int64(limit))
+	}
+
+	pagination := PaginationMeta{
+		Page:       page,
+		Limit:      limit,
+		Total:      int(res.Total),
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}
+
+	data := gin.H{
+		"reviews": res.Reviews,
+	}
+
+	writePaginatedSuccess(c, http.StatusOK, "Lấy lịch sử đánh giá thành công", data, pagination)
+}
+
 func (h *reviewHandler) getMedia(c *gin.Context) {
 	mediaID := c.Param("mediaId")
 	rangeHeader := c.GetHeader("Range")

@@ -8,7 +8,30 @@ package sqlc
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const countUserReviews = `-- name: CountUserReviews :one
+SELECT COUNT(*)::bigint
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+JOIN orders o ON o.id = oi.order_id
+WHERE o.user_id = $1
+  AND ($2::smallint = 0 OR pr.rating = $2::smallint)
+`
+
+type CountUserReviewsParams struct {
+	UserID  string
+	Column2 int16
+}
+
+func (q *Queries) CountUserReviews(ctx context.Context, arg CountUserReviewsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserReviews, arg.UserID, arg.Column2)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
 
 const deleteReviewMediaByReviewID = `-- name: DeleteReviewMediaByReviewID :exec
 DELETE FROM review_media
@@ -405,6 +428,92 @@ func (q *Queries) ListReviewsByOrderItemIDs(ctx context.Context, orderItemIds []
 			&i.EditCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserReviews = `-- name: ListUserReviews :many
+SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at,
+       o.id AS order_id, o.created_at AS order_created_at,
+       oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url, oi.options::text AS options,
+       oi.unit_price_vnd, oi.quantity, oi.line_total_vnd
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+JOIN orders o ON o.id = oi.order_id
+WHERE o.user_id = $1
+  AND ($2::smallint = 0 OR pr.rating = $2::smallint)
+ORDER BY pr.created_at DESC, pr.id DESC
+LIMIT $4 OFFSET $3
+`
+
+type ListUserReviewsParams struct {
+	UserID       string
+	RatingFilter int16
+	OffsetCount  int32
+	LimitCount   int32
+}
+
+type ListUserReviewsRow struct {
+	ID             string
+	OrderItemID    string
+	Rating         int16
+	Comment        string
+	EditCount      int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	OrderID        string
+	OrderCreatedAt time.Time
+	ProductID      string
+	BrandName      string
+	ProductName    string
+	Model          string
+	ImageUrl       string
+	Options        string
+	UnitPriceVnd   pgtype.Numeric
+	Quantity       int64
+	LineTotalVnd   pgtype.Numeric
+}
+
+func (q *Queries) ListUserReviews(ctx context.Context, arg ListUserReviewsParams) ([]ListUserReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listUserReviews,
+		arg.UserID,
+		arg.RatingFilter,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserReviewsRow
+	for rows.Next() {
+		var i ListUserReviewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderItemID,
+			&i.Rating,
+			&i.Comment,
+			&i.EditCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OrderID,
+			&i.OrderCreatedAt,
+			&i.ProductID,
+			&i.BrandName,
+			&i.ProductName,
+			&i.Model,
+			&i.ImageUrl,
+			&i.Options,
+			&i.UnitPriceVnd,
+			&i.Quantity,
+			&i.LineTotalVnd,
 		); err != nil {
 			return nil, err
 		}

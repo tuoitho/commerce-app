@@ -197,4 +197,80 @@ describe('Header Component', () => {
       expect(favoriteLinks[1]).toHaveAttribute('href', '/favorites')
     })
   })
+
+  it('does NOT render "Lịch sử đánh giá" link when user is unauthenticated', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(screen.queryByText('Lịch sử đánh giá')).not.toBeInTheDocument()
+  })
+
+  it('renders "Lịch sử đánh giá" link when authenticated and links to /reviews', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const reviewLinks = screen.getAllByRole('link', { name: /Lịch sử đánh giá/i })
+    expect(reviewLinks.length).toBeGreaterThanOrEqual(1)
+    expect(reviewLinks[0]).toHaveAttribute('href', '/reviews')
+  })
+
+  it('renders "Lịch sử đánh giá" in mobile drawer when authenticated', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    // Open mobile menu
+    const menuButton = screen.getByRole('button', { name: /toggle menu/i })
+    fireEvent.click(menuButton)
+
+    await waitFor(() => {
+      const reviewLinks = screen.getAllByRole('link', { name: /Lịch sử đánh giá/i })
+      expect(reviewLinks.length).toBe(2) // 1 desktop + 1 mobile
+      expect(reviewLinks[1]).toHaveAttribute('href', '/reviews')
+    })
+  })
 })

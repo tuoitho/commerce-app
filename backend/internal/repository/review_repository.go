@@ -640,3 +640,123 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 		Total:   summaryRow.TotalReviews,
 	}, nil
 }
+
+func (r *ReviewRepository) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 10 {
+		limit = 10
+	}
+
+	offset := (page - 1) * limit
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := sqlc.New(tx)
+
+	total, err := q.CountUserReviews(ctx, sqlc.CountUserReviewsParams{
+		UserID:  userID,
+		Column2: ratingFilter,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	reviewRows, err := q.ListUserReviews(ctx, sqlc.ListUserReviewsParams{
+		UserID:       userID,
+		RatingFilter: ratingFilter,
+		OffsetCount:  int32(offset),
+		LimitCount:   int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	reviewIDs := make([]string, 0, len(reviewRows))
+	for _, row := range reviewRows {
+		reviewIDs = append(reviewIDs, row.ID)
+	}
+
+	mediaMap := make(map[string][]domain.ReviewMedia)
+	if len(reviewIDs) > 0 {
+		mediaRows, err := q.ListReviewMediaByReviewIDs(ctx, reviewIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range mediaRows {
+			mediaMap[m.ReviewID] = append(mediaMap[m.ReviewID], domain.ReviewMedia{
+				ID:        m.ID,
+				ReviewID:  m.ReviewID,
+				Type:      domain.ReviewMediaType(m.MediaType),
+				URL:       fmt.Sprintf("/media/reviews/%s", m.ID),
+				MimeType:  m.MimeType,
+				ObjectKey: m.ObjectKey,
+				SizeBytes: m.SizeBytes,
+				Position:  m.Position,
+				CreatedAt: m.CreatedAt,
+			})
+		}
+	}
+
+	userReviews := make([]domain.UserReview, 0, len(reviewRows))
+	for _, row := range reviewRows {
+		var options []domain.CartOption
+		if row.Options != "" {
+			_ = json.Unmarshal([]byte(row.Options), &options)
+		}
+		if options == nil {
+			options = []domain.CartOption{}
+		}
+
+		media := mediaMap[row.ID]
+		if media == nil {
+			media = []domain.ReviewMedia{}
+		}
+
+		userReviews = append(userReviews, domain.UserReview{
+			ID:          row.ID,
+			OrderItemID: row.OrderItemID,
+			Order: domain.UserReviewOrder{
+				ID:        row.OrderID,
+				CreatedAt: row.OrderCreatedAt,
+			},
+			Product: domain.UserReviewProduct{
+				ID:        row.ProductID,
+				Name:      row.ProductName,
+				BrandName: row.BrandName,
+				Model:     row.Model,
+				ImageURL:  row.ImageUrl,
+				Options:   options,
+			},
+			Rating:    row.Rating,
+			Comment:   row.Comment,
+			EditCount: row.EditCount,
+			CanEdit:   row.EditCount == 0,
+			Edited:    row.EditCount > 0,
+			Media:     media,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &domain.UserReviewsResult{
+		Reviews: userReviews,
+		Total:   total,
+	}, nil
+}

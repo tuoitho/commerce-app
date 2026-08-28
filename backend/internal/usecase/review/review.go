@@ -371,3 +371,24 @@ func (uc *ReviewUseCase) StreamMedia(ctx context.Context, mediaID string, start,
 	}
 	return stream, media, nil
 }
+
+func (uc *ReviewUseCase) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	if ratingFilter < 0 || ratingFilter > 5 {
+		return nil, domain.NewValidationError(map[string]string{
+			"rating": "Số sao lọc không hợp lệ, phải từ 1 đến 5 hoặc 0 để lấy tất cả",
+		})
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 10 {
+		limit = 10
+	}
+
+	return uc.repo.GetUserReviews(ctx, userID, ratingFilter, page, limit)
+}

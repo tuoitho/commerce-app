@@ -148,6 +148,9 @@ func (f *fakeReviewRepoForHandler) GetReviewMediaByID(ctx context.Context, media
 func (f *fakeReviewRepoForHandler) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
 	return nil, nil
 }
+func (f *fakeReviewRepoForHandler) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	return nil, nil
+}
 
 func newOrderTestRouter(orderRepo *fakeOrderUsecaseRepo) (*gin.Engine, string) {
 	return newOrderTestRouterWithReview(orderRepo, nil)
