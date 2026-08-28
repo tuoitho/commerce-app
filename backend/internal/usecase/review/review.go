@@ -392,3 +392,22 @@ func (uc *ReviewUseCase) GetUserReviews(ctx context.Context, userID string, rati
 
 	return uc.repo.GetUserReviews(ctx, userID, ratingFilter, page, limit)
 }
+
+
+func (u *ReviewUseCase) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	return u.repo.GetAdminReviews(ctx, ratingFilter, hasReplyFilter, page, limit)
+}
+
+func (u *ReviewUseCase) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	if reply != nil {
+		content := strings.TrimSpace(*reply)
+		if content == "" || len(content) > domain.MaxReviewCommentLength {
+			return nil, domain.NewValidationError(map[string]string{
+				"reply": "Nội dung phản hồi không hợp lệ",
+			})
+		}
+		reply = &content
+	}
+	return u.repo.UpdateAdminReply(ctx, reviewID, reply)
+}
+

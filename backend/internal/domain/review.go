@@ -101,6 +101,8 @@ type ReviewMedia struct {
 }
 
 type Review struct {
+	AdminReply    *string       `json:"adminReply,omitempty"`
+	AdminRepliedAt *time.Time  `json:"adminRepliedAt,omitempty"`
 	ID          string        `json:"id"`
 	OrderItemID string        `json:"orderItemId,omitempty"`
 	Rating      int16         `json:"rating"`
@@ -123,6 +125,8 @@ type PublicPurchase struct {
 }
 
 type PublicReview struct {
+	AdminReply    *string       `json:"adminReply,omitempty"`
+	AdminRepliedAt *time.Time  `json:"adminRepliedAt,omitempty"`
 	ID        string         `json:"id"`
 	Rating    int16          `json:"rating"`
 	Comment   string         `json:"comment"`
@@ -161,6 +165,8 @@ type UserReviewOrder struct {
 }
 
 type UserReview struct {
+	AdminReply    *string       `json:"adminReply,omitempty"`
+	AdminRepliedAt *time.Time  `json:"adminRepliedAt,omitempty"`
 	ID          string            `json:"id"`
 	OrderItemID string            `json:"orderItemId"`
 	Order       UserReviewOrder   `json:"order"`
@@ -217,6 +223,8 @@ type ReviewRepository interface {
 	GetReviewMediaByID(ctx context.Context, mediaID string) (*ReviewMedia, error)
 	GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*ProductReviewsResult, error)
 	GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*UserReviewsResult, error)
+	GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*AdminReviewsResult, error)
+	UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*Review, error)
 }
 
 type ReviewObjectInfo struct {
@@ -255,4 +263,24 @@ func MaskReviewerEmail(rawEmail string) *string {
 	runes := []rune(local)
 	masked := string(runes[0]) + "***@" + domain
 	return &masked
+}
+
+type AdminReview struct {
+	ID             string            `json:"id"`
+	OrderItemID    string            `json:"orderItemId"`
+	Rating         int16             `json:"rating"`
+	Comment        string            `json:"comment"`
+	EditCount      int16             `json:"editCount"`
+	Media          []ReviewMedia     `json:"media"`
+	CreatedAt      time.Time         `json:"createdAt"`
+	UpdatedAt      time.Time         `json:"updatedAt"`
+	AdminReply     *string           `json:"adminReply,omitempty"`
+	AdminRepliedAt *time.Time        `json:"adminRepliedAt,omitempty"`
+	ReviewerEmail  *string           `json:"reviewerEmail,omitempty"`
+	Product        UserReviewProduct `json:"product"`
+}
+
+type AdminReviewsResult struct {
+	Reviews []AdminReview `json:"reviews"`
+	Total   int64         `json:"total"`
 }

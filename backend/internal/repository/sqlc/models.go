@@ -127,13 +127,15 @@ type ProductOptionValue struct {
 }
 
 type ProductReview struct {
-	ID          string
-	OrderItemID string
-	Rating      int16
-	Comment     string
-	EditCount   int16
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             string
+	OrderItemID    string
+	Rating         int16
+	Comment        string
+	EditCount      int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AdminReply     pgtype.Text
+	AdminRepliedAt pgtype.Timestamptz
 }
 
 type ProductVariant struct {

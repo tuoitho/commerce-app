@@ -12,6 +12,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countAdminReviews = `-- name: CountAdminReviews :one
+SELECT COUNT(*)::bigint
+FROM product_reviews pr
+WHERE ($1::smallint = 0 OR pr.rating = $1::smallint)
+  AND ($2::text = '' 
+       OR ($2::text = 'yes' AND pr.admin_reply IS NOT NULL)
+       OR ($2::text = 'no' AND pr.admin_reply IS NULL))
+`
+
+type CountAdminReviewsParams struct {
+	RatingFilter   int16
+	HasReplyFilter string
+}
+
+func (q *Queries) CountAdminReviews(ctx context.Context, arg CountAdminReviewsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminReviews, arg.RatingFilter, arg.HasReplyFilter)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countUserReviews = `-- name: CountUserReviews :one
 SELECT COUNT(*)::bigint
 FROM product_reviews pr
@@ -114,7 +135,7 @@ func (q *Queries) GetRatingCountsByProductID(ctx context.Context, productID stri
 }
 
 const getReviewByID = `-- name: GetReviewByID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE id = $1
 `
@@ -130,12 +151,14 @@ func (q *Queries) GetReviewByID(ctx context.Context, id string) (ProductReview, 
 		&i.EditCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AdminReply,
+		&i.AdminRepliedAt,
 	)
 	return i, err
 }
 
 const getReviewByOrderItemID = `-- name: GetReviewByOrderItemID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = $1
 `
@@ -151,6 +174,8 @@ func (q *Queries) GetReviewByOrderItemID(ctx context.Context, orderItemID string
 		&i.EditCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AdminReply,
+		&i.AdminRepliedAt,
 	)
 	return i, err
 }
@@ -213,9 +238,19 @@ type InsertReviewParams struct {
 	Comment     string
 }
 
-func (q *Queries) InsertReview(ctx context.Context, arg InsertReviewParams) (ProductReview, error) {
+type InsertReviewRow struct {
+	ID          string
+	OrderItemID string
+	Rating      int16
+	Comment     string
+	EditCount   int16
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) InsertReview(ctx context.Context, arg InsertReviewParams) (InsertReviewRow, error) {
 	row := q.db.QueryRow(ctx, insertReview, arg.OrderItemID, arg.Rating, arg.Comment)
-	var i ProductReview
+	var i InsertReviewRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrderItemID,
@@ -270,8 +305,92 @@ func (q *Queries) InsertReviewMedia(ctx context.Context, arg InsertReviewMediaPa
 	return i, err
 }
 
+const listAdminReviews = `-- name: ListAdminReviews :many
+SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
+       u.email AS reviewer_email,
+       oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url, oi.options::text AS options
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+JOIN orders o ON o.id = oi.order_id
+JOIN users u ON u.id = o.user_id
+WHERE ($1::smallint = 0 OR pr.rating = $1::smallint)
+  AND ($2::text = '' 
+       OR ($2::text = 'yes' AND pr.admin_reply IS NOT NULL)
+       OR ($2::text = 'no' AND pr.admin_reply IS NULL))
+ORDER BY pr.created_at DESC, pr.id DESC
+LIMIT $4 OFFSET $3
+`
+
+type ListAdminReviewsParams struct {
+	RatingFilter   int16
+	HasReplyFilter string
+	OffsetCount    int32
+	LimitCount     int32
+}
+
+type ListAdminReviewsRow struct {
+	ID             string
+	OrderItemID    string
+	Rating         int16
+	Comment        string
+	EditCount      int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AdminReply     pgtype.Text
+	AdminRepliedAt pgtype.Timestamptz
+	ReviewerEmail  string
+	ProductID      string
+	BrandName      string
+	ProductName    string
+	Model          string
+	ImageUrl       string
+	Options        string
+}
+
+func (q *Queries) ListAdminReviews(ctx context.Context, arg ListAdminReviewsParams) ([]ListAdminReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminReviews,
+		arg.RatingFilter,
+		arg.HasReplyFilter,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminReviewsRow
+	for rows.Next() {
+		var i ListAdminReviewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderItemID,
+			&i.Rating,
+			&i.Comment,
+			&i.EditCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AdminReply,
+			&i.AdminRepliedAt,
+			&i.ReviewerEmail,
+			&i.ProductID,
+			&i.BrandName,
+			&i.ProductName,
+			&i.Model,
+			&i.ImageUrl,
+			&i.Options,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicReviewsByProductID = `-- name: ListPublicReviewsByProductID :many
-SELECT pr.id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at,
+SELECT pr.id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
        u.email AS reviewer_email,
        oi.model AS model,
        oi.options::text AS options
@@ -291,15 +410,17 @@ type ListPublicReviewsByProductIDParams struct {
 }
 
 type ListPublicReviewsByProductIDRow struct {
-	ID            string
-	Rating        int16
-	Comment       string
-	EditCount     int16
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	ReviewerEmail string
-	Model         string
-	Options       string
+	ID             string
+	Rating         int16
+	Comment        string
+	EditCount      int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AdminReply     pgtype.Text
+	AdminRepliedAt pgtype.Timestamptz
+	ReviewerEmail  string
+	Model          string
+	Options        string
 }
 
 func (q *Queries) ListPublicReviewsByProductID(ctx context.Context, arg ListPublicReviewsByProductIDParams) ([]ListPublicReviewsByProductIDRow, error) {
@@ -318,6 +439,8 @@ func (q *Queries) ListPublicReviewsByProductID(ctx context.Context, arg ListPubl
 			&i.EditCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AdminReply,
+			&i.AdminRepliedAt,
 			&i.ReviewerEmail,
 			&i.Model,
 			&i.Options,
@@ -405,7 +528,7 @@ func (q *Queries) ListReviewMediaByReviewIDs(ctx context.Context, reviewIds []st
 }
 
 const listReviewsByOrderItemIDs = `-- name: ListReviewsByOrderItemIDs :many
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = ANY($1::uuid[])
 ORDER BY created_at DESC, id DESC
@@ -428,6 +551,8 @@ func (q *Queries) ListReviewsByOrderItemIDs(ctx context.Context, orderItemIds []
 			&i.EditCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AdminReply,
+			&i.AdminRepliedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -440,7 +565,7 @@ func (q *Queries) ListReviewsByOrderItemIDs(ctx context.Context, orderItemIds []
 }
 
 const listUserReviews = `-- name: ListUserReviews :many
-SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at,
+SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
        o.id AS order_id, o.created_at AS order_created_at,
        oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url, oi.options::text AS options,
        oi.unit_price_vnd, oi.quantity, oi.line_total_vnd
@@ -468,6 +593,8 @@ type ListUserReviewsRow struct {
 	EditCount      int16
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	AdminReply     pgtype.Text
+	AdminRepliedAt pgtype.Timestamptz
 	OrderID        string
 	OrderCreatedAt time.Time
 	ProductID      string
@@ -503,6 +630,8 @@ func (q *Queries) ListUserReviews(ctx context.Context, arg ListUserReviewsParams
 			&i.EditCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AdminReply,
+			&i.AdminRepliedAt,
 			&i.OrderID,
 			&i.OrderCreatedAt,
 			&i.ProductID,
@@ -526,7 +655,7 @@ func (q *Queries) ListUserReviews(ctx context.Context, arg ListUserReviewsParams
 }
 
 const lockReviewByID = `-- name: LockReviewByID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE id = $1
 FOR UPDATE
@@ -543,12 +672,14 @@ func (q *Queries) LockReviewByID(ctx context.Context, id string) (ProductReview,
 		&i.EditCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AdminReply,
+		&i.AdminRepliedAt,
 	)
 	return i, err
 }
 
 const lockReviewByOrderItemID = `-- name: LockReviewByOrderItemID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = $1
 FOR UPDATE
@@ -565,6 +696,39 @@ func (q *Queries) LockReviewByOrderItemID(ctx context.Context, orderItemID strin
 		&i.EditCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AdminReply,
+		&i.AdminRepliedAt,
+	)
+	return i, err
+}
+
+const updateAdminReply = `-- name: UpdateAdminReply :one
+UPDATE product_reviews
+SET admin_reply = $2,
+    admin_replied_at = $3
+WHERE id = $1
+RETURNING id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
+`
+
+type UpdateAdminReplyParams struct {
+	ID             string
+	AdminReply     pgtype.Text
+	AdminRepliedAt pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateAdminReply(ctx context.Context, arg UpdateAdminReplyParams) (ProductReview, error) {
+	row := q.db.QueryRow(ctx, updateAdminReply, arg.ID, arg.AdminReply, arg.AdminRepliedAt)
+	var i ProductReview
+	err := row.Scan(
+		&i.ID,
+		&i.OrderItemID,
+		&i.Rating,
+		&i.Comment,
+		&i.EditCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AdminReply,
+		&i.AdminRepliedAt,
 	)
 	return i, err
 }
@@ -585,9 +749,19 @@ type UpdateReviewParams struct {
 	Comment string
 }
 
-func (q *Queries) UpdateReview(ctx context.Context, arg UpdateReviewParams) (ProductReview, error) {
+type UpdateReviewRow struct {
+	ID          string
+	OrderItemID string
+	Rating      int16
+	Comment     string
+	EditCount   int16
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) UpdateReview(ctx context.Context, arg UpdateReviewParams) (UpdateReviewRow, error) {
 	row := q.db.QueryRow(ctx, updateReview, arg.ID, arg.Rating, arg.Comment)
-	var i ProductReview
+	var i UpdateReviewRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrderItemID,

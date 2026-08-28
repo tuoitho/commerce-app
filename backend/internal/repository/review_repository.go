@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,6 +17,35 @@ import (
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/repository/sqlc"
 )
+
+
+func pgTextToStrPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	return &t.String
+}
+
+func pgTimestamptzToTimePtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	return &t.Time
+}
+
+func strPtrToPgText(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: *s, Valid: true}
+}
+
+func timePtrToPgTimestamptz(t *time.Time) pgtype.Timestamptz {
+	if t == nil {
+		return pgtype.Timestamptz{Valid: false}
+	}
+	return pgtype.Timestamptz{Time: *t, Valid: true}
+}
 
 type ReviewRepository struct {
 	db orderDB
@@ -625,6 +656,8 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 			},
 			Media:     media,
 			Edited:    row.EditCount > 0,
+			AdminReply:     pgTextToStrPtr(row.AdminReply),
+			AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
 			CreatedAt: row.CreatedAt,
 			UpdatedAt: row.UpdatedAt,
 		})
@@ -745,6 +778,8 @@ func (r *ReviewRepository) GetUserReviews(ctx context.Context, userID string, ra
 			EditCount: row.EditCount,
 			CanEdit:   row.EditCount == 0,
 			Edited:    row.EditCount > 0,
+			AdminReply:     pgTextToStrPtr(row.AdminReply),
+			AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
 			Media:     media,
 			CreatedAt: row.CreatedAt,
 			UpdatedAt: row.UpdatedAt,
@@ -760,3 +795,140 @@ func (r *ReviewRepository) GetUserReviews(ctx context.Context, userID string, ra
 		Total:   total,
 	}, nil
 }
+
+func (r *ReviewRepository) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+
+	q := sqlc.New(r.db)
+
+	total, err := q.CountAdminReviews(ctx, sqlc.CountAdminReviewsParams{
+		RatingFilter:   ratingFilter,
+		HasReplyFilter: hasReplyFilter,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	reviewRows, err := q.ListAdminReviews(ctx, sqlc.ListAdminReviewsParams{
+		RatingFilter:   ratingFilter,
+		HasReplyFilter: hasReplyFilter,
+		LimitCount:     int32(limit),
+		OffsetCount:    int32(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var reviewIDs []string
+	for _, row := range reviewRows {
+		reviewIDs = append(reviewIDs, row.ID)
+	}
+
+	mediaMap := make(map[string][]domain.ReviewMedia)
+	if len(reviewIDs) > 0 {
+		mediaRows, err := q.ListReviewMediaByReviewIDs(ctx, reviewIDs)
+		if err == nil {
+			for _, m := range mediaRows {
+				mediaMap[m.ReviewID] = append(mediaMap[m.ReviewID], domain.ReviewMedia{
+					ID:        m.ID,
+					ReviewID:  m.ReviewID,
+					Type:      domain.ReviewMediaType(m.MediaType),
+					URL:       fmt.Sprintf("/media/reviews/%s", m.ID),
+					MimeType:  m.MimeType,
+					ObjectKey: m.ObjectKey,
+					SizeBytes: m.SizeBytes,
+					Position:  m.Position,
+					CreatedAt: m.CreatedAt,
+				})
+			}
+		}
+	}
+
+	adminReviews := make([]domain.AdminReview, 0, len(reviewRows))
+	for _, row := range reviewRows {
+		var options []domain.CartOption
+		if row.Options != "" {
+			_ = json.Unmarshal([]byte(row.Options), &options)
+		}
+		if options == nil {
+			options = []domain.CartOption{}
+		}
+		media := mediaMap[row.ID]
+		if media == nil {
+			media = []domain.ReviewMedia{}
+		}
+
+		adminReviews = append(adminReviews, domain.AdminReview{
+			ID:          row.ID,
+			OrderItemID: row.OrderItemID,
+			Rating:      row.Rating,
+			Comment:     row.Comment,
+			EditCount:   row.EditCount,
+			Media:       media,
+			CreatedAt:   row.CreatedAt,
+			UpdatedAt:   row.UpdatedAt,
+			AdminReply:     pgTextToStrPtr(row.AdminReply),
+			AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
+			ReviewerEmail:  &row.ReviewerEmail,
+			Product: domain.UserReviewProduct{
+				ID:        row.ProductID,
+				Name:      row.ProductName,
+				BrandName: row.BrandName,
+				Model:     row.Model,
+				ImageURL:  row.ImageUrl,
+				Options:   options,
+			},
+		})
+	}
+
+	return &domain.AdminReviewsResult{
+		Reviews: adminReviews,
+		Total:   total,
+	}, nil
+}
+
+func (r *ReviewRepository) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	q := sqlc.New(r.db)
+
+	var replyTime *time.Time
+	if reply != nil {
+		now := time.Now()
+		replyTime = &now
+	}
+
+	row, err := q.UpdateAdminReply(ctx, sqlc.UpdateAdminReplyParams{
+		ID:             reviewID,
+		AdminReply:     strPtrToPgText(reply),
+		AdminRepliedAt: timePtrToPgTimestamptz(replyTime),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrReviewNotFound
+		}
+		return nil, err
+	}
+
+	// Just return a partial Review with the updated fields, or fetch full.
+	// Since we are just updating, let's just return the struct. Media is not needed for the immediate return.
+	return &domain.Review{
+		ID:             row.ID,
+		OrderItemID:    row.OrderItemID,
+		Rating:         row.Rating,
+		Comment:        row.Comment,
+		EditCount:      row.EditCount,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		AdminReply:     pgTextToStrPtr(row.AdminReply),
+		AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
+	}, nil
+}
+

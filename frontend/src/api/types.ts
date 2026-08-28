@@ -131,6 +131,8 @@ export interface ProductDetail {
   variants: ProductVariant[]
   createdAt: string
   updatedAt: string
+  adminReply?: string
+  adminRepliedAt?: string
 }
 
 export interface ProductFilterParams {
@@ -207,6 +209,8 @@ export interface Address {
   isDefault: boolean
   createdAt: string
   updatedAt: string
+  adminReply?: string
+  adminRepliedAt?: string
 }
 
 export interface AddressInput {
@@ -403,6 +407,8 @@ export interface UserReview {
   media: ReviewMedia[]
   createdAt: string
   updatedAt: string
+  adminReply?: string
+  adminRepliedAt?: string
 }
 
 export interface UserReviewsResponse {
@@ -470,5 +476,6 @@ export interface CreateOrderInput {
 
 // Favorites
 export type { FavoriteAvailability, FavoriteProduct } from '@/types/favorite'
+
 
 

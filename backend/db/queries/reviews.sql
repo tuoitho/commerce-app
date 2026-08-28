@@ -26,29 +26,29 @@ WHERE id = $1 AND edit_count = 0
 RETURNING id, order_item_id, rating, comment, edit_count, created_at, updated_at;
 
 -- name: GetReviewByID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE id = $1;
 
 -- name: LockReviewByID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE id = $1
 FOR UPDATE;
 
 -- name: GetReviewByOrderItemID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = $1;
 
 -- name: LockReviewByOrderItemID :one
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = $1
 FOR UPDATE;
 
 -- name: ListReviewsByOrderItemIDs :many
-SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at
+SELECT id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at
 FROM product_reviews
 WHERE order_item_id = ANY(@order_item_ids::uuid[])
 ORDER BY created_at DESC, id DESC;
@@ -95,7 +95,7 @@ WHERE oi.product_id = $1
 GROUP BY pr.rating;
 
 -- name: ListPublicReviewsByProductID :many
-SELECT pr.id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at,
+SELECT pr.id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
        u.email AS reviewer_email,
        oi.model AS model,
        oi.options::text AS options
@@ -116,7 +116,7 @@ WHERE o.user_id = $1
   AND ($2::smallint = 0 OR pr.rating = $2::smallint);
 
 -- name: ListUserReviews :many
-SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at,
+SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
        o.id AS order_id, o.created_at AS order_created_at,
        oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url, oi.options::text AS options,
        oi.unit_price_vnd, oi.quantity, oi.line_total_vnd
@@ -125,5 +125,35 @@ JOIN order_items oi ON oi.id = pr.order_item_id
 JOIN orders o ON o.id = oi.order_id
 WHERE o.user_id = @user_id
   AND (@rating_filter::smallint = 0 OR pr.rating = @rating_filter::smallint)
+ORDER BY pr.created_at DESC, pr.id DESC
+LIMIT @limit_count OFFSET @offset_count;
+
+-- name: UpdateAdminReply :one
+UPDATE product_reviews
+SET admin_reply = $2,
+    admin_replied_at = $3
+WHERE id = $1
+RETURNING id, order_item_id, rating, comment, edit_count, created_at, updated_at, admin_reply, admin_replied_at;
+
+-- name: CountAdminReviews :one
+SELECT COUNT(*)::bigint
+FROM product_reviews pr
+WHERE (@rating_filter::smallint = 0 OR pr.rating = @rating_filter::smallint)
+  AND (@has_reply_filter::text = '' 
+       OR (@has_reply_filter::text = 'yes' AND pr.admin_reply IS NOT NULL)
+       OR (@has_reply_filter::text = 'no' AND pr.admin_reply IS NULL));
+
+-- name: ListAdminReviews :many
+SELECT pr.id, pr.order_item_id, pr.rating, pr.comment, pr.edit_count, pr.created_at, pr.updated_at, pr.admin_reply, pr.admin_replied_at,
+       u.email AS reviewer_email,
+       oi.product_id, oi.brand_name, oi.product_name, oi.model, oi.image_url, oi.options::text AS options
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+JOIN orders o ON o.id = oi.order_id
+JOIN users u ON u.id = o.user_id
+WHERE (@rating_filter::smallint = 0 OR pr.rating = @rating_filter::smallint)
+  AND (@has_reply_filter::text = '' 
+       OR (@has_reply_filter::text = 'yes' AND pr.admin_reply IS NOT NULL)
+       OR (@has_reply_filter::text = 'no' AND pr.admin_reply IS NULL))
 ORDER BY pr.created_at DESC, pr.id DESC
 LIMIT @limit_count OFFSET @offset_count;

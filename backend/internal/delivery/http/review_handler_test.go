@@ -605,3 +605,12 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 		assert.Equal(t, 1, resp.Meta.Pagination.Page)
 	})
 }
+
+
+func (m *mockReviewRepoForHTTP) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	return &domain.AdminReviewsResult{}, nil
+}
+
+func (m *mockReviewRepoForHTTP) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	return &domain.Review{}, nil
+}

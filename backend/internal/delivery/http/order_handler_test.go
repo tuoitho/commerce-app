@@ -1015,3 +1015,12 @@ func TestOrderHTTP_UndoCancel(t *testing.T) {
 }
 
 
+
+
+func (m *fakeReviewRepoForHandler) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	return &domain.AdminReviewsResult{}, nil
+}
+
+func (m *fakeReviewRepoForHandler) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	return &domain.Review{}, nil
+}
