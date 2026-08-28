@@ -52,7 +52,7 @@ contracts:
 
   - id: PURCHASED-REVIEW-API
     revision: 2
-    status: DRAFT
+    status: FROZEN
     requirements:
       - REQ-REVIEW-01
       - REQ-REVIEW-02

@@ -476,4 +476,70 @@ describe('OrderDetailPage', () => {
       expect(ordersApi.cancelOrder).toHaveBeenCalledWith('ord-123456')
     })
   })
+
+  it('renders review button for eligible item in delivered order', async () => {
+    const deliveredOrder: Order = {
+      ...baseMockOrder,
+      status: 'delivered',
+      items: [
+        {
+          ...baseMockOrder.items[0],
+          reviewState: {
+            status: 'eligible',
+            reviewId: null,
+            canEdit: false,
+            remainingEdits: 0,
+          },
+        },
+      ],
+    }
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(deliveredOrder)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Đánh giá/i })).toBeInTheDocument()
+    })
+  })
+
+  it('renders edit review button for reviewed item with remaining edits in delivered order', async () => {
+    const deliveredOrder: Order = {
+      ...baseMockOrder,
+      status: 'delivered',
+      items: [
+        {
+          ...baseMockOrder.items[0],
+          reviewState: {
+            status: 'reviewed',
+            reviewId: 'rev-1',
+            canEdit: true,
+            remainingEdits: 1,
+          },
+        },
+      ],
+    }
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(deliveredOrder)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Sửa đánh giá/i })).toBeInTheDocument()
+    })
+  })
 })

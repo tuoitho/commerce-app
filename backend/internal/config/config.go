@@ -26,16 +26,32 @@ type Config struct {
 	LogLevel               string
 	OrderConfirmTimeout    time.Duration
 	ShippingFeeVND         domain.MoneyVND
+	MinIOEndpoint          string
+	MinIOAccessKey         string
+	MinIOSecretKey         string
+	MinIOBucket            string
+	MinIOUseSSL            bool
+	MinIORequestTimeout    time.Duration
+	MinIOReconcilerInterval time.Duration
+	MinIOGracePeriod       time.Duration
 }
 
 const (
-	defaultAppEnv              = "development"
-	defaultHTTPPort            = 8080
-	defaultAccessTokenTTL      = 15 * time.Minute
-	defaultRefreshTokenTTL     = 720 * time.Hour
-	defaultLogLevel            = "info"
-	defaultOrderConfirmTimeout = 1 * time.Minute
-	defaultShippingFeeVND      = domain.MoneyVND("0")
+	defaultAppEnv                  = "development"
+	defaultHTTPPort                = 8080
+	defaultAccessTokenTTL          = 15 * time.Minute
+	defaultRefreshTokenTTL         = 720 * time.Hour
+	defaultLogLevel                = "info"
+	defaultOrderConfirmTimeout     = 1 * time.Minute
+	defaultShippingFeeVND          = domain.MoneyVND("0")
+	defaultMinIOEndpoint           = "localhost:9000"
+	defaultMinIOAccessKey          = "minioadmin"
+	defaultMinIOSecretKey          = "minioadmin"
+	defaultMinIOBucket             = "product-reviews"
+	defaultMinIOUseSSL             = false
+	defaultMinIORequestTimeout     = 10 * time.Second
+	defaultMinIOReconcilerInterval = 15 * time.Minute
+	defaultMinIOGracePeriod        = 60 * time.Minute
 )
 
 var allowedLogLevels = map[string]bool{
@@ -67,6 +83,15 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"LOG_LEVEL",
 		"ORDER_CONFIRM_TIMEOUT",
 		"SHIPPING_FEE_VND",
+		"MINIO_ENDPOINT",
+		"MINIO_ACCESS_KEY",
+		"MINIO_SECRET_KEY",
+		"MINIO_BUCKET",
+		"MINIO_USE_SSL",
+		"MINIO_SSL",
+		"MINIO_REQUEST_TIMEOUT",
+		"MINIO_RECONCILER_INTERVAL",
+		"MINIO_GRACE_PERIOD",
 	}
 
 	for _, key := range keys {
@@ -222,6 +247,101 @@ func LoadWithFile(envFile string) (*Config, error) {
 		}
 	} else {
 		cfg.ShippingFeeVND = defaultShippingFeeVND
+	}
+
+	// 12. MINIO_ENDPOINT
+	minioEndpoint := strings.TrimSpace(v.GetString("MINIO_ENDPOINT"))
+	if minioEndpoint == "" {
+		minioEndpoint = defaultMinIOEndpoint
+	}
+	cfg.MinIOEndpoint = minioEndpoint
+
+	// 13. MINIO_ACCESS_KEY
+	minioAccessKey := strings.TrimSpace(v.GetString("MINIO_ACCESS_KEY"))
+	if minioAccessKey == "" {
+		minioAccessKey = defaultMinIOAccessKey
+	}
+	cfg.MinIOAccessKey = minioAccessKey
+
+	// 14. MINIO_SECRET_KEY
+	minioSecretKey := strings.TrimSpace(v.GetString("MINIO_SECRET_KEY"))
+	if minioSecretKey == "" {
+		minioSecretKey = defaultMinIOSecretKey
+	}
+	cfg.MinIOSecretKey = minioSecretKey
+
+	// 15. MINIO_BUCKET
+	minioBucket := strings.TrimSpace(v.GetString("MINIO_BUCKET"))
+	if minioBucket == "" {
+		minioBucket = defaultMinIOBucket
+	}
+	cfg.MinIOBucket = minioBucket
+
+	// 16. MINIO_USE_SSL / MINIO_SSL
+	if v.IsSet("MINIO_USE_SSL") || v.IsSet("MINIO_SSL") {
+		rawSSL := strings.TrimSpace(v.GetString("MINIO_USE_SSL"))
+		if rawSSL == "" {
+			rawSSL = strings.TrimSpace(v.GetString("MINIO_SSL"))
+		}
+		if rawSSL != "" {
+			useSSL, err := strconv.ParseBool(rawSSL)
+			if err != nil {
+				return nil, fmt.Errorf("config: MINIO_USE_SSL must be a boolean, got %q", rawSSL)
+			}
+			cfg.MinIOUseSSL = useSSL
+		} else {
+			cfg.MinIOUseSSL = defaultMinIOUseSSL
+		}
+	} else {
+		cfg.MinIOUseSSL = defaultMinIOUseSSL
+	}
+
+	// 17. MINIO_REQUEST_TIMEOUT
+	if v.IsSet("MINIO_REQUEST_TIMEOUT") {
+		rawTimeout := strings.TrimSpace(v.GetString("MINIO_REQUEST_TIMEOUT"))
+		if rawTimeout != "" {
+			timeout, err := time.ParseDuration(rawTimeout)
+			if err != nil {
+				return nil, fmt.Errorf("config: MINIO_REQUEST_TIMEOUT must be a duration, got %q", rawTimeout)
+			}
+			cfg.MinIORequestTimeout = timeout
+		} else {
+			cfg.MinIORequestTimeout = defaultMinIORequestTimeout
+		}
+	} else {
+		cfg.MinIORequestTimeout = defaultMinIORequestTimeout
+	}
+
+	// 18. MINIO_RECONCILER_INTERVAL
+	if v.IsSet("MINIO_RECONCILER_INTERVAL") {
+		rawInterval := strings.TrimSpace(v.GetString("MINIO_RECONCILER_INTERVAL"))
+		if rawInterval != "" {
+			interval, err := time.ParseDuration(rawInterval)
+			if err != nil {
+				return nil, fmt.Errorf("config: MINIO_RECONCILER_INTERVAL must be a duration, got %q", rawInterval)
+			}
+			cfg.MinIOReconcilerInterval = interval
+		} else {
+			cfg.MinIOReconcilerInterval = defaultMinIOReconcilerInterval
+		}
+	} else {
+		cfg.MinIOReconcilerInterval = defaultMinIOReconcilerInterval
+	}
+
+	// 19. MINIO_GRACE_PERIOD
+	if v.IsSet("MINIO_GRACE_PERIOD") {
+		rawGrace := strings.TrimSpace(v.GetString("MINIO_GRACE_PERIOD"))
+		if rawGrace != "" {
+			grace, err := time.ParseDuration(rawGrace)
+			if err != nil {
+				return nil, fmt.Errorf("config: MINIO_GRACE_PERIOD must be a duration, got %q", rawGrace)
+			}
+			cfg.MinIOGracePeriod = grace
+		} else {
+			cfg.MinIOGracePeriod = defaultMinIOGracePeriod
+		}
+	} else {
+		cfg.MinIOGracePeriod = defaultMinIOGracePeriod
 	}
 
 	return cfg, nil

@@ -18,18 +18,26 @@ func newOrderHandler(uc *orderuc.UseCase) *orderHandler {
 	return &orderHandler{uc: uc}
 }
 
+type orderItemReviewStateResponse struct {
+	Status         string  `json:"status"`
+	ReviewID       *string `json:"reviewId"`
+	CanEdit        bool    `json:"canEdit"`
+	RemainingEdits int     `json:"remainingEdits"`
+}
+
 type orderItemResponse struct {
-	ID           string              `json:"id"`
-	VariantID    string              `json:"variantId"`
-	ProductID    string              `json:"productId"`
-	BrandName    string              `json:"brandName"`
-	ProductName  string              `json:"productName"`
-	Model        string              `json:"model"`
-	ImageURL     string              `json:"imageUrl"`
-	Options      []domain.CartOption `json:"options"`
-	UnitPriceVND string              `json:"unitPriceVnd"`
-	Quantity     int64               `json:"quantity"`
-	LineTotalVND string              `json:"lineTotalVnd"`
+	ID           string                        `json:"id"`
+	VariantID    string                        `json:"variantId"`
+	ProductID    string                        `json:"productId"`
+	BrandName    string                        `json:"brandName"`
+	ProductName  string                        `json:"productName"`
+	Model        string                        `json:"model"`
+	ImageURL     string                        `json:"imageUrl"`
+	Options      []domain.CartOption           `json:"options"`
+	UnitPriceVND string                        `json:"unitPriceVnd"`
+	Quantity     int64                         `json:"quantity"`
+	LineTotalVND string                        `json:"lineTotalVnd"`
+	ReviewState  *orderItemReviewStateResponse `json:"reviewState,omitempty"`
 }
 
 type orderResponse struct {
@@ -54,6 +62,18 @@ type orderResponse struct {
 	CancellableUntil *time.Time          `json:"cancellableUntil,omitempty"`
 }
 
+func toOrderItemReviewStateResponse(state domain.OrderItemReviewState) *orderItemReviewStateResponse {
+	if state.Status == "" {
+		return nil
+	}
+	return &orderItemReviewStateResponse{
+		Status:         string(state.Status),
+		ReviewID:       state.ReviewID,
+		CanEdit:        state.CanEdit,
+		RemainingEdits: state.RemainingEdits,
+	}
+}
+
 func toOrderResponse(order domain.Order) orderResponse {
 	items := make([]orderItemResponse, len(order.Items))
 	for i, item := range order.Items {
@@ -69,6 +89,7 @@ func toOrderResponse(order domain.Order) orderResponse {
 			UnitPriceVND: string(item.UnitPriceVND),
 			Quantity:     item.Quantity,
 			LineTotalVND: string(item.LineTotalVND),
+			ReviewState:  toOrderItemReviewStateResponse(item.ReviewState),
 		}
 	}
 

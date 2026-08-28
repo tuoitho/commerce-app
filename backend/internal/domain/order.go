@@ -103,6 +103,7 @@ type OrderItem struct {
 	UnitPriceVND MoneyVND
 	Quantity     int64
 	LineTotalVND MoneyVND
+	ReviewState  OrderItemReviewState
 }
 
 type Order struct {

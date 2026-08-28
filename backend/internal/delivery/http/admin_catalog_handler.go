@@ -274,7 +274,7 @@ func (h *adminCatalogHandler) GetProduct(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, false))
+	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, false, domain.ReviewSummary{}))
 }
 
 func (h *adminCatalogHandler) CreateProduct(c *gin.Context) {
@@ -291,7 +291,7 @@ func (h *adminCatalogHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	writeSuccess(c, http.StatusCreated, "Tạo sản phẩm thành công", toDetailResponse(*created, false))
+	writeSuccess(c, http.StatusCreated, "Tạo sản phẩm thành công", toDetailResponse(*created, false, domain.ReviewSummary{}))
 }
 
 func (h *adminCatalogHandler) UpdateProduct(c *gin.Context) {
@@ -308,7 +308,7 @@ func (h *adminCatalogHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	writeSuccess(c, http.StatusOK, "Cập nhật sản phẩm thành công", toDetailResponse(*updated, false))
+	writeSuccess(c, http.StatusOK, "Cập nhật sản phẩm thành công", toDetailResponse(*updated, false, domain.ReviewSummary{}))
 }
 
 func (h *adminCatalogHandler) DeleteProduct(c *gin.Context) {

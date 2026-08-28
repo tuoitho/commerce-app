@@ -38,6 +38,12 @@ var (
 	ErrReturnRequestExists     = errors.New("return request exists")
 	ErrReturnItemLimitExceeded = errors.New("return item limit exceeded")
 	ErrReturnActionNotAllowed  = errors.New("return action not allowed")
+
+	ErrReviewNotEligible      = errors.New("review not eligible")
+	ErrReviewAlreadyExists    = errors.New("review already exists")
+	ErrReviewEditLimitReached = errors.New("review edit limit reached")
+	ErrReviewNotFound         = errors.New("review not found")
+	ErrReviewMediaNotFound    = errors.New("review media not found")
 )
 
 type ValidationError struct {

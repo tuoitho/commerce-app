@@ -16,13 +16,18 @@ type favoriteReader interface {
 	GetFavoriteProductIDs(ctx context.Context, userID string, productIDs []string) ([]string, error)
 }
 
+type reviewSummaryReader interface {
+	GetProductReviewSummary(ctx context.Context, productID string) (*domain.ReviewSummary, error)
+}
+
 type catalogHandler struct {
 	uc        *cataloguc.UseCase
 	favorites favoriteReader
+	reviews   reviewSummaryReader
 }
 
-func newCatalogHandler(uc *cataloguc.UseCase, favorites favoriteReader) *catalogHandler {
-	return &catalogHandler{uc: uc, favorites: favorites}
+func newCatalogHandler(uc *cataloguc.UseCase, favorites favoriteReader, reviews reviewSummaryReader) *catalogHandler {
+	return &catalogHandler{uc: uc, favorites: favorites, reviews: reviews}
 }
 
 type categoryResponse struct {
@@ -63,6 +68,7 @@ type productDetailResponse struct {
 	Active        bool                  `json:"active"`
 	OptionGroups  []optionGroupResponse `json:"optionGroups"`
 	Variants      []variantResponse     `json:"variants"`
+	ReviewSummary domain.ReviewSummary  `json:"reviewSummary"`
 	CreatedAt     time.Time             `json:"createdAt"`
 	UpdatedAt     time.Time             `json:"updatedAt"`
 	Viewer        viewerState           `json:"viewer"`
@@ -311,7 +317,16 @@ func (h *catalogHandler) GetProduct(c *gin.Context) {
 			isFav = true
 		}
 	}
-	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, isFav))
+
+	var reviewSummary domain.ReviewSummary
+	if h.reviews != nil {
+		sum, err := h.reviews.GetProductReviewSummary(c.Request.Context(), product.ID)
+		if err == nil && sum != nil {
+			reviewSummary = *sum
+		}
+	}
+
+	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product, isFav, reviewSummary))
 }
 
 func toSummaryResponse(p domain.Product, isFavorite bool) productSummaryResponse {
@@ -331,7 +346,7 @@ func toSummaryResponse(p domain.Product, isFavorite bool) productSummaryResponse
 	}
 }
 
-func toDetailResponse(p domain.Product, isFavorite bool) productDetailResponse {
+func toDetailResponse(p domain.Product, isFavorite bool, reviewSummary domain.ReviewSummary) productDetailResponse {
 	images := p.ImageURLs
 	if images == nil {
 		images = []string{}
@@ -354,6 +369,7 @@ func toDetailResponse(p domain.Product, isFavorite bool) productDetailResponse {
 		Active:        p.Active,
 		OptionGroups:  toOptionGroupResponses(p.OptionGroups),
 		Variants:      toVariantResponses(p.Variants),
+		ReviewSummary: reviewSummary,
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,
 		Viewer:        viewerState{IsFavorite: isFavorite},

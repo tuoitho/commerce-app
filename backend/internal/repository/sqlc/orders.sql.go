@@ -57,6 +57,23 @@ func (q *Queries) CountOrdersByStatus(ctx context.Context, userID string) ([]Cou
 	return items, nil
 }
 
+const countUnreviewedDeliveredOrderItems = `-- name: CountUnreviewedDeliveredOrderItems :one
+SELECT count(*)::bigint AS count
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE o.user_id = $1
+  AND o.status = 'delivered'
+  AND pr.id IS NULL
+`
+
+func (q *Queries) CountUnreviewedDeliveredOrderItems(ctx context.Context, userID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnreviewedDeliveredOrderItems, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const decrementVariantStock = `-- name: DecrementVariantStock :one
 UPDATE product_variants
 SET stock_quantity = stock_quantity - $1::bigint,
@@ -458,6 +475,148 @@ func (q *Queries) ListOrderItemsByOrderIDs(ctx context.Context, orderIds []strin
 			&i.UnitPriceVnd,
 			&i.Quantity,
 			&i.LineTotalVnd,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrderItemsWithReviewStateByOrderID = `-- name: ListOrderItemsWithReviewStateByOrderID :many
+SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id,
+       oi.brand_name, oi.product_name, oi.model, oi.image_url,
+       oi.options::text AS options,
+       oi.unit_price_vnd::text AS unit_price_vnd,
+       oi.quantity,
+       oi.line_total_vnd::text AS line_total_vnd,
+       o.status AS order_status,
+       pr.id AS review_id,
+       pr.edited_at AS review_edited_at
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE oi.order_id = $1
+ORDER BY oi.id ASC
+`
+
+type ListOrderItemsWithReviewStateByOrderIDRow struct {
+	ID             string
+	OrderID        string
+	VariantID      string
+	ProductID      string
+	BrandName      string
+	ProductName    string
+	Model          string
+	ImageUrl       string
+	Options        string
+	UnitPriceVnd   string
+	Quantity       int64
+	LineTotalVnd   string
+	OrderStatus    string
+	ReviewID       pgtype.UUID
+	ReviewEditedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListOrderItemsWithReviewStateByOrderID(ctx context.Context, orderID string) ([]ListOrderItemsWithReviewStateByOrderIDRow, error) {
+	rows, err := q.db.Query(ctx, listOrderItemsWithReviewStateByOrderID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrderItemsWithReviewStateByOrderIDRow
+	for rows.Next() {
+		var i ListOrderItemsWithReviewStateByOrderIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderID,
+			&i.VariantID,
+			&i.ProductID,
+			&i.BrandName,
+			&i.ProductName,
+			&i.Model,
+			&i.ImageUrl,
+			&i.Options,
+			&i.UnitPriceVnd,
+			&i.Quantity,
+			&i.LineTotalVnd,
+			&i.OrderStatus,
+			&i.ReviewID,
+			&i.ReviewEditedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrderItemsWithReviewStateByOrderIDs = `-- name: ListOrderItemsWithReviewStateByOrderIDs :many
+SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id,
+       oi.brand_name, oi.product_name, oi.model, oi.image_url,
+       oi.options::text AS options,
+       oi.unit_price_vnd::text AS unit_price_vnd,
+       oi.quantity,
+       oi.line_total_vnd::text AS line_total_vnd,
+       o.status AS order_status,
+       pr.id AS review_id,
+       pr.edited_at AS review_edited_at
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE oi.order_id = ANY($1::uuid[])
+ORDER BY oi.order_id, oi.id ASC
+`
+
+type ListOrderItemsWithReviewStateByOrderIDsRow struct {
+	ID             string
+	OrderID        string
+	VariantID      string
+	ProductID      string
+	BrandName      string
+	ProductName    string
+	Model          string
+	ImageUrl       string
+	Options        string
+	UnitPriceVnd   string
+	Quantity       int64
+	LineTotalVnd   string
+	OrderStatus    string
+	ReviewID       pgtype.UUID
+	ReviewEditedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListOrderItemsWithReviewStateByOrderIDs(ctx context.Context, orderIds []string) ([]ListOrderItemsWithReviewStateByOrderIDsRow, error) {
+	rows, err := q.db.Query(ctx, listOrderItemsWithReviewStateByOrderIDs, orderIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrderItemsWithReviewStateByOrderIDsRow
+	for rows.Next() {
+		var i ListOrderItemsWithReviewStateByOrderIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderID,
+			&i.VariantID,
+			&i.ProductID,
+			&i.BrandName,
+			&i.ProductName,
+			&i.Model,
+			&i.ImageUrl,
+			&i.Options,
+			&i.UnitPriceVnd,
+			&i.Quantity,
+			&i.LineTotalVnd,
+			&i.OrderStatus,
+			&i.ReviewID,
+			&i.ReviewEditedAt,
 		); err != nil {
 			return nil, err
 		}

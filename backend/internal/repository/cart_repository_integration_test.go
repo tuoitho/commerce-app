@@ -50,12 +50,16 @@ func TestCartRepositoryIntegration(t *testing.T) {
 	}
 	conn := connectIntegrationDB(t, ctx, dbURL)
 	defer conn.Close(ctx)
-	applyMigration(t, ctx, conn, "000001_create_users.up.sql")
-	applyMigration(t, ctx, conn, "000002_create_catalog.up.sql")
-	applyMigration(t, ctx, conn, "000003_phone_variants_cart.up.sql")
-	applyMigration(t, ctx, conn, "000004_int64_stock_quantity.up.sql")
-	applyMigration(t, ctx, conn, "000005_add_user_roles.up.sql")
-	applyMigration(t, ctx, conn, "000006_add_brand_to_products.up.sql")
+	for _, migration := range []string{
+		"000001_create_users.up.sql",
+		"000002_create_catalog.up.sql",
+		"000003_phone_variants_cart.up.sql",
+		"000004_int64_stock_quantity.up.sql",
+		"000005_add_user_roles.up.sql",
+		"000006_add_brand_to_products.up.sql",
+	} {
+		applyMigration(t, ctx, conn, migration)
+	}
 	seedPath := filepath.Join("..", "..", "db", "seed", "catalog.sql")
 	seedCatalog(t, ctx, conn, seedPath)
 	seedCatalog(t, ctx, conn, seedPath)

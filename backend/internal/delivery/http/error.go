@@ -40,6 +40,16 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 400, "invalid_product_id", "Mã sản phẩm không hợp lệ", nil)
 	case errors.Is(err, domain.ErrProductNotFound):
 		respondError(c, 404, "product_not_found", "Sản phẩm không tồn tại hoặc đã ngừng kinh doanh", nil)
+	case errors.Is(err, domain.ErrReviewNotEligible):
+		respondError(c, 409, "review_not_eligible", "Sản phẩm trong đơn hàng chưa đủ điều kiện đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewAlreadyExists):
+		respondError(c, 409, "review_already_exists", "Sản phẩm trong dòng hàng này đã được đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewEditLimitReached):
+		respondError(c, 409, "review_edit_limit_reached", "Đánh giá này đã hết lượt chỉnh sửa", nil)
+	case errors.Is(err, domain.ErrReviewNotFound):
+		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewMediaNotFound):
+		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
 	case errors.Is(err, domain.ErrEmailInUse):
 		respondError(c, 409, "email_in_use", "Email đã được sử dụng", nil)
 	case errors.Is(err, domain.ErrInvalidCredentials):

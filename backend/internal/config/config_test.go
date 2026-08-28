@@ -22,6 +22,15 @@ func clearEnv() func() {
 		"LOG_LEVEL",
 		"ORDER_CONFIRM_TIMEOUT",
 		"SHIPPING_FEE_VND",
+		"MINIO_ENDPOINT",
+		"MINIO_ACCESS_KEY",
+		"MINIO_SECRET_KEY",
+		"MINIO_BUCKET",
+		"MINIO_USE_SSL",
+		"MINIO_SSL",
+		"MINIO_REQUEST_TIMEOUT",
+		"MINIO_RECONCILER_INTERVAL",
+		"MINIO_GRACE_PERIOD",
 	}
 
 	saved := make(map[string]string)
@@ -80,6 +89,30 @@ func TestConfig_Defaults(t *testing.T) {
 	}
 	if cfg.ShippingFeeVND != "0" {
 		t.Errorf("expected ShippingFeeVND '0', got %q", string(cfg.ShippingFeeVND))
+	}
+	if cfg.MinIOEndpoint != "localhost:9000" {
+		t.Errorf("expected MinIOEndpoint 'localhost:9000', got %q", cfg.MinIOEndpoint)
+	}
+	if cfg.MinIOAccessKey != "minioadmin" {
+		t.Errorf("expected MinIOAccessKey 'minioadmin', got %q", cfg.MinIOAccessKey)
+	}
+	if cfg.MinIOSecretKey != "minioadmin" {
+		t.Errorf("expected MinIOSecretKey 'minioadmin', got %q", cfg.MinIOSecretKey)
+	}
+	if cfg.MinIOBucket != "product-reviews" {
+		t.Errorf("expected MinIOBucket 'product-reviews', got %q", cfg.MinIOBucket)
+	}
+	if cfg.MinIOUseSSL != false {
+		t.Errorf("expected MinIOUseSSL false, got %v", cfg.MinIOUseSSL)
+	}
+	if cfg.MinIORequestTimeout != 10*time.Second {
+		t.Errorf("expected MinIORequestTimeout 10s, got %v", cfg.MinIORequestTimeout)
+	}
+	if cfg.MinIOReconcilerInterval != 15*time.Minute {
+		t.Errorf("expected MinIOReconcilerInterval 15m, got %v", cfg.MinIOReconcilerInterval)
+	}
+	if cfg.MinIOGracePeriod != 60*time.Minute {
+		t.Errorf("expected MinIOGracePeriod 60m, got %v", cfg.MinIOGracePeriod)
 	}
 }
 
@@ -329,6 +362,52 @@ func TestConfig_OrderPlacementConfigs(t *testing.T) {
 	}
 	if cfg.ShippingFeeVND != "30000" {
 		t.Errorf("expected ShippingFeeVND '30000', got %q", string(cfg.ShippingFeeVND))
+	}
+}
+
+func TestConfig_MinIOConfigs(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+
+	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
+	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "minio.internal:9000")
+	os.Setenv("MINIO_ACCESS_KEY", "custom-access-key")
+	os.Setenv("MINIO_SECRET_KEY", "custom-secret-key")
+	os.Setenv("MINIO_BUCKET", "custom-bucket")
+	os.Setenv("MINIO_USE_SSL", "true")
+	os.Setenv("MINIO_REQUEST_TIMEOUT", "30s")
+	os.Setenv("MINIO_RECONCILER_INTERVAL", "5m")
+	os.Setenv("MINIO_GRACE_PERIOD", "30m")
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.MinIOEndpoint != "minio.internal:9000" {
+		t.Errorf("expected MinIOEndpoint 'minio.internal:9000', got %q", cfg.MinIOEndpoint)
+	}
+	if cfg.MinIOAccessKey != "custom-access-key" {
+		t.Errorf("expected MinIOAccessKey 'custom-access-key', got %q", cfg.MinIOAccessKey)
+	}
+	if cfg.MinIOSecretKey != "custom-secret-key" {
+		t.Errorf("expected MinIOSecretKey 'custom-secret-key', got %q", cfg.MinIOSecretKey)
+	}
+	if cfg.MinIOBucket != "custom-bucket" {
+		t.Errorf("expected MinIOBucket 'custom-bucket', got %q", cfg.MinIOBucket)
+	}
+	if cfg.MinIOUseSSL != true {
+		t.Errorf("expected MinIOUseSSL true, got %v", cfg.MinIOUseSSL)
+	}
+	if cfg.MinIORequestTimeout != 30*time.Second {
+		t.Errorf("expected MinIORequestTimeout 30s, got %v", cfg.MinIORequestTimeout)
+	}
+	if cfg.MinIOReconcilerInterval != 5*time.Minute {
+		t.Errorf("expected MinIOReconcilerInterval 5m, got %v", cfg.MinIOReconcilerInterval)
+	}
+	if cfg.MinIOGracePeriod != 30*time.Minute {
+		t.Errorf("expected MinIOGracePeriod 30m, got %v", cfg.MinIOGracePeriod)
 	}
 }
 

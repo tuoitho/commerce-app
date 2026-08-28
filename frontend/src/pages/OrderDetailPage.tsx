@@ -16,13 +16,17 @@ import {
   RefreshCw,
   ShoppingBag,
   ShieldCheck,
+  Star,
+  Edit3,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
-import { ApiError, type Order, type OrderStatus } from '@/api/types'
+import { getOwnedReview } from '@/api/reviews'
+import { ApiError, type Order, type OrderStatus, type OrderItem, type Review } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
 import { ReturnRequestsSection } from '@/components/ReturnRequestsSection'
+import { ReviewFormModal } from '@/components/ReviewFormModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -140,6 +144,47 @@ export function OrderDetailPage() {
   // Dialog state for actions
   const [dialogType, setDialogType] = useState<'cancel' | 'request_cancel' | 'undo_cancel' | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+
+  // Review modal state
+  const [reviewModalState, setReviewModalState] = useState<{
+    open: boolean
+    mode: 'create' | 'edit'
+    orderItem?: OrderItem
+    existingReview?: Review
+  }>({ open: false, mode: 'create' })
+
+  const handleOpenReview = async (item: OrderItem, mode: 'create' | 'edit', reviewId?: string | null) => {
+    if (mode === 'edit' && reviewId) {
+      try {
+        const rev = await getOwnedReview(reviewId)
+        setReviewModalState({
+          open: true,
+          mode: 'edit',
+          orderItem: item,
+          existingReview: rev,
+        })
+      } catch {
+        toastError('Lỗi', 'Không thể tải thông tin đánh giá. Vui lòng thử lại sau.')
+      }
+    } else {
+      setReviewModalState({
+        open: true,
+        mode: 'create',
+        orderItem: item,
+        existingReview: undefined,
+      })
+    }
+  }
+
+  const handleReviewSuccess = () => {
+    success(
+      'Thành công',
+      reviewModalState.mode === 'create'
+        ? 'Đã gửi đánh giá sản phẩm thành công.'
+        : 'Đã cập nhật đánh giá thành công.'
+    )
+    fetchOrderDetail()
+  }
 
   // Redirect if not logged in
   useEffect(() => {
@@ -497,14 +542,50 @@ export function OrderDetailPage() {
                       </div>
                     </div>
 
-                    {/* Price and Quantity */}
-                    <div className="text-right shrink-0">
-                      <div className="font-bold text-slate-900 text-sm sm:text-base tabular-nums">
-                        {formatVND(item.lineTotalVnd)}
+                    {/* Price, Quantity and Review Action */}
+                    <div className="text-right shrink-0 space-y-2">
+                      <div>
+                        <div className="font-bold text-slate-900 text-sm sm:text-base tabular-nums">
+                          {formatVND(item.lineTotalVnd)}
+                        </div>
+                        <div className="text-xs text-slate-500 tabular-nums mt-0.5">
+                          {formatVND(item.unitPriceVnd)} x {item.quantity}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 tabular-nums mt-0.5">
-                        {formatVND(item.unitPriceVnd)} x {item.quantity}
-                      </div>
+
+                      {/* Review Actions for Delivered orders */}
+                      {order.status === 'delivered' && (
+                        <div className="flex items-center justify-end">
+                          {item.reviewState?.status === 'eligible' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReview(item, 'create')}
+                              className="h-8 px-3 text-xs font-semibold text-emerald-700 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 gap-1.5 shadow-2xs"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
+                              <span>Đánh giá</span>
+                            </Button>
+                          )}
+                          {item.reviewState?.status === 'reviewed' && item.reviewState.canEdit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReview(item, 'edit', item.reviewState?.reviewId)}
+                              className="h-8 px-3 text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 gap-1.5 shadow-2xs"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Sửa đánh giá</span>
+                            </Button>
+                          )}
+                          {item.reviewState?.status === 'reviewed' && !item.reviewState.canEdit && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Đã đánh giá</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -807,6 +888,22 @@ export function OrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Review Form Modal */}
+      {reviewModalState.open && (
+        <ReviewFormModal
+          open={reviewModalState.open}
+          onOpenChange={(open) =>
+            setReviewModalState((prev) => ({ ...prev, open }))
+          }
+          mode={reviewModalState.mode}
+          orderId={order.id}
+          orderItem={reviewModalState.orderItem}
+          existingReview={reviewModalState.existingReview}
+          onSuccess={handleReviewSuccess}
+          onRefreshAuthoritativeState={fetchOrderDetail}
+        />
+      )}
     </div>
   )
 }

@@ -183,3 +183,44 @@ UPDATE orders
 SET delivered_at = now(), updated_at = now()
 WHERE id = $1;
 
+-- name: CountUnreviewedDeliveredOrderItems :one
+SELECT count(*)::bigint AS count
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE o.user_id = $1
+  AND o.status = 'delivered'
+  AND pr.id IS NULL;
+
+-- name: ListOrderItemsWithReviewStateByOrderID :many
+SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id,
+       oi.brand_name, oi.product_name, oi.model, oi.image_url,
+       oi.options::text AS options,
+       oi.unit_price_vnd::text AS unit_price_vnd,
+       oi.quantity,
+       oi.line_total_vnd::text AS line_total_vnd,
+       o.status AS order_status,
+       pr.id AS review_id,
+       pr.edited_at AS review_edited_at
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE oi.order_id = $1
+ORDER BY oi.id ASC;
+
+-- name: ListOrderItemsWithReviewStateByOrderIDs :many
+SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id,
+       oi.brand_name, oi.product_name, oi.model, oi.image_url,
+       oi.options::text AS options,
+       oi.unit_price_vnd::text AS unit_price_vnd,
+       oi.quantity,
+       oi.line_total_vnd::text AS line_total_vnd,
+       o.status AS order_status,
+       pr.id AS review_id,
+       pr.edited_at AS review_edited_at
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+WHERE oi.order_id = ANY(@order_ids::uuid[])
+ORDER BY oi.order_id, oi.id ASC;
+

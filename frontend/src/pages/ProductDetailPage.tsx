@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FavoriteButton } from '@/components/FavoriteButton'
+import { ProductReviewsSection } from '@/components/ProductReviewsSection'
 
 // Currency formatter
 function formatVND(value: string | number): string {
@@ -115,32 +116,37 @@ export function ProductDetailPage() {
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [activeTab, setActiveTab] = useState<'specs' | 'highlights' | 'warranty'>('specs')
 
-  // Load product data
-  useEffect(() => {
+  const fetchProduct = useCallback(async () => {
     if (!id) return
     setIsLoading(true)
     setError(null)
-    catalogApi
-      .getProduct(id)
-      .then((data) => {
-        setProduct(data)
-        // Auto-select first available options if options exist
-        if (data && data.optionGroups && data.optionGroups.length > 0) {
+    try {
+      const data = await catalogApi.getProduct(id)
+      setProduct(data)
+      if (data && data.optionGroups && data.optionGroups.length > 0) {
+        setSelectedOptions((prev) => {
+          if (Object.keys(prev).length > 0) return prev
           const initial: Record<string, string> = {}
           data.optionGroups.forEach((g) => {
             if (g.values && g.values.length > 0) {
               initial[g.id] = g.values[0].id
             }
           })
-          setSelectedOptions(initial)
-        }
-      })
-      .catch((err: unknown) => {
-        console.error('Failed to load product', err)
-        setError('Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.')
-      })
-      .finally(() => setIsLoading(false))
+          return initial
+        })
+      }
+    } catch (err: unknown) {
+      console.error('Failed to load product', err)
+      setError('Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.')
+    } finally {
+      setIsLoading(false)
+    }
   }, [id])
+
+  // Load product data
+  useEffect(() => {
+    fetchProduct()
+  }, [fetchProduct])
 
   // Find active variant matching current selections
   const selectedVariant = useMemo<ProductVariant | null>(() => {
@@ -475,11 +481,27 @@ export function ProductDetailPage() {
                     Model: {product.model}
                   </span>
                 )}
-                <div className="flex items-center gap-1 text-xs text-amber-500 font-bold ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    document
+                      .getElementById('product-reviews-section')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                  className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-bold ml-auto transition"
+                >
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span>5.0</span>
-                  <span className="text-slate-400 font-normal">(128 đánh giá)</span>
-                </div>
+                  {product.reviewSummary && product.reviewSummary.averageRating !== null && product.reviewSummary.averageRating !== undefined ? (
+                    <>
+                      <span>{product.reviewSummary.averageRating.toFixed(1)}</span>
+                      <span className="text-slate-400 font-normal">
+                        ({product.reviewSummary.reviewCount} đánh giá)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-normal">Chưa có đánh giá</span>
+                  )}
+                </button>
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
@@ -777,6 +799,13 @@ export function ProductDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Customer Reviews Section */}
+        <ProductReviewsSection
+          productId={product.id}
+          reviewSummary={product.reviewSummary}
+          onReviewUpdated={fetchProduct}
+        />
       </div>
 
       {/* Floating Mobile Sticky Purchase Bar */}

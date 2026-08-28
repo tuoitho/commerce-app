@@ -12,9 +12,10 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnsuc "commerce-backend/internal/usecase/returns"
-	favoriteuc "commerce-backend/internal/usecase/favorite"
+	reviewuc "commerce-backend/internal/usecase/review"
 )
 
 type Dependencies struct {
@@ -26,6 +27,7 @@ type Dependencies struct {
 	Order        *orderuc.UseCase
 	Returns      *returnsuc.UseCase
 	Favorites    *favoriteuc.UseCase
+	Review       *reviewuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -33,6 +35,12 @@ type Dependencies struct {
 }
 
 func NewRouter(router *gin.Engine, deps Dependencies) {
+	reviewHandler := newReviewHandler(deps.Review)
+	mediaHandler := newMediaHandler(deps.Review)
+
+	// Public media proxy route
+	router.GET("/media/reviews/:mediaId", mediaHandler.GetPublicMedia)
+
 	api := router.Group("/api/v1")
 
 	authHandler := newAuthHandler(deps.UseCase, deps.RefreshTTL, deps.CookieSecure)
@@ -47,7 +55,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		auth.GET("/me", guard.AuthRequired, authHandler.Me)
 	}
 
-	catalogHandler := newCatalogHandler(deps.Catalog, deps.Favorites)
+	catalogHandler := newCatalogHandler(deps.Catalog, deps.Favorites, deps.Review)
 	api.GET("/categories", catalogHandler.ListCategories)
 	api.GET("/brands", catalogHandler.ListBrands)
 	products := api.Group("/products")
@@ -56,6 +64,14 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		products.GET("", catalogHandler.ListProducts)
 		products.GET("/featured", catalogHandler.ListFeaturedProducts)
 		products.GET("/:id", catalogHandler.GetProduct)
+		products.GET("/:id/reviews", reviewHandler.ListProductReviews)
+	}
+
+	reviews := api.Group("/reviews")
+	reviews.Use(guard.RequireCustomerAuthForReviews)
+	{
+		reviews.GET("/:reviewId", reviewHandler.GetOwnedReview)
+		reviews.PUT("/:reviewId", reviewHandler.EditOwnedReview)
 	}
 
 	favoriteHandler := newFavoriteHandler(deps.Favorites)
@@ -108,6 +124,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.POST("/:id/return-requests", returnHandler.Create)
 		orders.GET("/:id/return-requests", returnHandler.ListByOrder)
 		orders.POST("/:id/return-requests/:requestId/cancel", returnHandler.Cancel)
+		orders.POST("/:id/items/:orderItemId/review", guard.RequireCustomerAuthForReviews, reviewHandler.Create)
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)

@@ -1,4 +1,12 @@
-.PHONY: backend frontend frontend-admin admin db-up seed run test build
+.PHONY: backend frontend frontend-admin admin db-up seed compose-up compose-down run test build
+
+## Start infrastructure services (PostgreSQL and MinIO).
+compose-up:
+	docker compose -f deployment/docker-compose.yml up -d
+
+## Stop infrastructure services.
+compose-down:
+	docker compose -f deployment/docker-compose.yml down
 
 ## Apply database migrations against the local backend DB.
 db-up:

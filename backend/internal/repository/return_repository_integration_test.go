@@ -55,6 +55,8 @@ func TestReturnRepository_Integration(t *testing.T) {
 		"000008_category_admin_index.up.sql",
 		"000009_order_placement.up.sql",
 		"000010_order_returns.up.sql",
+		"000011_product_favorites.up.sql",
+		"000012_product_reviews.up.sql",
 	} {
 		applyMigration(t, ctx, conn, migration)
 	}

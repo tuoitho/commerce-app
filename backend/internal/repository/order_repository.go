@@ -273,6 +273,39 @@ func (r *OrderRepository) Create(ctx context.Context, userID string, addressID s
 	return order, nil
 }
 
+func computeReviewStateFromNullable(orderStatus string, reviewID pgtype.UUID, reviewEditedAt pgtype.Timestamptz) domain.OrderItemReviewState {
+	if reviewID.Valid {
+		rID := uuid.UUID(reviewID.Bytes).String()
+		canEdit := !reviewEditedAt.Valid
+		remainingEdits := 0
+		if canEdit {
+			remainingEdits = 1
+		}
+		return domain.OrderItemReviewState{
+			Status:         domain.OrderItemReviewReviewed,
+			ReviewID:       &rID,
+			CanEdit:        canEdit,
+			RemainingEdits: remainingEdits,
+		}
+	}
+
+	if orderStatus == string(domain.OrderStatusDelivered) {
+		return domain.OrderItemReviewState{
+			Status:         domain.OrderItemReviewEligible,
+			ReviewID:       nil,
+			CanEdit:        false,
+			RemainingEdits: 0,
+		}
+	}
+
+	return domain.OrderItemReviewState{
+		Status:         domain.OrderItemReviewIneligible,
+		ReviewID:       nil,
+		CanEdit:        false,
+		RemainingEdits: 0,
+	}
+}
+
 func (r *OrderRepository) GetByID(ctx context.Context, userID, orderID string) (*domain.Order, error) {
 	if _, err := uuid.Parse(orderID); err != nil {
 		return nil, domain.ErrOrderNotFound
@@ -293,7 +326,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, userID, orderID string) (
 		return nil, err
 	}
 
-	itemRows, err := q.ListOrderItemsByOrderID(ctx, orderID)
+	itemRows, err := q.ListOrderItemsWithReviewStateByOrderID(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -318,6 +351,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, userID, orderID string) (
 			UnitPriceVND: domain.MoneyVND(row.UnitPriceVnd),
 			Quantity:     row.Quantity,
 			LineTotalVND: domain.MoneyVND(row.LineTotalVnd),
+			ReviewState:  computeReviewStateFromNullable(row.OrderStatus, row.ReviewID, row.ReviewEditedAt),
 		}
 	}
 
@@ -388,7 +422,7 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID string, bucket 
 		orderIDs[i] = row.ID
 	}
 
-	itemRows, err := q.ListOrderItemsByOrderIDs(ctx, orderIDs)
+	itemRows, err := q.ListOrderItemsWithReviewStateByOrderIDs(ctx, orderIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +447,7 @@ func (r *OrderRepository) ListByUser(ctx context.Context, userID string, bucket 
 			UnitPriceVND: domain.MoneyVND(row.UnitPriceVnd),
 			Quantity:     row.Quantity,
 			LineTotalVND: domain.MoneyVND(row.LineTotalVnd),
+			ReviewState:  computeReviewStateFromNullable(row.OrderStatus, row.ReviewID, row.ReviewEditedAt),
 		}
 		itemsByOrderID[row.OrderID] = append(itemsByOrderID[row.OrderID], item)
 	}
@@ -481,10 +516,14 @@ func (r *OrderRepository) StatsByUser(ctx context.Context, userID string) (domai
 			stats.AwaitingPickup += count
 		case domain.OrderStatusShipped:
 			stats.AwaitingDelivery += count
-		case domain.OrderStatusDelivered:
-			stats.AwaitingReview += count
 		}
 	}
+
+	unreviewedItemsCount, err := q.CountUnreviewedDeliveredOrderItems(ctx, userID)
+	if err != nil {
+		return domain.OrderStats{}, err
+	}
+	stats.AwaitingReview = int(unreviewedItemsCount)
 
 	return stats, nil
 }

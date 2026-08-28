@@ -468,6 +468,21 @@ export function OrderHistoryPage() {
                                 ))}
                               </div>
                             )}
+
+                            {/* Review status badge for delivered orders */}
+                            {order.status === 'delivered' && (
+                              <div className="pt-1">
+                                {item.reviewState?.status === 'eligible' ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md">
+                                    Chưa đánh giá
+                                  </span>
+                                ) : item.reviewState?.status === 'reviewed' ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                                    Đã đánh giá
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                         </div>
 

@@ -71,6 +71,35 @@ func (g *guard) RequireCustomerAuthForFavorites(c *gin.Context) {
 	c.Next()
 }
 
+func (g *guard) RequireCustomerAuthForReviews(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để đánh giá sản phẩm", nil)
+		c.Abort()
+		return
+	}
+	tokenStr, ok := strings.CutPrefix(authHeader, bearerPrefix)
+	if !ok || strings.TrimSpace(tokenStr) == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để đánh giá sản phẩm", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(tokenStr)
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+		c.Abort()
+		return
+	}
+	if role != domain.RoleCustomer && role != "" {
+		respondError(c, http.StatusForbidden, "forbidden", "Bạn không có quyền đánh giá sản phẩm", nil)
+		c.Abort()
+		return
+	}
+	c.Set(contextUserKey, userID)
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
 func (g *guard) OptionalCustomerAuth(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {

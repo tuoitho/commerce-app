@@ -157,6 +157,7 @@ export interface ProductDetail {
   active?: boolean
   optionGroups: OptionGroup[]
   variants: ProductVariant[]
+  reviewSummary?: ReviewSummary
   createdAt: string
   updatedAt: string
   viewer?: ViewerState
@@ -267,6 +268,15 @@ export type OrderStatusBucket =
   | 'returns'
   | 'cancelled'
 
+export type OrderItemReviewStatus = 'ineligible' | 'eligible' | 'reviewed'
+
+export interface OrderItemReviewState {
+  status: OrderItemReviewStatus
+  reviewId?: string | null
+  canEdit: boolean
+  remainingEdits: number
+}
+
 export interface OrderItem {
   id: string
   variantId: string
@@ -279,6 +289,7 @@ export interface OrderItem {
   unitPriceVnd: string
   quantity: number
   lineTotalVnd: string
+  reviewState?: OrderItemReviewState
 }
 
 export interface Order {
@@ -321,4 +332,83 @@ export interface CreateOrderInput {
   addressId: string
   lines: OrderLineInput[]
 }
+
+// Product Reviews
+export interface ReviewSummary {
+  averageRating: number | null
+  reviewCount: number
+}
+
+export type ReviewMediaType = 'image' | 'video'
+
+export interface ReviewMedia {
+  id: string
+  type: ReviewMediaType
+  mimeType: string
+  sizeBytes: number
+  position: number
+  url: string
+  createdAt?: string
+}
+
+export interface PurchasedOption {
+  groupLabel: string
+  valueLabel: string
+}
+
+export interface ReviewViewerState {
+  isOwner: boolean
+  canEdit: boolean
+  remainingEdits: number
+}
+
+export interface Review {
+  id: string
+  orderItemId?: string
+  productId: string
+  variantId: string
+  purchasedOptions: PurchasedOption[]
+  rating: number
+  comment: string
+  media: ReviewMedia[]
+  verifiedPurchase: boolean
+  authorLabel: string
+  createdAt: string
+  updatedAt: string
+  viewer?: ReviewViewerState | null
+}
+
+export interface CreateReviewMediaItem {
+  source: 'upload'
+  uploadIndex: number
+  sha256: string
+  sizeBytes: number
+}
+
+export interface EditReviewMediaExistingItem {
+  source: 'existing'
+  mediaId: string
+}
+
+export interface EditReviewMediaUploadItem {
+  source: 'upload'
+  uploadIndex: number
+  sha256: string
+  sizeBytes: number
+}
+
+export type EditReviewMediaItem = EditReviewMediaExistingItem | EditReviewMediaUploadItem
+
+export interface CreateReviewPayload {
+  rating: number
+  comment?: string
+  media?: CreateReviewMediaItem[]
+}
+
+export interface EditReviewPayload {
+  rating: number
+  comment?: string
+  media?: EditReviewMediaItem[]
+}
+
 

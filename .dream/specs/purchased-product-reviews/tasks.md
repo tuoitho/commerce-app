@@ -66,8 +66,10 @@ verification:
     scope: MinIO private bucket, immediate public revocation, reconciler deletion bound using shortened test schedule
   - type: typecheck
     scope: make -C backend gen && make -C backend vet
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
+  PURCHASED-REVIEW-MEDIA: 1
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-007`, `PURCHASED-REVIEW-API-008`, `PURCHASED-REVIEW-API-009`, `PURCHASED-REVIEW-API-016`, `PURCHASED-REVIEW-API-021`, `PURCHASED-REVIEW-API-022`, `PURCHASED-REVIEW-API-031`, `PURCHASED-REVIEW-API-044`, `PURCHASED-REVIEW-API-045`, `PURCHASED-REVIEW-API-046`.
@@ -136,8 +138,10 @@ verification:
     scope: multipart limits, concurrent create/edit, MinIO failure cleanup, raw 200/206/304/404/416/503
   - type: typecheck
     scope: make -C backend test && make -C backend vet
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
+  PURCHASED-REVIEW-MEDIA: 1
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-001` through `PURCHASED-REVIEW-API-017`, `PURCHASED-REVIEW-API-027` through `PURCHASED-REVIEW-API-035`, `PURCHASED-REVIEW-API-038`, `PURCHASED-REVIEW-API-041`, `PURCHASED-REVIEW-API-048`, `PURCHASED-REVIEW-API-049`, `PURCHASED-REVIEW-API-052`, `PURCHASED-REVIEW-API-053`, `PURCHASED-REVIEW-API-054`, `PURCHASED-REVIEW-MEDIA-001` through `PURCHASED-REVIEW-MEDIA-009`.
@@ -191,8 +195,9 @@ verification:
     scope: stable updatedAt/id pagination, anonymous/owner viewer state, variant snapshot, quantity-one pending count
   - type: typecheck
     scope: make -C backend test && make -C backend vet
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-018` through `PURCHASED-REVIEW-API-026`, `PURCHASED-REVIEW-API-036`, `PURCHASED-REVIEW-API-037`, `PURCHASED-REVIEW-API-039`, `PURCHASED-REVIEW-API-040`, `PURCHASED-REVIEW-API-044`, `PURCHASED-REVIEW-API-047`.
@@ -251,8 +256,10 @@ verification:
     scope: rating keyboard control, media picker/reorder/remove, one-edit warning, validation, timeout reload before retry
   - type: typecheck
     scope: npm run lint && npm test && npm run build in frontend
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
+  PURCHASED-REVIEW-MEDIA: 1
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-005`, `PURCHASED-REVIEW-API-006`, `PURCHASED-REVIEW-API-010`, `PURCHASED-REVIEW-API-012`, `PURCHASED-REVIEW-API-014`, `PURCHASED-REVIEW-API-029`, `PURCHASED-REVIEW-API-031`, `PURCHASED-REVIEW-API-052`, `PURCHASED-REVIEW-API-053`.
@@ -302,8 +309,10 @@ verification:
     scope: public product review pagination and media interaction
   - type: visual
     scope: representative mobile and desktop product detail widths
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
+  PURCHASED-REVIEW-MEDIA: 1
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-018` through `PURCHASED-REVIEW-API-022`, `PURCHASED-REVIEW-API-029`, `PURCHASED-REVIEW-API-040`, `PURCHASED-REVIEW-API-044`, `PURCHASED-REVIEW-API-047`, `PURCHASED-REVIEW-MEDIA-001` through `PURCHASED-REVIEW-MEDIA-009`.
@@ -360,8 +369,9 @@ verification:
     scope: safe login return and create/edit flow from delivered order item
   - type: visual
     scope: order detail review actions on mobile and desktop
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
 ```
 
 **Acceptance scenarios:** `PURCHASED-REVIEW-API-001` through `PURCHASED-REVIEW-API-004`, `PURCHASED-REVIEW-API-009`, `PURCHASED-REVIEW-API-010`, `PURCHASED-REVIEW-API-013` through `PURCHASED-REVIEW-API-017`, `PURCHASED-REVIEW-API-023` through `PURCHASED-REVIEW-API-026`, `PURCHASED-REVIEW-API-036`, `PURCHASED-REVIEW-API-037`, `PURCHASED-REVIEW-API-038`.
@@ -429,8 +439,10 @@ verification:
     scope: product and order surfaces at representative mobile and desktop widths
   - type: typecheck
     scope: root make test && root make build after make db-up
-status: pending
-verified_against: {}
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 2
+  PURCHASED-REVIEW-MEDIA: 1
 ```
 
 **Acceptance scenarios:** toàn bộ scenario trong `contracts/scenarios.yaml` revision 1.
