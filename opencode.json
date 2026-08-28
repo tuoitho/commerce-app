@@ -5,7 +5,7 @@
   ],
   "agent": {
     "general": {
-        "model": "opencode/deepseek-v4-flash-free"
+        // "model": "opencode/deepseek-v4-flash-free"
 
       // "model": "openai/gpt-5.6-luna-fast"
     }
