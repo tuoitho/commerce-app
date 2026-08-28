@@ -18,7 +18,7 @@ Shared behavior is frozen before parallel implementation. Implementation context
 Require an approved planning baseline under `.dream/specs/<feature>/`:
 - Approved `requirements.md` (with stable REQ, INV, AC IDs)
 - Approved `design.md` (with verification proof strategy)
-- Frozen contracts in `contracts/manifest.yaml` (when shared boundaries exist)
+- Frozen contracts in `contracts/` (when shared boundaries exist)
 - Approved `tasks.md` DAG
 - Passed specification review (`reviewing-feature-spec`)
 

@@ -13,7 +13,7 @@ Transform approved requirements into `.dream/specs/<feature>/design.md`.
 - responsibility and data ownership;
 - relevant upstream/downstream dependencies;
 - security, transaction, consistency, and failure boundaries;
-- which cross-component interfaces require executable contracts;
+- which cross-component interfaces require shared contracts;
 - verification strategy and proof selection for each behavior;
 - material technical decisions whose change would affect another owner.
 
@@ -50,7 +50,7 @@ Requirement IDs traced to boundary: [REQ-...]
 Verification / Proof level: [unit | integration-db | contract | component | browser | visual]
 ```
 
-Do not define every request/response field here. Detailed shared schemas, statuses, examples, and scenarios belong to `authoring-executable-contracts` when a contract artifact is required.
+Do not define every request/response field here. Detailed boundary shapes, statuses, examples, and semantic rules belong to `authoring-shared-contracts` when a shared contract is required.
 
 ## Design gate
 

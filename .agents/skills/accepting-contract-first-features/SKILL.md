@@ -16,7 +16,7 @@ Use fresh context for final acceptance.
 Read:
 
 - approved `requirements.md` and `design.md`;
-- current frozen contract manifest in `contracts/manifest.yaml` (when applicable);
+- current frozen contracts in `contracts/` (when applicable);
 - `tasks.md` with task status and `verified_against` revisions;
 - open/closed CCRs in `changes/`;
 - review findings in `evidence/workstreams/`;
@@ -44,7 +44,7 @@ Produce a concise verdict: `ACCEPTED` or `BLOCKED`, followed by evidence referen
 
 **Verdict:** ACCEPTED | BLOCKED
 **Feature:** <feature>
-**Contract Baseline:** <manifest-summary>
+**Contract Baseline:** <contract-summary>
 **Feature Verification Report:** `.dream/specs/<feature>/evidence/feature-verification.md` (Status: Verified)
 
 ## Evidence Summary

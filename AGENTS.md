@@ -17,7 +17,7 @@
   `.dream/specs/<feature>/design.md`, and
   `.dream/specs/<feature>/tasks.md`.
 
-  Governed features may additionally contain executable shared contracts,
+  Governed features may additionally contain shared contracts,
   contract revisions, and verification evidence under the same feature
   directory. Requirements define behavioral authority, design defines
   architectural authority, frozen contracts define shared implementation

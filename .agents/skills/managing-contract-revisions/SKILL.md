@@ -18,11 +18,11 @@ A CCR records:
 - reason and evidence;
 - current contract/revision;
 - affected requirements/design decisions;
-- proposed semantic/schema change;
+- proposed semantic/behavior change;
 - compatibility (`additive`, `breaking`, `semantic`);
 - affected providers, consumers, tasks, and integration scenarios.
 
-If the requested behavior is not supported by approved requirements, update requirements first. If it changes responsibility/architecture, update design first. Then author and review a new contract revision using the normal contract skills (`authoring-executable-contracts` and `reviewing-and-freezing-contracts`).
+If the requested behavior is not supported by approved requirements, update requirements first. If it changes responsibility/architecture, update design first. Then author and review a new contract revision using the normal contract skills (`authoring-shared-contracts` and `reviewing-and-freezing-contracts`).
 
 ## Invalidation by Contract Role
 
@@ -43,7 +43,7 @@ INT-02 (role: verifier) → INVALIDATED
 BE-01 (contracts: [])   → unchanged
 ```
 
-After the new revision is frozen in `contracts/manifest.yaml`:
+After the new revision is frozen in the contract file(s) under `contracts/`:
 1. Route reopened tasks back to their persistent workstream owners.
 2. Rerun their task gates (`verifying-task-gates`).
 3. Rerun affected runtime integration scenarios (`verifying-runtime-integration`).

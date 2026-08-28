@@ -25,7 +25,7 @@ A task is a bounded observable outcome, not a coding recipe. Each task MUST cont
 - `contracts`: list of contract references with role (`provider`, `consumer`, `verifier`), or `[]` if no shared contract applies;
 - `depends_on`: list of task IDs that must complete first;
 - `risk`: `normal` or `high`;
-- `verification`: list of deterministic checks matching the design's proof strategy;
+- `verification`: list of deterministic checks matching the design's proof strategy (`scenario` references a covered contract example in `contracts/<contract-id>.md` or a REQ/AC mapping);
 - `status`: `pending`, `in_progress`, `completed`, `stale`, or `reopened`;
 - `verified_against`: map of contract revisions verified upon completion.
 

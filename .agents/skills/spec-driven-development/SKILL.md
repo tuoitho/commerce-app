@@ -21,9 +21,7 @@ Three canonical planning documents:
 
 Additional governed artifacts when applicable:
 .dream/specs/<feature>/contracts/
-├── manifest.yaml
-├── api.openapi.yaml
-└── scenarios.yaml
+└── <contract-id>.md
 .dream/specs/<feature>/changes/
 └── CCR-<ID>.md
 .dream/specs/<feature>/evidence/
@@ -57,7 +55,7 @@ If a feature directory already exists, read it and continue from the first missi
                  yes            no
                   │              │
                   ▼              │
-       authoring-executable-     │
+       authoring-shared-         │
              contracts           │
                   │              │
                   ▼              │
@@ -100,7 +98,7 @@ If a feature directory already exists, read it and continue from the first missi
 
 7. **Contract Authoring & Freezing (when shared boundaries exist):**
    - If the approved design identifies shared boundaries (e.g. cross-workstream, frontend-backend, service-to-service, public interfaces):
-     1. Load `authoring-executable-contracts` to create contract schemas, scenarios, and manifest in `contracts/`.
+     1. Load `authoring-shared-contracts` to author Markdown shared contracts in `contracts/`.
      2. Load `reviewing-and-freezing-contracts` to review draft contracts and freeze them (`FROZEN`).
    - If no shared boundary is required (e.g., internal domain feature, single-component refactor): do NOT author artificial contract files. Proceed directly to task planning.
 

@@ -28,7 +28,7 @@ Read:
 
 - `requirements.md` (with stable REQ, INV, and AC IDs)
 - `design.md` (with boundaries and proof obligations)
-- `contracts/` (manifest, schemas, scenarios)
+- `contracts/` (frozen shared-contract files)
 - `tasks.md` (with completed status, roles, and verified revisions)
 - Task evidence files under `evidence/tasks/*.md`
 - Workstream review files under `evidence/workstreams/*.yaml`

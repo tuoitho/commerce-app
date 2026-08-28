@@ -29,13 +29,13 @@ depends_on: []
 risk: normal # normal | high
 verification:
   - type: provider-contract # provider-contract | consumer-contract | unit | integration-db | component | typecheck
-    scenario: <SCENARIO-ID>
+    scenario: <SCENARIO-ID or contract example from contracts/<id>.md>
     scope: <scope-or-command>
 status: pending
 verified_against: {}
 ```
 
-**Acceptance scenarios:** `<SCENARIO-ID>`, `<SCENARIO-ID>`
+**Contract examples / acceptance checks:** `<SCENARIO-ID or contract example>`, `<SCENARIO-ID or contract example>`
 
 **Architectural constraints:** only shared/material constraints from `design.md`.
 

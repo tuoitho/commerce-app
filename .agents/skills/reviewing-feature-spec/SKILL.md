@@ -27,7 +27,7 @@ Contracts (SHARED INTERFACES & SCENARIOS)
 Tasks DAG (OWNERSHIP / ROLES / VERIFICATION)
 ```
 
-Note: Detailed low-level contract schemas are reviewed by `reviewing-and-freezing-contracts`. This skill focuses on **cross-phase integration and completeness**.
+Note: Detailed contract semantics are reviewed by `reviewing-and-freezing-contracts`. This skill focuses on **cross-phase integration and completeness**.
 
 ## Review Checks
 
@@ -45,8 +45,8 @@ Note: Detailed low-level contract schemas are reviewed by `reviewing-and-freezin
 - State ownership, failure semantics, and security boundaries are explicit.
 
 ### 3. Contract Alignment (when contracts exist)
-- All shared boundaries requiring contracts have corresponding frozen contract definitions in `contracts/manifest.yaml`.
-- Scenarios in `scenarios.yaml` cover normal and state-dependent/failure behaviors mapped to requirement IDs.
+- All shared boundaries requiring contracts have corresponding frozen contract definitions under `contracts/` (`contracts/<contract-id>.md`).
+- Contract Rules and Contract Examples cover normal, state-dependent, and failure behaviors mapped to requirement IDs.
 
 ### 4. Task Breakdown & Traceability
 - **Complete REQ & AC Coverage:** Every approved `REQ` and `AC` is covered by at least one implementation task.

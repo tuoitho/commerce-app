@@ -9,32 +9,39 @@ Review draft contracts independently from implementation code.
 
 ## Review contract
 
-For every contract revision verify:
+For every contract revision verify the seven semantic questions:
 
-1. Traceability — every scenario maps to approved requirements; every boundary requirement has contract coverage.
-2. Completeness — success, material failures, auth/caller context, and state-dependent behavior are explicit.
-3. Consistency — schema, examples, statuses, names, and semantics agree.
-4. Independence — consumer and provider could implement without reading each other's code.
-5. Compatibility — assumptions about unknown fields, optionality, defaults, and versioning are explicit.
-6. Testability — scenarios can become consumer/provider/integration assertions.
+1. **Shared understanding** — do provider and consumer read the same input/output shape and meaning from this contract?
+2. **Success behavior** — is the success status and returned data explicit for every operation?
+3. **Material failures** — is every material failure status and its error coding (`error.code`, `error.fields`) explicit?
+4. **Auth / viewer / state semantics** — are caller context, viewer-dependent state, and state transitions that change a response explicit?
+5. **Misinterpretation risk** — is there any behavior two agents could reasonably implement differently? Contract Examples should pin these down.
+6. **Compatibility** — if this revision changes semantics, is the change and its coordinated-release requirement explicit?
+7. **Traceability** — does every header requirement cover defined behavior, and is every operating behavior traceable to requirements or design authority?
 
-## Canonical Reference
-
-**REQUIRED SUB-SKILL:** Use `authoring-executable-contracts` for the canonical contract manifest format (`references/contract-manifest.template.yaml`) and scenarios format (`references/scenarios.template.yaml`).
+**Do not block on contract tooling mechanics.** Overlay merge, OpenAPI lint, `$ref` resolution, or scenario-file shape are not review subjects unless the repository uses the machine-readable artifact as its productive source of truth (e.g. codegen). An executable rollout scenario is not a blocking requirement unless version-skew compatibility is a genuine deployment requirement of the feature.
 
 ## Findings
 
 Classify findings as `contract_defect`, `requirement_gap`, `design_gap`, or `non_blocking_suggestion`. Do not resolve a requirement/design ambiguity by silently inventing contract behavior.
 
-When blocking findings are resolved, update the manifest entry in `.dream/specs/<feature>/contracts/manifest.yaml` to mark the contract `FROZEN`:
+When blocking findings are resolved, update `.dream/specs/<feature>/contracts/<contract-id>.md` to mark the revision `FROZEN`:
 
-```yaml
-id: PRODUCT-DETAIL
-revision: 3
-status: FROZEN
-requirements: [REQ-PRODUCT-01, REQ-PRODUCT-07]
-providers: [backend-product]
-consumers: [frontend-product-detail]
+```markdown
+# <CONTRACT-ID>
+
+Revision: 2
+Status: FROZEN
+
+Requirements:
+- REQ-REVIEW-03
+- REQ-REVIEW-05
+
+Provider:
+- backend
+
+Consumers:
+- frontend
 ```
 
 A frozen revision is immutable during implementation. Later changes create a new revision through `managing-contract-revisions`; they do not rewrite history.
