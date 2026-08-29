@@ -31,6 +31,8 @@ type mockReviewRepoForHTTP struct {
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
 	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
 	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
+	getAdminReviewsFn func(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error)
+	updateAdminReplyFn func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error)
 }
 
 func (m *mockReviewRepoForHTTP) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -608,9 +610,15 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 
 
 func (m *mockReviewRepoForHTTP) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	if m.getAdminReviewsFn != nil {
+		return m.getAdminReviewsFn(ctx, ratingFilter, hasReplyFilter, page, limit)
+	}
 	return &domain.AdminReviewsResult{}, nil
 }
 
 func (m *mockReviewRepoForHTTP) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	if m.updateAdminReplyFn != nil {
+		return m.updateAdminReplyFn(ctx, reviewID, reply)
+	}
 	return &domain.Review{}, nil
 }

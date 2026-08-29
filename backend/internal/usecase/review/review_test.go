@@ -23,6 +23,8 @@ type mockReviewRepo struct {
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
 	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
 	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
+	getAdminReviewsFn func(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error)
+	updateAdminReplyFn func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error)
 }
 
 func (m *mockReviewRepo) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -77,6 +79,20 @@ func (m *mockReviewRepo) GetPublicReviewsByProductID(ctx context.Context, produc
 func (m *mockReviewRepo) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
 	if m.getUserReviewsFn != nil {
 		return m.getUserReviewsFn(ctx, userID, ratingFilter, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepo) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	if m.getAdminReviewsFn != nil {
+		return m.getAdminReviewsFn(ctx, ratingFilter, hasReplyFilter, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepo) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	if m.updateAdminReplyFn != nil {
+		return m.updateAdminReplyFn(ctx, reviewID, reply)
 	}
 	return nil, nil
 }
@@ -378,3 +394,84 @@ func TestGetUserReviews_UseCase(t *testing.T) {
 		assert.Equal(t, int16(5), capturedRating)
 	})
 }
+
+func TestAdminReviews_UseCase(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("UpdateAdminReply - empty string returns validation error", func(t *testing.T) {
+		repo := &mockReviewRepo{}
+		uc := NewReviewUseCase(repo, nil, nil)
+		emptyReply := "   "
+		_, err := uc.UpdateAdminReply(ctx, "rev-1", &emptyReply)
+		require.Error(t, err)
+		var valErr *domain.ValidationError
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "reply")
+	})
+
+	t.Run("UpdateAdminReply - exceeds max comment length", func(t *testing.T) {
+		repo := &mockReviewRepo{}
+		uc := NewReviewUseCase(repo, nil, nil)
+		longReply := string(make([]rune, domain.MaxReviewCommentLength+1))
+		_, err := uc.UpdateAdminReply(ctx, "rev-1", &longReply)
+		require.Error(t, err)
+		var valErr *domain.ValidationError
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "reply")
+	})
+
+	t.Run("UpdateAdminReply - success with trimmed reply", func(t *testing.T) {
+		var capturedReply *string
+		var capturedID string
+		repo := &mockReviewRepo{
+			updateAdminReplyFn: func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+				capturedID = reviewID
+				capturedReply = reply
+				return &domain.Review{ID: reviewID, AdminReply: reply}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		reply := "  Cảm ơn bạn đã phản hồi!  "
+		res, err := uc.UpdateAdminReply(ctx, "rev-1", &reply)
+		require.NoError(t, err)
+		assert.Equal(t, "rev-1", capturedID)
+		require.NotNil(t, capturedReply)
+		assert.Equal(t, "Cảm ơn bạn đã phản hồi!", *capturedReply)
+		assert.Equal(t, "Cảm ơn bạn đã phản hồi!", *res.AdminReply)
+	})
+
+	t.Run("UpdateAdminReply - delete reply by passing nil", func(t *testing.T) {
+		var capturedReply *string
+		repo := &mockReviewRepo{
+			updateAdminReplyFn: func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+				capturedReply = reply
+				return &domain.Review{ID: reviewID, AdminReply: nil}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.UpdateAdminReply(ctx, "rev-1", nil)
+		require.NoError(t, err)
+		assert.Nil(t, capturedReply)
+		assert.Nil(t, res.AdminReply)
+	})
+
+	t.Run("GetAdminReviews - delegates to repo", func(t *testing.T) {
+		repo := &mockReviewRepo{
+			getAdminReviewsFn: func(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+				return &domain.AdminReviewsResult{
+					Reviews: []domain.AdminReview{
+						{ID: "rev-1", Rating: 5, Comment: "Great!"},
+					},
+					Total: 1,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.GetAdminReviews(ctx, 5, "yes", 1, 10)
+		require.NoError(t, err)
+		require.Len(t, res.Reviews, 1)
+		assert.Equal(t, "rev-1", res.Reviews[0].ID)
+		assert.Equal(t, int64(1), res.Total)
+	})
+}
+

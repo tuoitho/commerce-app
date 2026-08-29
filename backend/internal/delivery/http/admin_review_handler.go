@@ -28,7 +28,7 @@ func (h *AdminReviewHandler) ListReviews(c *gin.Context) {
 
 	result, err := h.reviewUC.GetAdminReviews(ctx, int16(ratingFilter), hasReplyFilter, page, limit)
 	if err != nil {
-		c.Error(err)
+		writeError(c, err)
 		return
 	}
 
@@ -59,7 +59,7 @@ func (h *AdminReviewHandler) UpdateReply(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.Error(domain.NewValidationError(map[string]string{
+		writeError(c, domain.NewValidationError(map[string]string{
 			"body": "Định dạng không hợp lệ",
 		}))
 		return
@@ -67,7 +67,7 @@ func (h *AdminReviewHandler) UpdateReply(c *gin.Context) {
 
 	updated, err := h.reviewUC.UpdateAdminReply(ctx, reviewID, &req.Reply)
 	if err != nil {
-		c.Error(err)
+		writeError(c, err)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *AdminReviewHandler) DeleteReply(c *gin.Context) {
 
 	updated, err := h.reviewUC.UpdateAdminReply(ctx, reviewID, nil)
 	if err != nil {
-		c.Error(err)
+		writeError(c, err)
 		return
 	}
 

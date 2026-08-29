@@ -227,4 +227,55 @@ describe('ProductReviewsSection', () => {
       expect(screen.queryByText('Không thể tải đánh giá sản phẩm. Vui lòng thử lại.')).not.toBeInTheDocument()
     })
   })
+
+  it('renders admin reply when present and omits it when absent', async () => {
+    const responseWithReply: MockReviewsEnvelope = {
+      data: {
+        summary: {
+          totalReviews: 2,
+          averageRating: '5.0',
+          ratingCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 2 },
+        },
+        reviews: [
+          {
+            id: 'rev-with-reply',
+            rating: 5,
+            comment: 'Sản phẩm tuyệt vời',
+            reviewer: { maskedEmail: 'a***@gmail.com' },
+            purchase: { model: 'Model X', options: [] },
+            media: [],
+            adminReply: 'Cảm ơn bạn đã tin tưởng AuraPhone!',
+            adminRepliedAt: '2026-08-28T10:00:00Z',
+            createdAt: '2026-08-28T00:00:00Z',
+          },
+          {
+            id: 'rev-no-reply',
+            rating: 5,
+            comment: 'Giao hàng nhanh chóng',
+            reviewer: { maskedEmail: 'b***@gmail.com' },
+            purchase: { model: 'Model Y', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+          },
+        ],
+      },
+      message: 'OK',
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: { page: 1, limit: 10, total: 2, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(responseWithReply)
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Phản hồi từ người bán')).toBeInTheDocument()
+      expect(screen.getByText('Cảm ơn bạn đã tin tưởng AuraPhone!')).toBeInTheDocument()
+      expect(screen.getByText('Sản phẩm tuyệt vời')).toBeInTheDocument()
+      expect(screen.getByText('Giao hàng nhanh chóng')).toBeInTheDocument()
+    })
+  })
 })
+

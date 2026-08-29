@@ -1265,6 +1265,12 @@ func (f *fakeReviewRepoForOrder) GetPublicReviewsByProductID(ctx context.Context
 func (f *fakeReviewRepoForOrder) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
 	return nil, nil
 }
+func (f *fakeReviewRepoForOrder) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	return nil, nil
+}
 
 func TestOrderUseCase_ReturnProjection(t *testing.T) {
 	ctx := context.Background()
