@@ -14,7 +14,9 @@ Thiết kế phải bảo đảm:
 - MinIO hoặc PostgreSQL lỗi không làm lộ media mồ côi;
 - tổng quan sản phẩm, section đánh giá và trạng thái trong đơn hàng dùng cùng nguồn dữ liệu;
 - khách hàng có một read model phân trang để xem toàn bộ đánh giá của chính mình mà không tạo nguồn sự thật hoặc lịch sử phiên bản mới;
-- không thay đổi hành vi của frontend quản trị vì kiểm duyệt đánh giá nằm ngoài phạm vi.
+  - quản trị viên có thể phản hồi mà không có quyền sửa, ẩn hoặc xóa nội dung đánh giá của khách hàng;
+  - mỗi đánh giá có tối đa một phản hồi cửa hàng và cập nhật đồng thời không ghi đè âm thầm;
+  - phản hồi là dữ liệu nội tại của đánh giá, còn quyền tạo/sửa chỉ xuất hiện trong caller context của admin.
 
 ## 2. Kiến Trúc Tổng Thể
 
@@ -42,6 +44,12 @@ Backend HTTP /api/v1
          |-- trạng thái review của từng order item
          |-- awaitingReview theo order item
          `-- review summary theo product
+
+Frontend quản trị
+  |  JSON: danh sách review + phản hồi hiện tại
+  |  JSON: tạo/sửa phản hồi với concurrency version
+  v
+Backend HTTP /api/v1/admin --> Review application/domain --> PostgreSQL
 
 Trình duyệt <--- GET /media/reviews/:mediaId --- Backend media proxy --- MinIO
 ```
@@ -79,6 +87,14 @@ Manifest cho phép giữ, bỏ, sắp xếp media cũ và chèn media mới ở 
 Media được đọc qua route công khai ngoài `/api/v1` để trả raw bytes thay vì Full Status Envelope. Route hỗ trợ `Range`, `Content-Range`, `Accept-Ranges`, `Content-Length`, MIME đã xác minh và ETag. Cache phải revalidate ở mỗi lần dùng (`max-age=0, must-revalidate`) để database gate có thể thu hồi media ngay sau edit; không dùng `immutable` hoặc freshness lifetime dương.
 
 Tên tệp gốc và MinIO object key không xuất hiện trong URL công khai. URL chỉ chứa media ID không mang thông tin người dùng.
+
+### 3.6 Một Phản Hồi Hiện Tại Với Optimistic Concurrency
+
+Phản hồi cửa hàng là resource một-một thuộc đánh giá, không phải comment thread và không được nhúng vào nội dung review do khách hàng sở hữu. PostgreSQL bảo đảm uniqueness theo review ID. Tạo phản hồi dùng điều kiện chưa tồn tại; sửa phản hồi yêu cầu concurrency version của state mà admin đã đọc và chỉ thành công khi version vẫn khớp.
+
+Thiết kế này cho phép mọi admin sửa cùng một phản hồi nhưng ngăn lost update. Admin thua cạnh tranh nhận conflict và phải tải state mới trước khi quyết định sửa lại; backend không tự merge hoặc last-write-wins. Không có delete transition.
+
+Phản hồi cùng timestamp cập nhật là intrinsic review data và xuất hiện ở public review collection, owned-review/history và admin collection. Admin identity chỉ phục vụ authorization/audit nội bộ, không thuộc public representation. Admin capability/version chỉ có trong admin representation, không được suy ra từ public viewer state.
 
 ## 4. Sở Hữu Dữ Liệu
 
@@ -129,6 +145,12 @@ Read model mỗi order item bổ sung review state cá nhân hóa:
 Lịch sử cá nhân là projection chỉ đọc từ `product_reviews` theo `user_id`, không phải thực thể hoặc bảng audit mới. Truy vấn dùng thứ tự `(updated_at DESC, id DESC)` và phân trang cùng quy tắc ổn định với danh sách công khai.
 
 Mỗi mục dùng trạng thái review hiện tại và bổ sung thông tin nhận biết sản phẩm cần cho trang tài khoản. Tên sản phẩm phải lấy từ dữ liệu mua hàng đã lưu để đánh giá vẫn nhận biết được khi catalog không còn công khai; trạng thái hiển thị công khai hiện tại của sản phẩm chỉ quyết định có cung cấp liên kết tới trang chi tiết hay không. Viewer state luôn là state của owner và là nguồn quyết định hành động chỉnh sửa.
+
+### 4.6 Phản Hồi Cửa Hàng Và Admin Read Model
+
+Phản hồi cửa hàng sở hữu review ID duy nhất, nội dung đã trim, admin tạo/cập nhật phục vụ audit nội bộ, thời điểm tạo/cập nhật và concurrency version. Quan hệ phụ thuộc vòng đời review; tính năng hiện không có transition xóa review hoặc phản hồi.
+
+Admin collection là projection phân trang từ review hiện tại, thông tin nhận biết sản phẩm và phản hồi hiện tại. Nó không tạo nguồn sự thật thứ hai và không cấp mutation nào lên rating, comment, media hoặc verified-purchase state. Thứ tự `(review.updated_at DESC, review.id DESC)` phản ánh yêu cầu danh sách review cập nhật gần nhất; thay đổi riêng phản hồi không đổi thứ tự review.
 
 ## 5. Luồng Hành Vi
 
@@ -187,6 +209,15 @@ Khi MinIO hoạt động liên tục, mọi object không tham chiếu phải h�
 4. Frontend hiển thị content/media hiện tại, trạng thái chỉnh sửa, empty/error/retry và liên kết về lịch sử đơn hàng khi chưa có đánh giá.
 5. Sau khi chỉnh sửa thành công, frontend thay mục tương ứng bằng review mới hoặc tải lại trang hiện tại; không thêm một mục lịch sử mới.
 
+### 5.7 Quản Trị Phản Hồi
+
+1. Admin route yêu cầu access token có role admin và đọc collection review phân trang cùng phản hồi hiện tại/version.
+2. Khi chưa có phản hồi, admin gửi nội dung mong muốn; backend trim/validate rồi insert với unique review ID.
+3. Khi đã có phản hồi, admin gửi nội dung cùng version đã đọc; backend update có điều kiện theo review ID và version, tăng version và timestamp khi thành công.
+4. Unique hoặc version condition không còn đúng trả conflict tiếng Việt; admin UI giữ draft, hiển thị conflict và cho tải state mới, không tự ghi đè.
+5. Public và owned review reads join phản hồi đã commit. Lần đọc sau commit thấy state mới; không yêu cầu cache invalidation xuyên process hoặc push realtime.
+6. Customer edit chỉ cập nhật review-owned fields nên response row không đổi. Product bị ẩn chỉ chặn public product route/link; admin collection và owned history vẫn đọc response.
+
 ## 6. Validation Và Bảo Mật
 
 - Rating phải là integer 1-5; comment sau trim tối đa 1000 ký tự.
@@ -201,6 +232,9 @@ Khi MinIO hoạt động liên tục, mọi object không tham chiếu phải h�
 - Review công khai không chứa email, user ID, original filename hoặc MinIO location.
 - Comment render dạng text; image có accessible description sinh từ ngữ cảnh sản phẩm/vị trí, video dùng native controls và keyboard semantics.
 - Route mutation yêu cầu customer auth; route danh sách và media là public; optional auth chỉ bổ sung viewer state, không đổi dữ liệu intrinsic.
+- Route phản hồi và admin review collection dùng admin auth guard hiện có; customer token và anonymous caller không có quyền mutation.
+- Nội dung phản hồi sau trim dài 1-1000 ký tự, render dạng text và không công khai admin ID/email.
+- Concurrency version là opaque precondition của admin mutation; client không được tự tăng hoặc dùng version để suy ra audit history.
 
 ## 7. Cấu Hình Và Vận Hành
 
@@ -225,6 +259,11 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 | MinIO lỗi khi đọc media | `503`, review metadata vẫn đọc được và UI hiển thị media unavailable/retry |
 | Product soft-deleted | Review được giữ; catalog visibility hiện có không thay đổi |
 | Order chuyển `returned` sau review | Review và quyền sửa còn lại được giữ; order item không review trước đó không còn eligible |
+| Hai admin cùng tạo response | Unique review ID cho một thành công; thao tác còn lại nhận conflict |
+| Hai admin sửa cùng version | Conditional version update cho một thành công; thao tác còn lại nhận conflict và không ghi đè |
+| Customer sửa review đã có response | Review fields đổi nguyên tử; response được giữ và lần đọc sau ghép với review mới |
+| Product bị ẩn | Response còn trong owned history và admin collection; không tạo public product link mới |
+| Lưu response thất bại | Response cũ không đổi; admin UI giữ draft để retry |
 
 ## 9. Ranh Giới Thành Phần
 
@@ -232,11 +271,11 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** Backend review/order/catalog HTTP delivery  
 **Consumer(s):** Frontend khách hàng  
-**Purpose:** Tạo/sửa review multipart, đọc collection review, mở rộng product summary và order-item review state  
+**Purpose:** Tạo/sửa review multipart, đọc collection review kèm phản hồi cửa hàng, mở rộng product summary và order-item review state
 **Authentication / caller context:** Customer auth cho mutation và order state; public với optional customer auth cho product reviews  
-**Material state or failure semantics:** Eligibility theo order item, concurrency, one-edit limit, validation media, pagination, Full Status Envelope
+**Material state or failure semantics:** Eligibility theo order item, concurrency, one-edit limit, validation media, response tùy chọn, pagination, Full Status Envelope
 **Contract artifact required:** Yes  
-**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09
+**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09, REQ-REVIEW-10
 **Verification / Proof level:** provider-contract, runtime-http, component, browser
 
 ### Boundary ID: BND-REVIEW-MEDIA-CONTENT
@@ -276,12 +315,45 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** Frontend review UI  
 **Consumer(s):** Khách hàng và người xem sản phẩm  
-**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section, lịch sử đánh giá cá nhân và responsive media viewer
+**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section và lịch sử cá nhân có phản hồi cửa hàng, cùng responsive media viewer
 **Authentication / caller context:** Authenticated mutations; public read; safe login return  
 **Material state or failure semantics:** Loading/empty/error/success, preserve form on retry, accessible controls, desktop/mobile layout  
 **Contract artifact required:** No, tiêu thụ BND-REVIEW-HTTP và BND-REVIEW-MEDIA-CONTENT  
-**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09
+**Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09, REQ-REVIEW-10
 **Verification / Proof level:** component, browser, visual
+
+### Boundary ID: BND-REVIEW-ADMIN-HTTP
+
+**Producer / provider:** Backend admin review HTTP delivery
+**Consumer(s):** Frontend quản trị
+**Purpose:** Đọc review phân trang và tạo/sửa một phản hồi cửa hàng với optimistic concurrency
+**Authentication / caller context:** Access token có role admin; mọi admin có cùng capability phản hồi
+**Material state or failure semantics:** Một response/review, validation 1-1000 ký tự, not-found, forbidden, create/update conflict, Full Status Envelope
+**Contract artifact required:** Yes
+**Requirement IDs traced to boundary:** REQ-REVIEW-10
+**Verification / Proof level:** provider-contract, runtime-http, component, browser
+
+### Boundary ID: BND-REVIEW-RESPONSE-PERSISTENCE
+
+**Producer / provider:** PostgreSQL review response persistence
+**Consumer(s):** Backend review public/owned/admin read use cases và admin response mutation
+**Purpose:** Sở hữu response hiện tại, one-to-one invariant, audit ownership và concurrency version
+**Authentication / caller context:** Internal backend context; admin identity đã xác thực cho mutation
+**Material state or failure semantics:** Unique review ID, conditional version update, no partial mutation, response giữ nguyên qua customer edit/product visibility change
+**Contract artifact required:** No
+**Requirement IDs traced to boundary:** REQ-REVIEW-10
+**Verification / Proof level:** unit, integration-db
+
+### Boundary ID: BND-REVIEW-ADMIN-UI
+
+**Producer / provider:** Frontend admin review UI
+**Consumer(s):** Quản trị viên
+**Purpose:** Danh sách review, form tạo/sửa response và xử lý validation/conflict/retry
+**Authentication / caller context:** Protected admin route dùng session hiện có
+**Material state or failure semantics:** Loading/empty/error, giữ draft khi lỗi, tải lại state sau conflict, không cung cấp edit/delete review hoặc delete response
+**Contract artifact required:** No, tiêu thụ BND-REVIEW-ADMIN-HTTP
+**Requirement IDs traced to boundary:** REQ-REVIEW-10
+**Verification / Proof level:** component, browser
 
 ## 10. Chiến Lược Chứng Minh
 
@@ -296,6 +368,7 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 | REQ-REVIEW-07 | Review state theo từng order item và awaitingReview semantics | integration-db + component + browser | Join/count tests, order page tests, create-review user flow |
 | REQ-REVIEW-08 | Auth, envelope, safe return, keyboard, retry state | provider-contract + component + browser + visual | Auth/error contract tests, keyboard tests, full login-return/upload flow, desktop/mobile inspection |
 | REQ-REVIEW-09 | Collection chỉ thuộc owner, phân trang ổn định, product identity/link state, edit và empty/error/login-return | integration-db + provider-contract + component + browser | Owner-filtered query tests, API contract, account-page render tests và authenticated routing/edit flow |
+| REQ-REVIEW-10 | Admin list, one response/review, validation, authorization, conflict safety, public visibility và retention qua review/product state | unit + integration-db + provider-contract + runtime-http + component + browser | Validation/domain tests, concurrent database tests, admin/public contract scenarios, HTTP auth/conflict checks, admin/customer render tests và protected admin flow |
 
 Không dùng browser test để chứng minh unique constraint, aggregate math hoặc transaction semantics vì integration test ở boundary tương ứng đủ mạnh. Browser automation chỉ bao phủ các flow thực sự cần routing, file input, native media và tương tác responsive.
 
@@ -311,6 +384,8 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 6. Đơn có hai order item cùng product nhưng variant khác; tạo hai review và summary count tăng hai.
 7. Media proxy trả range đúng, 404 cho media không tham chiếu và 503 không lộ thông tin MinIO khi storage dừng.
 8. Hai khách hàng có nhiều review, xác nhận lịch sử của mỗi người chỉ trả review thuộc owner theo thứ tự ổn định; review của sản phẩm đã ẩn vẫn nhận biết được nhưng không có product link.
+9. Hai admin cùng tạo rồi cùng sửa response từ một version; xác nhận mỗi cuộc đua chỉ một mutation thành công và public/owned reads thấy state đã commit.
+10. Customer sửa review đã có response và product sau đó bị ẩn; xác nhận response được giữ trong owned history/admin collection, còn public product route/link vẫn không khả dụng.
 
 ## 12. Tác Động Và Tương Thích
 
@@ -320,7 +395,9 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 - Frontend API client cần hỗ trợ `FormData` mà không tự đặt JSON `Content-Type`, đồng thời vẫn giữ auth refresh và envelope handling.
 - Frontend chi tiết đơn thêm form/action theo từng dòng; trang sản phẩm thêm section public có pagination và media viewer.
 - Backend bổ sung collection có customer auth cho lịch sử review cá nhân; frontend bổ sung route và điểm truy cập "Đánh giá của tôi" trong khu vực tài khoản.
-- Frontend admin không thay đổi vì moderation và quản trị review ngoài phạm vi.
+- Frontend admin bổ sung protected review route, collection phân trang và form tạo/sửa response; không bổ sung moderation hoặc mutation lên review của khách hàng.
+- PostgreSQL bổ sung state một-một của response và concurrency version; review/media/order invariants hiện có không đổi.
+- Public product review, owned review và history representations được mở rộng bằng response tùy chọn; client phải xử lý trạng thái không có response.
 - Existing product, order, return, favorite và catalog visibility behavior phải được giữ ngoài các phần mở rộng đã nêu.
 
 ## 13. Ranh Giới Contract Cần Đóng Băng
@@ -335,5 +412,7 @@ Tính năng có shared boundary giữa backend và frontend nên phải author e
 - raw media content route, Range/404/503 semantics;
 - scenarios cho duplicate, one-edit limit, returned order và nhiều order item cùng product.
 - collection lịch sử review cá nhân, owner isolation, pagination, product identity/link availability và owner edit state.
+- admin review collection, response create/update precondition, validation/auth/not-found/conflict semantics;
+- response tùy chọn trong public và owned review representations, không lộ admin identity.
 
 Chi tiết field, endpoint, status, example và scenario ID không được coi là ổn định cho tới khi contract được review và chuyển sang `FROZEN`.

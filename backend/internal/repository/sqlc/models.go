@@ -195,6 +195,16 @@ type ReviewMedium struct {
 	CreatedAt time.Time
 }
 
+type ReviewResponse struct {
+	ReviewID  string
+	Content   string
+	CreatedBy string
+	UpdatedBy string
+	Version   int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type User struct {
 	ID           string
 	Email        string

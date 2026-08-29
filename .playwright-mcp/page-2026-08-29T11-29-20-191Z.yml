@@ -1,0 +1,29 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - heading "AuraPhone Admin" [level=1] [ref=e10]
+    - paragraph [ref=e11]: Hệ thống quản trị thương mại điện tử AuraPhone
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - heading "Đăng nhập quản trị viên" [level=3] [ref=e14]
+      - paragraph [ref=e15]: Nhập email và mật khẩu của tài khoản quản trị để tiếp tục
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]: "Tài khoản Admin mặc định:"
+          - button "Điền lại" [ref=e20]
+        - generic [ref=e21]: "Email: admin@example.com | Pass: Admin123456@"
+      - generic [ref=e22]:
+        - alert [ref=e37]:
+          - generic [ref=e40]: Email hoặc mật khẩu không đúng
+        - generic [ref=e23]:
+          - generic [ref=e24]: Email quản trị
+          - textbox "Email quản trị" [ref=e28]:
+            - /placeholder: admin@example.com
+            - text: admin@example.com
+        - generic [ref=e29]:
+          - generic [ref=e30]: Mật khẩu
+          - textbox "Mật khẩu" [ref=e34]:
+            - /placeholder: ••••••••
+            - text: Admin123456@
+        - button "Đăng nhập" [ref=e35] [cursor=pointer]
+  - paragraph [ref=e36]: Chỉ nhân sự có thẩm quyền mới được phép truy cập cổng quản trị.

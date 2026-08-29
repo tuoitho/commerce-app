@@ -6,6 +6,7 @@
 |---|---:|---|
 | PURCHASED-REVIEW-API | 2 | FROZEN |
 | PURCHASED-REVIEW-API | 3 | FROZEN |
+| PURCHASED-REVIEW-API | 4 | FROZEN |
 | PURCHASED-REVIEW-MEDIA | 1 | FROZEN |
 
 ## Execution DAG
@@ -18,6 +19,10 @@ FE-01 -> FE-02 -> FE-03 --/
 BE-03 -> BE-04 --\
                 -> INT-02
 FE-03 -> FE-04 --/
+
+BE-04 -> BE-05 -------\
+FE-04 -> FE-05 --------> INT-03
+AD-01 ----------------/
 ```
 
 `BE-01`, `BE-02`, `BE-03` dùng cùng một persistent owner vì chia sẻ schema, transaction, MinIO lifecycle và read model. `FE-01`, `FE-02`, `FE-03` dùng cùng một persistent owner vì chia sẻ API types, mutation state và UI review. Hai workstream có thể bắt đầu song song từ contract revision 1 đã đóng băng.
@@ -531,6 +536,165 @@ status: completed
 verified_against:
   PURCHASED-REVIEW-API: 3
   PURCHASED-REVIEW-MEDIA: 1
+```
+
+## Revision 4 Extension: Phản Hồi Cửa Hàng
+
+### BE-05 — Cung cấp nguồn sự thật và API phản hồi cửa hàng
+
+```yaml
+id: BE-05
+owner: backend-review
+outcome: Backend cung cấp admin review collection và create/update response theo revision 4, bảo đảm một response mỗi review, optimistic concurrency, authorization và phản ánh response trên mọi customer read model.
+requirements:
+  - REQ-REVIEW-10
+acceptance_criteria:
+  - AC-REVIEW-10-01
+  - AC-REVIEW-10-02
+  - AC-REVIEW-10-03
+  - AC-REVIEW-10-04
+  - AC-REVIEW-10-05
+  - AC-REVIEW-10-06
+  - AC-REVIEW-10-07
+  - AC-REVIEW-10-08
+  - AC-REVIEW-10-09
+  - AC-REVIEW-10-10
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 4
+    role: provider
+depends_on:
+  - BE-04
+risk: high
+verification:
+  - type: unit
+    scope: trim/plain-text validation, authorization mapping and response state transitions
+  - type: integration-db
+    scope: one response per review, concurrent create/update, stale version, customer edit retention, hidden-product admin/owner reads and deterministic pagination
+  - type: provider-contract
+    scope: PURCHASED-REVIEW-API-R4-001 through PURCHASED-REVIEW-API-R4-013
+  - type: runtime-http
+    scope: admin auth, Full Status Envelope, exact validation/not-found/conflict codes and public/owned response visibility
+  - type: typecheck
+    scope: make -C backend gen && make -C backend test && make -C backend vet
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 4
+```
+
+### FE-05 — Hiển thị phản hồi cửa hàng cho khách hàng
+
+```yaml
+id: FE-05
+owner: frontend-review
+outcome: Public product reviews và lịch sử đánh giá cá nhân hiển thị response tùy chọn dưới dạng plain text, không lộ admin identity/version và giữ đúng product-link state.
+requirements:
+  - REQ-REVIEW-10
+acceptance_criteria:
+  - AC-REVIEW-10-01
+  - AC-REVIEW-10-07
+  - AC-REVIEW-10-08
+  - AC-REVIEW-10-09
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 4
+    role: consumer
+depends_on:
+  - FE-04
+risk: normal
+verification:
+  - type: consumer-contract
+    scope: PURCHASED-REVIEW-API-R4-009 through R4-011
+  - type: component
+    scope: null/populated response, literal HTML text, post-edit response retention and hidden-product owner history
+  - type: typecheck
+    scope: npm run lint && npm test && npm run build in frontend
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 4
+```
+
+### AD-01 — Cung cấp giao diện quản trị phản hồi đánh giá
+
+```yaml
+id: AD-01
+owner: frontend-admin-review
+outcome: Admin có protected review route với collection phân trang và form tạo/sửa response, giữ draft khi lỗi và tải lại state khi optimistic-concurrency conflict.
+requirements:
+  - REQ-REVIEW-10
+acceptance_criteria:
+  - AC-REVIEW-10-01
+  - AC-REVIEW-10-02
+  - AC-REVIEW-10-03
+  - AC-REVIEW-10-04
+  - AC-REVIEW-10-05
+  - AC-REVIEW-10-06
+  - AC-REVIEW-10-10
+  - AC-REVIEW-10-11
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 4
+    role: consumer
+depends_on: []
+risk: normal
+verification:
+  - type: consumer-contract
+    scope: PURCHASED-REVIEW-API-R4-001 through R4-008, R4-012 and R4-013
+  - type: component
+    scope: protected collection, pagination, create/edit, trim boundaries, validation/conflict/system failures with unchanged persisted response, retained draft, conflict reload and retry
+  - type: browser
+    scope: admin login, review discovery, create response and update from current version
+  - type: visual
+    scope: representative mobile and desktop admin review widths
+  - type: typecheck
+    scope: npm run lint && npm test && npm run build in frontend-admin
+status: completed
+verified_against:
+  PURCHASED-REVIEW-API: 4
+```
+
+### INT-03 — Xác minh revision 4 xuyên backend và hai frontend
+
+```yaml
+id: INT-03
+owner: review-integration
+outcome: Runtime lắp ráp chứng minh response concurrency, admin workflow, customer visibility và retention đúng frozen revision 4 trong coordinated rollout.
+requirements:
+  - REQ-REVIEW-10
+acceptance_criteria:
+  - AC-REVIEW-10-01
+  - AC-REVIEW-10-02
+  - AC-REVIEW-10-03
+  - AC-REVIEW-10-04
+  - AC-REVIEW-10-05
+  - AC-REVIEW-10-06
+  - AC-REVIEW-10-07
+  - AC-REVIEW-10-08
+  - AC-REVIEW-10-09
+  - AC-REVIEW-10-10
+  - AC-REVIEW-10-11
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 4
+    role: verifier
+depends_on:
+  - BE-05
+  - FE-05
+  - AD-01
+risk: high
+verification:
+  - type: provider-contract
+    scope: execute inherited revision 3 scenarios plus all PURCHASED-REVIEW-API-R4-001 through R4-013 scenarios
+  - type: runtime-http
+    scope: concurrent create/update, stale version, exact errors, public/owned/admin reads, customer edit retention and hidden product
+  - type: browser
+    scope: protected admin create/update, failed-save draft retention, conflict reload and retry, followed by public and owner-history visibility
+  - type: visual
+    scope: response presentation and admin review workflow at representative mobile and desktop widths
+  - type: typecheck
+    scope: root make test && root make build
+status: pending
+verified_against: {}
 ```
 
 ### INT-02 — Xác minh revision 3 xuyên backend và browser

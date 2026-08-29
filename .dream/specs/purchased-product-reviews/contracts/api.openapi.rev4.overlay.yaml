@@ -1,0 +1,368 @@
+overlay: 1.0.0
+info:
+  title: Purchased Product Reviews API Revision 4
+  version: 4.0.0
+actions:
+  - target: $.paths
+    description: Add the admin review collection and store-response mutations.
+    update:
+      /api/v1/admin/reviews:
+        get:
+          tags: [Admin review responses]
+          operationId: listAdminReviews
+          summary: List current reviews and their current store responses
+          description: Results are ordered by review.updatedAt descending, then review.id descending. Updating only a store response does not change this ordering.
+          security:
+            - bearerAuth: []
+          parameters:
+            - $ref: '#/components/parameters/Page'
+            - $ref: '#/components/parameters/Limit'
+          responses:
+            '200':
+              description: Admin review collection
+              content:
+                application/json:
+                  schema: { $ref: '#/components/schemas/AdminReviewListEnvelope' }
+            '400': { $ref: '#/components/responses/AdminReviewBadRequest' }
+            '401': { $ref: '#/components/responses/AdminUnauthorized' }
+            '403': { $ref: '#/components/responses/AdminForbidden' }
+            '500': { $ref: '#/components/responses/AdminInternalError' }
+      /api/v1/admin/reviews/{reviewId}/response:
+        parameters:
+          - $ref: '#/components/parameters/ReviewId'
+        post:
+          tags: [Admin review responses]
+          operationId: createStoreReviewResponse
+          summary: Create the single store response for a review
+          security:
+            - bearerAuth: []
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema: { $ref: '#/components/schemas/CreateStoreResponseInput' }
+          responses:
+            '201':
+              description: Store response created
+              content:
+                application/json:
+                  schema: { $ref: '#/components/schemas/AdminStoreResponseEnvelope' }
+            '400': { $ref: '#/components/responses/StoreResponseBadRequest' }
+            '401': { $ref: '#/components/responses/AdminUnauthorized' }
+            '403': { $ref: '#/components/responses/AdminForbidden' }
+            '404': { $ref: '#/components/responses/AdminReviewNotFound' }
+            '409': { $ref: '#/components/responses/StoreResponseConflict' }
+            '500': { $ref: '#/components/responses/AdminInternalError' }
+        put:
+          tags: [Admin review responses]
+          operationId: updateStoreReviewResponse
+          summary: Update the current store response if its version is unchanged
+          security:
+            - bearerAuth: []
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema: { $ref: '#/components/schemas/UpdateStoreResponseInput' }
+          responses:
+            '200':
+              description: Store response updated and version incremented by one
+              content:
+                application/json:
+                  schema: { $ref: '#/components/schemas/AdminStoreResponseEnvelope' }
+            '400': { $ref: '#/components/responses/StoreResponseBadRequest' }
+            '401': { $ref: '#/components/responses/AdminUnauthorized' }
+            '403': { $ref: '#/components/responses/AdminForbidden' }
+            '404': { $ref: '#/components/responses/AdminReviewNotFound' }
+            '409': { $ref: '#/components/responses/StoreResponseConflict' }
+            '500': { $ref: '#/components/responses/AdminInternalError' }
+
+  - target: $.tags
+    description: Add the admin response boundary tag.
+    update:
+      - name: Admin review responses
+        description: Admin-only review discovery and single store-response mutations.
+
+  - target: $.components.schemas.Review.required
+    description: Every revision 4 review representation explicitly carries the current response or null.
+    update:
+      - response
+
+  - target: $.components.schemas.Review.properties
+    description: Add the intrinsic public store response without admin identity or concurrency capability.
+    update:
+      response:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/StoreReviewResponse'
+
+  - target: $.components.schemas
+    description: Add response, admin collection, mutation, and envelope schemas.
+    update:
+      StoreReviewResponse:
+        type: object
+        additionalProperties: false
+        required: [content, authorLabel, createdAt, updatedAt]
+        properties:
+          content:
+            type: string
+            minLength: 1
+            maxLength: 1000
+            description: Trimmed plain text; consumers must render it as text, never as HTML.
+          authorLabel:
+            type: string
+            const: Phản hồi từ cửa hàng
+          createdAt: { type: string, format: date-time }
+          updatedAt: { type: string, format: date-time }
+      AdminStoreReviewResponse:
+        type: object
+        additionalProperties: false
+        required: [content, authorLabel, createdAt, updatedAt, version]
+        properties:
+          content:
+            type: string
+            minLength: 1
+            maxLength: 1000
+            description: Trimmed plain text; consumers must render it as text, never as HTML.
+          authorLabel:
+            type: string
+            const: Phản hồi từ cửa hàng
+          createdAt: { type: string, format: date-time }
+          updatedAt: { type: string, format: date-time }
+          version:
+            type: integer
+            minimum: 1
+            description: Opaque optimistic-concurrency precondition; incremented by one after each successful update.
+      AdminReviewProduct:
+        type: object
+        additionalProperties: false
+        required: [id, name, publicPath]
+        properties:
+          id:
+            type: string
+            format: uuid
+            description: Must equal review.productId in the containing AdminReviewItem.
+          name: { type: string, minLength: 1 }
+          publicPath:
+            oneOf:
+              - type: 'null'
+              - type: string
+                pattern: '^/products/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+            description: Null exactly when the product is not public; otherwise equals /products/{id} using this product object's id. The review and response remain visible to admin when null.
+      AdminReview:
+        allOf:
+          - $ref: '#/components/schemas/Review'
+          - type: object
+            required: [viewer]
+            properties:
+              viewer:
+                type: 'null'
+                description: Admin callers never receive customer owner/edit capability.
+      AdminReviewItem:
+        type: object
+        additionalProperties: false
+        required: [review, product, responseVersion]
+        properties:
+          review: { $ref: '#/components/schemas/AdminReview' }
+          product: { $ref: '#/components/schemas/AdminReviewProduct' }
+          responseVersion:
+            oneOf:
+              - type: 'null'
+              - type: integer
+                minimum: 1
+            description: Null exactly when review.response is null; otherwise the opaque optimistic-concurrency version for that response.
+      CreateStoreResponseInput:
+        type: object
+        additionalProperties: false
+        required: [content]
+        properties:
+          content:
+            type: string
+            description: Backend trims leading and trailing whitespace, then requires 1 through 1000 characters. Whitespace-only content is invalid.
+      UpdateStoreResponseInput:
+        type: object
+        additionalProperties: false
+        required: [content, version]
+        properties:
+          content:
+            type: string
+            description: Backend trims leading and trailing whitespace, then requires 1 through 1000 characters. Whitespace-only content is invalid.
+          version: { type: integer, minimum: 1 }
+      AdminReviewListEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data:
+            type: array
+            items: { $ref: '#/components/schemas/AdminReviewItem' }
+          error: { type: 'null' }
+          meta:
+            allOf:
+              - $ref: '#/components/schemas/ResponseMeta'
+              - type: object
+                required: [pagination]
+      AdminStoreResponseEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: true }
+          message: { type: string }
+          data: { $ref: '#/components/schemas/AdminStoreReviewResponse' }
+          error: { type: 'null' }
+          meta: { $ref: '#/components/schemas/ResponseMeta' }
+      AdminValidationErrorEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/ValidationErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+      AdminUnauthorizedErrorDetail:
+        type: object
+        additionalProperties: false
+        required: [code, message]
+        properties:
+          code: { type: string, enum: [unauthorized, invalid_token] }
+          message: { type: string }
+      AdminForbiddenErrorDetail:
+        type: object
+        additionalProperties: false
+        required: [code, message]
+        properties:
+          code: { type: string, const: forbidden }
+          message: { type: string }
+      AdminReviewNotFoundErrorDetail:
+        type: object
+        additionalProperties: false
+        required: [code, message]
+        properties:
+          code: { type: string, const: review_not_found }
+          message: { type: string }
+      StoreResponseConflictErrorDetail:
+        type: object
+        additionalProperties: false
+        required: [code, message]
+        properties:
+          code: { type: string, const: review_response_conflict }
+          message: { type: string }
+      AdminInternalErrorDetail:
+        type: object
+        additionalProperties: false
+        required: [code, message]
+        properties:
+          code: { type: string, const: internal }
+          message: { type: string }
+      AdminUnauthorizedEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/AdminUnauthorizedErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+      AdminForbiddenEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/AdminForbiddenErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+      AdminReviewNotFoundEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/AdminReviewNotFoundErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+      StoreResponseConflictEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/StoreResponseConflictErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+      AdminInternalErrorEnvelope:
+        type: object
+        additionalProperties: false
+        required: [success, message, data, error, meta]
+        properties:
+          success: { type: boolean, const: false }
+          message: { type: string }
+          data: { type: 'null' }
+          error: { $ref: '#/components/schemas/AdminInternalErrorDetail' }
+          meta: { $ref: '#/components/schemas/ErrorMeta' }
+
+  - target: $.components.responses
+    description: Add exact admin validation, authorization, not-found, and conflict failures.
+    update:
+      AdminReviewBadRequest:
+        description: Invalid admin collection pagination. error.fields uses page and/or limit.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminValidationErrorEnvelope' }
+      StoreResponseBadRequest:
+        description: Invalid reviewId, content, version, JSON body, or unknown field. error.code is validation_error and error.fields uses reviewId, content, version, or body respectively.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminValidationErrorEnvelope' }
+      AdminUnauthorized:
+        description: Missing token returns unauthorized; malformed, invalid, or expired token returns invalid_token.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUnauthorizedEnvelope' }
+      AdminForbidden:
+        description: Authenticated caller is not an administrator
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminForbiddenEnvelope' }
+            example:
+              success: false
+              message: Bạn không có quyền phản hồi đánh giá
+              data: null
+              error: { code: forbidden, message: Bạn không có quyền phản hồi đánh giá }
+              meta: { timestamp: '2026-08-28T10:00:00Z' }
+      AdminReviewNotFound:
+        description: Review does not exist
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminReviewNotFoundEnvelope' }
+            example:
+              success: false
+              message: Không tìm thấy đánh giá
+              data: null
+              error: { code: review_not_found, message: Không tìm thấy đánh giá }
+              meta: { timestamp: '2026-08-28T10:00:00Z' }
+      StoreResponseConflict:
+        description: A response already exists on create, no response exists on update, or the submitted version is stale. The current response is not overwritten.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StoreResponseConflictEnvelope' }
+            example:
+              success: false
+              message: Phản hồi đã thay đổi, vui lòng tải lại và thử lại
+              data: null
+              error: { code: review_response_conflict, message: Phản hồi đã thay đổi, vui lòng tải lại và thử lại }
+              meta: { timestamp: '2026-08-28T10:00:00Z' }
+      AdminInternalError:
+        description: Internal failure that does not expose implementation details
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInternalErrorEnvelope' }

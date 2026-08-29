@@ -109,3 +109,40 @@ contracts:
       - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev3.yaml
+
+  - id: PURCHASED-REVIEW-API
+    revision: 4
+    status: FROZEN
+    requirements:
+      - REQ-REVIEW-01
+      - REQ-REVIEW-02
+      - REQ-REVIEW-03
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-06
+      - REQ-REVIEW-07
+      - REQ-REVIEW-08
+      - REQ-REVIEW-09
+      - REQ-REVIEW-10
+    providers: [backend-review]
+    consumers: [frontend-review, frontend-admin-review]
+    compatibility:
+      classification: breaking-review-representation-with-additive-admin-operations
+      inherits: PURCHASED-REVIEW-API@3
+      rollout: backend-provider-and-frontend-review-consumer-must-deploy-together; frontend-admin-consumer-may-follow
+      compatible_changes:
+        - new admin operations do not affect clients that do not call them
+      breaking_changes:
+        - Review now requires a nullable response field and revision 3 has additionalProperties false
+        - remove or rename response fields or admin operations
+        - expose admin identity publicly
+        - change one-response, authorization, validation, retention, or optimistic-concurrency semantics
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev2.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev3.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev4.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev3.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev4.yaml

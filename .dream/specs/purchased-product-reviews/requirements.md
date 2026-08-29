@@ -20,6 +20,7 @@ Tính năng phục vụ hai nhóm người dùng:
 - **Tổng quan đánh giá**: Điểm trung bình và tổng số đánh giá hiện có của một sản phẩm.
 - **Dòng hàng chờ đánh giá**: Dòng hàng đủ điều kiện đánh giá của một khách hàng.
 - **Lịch sử đánh giá cá nhân**: Danh sách trạng thái hiện tại của mọi đánh giá do khách hàng đang đăng nhập đã gửi; đây không phải lịch sử các phiên bản trước và sau khi chỉnh sửa.
+- **Phản hồi của cửa hàng**: Nội dung văn bản hiện tại do một quản trị viên tạo cho một đánh giá; mỗi đánh giá có tối đa một phản hồi và phản hồi không tạo thành luồng bình luận.
 
 ## Phạm Vi
 
@@ -34,11 +35,14 @@ Tính năng phục vụ hai nhóm người dùng:
 - Tính đúng số sản phẩm "Chờ đánh giá" trong lịch sử đơn hàng.
 - Giữ tính đúng đắn khi một sản phẩm được mua nhiều lần hoặc một đơn hàng thay đổi sang trạng thái trả hàng sau khi đã đánh giá.
 - Cho phép khách hàng xem danh sách phân trang toàn bộ đánh giá mình đã gửi từ khu vực tài khoản.
+- Cho phép quản trị viên xem đánh giá và tạo hoặc sửa một phản hồi của cửa hàng cho từng đánh giá.
+- Hiển thị phản hồi của cửa hàng cùng đánh giá cho người dùng ngay từ lần đọc thành công kế tiếp.
 
 ### Ngoài Phạm Vi
 
-- Phản hồi của người bán, bình luận theo luồng, lượt thích hoặc báo cáo đánh giá.
-- Kiểm duyệt hoặc quản trị đánh giá trong giao diện quản trị.
+- Bình luận theo luồng, lượt thích hoặc báo cáo đánh giá.
+- Kiểm duyệt, ẩn hoặc xóa đánh giá trong giao diện quản trị.
+- Xóa phản hồi của cửa hàng hoặc lưu lịch sử các phiên bản phản hồi.
 - Xóa đánh giá bởi khách hàng.
 - Đánh giá theo từng biến thể; mọi đánh giá được tổng hợp ở cấp sản phẩm.
 - Cửa sổ thời gian hết hạn quyền đánh giá.
@@ -482,3 +486,86 @@ Cho trước người dùng chưa đăng nhập mở URL nội bộ hợp lệ c
 **AC-REVIEW-09-07**
 
 Cho trước một lỗi tạm thời khi tải lịch sử, khi lỗi được hiển thị, thì người dùng có thể thử lại và không thấy dữ liệu đánh giá còn sót lại từ phiên đăng nhập trước.
+
+### REQ-REVIEW-10 — Quản Trị Viên Phản Hồi Đánh Giá
+
+**Câu Chuyện Người Dùng**
+
+Là một quản trị viên,
+tôi muốn phản hồi đánh giá của khách hàng,
+để cửa hàng có thể cung cấp thông tin hoặc hỗ trợ liên quan đến trải nghiệm được chia sẻ.
+
+#### Yêu Cầu Hành Vi
+
+Khi quản trị viên mở khu vực đánh giá trong giao diện quản trị, hệ thống phải cung cấp danh sách phân trang các đánh giá hiện tại theo thứ tự cập nhật gần nhất trước và cho biết phản hồi hiện tại của cửa hàng nếu có.
+
+Khi bất kỳ quản trị viên đã xác thực nào gửi nội dung hợp lệ cho một đánh giá chưa có phản hồi, hệ thống phải tạo đúng một phản hồi cho đánh giá đó. Khi đánh giá đã có phản hồi, bất kỳ quản trị viên đã xác thực nào cũng phải có thể sửa phản hồi hiện tại thay vì tạo phản hồi thứ hai.
+
+Phản hồi phải là văn bản thuần túy, được loại bỏ khoảng trắng ở đầu và cuối, có độ dài từ 1 đến 1000 ký tự sau khi loại bỏ khoảng trắng. Phản hồi hiển thị cho người dùng với nhãn "Phản hồi từ cửa hàng" và thời điểm cập nhật, không công khai danh tính quản trị viên.
+
+Khi thao tác tạo hoặc sửa phản hồi thành công, lần đọc thành công kế tiếp của danh sách đánh giá công khai hoặc lịch sử đánh giá cá nhân phải phản ánh nội dung mới mà không yêu cầu thay đổi đánh giá của khách hàng.
+
+#### Bất Biến
+
+- `INV-REVIEW-10-01` — Mỗi đánh giá có tối đa một phản hồi hiện tại của cửa hàng, kể cả khi nhiều quản trị viên thao tác đồng thời.
+- `INV-REVIEW-10-02` — Chỉ phiên quản trị viên hợp lệ được tạo hoặc sửa phản hồi; khách hàng và người dùng ẩn danh không được thay đổi phản hồi.
+- `INV-REVIEW-10-03` — Tạo hoặc sửa phản hồi không được thay đổi điểm sao, nhận xét, media, quyền chỉnh sửa hoặc thông tin mua hàng đã xác minh của đánh giá.
+- `INV-REVIEW-10-04` — Nội dung phản hồi được hiển thị như văn bản thuần túy và không được thực thi hoặc hiển thị như HTML.
+
+#### Hành Vi Lỗi / Phụ Thuộc Trạng Thái
+
+Nếu nội dung rỗng sau khi loại bỏ khoảng trắng hoặc dài hơn 1000 ký tự, hệ thống phải từ chối toàn bộ thao tác bằng lỗi xác thực cho trường nội dung và giữ nguyên phản hồi hiện tại nếu có.
+
+Nếu người gọi không có phiên quản trị viên hợp lệ, hệ thống phải từ chối thao tác mà không thay đổi phản hồi. Nếu đánh giá không tồn tại, hệ thống phải trả lỗi không tìm thấy bằng tiếng Việt.
+
+Nếu hai quản trị viên đồng thời tạo phản hồi cho cùng một đánh giá chưa có phản hồi, hệ thống phải chỉ tạo một phản hồi; thao tác không thể áp dụng trên trạng thái hiện tại phải thất bại bằng lỗi xung đột tiếng Việt thay vì ghi đè âm thầm. Nếu hai quản trị viên đồng thời sửa cùng một phản hồi, hệ thống phải ngăn một quản trị viên ghi đè âm thầm thay đổi mà người đó chưa đọc.
+
+Khi khách hàng sửa đánh giá, phản hồi hiện tại phải được giữ nguyên và hiển thị cùng nội dung đánh giá mới. Khi sản phẩm không còn hiển thị công khai, phản hồi vẫn được giữ và vẫn xuất hiện cùng đánh giá trong lịch sử cá nhân và giao diện quản trị; hành vi không cung cấp trang sản phẩm công khai vẫn không đổi.
+
+Nếu lưu phản hồi thất bại, hệ thống phải giữ nguyên phản hồi trước đó và giao diện quản trị phải giữ nội dung đang nhập để quản trị viên có thể thử lại.
+
+#### Tiêu Chí Chấp Nhận
+
+**AC-REVIEW-10-01**
+
+Cho trước một quản trị viên đã đăng nhập và một đánh giá chưa có phản hồi, khi quản trị viên gửi nội dung hợp lệ, thì đúng một phản hồi được tạo và xuất hiện với nhãn "Phản hồi từ cửa hàng" ở lần đọc thành công kế tiếp của người dùng.
+
+**AC-REVIEW-10-02**
+
+Cho trước một đánh giá đã có phản hồi, khi một quản trị viên bất kỳ sửa bằng nội dung hợp lệ dựa trên trạng thái hiện tại, thì cùng phản hồi đó hiển thị nội dung và thời điểm cập nhật mới mà không tạo phản hồi thứ hai.
+
+**AC-REVIEW-10-03**
+
+Cho trước nội dung rỗng, chỉ có khoảng trắng hoặc dài hơn 1000 ký tự, khi quản trị viên gửi phản hồi, thì hệ thống trả lỗi xác thực cho trường nội dung và không tạo hoặc thay đổi phản hồi.
+
+**AC-REVIEW-10-04**
+
+Cho trước người dùng không phải quản trị viên, khi người đó cố tạo hoặc sửa phản hồi, thì thao tác bị từ chối và trạng thái phản hồi không đổi.
+
+**AC-REVIEW-10-05**
+
+Cho trước hai quản trị viên đồng thời tạo phản hồi cho cùng một đánh giá chưa có phản hồi, khi cả hai thao tác hoàn tất, thì chỉ một phản hồi tồn tại và thao tác còn lại nhận lỗi xung đột bằng tiếng Việt.
+
+**AC-REVIEW-10-06**
+
+Cho trước hai quản trị viên đang xem cùng một phản hồi, khi một người lưu thay đổi trước và người còn lại lưu từ trạng thái cũ, thì thay đổi đã lưu trước không bị ghi đè âm thầm và người lưu sau nhận lỗi xung đột bằng tiếng Việt.
+
+**AC-REVIEW-10-07**
+
+Cho trước phản hồi chứa cú pháp HTML hoặc script hợp lệ trong giới hạn độ dài, khi phản hồi được hiển thị, thì người dùng chỉ thấy nội dung văn bản và không có mã nào được thực thi.
+
+**AC-REVIEW-10-08**
+
+Cho trước đánh giá đã có phản hồi, khi khách hàng sửa đánh giá thành công, thì phản hồi được giữ nguyên và hiển thị cùng trạng thái đánh giá mới.
+
+**AC-REVIEW-10-09**
+
+Cho trước đánh giá đã có phản hồi của một sản phẩm không còn hiển thị công khai, khi khách hàng mở lịch sử cá nhân hoặc quản trị viên mở danh sách đánh giá, thì phản hồi vẫn xuất hiện nhưng khách hàng không nhận liên kết tới trang sản phẩm công khai không khả dụng.
+
+**AC-REVIEW-10-10**
+
+Cho trước nhiều đánh giá, khi quản trị viên mở khu vực đánh giá, thì danh sách phân trang ổn định hiển thị mỗi đánh giá cùng phản hồi hiện tại nếu có và không làm thay đổi nội dung đánh giá.
+
+**AC-REVIEW-10-11**
+
+Cho trước quản trị viên đang tạo hoặc sửa phản hồi, khi thao tác lưu thất bại do validation, conflict hoặc lỗi hệ thống, thì phản hồi đã lưu trước đó không đổi, nội dung đang nhập vẫn còn trong biểu mẫu và quản trị viên có thể sửa hoặc tải state mới khi cần rồi thử lại.

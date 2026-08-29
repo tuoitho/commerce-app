@@ -102,7 +102,17 @@ describe('Reviews API Client', () => {
 
   it('listProductReviews sends GET request with page & limit pagination params', async () => {
     const mockList = [
-      { id: 'rev-1', rating: 5, comment: 'Hay' },
+      {
+        id: 'rev-1',
+        rating: 5,
+        comment: 'Hay',
+        response: {
+          content: '<strong>Cảm ơn bạn</strong>',
+          authorLabel: 'Phản hồi từ cửa hàng',
+          createdAt: '2026-08-28T01:00:00Z',
+          updatedAt: '2026-08-28T02:00:00Z',
+        },
+      },
     ]
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
@@ -123,6 +133,9 @@ describe('Reviews API Client', () => {
     const res = await listProductReviews('prod-1', 1, 10)
     expect(fetchSpy).toHaveBeenCalledWith('/api/v1/products/prod-1/reviews?page=1&limit=10', expect.objectContaining({ method: 'GET' }))
     expect(res.data).toEqual(mockList)
+    expect(res.data[0].response).toEqual(mockList[0].response)
+    expect(res.data[0].response).not.toHaveProperty('version')
+    expect(res.data[0].response).not.toHaveProperty('adminId')
     expect(res.meta.pagination?.total).toBe(1)
   })
 
@@ -134,6 +147,7 @@ describe('Reviews API Client', () => {
           id: 'rev-1',
           rating: 5,
           comment: 'Rất tốt',
+          response: null,
           viewer: { isOwner: true, canEdit: true, remainingEdits: 1 },
         },
         product: {

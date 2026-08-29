@@ -230,6 +230,20 @@ export function ProductReviewsSection({
                   </p>
                 )}
 
+                {rev.response && (
+                  <div className="border-l-2 border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-1.5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-xs font-bold text-emerald-800">{rev.response.authorLabel}</p>
+                      <time className="text-[11px] text-slate-400" dateTime={rev.response.updatedAt}>
+                        {new Date(rev.response.updatedAt).toLocaleDateString('vi-VN')}
+                      </time>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                      {rev.response.content}
+                    </p>
+                  </div>
+                )}
+
                 {/* Media Gallery */}
                 {rev.media && rev.media.length > 0 && (
                   <div className="flex items-center gap-2 pt-1 flex-wrap">

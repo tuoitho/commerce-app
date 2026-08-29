@@ -50,6 +50,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
 	case errors.Is(err, domain.ErrReviewMediaNotFound):
 		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewResponseConflict):
+		respondError(c, 409, "review_response_conflict", "Phản hồi đã thay đổi, vui lòng tải lại và thử lại", nil)
 	case errors.Is(err, domain.ErrEmailInUse):
 		respondError(c, 409, "email_in_use", "Email đã được sử dụng", nil)
 	case errors.Is(err, domain.ErrInvalidCredentials):

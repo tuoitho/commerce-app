@@ -21,8 +21,8 @@ import (
 var hex64Regex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type FileUpload struct {
-	Index       int
-	Reader      io.Reader
+	Index        int
+	Reader       io.Reader
 	DeclaredSize int64
 }
 
@@ -35,14 +35,14 @@ type MediaManifestItem struct {
 }
 
 type CreateInput struct {
-	OrderID      string
-	OrderItemID  string
-	UserID       string
-	Rating       int
-	RatingSet    bool
-	Comment      string
-	Media        []MediaManifestItem
-	Files        []FileUpload
+	OrderID     string
+	OrderItemID string
+	UserID      string
+	Rating      int
+	RatingSet   bool
+	Comment     string
+	Media       []MediaManifestItem
+	Files       []FileUpload
 }
 
 type EditInput struct {
@@ -249,6 +249,39 @@ func (uc *UseCase) ListOwnedReviews(ctx context.Context, userID string, page, li
 		return []domain.OwnedReviewHistoryItem{}, 0, nil
 	}
 	return uc.reviews.ListOwnerReviews(ctx, userID, page, limit)
+}
+
+func (uc *UseCase) ListAdminReviews(ctx context.Context, page, limit int) ([]domain.AdminReviewItem, int64, error) {
+	return uc.reviews.ListAdminReviews(ctx, page, limit)
+}
+
+func (uc *UseCase) CreateStoreResponse(ctx context.Context, reviewID, adminID, content string) (*domain.AdminStoreReviewResponse, error) {
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.NewValidationError(map[string]string{"reviewId": "Mã đánh giá không hợp lệ"})
+	}
+	trimmed, err := domain.NormalizeStoreReviewResponseContent(content)
+	if err != nil {
+		return nil, err
+	}
+	return uc.reviews.CreateReviewResponse(ctx, reviewID, adminID, trimmed)
+}
+
+func (uc *UseCase) UpdateStoreResponse(ctx context.Context, reviewID, adminID, content string, version int) (*domain.AdminStoreReviewResponse, error) {
+	fields := map[string]string{}
+	if _, err := uuid.Parse(reviewID); err != nil {
+		fields["reviewId"] = "Mã đánh giá không hợp lệ"
+	}
+	if version < 1 {
+		fields["version"] = "Phiên bản phản hồi phải là số nguyên dương"
+	}
+	trimmed, contentErr := domain.NormalizeStoreReviewResponseContent(content)
+	if contentErr != nil {
+		fields["content"] = "Nội dung phản hồi phải có từ 1 đến 1000 ký tự"
+	}
+	if len(fields) > 0 {
+		return nil, domain.NewValidationError(fields)
+	}
+	return uc.reviews.UpdateReviewResponse(ctx, reviewID, adminID, trimmed, version)
 }
 
 func (uc *UseCase) EditReview(ctx context.Context, in EditInput) (*domain.Review, error) {

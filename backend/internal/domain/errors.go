@@ -6,29 +6,29 @@ import (
 )
 
 var (
-	ErrValidation          = errors.New("validation failed")
-	ErrEmailInUse          = errors.New("email already in use")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrInvalidToken        = errors.New("invalid token")
-	ErrForbidden           = errors.New("forbidden")
-	ErrNotFound            = errors.New("not found")
-	ErrProductNotFound     = errors.New("product not found")
-	ErrInvalidProductID    = errors.New("invalid product id")
-	ErrInvalidCategoryID   = errors.New("invalid category id")
-	ErrCategoryNameInUse   = errors.New("category name in use")
-	ErrCategoryNotFound    = errors.New("category not found")
-	ErrCategoryInUse       = errors.New("category in use")
-	ErrInvalidMoneyVND     = errors.New("invalid VND amount")
-	ErrCartItemNotFound    = errors.New("cart item not found")
-	ErrVariantNotFound     = errors.New("variant not found")
-	ErrVariantUnavailable  = errors.New("variant unavailable")
-	ErrOutOfStock          = errors.New("out of stock")
-	ErrStockLimit          = errors.New("stock limit reached")
-	ErrCartItemUnavailable = errors.New("cart item unavailable")
-	ErrCartEmpty           = errors.New("cart empty")
-	ErrAddressNotFound     = errors.New("address not found")
-	ErrOrderNotFound       = errors.New("order not found")
-	ErrOrderNotCancellable = errors.New("order not cancellable")
+	ErrValidation              = errors.New("validation failed")
+	ErrEmailInUse              = errors.New("email already in use")
+	ErrInvalidCredentials      = errors.New("invalid credentials")
+	ErrInvalidToken            = errors.New("invalid token")
+	ErrForbidden               = errors.New("forbidden")
+	ErrNotFound                = errors.New("not found")
+	ErrProductNotFound         = errors.New("product not found")
+	ErrInvalidProductID        = errors.New("invalid product id")
+	ErrInvalidCategoryID       = errors.New("invalid category id")
+	ErrCategoryNameInUse       = errors.New("category name in use")
+	ErrCategoryNotFound        = errors.New("category not found")
+	ErrCategoryInUse           = errors.New("category in use")
+	ErrInvalidMoneyVND         = errors.New("invalid VND amount")
+	ErrCartItemNotFound        = errors.New("cart item not found")
+	ErrVariantNotFound         = errors.New("variant not found")
+	ErrVariantUnavailable      = errors.New("variant unavailable")
+	ErrOutOfStock              = errors.New("out of stock")
+	ErrStockLimit              = errors.New("stock limit reached")
+	ErrCartItemUnavailable     = errors.New("cart item unavailable")
+	ErrCartEmpty               = errors.New("cart empty")
+	ErrAddressNotFound         = errors.New("address not found")
+	ErrOrderNotFound           = errors.New("order not found")
+	ErrOrderNotCancellable     = errors.New("order not cancellable")
 	ErrOrderNotCancelRequested = errors.New("order not cancel requested")
 	ErrOrderActionNotAllowed   = errors.New("order action not allowed")
 
@@ -44,6 +44,7 @@ var (
 	ErrReviewEditLimitReached = errors.New("review edit limit reached")
 	ErrReviewNotFound         = errors.New("review not found")
 	ErrReviewMediaNotFound    = errors.New("review media not found")
+	ErrReviewResponseConflict = errors.New("review response conflict")
 )
 
 type ValidationError struct {
@@ -87,5 +88,3 @@ func (e *ProductChangedError) Error() string {
 func NewProductChangedError(products []string) *ProductChangedError {
 	return &ProductChangedError{Products: products}
 }
-
-

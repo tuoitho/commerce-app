@@ -1,0 +1,18 @@
+owner: backend-review
+scope: BE-05
+contract: PURCHASED-REVIEW-API
+revision: 4
+status: PASS
+findings:
+  - id: REV4-API-001
+    status: closed
+    classification: contract_violation
+    closure: Typed content/version errors now map to fields.content/version; malformed or unknown JSON maps to fields.body.
+  - id: REV4-API-002
+    status: closed
+    classification: requirement_violation
+    closure: Admin auth failures now use Vietnamese messages with unauthorized/invalid_token codes.
+verification:
+  - go test ./internal/delivery/http
+  - make test
+  - make vet

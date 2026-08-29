@@ -109,6 +109,7 @@ describe('MyReviewsPage', () => {
           authorLabel: 'Khách hàng đã mua hàng',
           createdAt: '2026-08-28T10:00:00Z',
           updatedAt: '2026-08-28T10:00:00Z',
+          response: null,
           viewer: { isOwner: true, canEdit: true, remainingEdits: 1 },
         },
         product: {
@@ -130,6 +131,7 @@ describe('MyReviewsPage', () => {
           authorLabel: 'Khách hàng đã mua hàng',
           createdAt: '2026-08-28T09:00:00Z',
           updatedAt: '2026-08-28T09:30:00Z',
+          response: null,
           viewer: { isOwner: true, canEdit: false, remainingEdits: 0 },
         },
         product: {
@@ -215,5 +217,62 @@ describe('MyReviewsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Chưa có đánh giá nào')).toBeInTheDocument()
     })
+  })
+
+  it('retains and safely renders a response for the current review without linking a hidden product', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      user: { id: 'u1', email: 'user@example.com', role: 'customer' },
+      accessToken: 'test-token',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    const literalContent = '<script>window.__responseXss=true</script> Nội dung sau chỉnh sửa'
+    vi.mocked(reviewsApi.listOwnedReviews).mockResolvedValueOnce({
+      message: 'Danh sách đánh giá của tôi',
+      data: [{
+        review: {
+          id: 'rev-responded',
+          productId: 'prod-hidden',
+          variantId: 'var-1',
+          rating: 5,
+          comment: 'Nội dung đánh giá hiện tại',
+          purchasedOptions: [],
+          media: [],
+          verifiedPurchase: true,
+          authorLabel: 'Khách hàng đã mua hàng',
+          createdAt: '2026-08-28T10:00:00Z',
+          updatedAt: '2026-08-28T11:00:00Z',
+          viewer: { isOwner: true, canEdit: false, remainingEdits: 0 },
+          response: {
+            content: literalContent,
+            authorLabel: 'Phản hồi từ cửa hàng',
+            createdAt: '2026-08-28T10:30:00Z',
+            updatedAt: '2026-08-28T10:45:00Z',
+          },
+        },
+        product: { id: 'prod-hidden', name: 'Sản phẩm đã ẩn', publicPath: null },
+      }],
+      meta: {
+        timestamp: '2026-08-28T12:00:00Z',
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/reviews']}>
+        <MyReviewsPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Phản hồi từ cửa hàng')).toBeInTheDocument()
+    expect(screen.getByText(literalContent)).toBeInTheDocument()
+    expect(screen.getByText('Nội dung đánh giá hiện tại')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Sản phẩm đã ẩn/i })).not.toBeInTheDocument()
+    expect(container.querySelector('script')).not.toBeInTheDocument()
+    expect(screen.queryByText(/version|admin/i)).not.toBeInTheDocument()
   })
 })

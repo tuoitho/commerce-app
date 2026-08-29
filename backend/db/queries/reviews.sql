@@ -77,9 +77,12 @@ WHERE rm.id = $1;
 -- name: ListProductReviews :many
 SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        pr.rating, pr.comment, pr.created_at, pr.updated_at, pr.edited_at,
-       oi.options::text AS purchased_options
+       oi.options::text AS purchased_options,
+       rr.content AS response_content, rr.created_at AS response_created_at,
+       rr.updated_at AS response_updated_at
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
+LEFT JOIN review_responses rr ON rr.review_id = pr.id
 WHERE pr.product_id = @product_id
 ORDER BY pr.updated_at DESC, pr.id DESC
 LIMIT @limit_count OFFSET @offset_count;
@@ -109,6 +112,8 @@ SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        pr.rating, pr.comment, pr.created_at, pr.updated_at, pr.edited_at,
        oi.product_name AS purchased_product_name,
        oi.options::text AS purchased_options,
+       rr.content AS response_content, rr.created_at AS response_created_at,
+       rr.updated_at AS response_updated_at,
        EXISTS (
            SELECT 1 FROM products p
            WHERE p.id = pr.product_id
@@ -117,6 +122,7 @@ SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        ) AS is_product_public
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
+LEFT JOIN review_responses rr ON rr.review_id = pr.id
 WHERE pr.user_id = @user_id
 ORDER BY pr.updated_at DESC, pr.id DESC
 LIMIT @limit_count OFFSET @offset_count;
@@ -125,3 +131,46 @@ LIMIT @limit_count OFFSET @offset_count;
 SELECT count(*)::bigint AS count
 FROM product_reviews
 WHERE user_id = $1;
+
+-- name: GetReviewResponse :one
+SELECT review_id, content, version, created_at, updated_at
+FROM review_responses
+WHERE review_id = $1;
+
+-- name: InsertReviewResponse :one
+INSERT INTO review_responses (review_id, content, created_by, updated_by)
+SELECT pr.id, @content, @admin_id, @admin_id
+FROM product_reviews pr
+WHERE pr.id = @review_id
+  AND NOT EXISTS (SELECT 1 FROM review_responses rr WHERE rr.review_id = pr.id)
+RETURNING review_id, content, version, created_at, updated_at;
+
+-- name: UpdateReviewResponse :one
+UPDATE review_responses
+SET content = @content, updated_by = @admin_id,
+    version = version + 1, updated_at = now()
+WHERE review_id = @review_id AND version = @version
+RETURNING review_id, content, version, created_at, updated_at;
+
+-- name: ReviewExists :one
+SELECT EXISTS (SELECT 1 FROM product_reviews WHERE id = $1);
+
+-- name: CountAdminReviews :one
+SELECT count(*)::bigint FROM product_reviews;
+
+-- name: ListAdminReviews :many
+SELECT pr.id, pr.order_item_id, pr.product_id, pr.variant_id, pr.rating, pr.comment,
+       pr.created_at, pr.updated_at, pr.edited_at,
+       oi.product_name AS purchased_product_name, oi.options::text AS purchased_options,
+       EXISTS (
+           SELECT 1 FROM products p
+           WHERE p.id = pr.product_id AND p.active
+             AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
+       ) AS is_product_public,
+       rr.content AS response_content, rr.created_at AS response_created_at,
+       rr.updated_at AS response_updated_at, rr.version AS response_version
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+LEFT JOIN review_responses rr ON rr.review_id = pr.id
+ORDER BY pr.updated_at DESC, pr.id DESC
+LIMIT @limit_count OFFSET @offset_count;

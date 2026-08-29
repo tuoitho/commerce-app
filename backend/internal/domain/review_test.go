@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -78,5 +80,46 @@ func TestNormalizeComment(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("NormalizeComment(%q) = %q; want %q", tt.input, got, tt.expected)
 		}
+	}
+}
+
+func TestNormalizeStoreReviewResponseContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+		wantErr bool
+	}{
+		{name: "trims plain text", content: "  <script>alert(1)</script>  ", want: "<script>alert(1)</script>"},
+		{name: "accepts 1000 characters after trim", content: " " + strings.Repeat("a", 1000) + " ", want: strings.Repeat("a", 1000)},
+		{name: "rejects whitespace only", content: " \n\t ", wantErr: true},
+		{name: "rejects 1001 characters after trim", content: strings.Repeat("a", 1001), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NormalizeStoreReviewResponseContent(tt.content)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("content length = %d, want %d", len(got), len(tt.want))
+			}
+		})
+	}
+}
+
+func TestReviewResponseJSONDoesNotExposeAdminIdentityOrVersion(t *testing.T) {
+	review := Review{Response: &StoreReviewResponse{Content: "Cảm ơn bạn"}}
+	b, err := json.Marshal(review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonBody := string(b)
+	if !strings.Contains(jsonBody, `"response":`) {
+		t.Fatalf("response field missing: %s", jsonBody)
+	}
+	if strings.Contains(jsonBody, "version") || strings.Contains(jsonBody, "admin") {
+		t.Fatalf("public review leaked admin capability or identity: %s", jsonBody)
 	}
 }

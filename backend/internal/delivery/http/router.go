@@ -169,4 +169,19 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminReturns.POST("/:id/refund", adminReturnHandler.RecordRefund)
 		}
 	}
+
+	adminReviews := api.Group("/admin/reviews")
+	adminReviews.Use(guard.AdminReviewAuthRequired, func(c *gin.Context) {
+		if callerRole(c) != "admin" {
+			respondError(c, 403, "forbidden", "Bạn không có quyền phản hồi đánh giá", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	})
+	{
+		adminReviews.GET("", reviewHandler.ListAdminReviews)
+		adminReviews.POST("/:reviewId/response", reviewHandler.CreateStoreResponse)
+		adminReviews.PUT("/:reviewId/response", reviewHandler.UpdateStoreResponse)
+	}
 }

@@ -8,12 +8,14 @@ import (
 )
 
 const (
-	MaxReviewMediaCount     = 5
-	MaxReviewVideoCount     = 2
-	MaxReviewImageSizeBytes = 5 * 1024 * 1024  // 5242880 bytes (5 MiB)
-	MaxReviewVideoSizeBytes = 50 * 1024 * 1024 // 52428800 bytes (50 MiB)
-	MaxReviewCommentLength  = 1000
-	DefaultAuthorLabel      = "Khách hàng đã mua hàng"
+	MaxReviewMediaCount      = 5
+	MaxReviewVideoCount      = 2
+	MaxReviewImageSizeBytes  = 5 * 1024 * 1024  // 5242880 bytes (5 MiB)
+	MaxReviewVideoSizeBytes  = 50 * 1024 * 1024 // 52428800 bytes (50 MiB)
+	MaxReviewCommentLength   = 1000
+	MaxStoreResponseLength   = 1000
+	DefaultAuthorLabel       = "Khách hàng đã mua hàng"
+	StoreResponseAuthorLabel = "Phản hồi từ cửa hàng"
 )
 
 type MediaType string
@@ -57,22 +59,35 @@ type ReviewViewerState struct {
 	RemainingEdits int  `json:"remainingEdits"`
 }
 
+type StoreReviewResponse struct {
+	Content     string    `json:"content"`
+	AuthorLabel string    `json:"authorLabel"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type AdminStoreReviewResponse struct {
+	StoreReviewResponse
+	Version int `json:"version"`
+}
+
 type Review struct {
-	ID               string             `json:"id"`
-	OrderItemID      string             `json:"orderItemId,omitempty"`
-	UserID           string             `json:"-"`
-	ProductID        string             `json:"productId"`
-	VariantID        string             `json:"variantId"`
-	PurchasedOptions []PurchasedOption  `json:"purchasedOptions"`
-	Rating           int                `json:"rating"`
-	Comment          string             `json:"comment"`
-	Media            []ReviewMedia      `json:"media"`
-	VerifiedPurchase bool               `json:"verifiedPurchase"`
-	AuthorLabel      string             `json:"authorLabel"`
-	CreatedAt        time.Time          `json:"createdAt"`
-	UpdatedAt        time.Time          `json:"updatedAt"`
-	EditedAt         *time.Time         `json:"-"`
-	Viewer           *ReviewViewerState `json:"viewer"`
+	ID               string               `json:"id"`
+	OrderItemID      string               `json:"orderItemId,omitempty"`
+	UserID           string               `json:"-"`
+	ProductID        string               `json:"productId"`
+	VariantID        string               `json:"variantId"`
+	PurchasedOptions []PurchasedOption    `json:"purchasedOptions"`
+	Rating           int                  `json:"rating"`
+	Comment          string               `json:"comment"`
+	Media            []ReviewMedia        `json:"media"`
+	VerifiedPurchase bool                 `json:"verifiedPurchase"`
+	AuthorLabel      string               `json:"authorLabel"`
+	CreatedAt        time.Time            `json:"createdAt"`
+	UpdatedAt        time.Time            `json:"updatedAt"`
+	EditedAt         *time.Time           `json:"-"`
+	Viewer           *ReviewViewerState   `json:"viewer"`
+	Response         *StoreReviewResponse `json:"response"`
 }
 
 type ReviewSummary struct {
@@ -89,6 +104,12 @@ type ReviewHistoryProduct struct {
 type OwnedReviewHistoryItem struct {
 	Review  Review               `json:"review"`
 	Product ReviewHistoryProduct `json:"product"`
+}
+
+type AdminReviewItem struct {
+	Review          Review               `json:"review"`
+	Product         ReviewHistoryProduct `json:"product"`
+	ResponseVersion *int                 `json:"responseVersion"`
 }
 
 type OrderItemReviewStatus string
@@ -120,4 +141,12 @@ func FormatMediaURL(mediaID string) string {
 // NormalizeComment trims leading and trailing whitespace.
 func NormalizeComment(comment string) string {
 	return strings.TrimSpace(comment)
+}
+
+func NormalizeStoreReviewResponseContent(content string) (string, error) {
+	trimmed := strings.TrimSpace(content)
+	if len([]rune(trimmed)) < 1 || len([]rune(trimmed)) > MaxStoreResponseLength {
+		return "", NewValidationError(map[string]string{"content": "Nội dung phản hồi phải có từ 1 đến 1000 ký tự"})
+	}
+	return trimmed, nil
 }

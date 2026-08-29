@@ -1,7 +1,10 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -18,19 +21,49 @@ type reviewHandler struct {
 	uc *reviewuc.UseCase
 }
 
+type storeResponseInput struct {
+	Content string `json:"content"`
+	Version *int   `json:"version,omitempty"`
+}
+
+func decodeStoreResponseInput(c *gin.Context) (storeResponseInput, bool) {
+	var input storeResponseInput
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"body": "Dữ liệu JSON không hợp lệ"})
+		return input, false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &typeErr) && (typeErr.Field == "content" || typeErr.Field == "version") {
+			respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{typeErr.Field: "Kiểu dữ liệu không hợp lệ"})
+			return input, false
+		}
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"body": "Dữ liệu JSON không hợp lệ hoặc chứa trường không được hỗ trợ"})
+		return input, false
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"body": "Dữ liệu JSON không hợp lệ"})
+		return input, false
+	}
+	return input, true
+}
+
 func newReviewHandler(uc *reviewuc.UseCase) *reviewHandler {
 	return &reviewHandler{uc: uc}
 }
 
 type createReviewPayloadJSON struct {
-	Rating  *int                          `json:"rating"`
-	Comment string                        `json:"comment"`
+	Rating  *int                         `json:"rating"`
+	Comment string                       `json:"comment"`
 	Media   []reviewuc.MediaManifestItem `json:"media"`
 }
 
 type editReviewPayloadJSON struct {
-	Rating  *int                          `json:"rating"`
-	Comment string                        `json:"comment"`
+	Rating  *int                         `json:"rating"`
+	Comment string                       `json:"comment"`
 	Media   []reviewuc.MediaManifestItem `json:"media"`
 }
 
@@ -339,4 +372,89 @@ func (h *reviewHandler) ListOwnedReviews(c *gin.Context) {
 		HasNext:    page < totalPages,
 		HasPrev:    page > 1,
 	})
+}
+
+func (h *reviewHandler) ListAdminReviews(c *gin.Context) {
+	page, limit, ok := parseReviewPagination(c)
+	if !ok {
+		return
+	}
+	items, total, err := h.uc.ListAdminReviews(c.Request.Context(), page, limit)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(limit)))
+	}
+	writePaginatedSuccess(c, http.StatusOK, "Danh sách đánh giá", items, PaginationMeta{Page: page, Limit: limit, Total: int(total), TotalPages: totalPages, HasNext: page < totalPages, HasPrev: page > 1})
+}
+
+func (h *reviewHandler) CreateStoreResponse(c *gin.Context) {
+	if _, err := uuid.Parse(c.Param("reviewId")); err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"reviewId": "Mã đánh giá không hợp lệ"})
+		return
+	}
+	input, ok := decodeStoreResponseInput(c)
+	if !ok {
+		return
+	}
+	if input.Version != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"body": "Dữ liệu chứa trường không được hỗ trợ"})
+		return
+	}
+	response, err := h.uc.CreateStoreResponse(c.Request.Context(), c.Param("reviewId"), callerUserID(c), input.Content)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusCreated, "Tạo phản hồi thành công", response)
+}
+
+func (h *reviewHandler) UpdateStoreResponse(c *gin.Context) {
+	if _, err := uuid.Parse(c.Param("reviewId")); err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{"reviewId": "Mã đánh giá không hợp lệ"})
+		return
+	}
+	input, ok := decodeStoreResponseInput(c)
+	if !ok {
+		return
+	}
+	version := 0
+	if input.Version != nil {
+		version = *input.Version
+	}
+	response, err := h.uc.UpdateStoreResponse(c.Request.Context(), c.Param("reviewId"), callerUserID(c), input.Content, version)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Cập nhật phản hồi thành công", response)
+}
+
+func parseReviewPagination(c *gin.Context) (int, int, bool) {
+	page, limit := 1, 10
+	fields := map[string]string{}
+	if raw := c.Query("page"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 {
+			fields["page"] = "Trang phải là số nguyên dương"
+		} else {
+			page = value
+		}
+	}
+	if raw := c.Query("limit"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > 50 {
+			fields["limit"] = "Số lượng trên mỗi trang phải từ 1 đến 50"
+		} else {
+			limit = value
+		}
+	}
+	if len(fields) > 0 {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", fields)
+		return 0, 0, false
+	}
+	return page, limit, true
 }

@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,21 +16,22 @@ import (
 )
 
 const (
-	revIntegUserA     = "11111111-1111-1111-1111-111111111111"
-	revIntegUserB     = "22222222-2222-2222-2222-222222222222"
-	revIntegCategory  = "12000000-0000-0000-0000-000000000001"
-	revIntegProduct1  = "13000000-0000-0000-0000-000000000001"
-	revIntegProduct2  = "13000000-0000-0000-0000-000000000002"
-	revIntegVariant1  = "14000000-0000-0000-0000-000000000001"
-	revIntegVariant2  = "14000000-0000-0000-0000-000000000002"
-	revIntegOrder1    = "17000000-0000-0000-0000-000000000001"
-	revIntegOrder2    = "17000000-0000-0000-0000-000000000002"
-	revIntegItem1     = "19000000-0000-0000-0000-000000000001"
-	revIntegItem2     = "19000000-0000-0000-0000-000000000002"
-	revIntegItem3     = "19000000-0000-0000-0000-000000000003"
-	revIntegReview1   = "21000000-0000-0000-0000-000000000001"
-	revIntegReview2   = "21000000-0000-0000-0000-000000000002"
-	revIntegReview3   = "21000000-0000-0000-0000-000000000003"
+	revIntegUserA    = "11111111-1111-1111-1111-111111111111"
+	revIntegUserB    = "22222222-2222-2222-2222-222222222222"
+	revIntegCategory = "12000000-0000-0000-0000-000000000001"
+	revIntegProduct1 = "13000000-0000-0000-0000-000000000001"
+	revIntegProduct2 = "13000000-0000-0000-0000-000000000002"
+	revIntegVariant1 = "14000000-0000-0000-0000-000000000001"
+	revIntegVariant2 = "14000000-0000-0000-0000-000000000002"
+	revIntegOrder1   = "17000000-0000-0000-0000-000000000001"
+	revIntegOrder2   = "17000000-0000-0000-0000-000000000002"
+	revIntegItem1    = "19000000-0000-0000-0000-000000000001"
+	revIntegItem2    = "19000000-0000-0000-0000-000000000002"
+	revIntegItem3    = "19000000-0000-0000-0000-000000000003"
+	revIntegReview1  = "21000000-0000-0000-0000-000000000001"
+	revIntegReview2  = "21000000-0000-0000-0000-000000000002"
+	revIntegReview3  = "21000000-0000-0000-0000-000000000003"
+	revIntegAdmin    = "99999999-9999-9999-9999-999999999999"
 )
 
 func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
@@ -62,6 +64,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		"000010_order_returns.up.sql",
 		"000011_product_favorites.up.sql",
 		"000012_product_reviews.up.sql",
+		"000013_review_responses.up.sql",
 	} {
 		applyMigration(t, ctx, conn, migration)
 	}
@@ -70,8 +73,9 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 	if _, err := conn.Exec(ctx, `
 		INSERT INTO users (id, email, password_hash, role) VALUES
 		($1, 'user-a@example.com', 'hash', 'customer'),
-		($2, 'user-b@example.com', 'hash', 'customer');
-	`, revIntegUserA, revIntegUserB); err != nil {
+		($2, 'user-b@example.com', 'hash', 'customer'),
+		($3, 'admin@example.com', 'hash', 'admin');
+	`, revIntegUserA, revIntegUserB, revIntegAdmin); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,18 +85,18 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		INSERT INTO products (id, category_id, name, description, price, currency, stock_quantity, active) VALUES
 		($2, $1, 'Active Phone', 'Description', 10000000, 'VND', 10, true),
 		($3, $1, 'Inactive Phone', 'Description', 12000000, 'VND', 0, false);
-		INSERT INTO product_variants (id, product_id, sku, price_vnd, stock_quantity, active) VALUES
-		($4, $2, 'SKU-1', 10000000, 10, true),
-		($5, $3, 'SKU-2', 12000000, 0, false);
+		INSERT INTO product_variants (id, product_id, price_vnd, stock_quantity, active) VALUES
+		($4, $2, 10000000, 10, true),
+		($5, $3, 12000000, 0, false);
 	`, revIntegCategory, revIntegProduct1, revIntegProduct2, revIntegVariant1, revIntegVariant2); err != nil {
 		t.Fatal(err)
 	}
 
 	// Seed orders & items
 	if _, err := conn.Exec(ctx, `
-		INSERT INTO orders (id, user_id, status, total_amount_vnd, shipping_address_snapshot) VALUES
-		($1, $2, 'delivered', 10000000, '{"street":"123"}'::jsonb),
-		($3, $4, 'delivered', 12000000, '{"street":"456"}'::jsonb);
+		INSERT INTO orders (id, user_id, status, subtotal_vnd, shipping_fee_vnd, total_vnd, recipient_name, phone, province_name, ward_name, detail_address) VALUES
+		($1, $2, 'delivered', 10000000, 0, 10000000, 'User A', '0900000001', 'Province', 'Ward', '123 Street'),
+		($3, $4, 'delivered', 12000000, 0, 12000000, 'User B', '0900000002', 'Province', 'Ward', '456 Street');
 
 		INSERT INTO order_items (id, order_id, variant_id, product_id, brand_name, product_name, options, unit_price_vnd, quantity, line_total_vnd) VALUES
 		($5, $1, $6, $7, 'Brand', 'Purchased Active Phone', '[{"groupLabel":"Color","valueLabel":"Black"}]'::jsonb, 10000000, 1, 10000000),
@@ -112,7 +116,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		($6, $7, $3, $8, $9, 4, 'Good inactive phone', '2026-08-28 11:00:00+00', '2026-08-28 11:00:00+00'),
 		($10, $11, $12, $4, $5, 3, 'User B review', '2026-08-28 12:00:00+00', '2026-08-28 12:00:00+00');
 	`, revIntegReview1, revIntegItem1, revIntegUserA, revIntegProduct1, revIntegVariant1,
-		revIntegReview2, revIntegItem2, revIntegUserA, revIntegProduct2, revIntegVariant2,
+		revIntegReview2, revIntegItem2, revIntegProduct2, revIntegVariant2,
 		revIntegReview3, revIntegItem3, revIntegUserB); err != nil {
 		t.Fatal(err)
 	}
@@ -203,5 +207,197 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		if items[0].Review.Viewer.CanEdit || items[0].Review.Viewer.RemainingEdits != 0 {
 			t.Errorf("expected canEdit false and remainingEdits 0, got %+v", items[0].Review.Viewer)
 		}
+	})
+
+	t.Run("R4 response create update conflict and read retention", func(t *testing.T) {
+		created, err := repo.CreateReviewResponse(ctx, revIntegReview2, revIntegAdmin, "Phản hồi đầu tiên")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if created.Version != 1 || created.Content != "Phản hồi đầu tiên" {
+			t.Fatalf("unexpected created response: %+v", created)
+		}
+		if _, err := repo.CreateReviewResponse(ctx, revIntegReview2, revIntegAdmin, "duplicate"); !errors.Is(err, domain.ErrReviewResponseConflict) {
+			t.Fatalf("duplicate create error = %v", err)
+		}
+
+		updated, err := repo.UpdateReviewResponse(ctx, revIntegReview2, revIntegAdmin, "Phản hồi mới", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if updated.Version != 2 || updated.CreatedAt != created.CreatedAt || !updated.UpdatedAt.After(created.UpdatedAt) {
+			t.Fatalf("unexpected updated response: %+v", updated)
+		}
+		if _, err := repo.UpdateReviewResponse(ctx, revIntegReview2, revIntegAdmin, "stale", 1); !errors.Is(err, domain.ErrReviewResponseConflict) {
+			t.Fatalf("stale update error = %v", err)
+		}
+
+		owned, _, err := repo.ListOwnerReviews(ctx, revIntegUserA, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ownerFound := false
+		for _, item := range owned {
+			if item.Review.ID == revIntegReview2 {
+				ownerFound = item.Review.Response != nil && item.Review.Response.Content == "Phản hồi mới" && item.Product.PublicPath == nil
+			}
+		}
+		if !ownerFound {
+			t.Fatal("hidden-product owner response not retained")
+		}
+
+		adminItems, total, err := repo.ListAdminReviews(ctx, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 3 {
+			t.Fatalf("admin total = %d, want 3", total)
+		}
+		found := false
+		for _, item := range adminItems {
+			if item.Review.ID == revIntegReview2 {
+				found = item.Review.Response != nil && item.Review.Response.Content == "Phản hồi mới" && item.ResponseVersion != nil && *item.ResponseVersion == 2 && item.Product.PublicPath == nil && item.Review.Viewer == nil
+			}
+		}
+		if !found {
+			t.Fatal("admin projection did not retain hidden-product response/version")
+		}
+	})
+
+	t.Run("INT-03 concurrent response create has one winner and one conflict", func(t *testing.T) {
+		start := make(chan struct{})
+		results := make(chan error, 2)
+		for _, content := range []string{"race winner A", "race winner B"} {
+			go func(content string) {
+				<-start
+				_, err := repo.CreateReviewResponse(ctx, revIntegReview3, revIntegAdmin, content)
+				results <- err
+			}(content)
+		}
+		close(start)
+		var success, conflicts int
+		for i := 0; i < 2; i++ {
+			err := <-results
+			if err == nil {
+				success++
+			} else if errors.Is(err, domain.ErrReviewResponseConflict) {
+				conflicts++
+			} else {
+				t.Fatalf("unexpected concurrent create error: %v", err)
+			}
+		}
+		if success != 1 || conflicts != 1 {
+			t.Fatalf("concurrent create results = success %d, conflicts %d", success, conflicts)
+		}
+		var responseCount int
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM review_responses WHERE review_id = $1`, revIntegReview3).Scan(&responseCount); err != nil {
+			t.Fatal(err)
+		}
+		if responseCount != 1 {
+			t.Fatalf("persisted response count = %d, want 1", responseCount)
+		}
+	})
+
+	t.Run("INT-03 concurrent same-version update has one winner and no lost update", func(t *testing.T) {
+		start := make(chan struct{})
+		results := make(chan error, 2)
+		for _, content := range []string{"update race A", "update race B"} {
+			go func(content string) {
+				<-start
+				_, err := repo.UpdateReviewResponse(ctx, revIntegReview3, revIntegAdmin, content, 1)
+				results <- err
+			}(content)
+		}
+		close(start)
+		var success, conflicts int
+		for i := 0; i < 2; i++ {
+			err := <-results
+			if err == nil {
+				success++
+			} else if errors.Is(err, domain.ErrReviewResponseConflict) {
+				conflicts++
+			} else {
+				t.Fatalf("unexpected concurrent update error: %v", err)
+			}
+		}
+		if success != 1 || conflicts != 1 {
+			t.Fatalf("concurrent update results = success %d, conflicts %d", success, conflicts)
+		}
+		var content string
+		var version int
+		if err := conn.QueryRow(ctx, `SELECT content, version FROM review_responses WHERE review_id = $1`, revIntegReview3).Scan(&content, &version); err != nil {
+			t.Fatal(err)
+		}
+		if version != 2 || (content != "update race A" && content != "update race B") {
+			t.Fatalf("persisted response = %q version %d", content, version)
+		}
+	})
+
+	t.Run("INT-03 HTTP boundary accepts exact 1000 and maps over-limit content", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		engine := gin.New()
+		manager := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+		adminToken, err := manager.GenerateAccessToken(revIntegAdmin, domain.RoleAdmin, 15*time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		uc := reviewuc.New(reviewuc.Dependencies{Reviews: repo, Storage: storage.NewMemoryStorage("test-bucket")})
+		delivery.NewRouter(engine, delivery.Dependencies{Review: uc, JWT: manager})
+
+		valid := `{"content":"` + strings.Repeat("a", 1000) + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+revIntegReview1+"/response", strings.NewReader(valid))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), `"content":"`+strings.Repeat("a", 1000)+`"`) {
+			t.Fatalf("exact 1000 response = %d: %s", w.Code, w.Body.String())
+		}
+
+		over := `{"content":"` + strings.Repeat("b", 1001) + `"}`
+		req = httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+revIntegReview2+"/response", strings.NewReader(over))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		req.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"fields":{"content":`) {
+			t.Fatalf("over-limit response = %d: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("INT-03 admin public and owner projections retain review fields with response", func(t *testing.T) {
+		public, _, err := repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var publicReview *domain.Review
+		for i := range public {
+			if public[i].ID == revIntegReview3 {
+				publicReview = &public[i]
+			}
+		}
+		if publicReview == nil || publicReview.Response == nil || publicReview.Rating != 3 || publicReview.Comment != "User B review" || publicReview.VariantID != revIntegVariant1 || publicReview.Viewer != nil {
+			t.Fatalf("public projection lost review fields: %+v", publicReview)
+		}
+		owned, _, err := repo.ListOwnerReviews(ctx, revIntegUserB, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(owned) != 1 || owned[0].Review.Response == nil || owned[0].Review.ID != revIntegReview3 || owned[0].Review.Viewer == nil || !owned[0].Review.Viewer.IsOwner {
+			t.Fatalf("owner projection lost review fields: %+v", owned)
+		}
+		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range adminItems {
+			if item.Review.ID == revIntegReview3 {
+				if item.Review.Response == nil || item.Review.Rating != 3 || item.Review.Comment != "User B review" || item.Review.Viewer != nil || item.ResponseVersion == nil || *item.ResponseVersion != 2 {
+					t.Fatalf("admin projection lost review fields: %+v", item)
+				}
+				return
+			}
+		}
+		t.Fatal("admin projection did not contain review3")
 	})
 }

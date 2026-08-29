@@ -1,21 +1,28 @@
 # Final Acceptance Decision
 
-**Verdict:** ACCEPTED
+**Verdict:** BLOCKED
 **Feature:** purchased-product-reviews
-**Contract Baseline:** PURCHASED-REVIEW-API@2, PURCHASED-REVIEW-MEDIA@1
-**Feature Verification Report:** `.dream/specs/purchased-product-reviews/evidence/feature-verification.md` (Status: Verified)
+**Contract Baseline:** `PURCHASED-REVIEW-API@4` (inherits `@3`), `PURCHASED-REVIEW-MEDIA@1`
+**Feature Verification Report:** `.dream/specs/purchased-product-reviews/evidence/feature-verification.md` (Status: Needs Fix)
 
 ## Evidence Summary
 
-- **Task Gates:** All 7 tasks (`BE-01`, `BE-02`, `BE-03`, `FE-01`, `FE-02`, `FE-03`, `INT-01`) marked `completed` and verified against active contract revisions.
-- **Contract Conformance:** All provider and consumer scenarios across `PURCHASED-REVIEW-API@2` and `PURCHASED-REVIEW-MEDIA@1` pass with deterministic proof.
-- **Database & Storage Layer:** Schema migration `000012_product_reviews.up.sql` applied with UNIQUE `order_item_id` constraint, cascade media delete, and MinIO storage adapter with orphan object cleanup.
-- **Backend API Layer:** Full Status Envelope compliance, reference-first public media proxy supporting RFC 9110 Range headers (206/416) and conditional ETag 304 revalidation, single-edit limit enforcement, and Vietnamese business error messages.
-- **Frontend Layer:** Responsive product review summary & paginated reviews with lightbox media preview, accessible star rating (1-5), order item review creation and single-edit modal, and `awaitingReview` stat card integration.
-- **Test Automation:** 100% test suites pass across all packages (`make test`), zero lint errors (`npm run lint`, `make vet`), and clean production builds (`make build`).
-- **Runtime Integration:** Full live PostgreSQL + MinIO + Go HTTP backend + Chromium browser test passed with zero errors (`.dream/specs/purchased-product-reviews/evidence/integration-verification.md`).
-- **Traceability:** 100% of approved requirements (`REQ-REVIEW-01` to `REQ-REVIEW-08`) and acceptance criteria mapped and verified.
+- **Task Gates:** Revision 4 tasks `BE-05`, `FE-05`, and `AD-01` have task evidence marked PASS, but required task `INT-03` remains `pending` in `tasks.md` and has no task evidence file.
+- **Workstream Reviews:** `backend-review-review-01.yaml` is PASS; findings `REV4-API-001` and `REV4-API-002` are closed.
+- **Runtime Integration:** `integration-verification.md` records PASS claims for selected provider, database, smoke, and browser checks, but does not establish the complete required INT-03 matrix.
+- **Feature Verification:** `feature-verification.md` is `Needs Fix`, not `Verified`, and records incomplete proof for multiple revision 4 acceptance criteria.
+- **Traceability:** Revision 4 traceability is incomplete because required task and feature-verification evidence is missing or explicitly partial/unverified.
+
+## Blocking Reasons
+
+- `INT-03` is required by `tasks.md` but its status is `pending` (`tasks.md:656-698`), violating the condition that every required task be completed against the current contract revision.
+- No `.dream/specs/purchased-product-reviews/evidence/tasks/INT-03.md` exists, so the required revision 4 integration task gate has no canonical evidence.
+- Feature verification is not `Verified`; it is explicitly `Needs Fix` (`feature-verification.md:6-7`). This alone prevents acceptance.
+- Required proof is still incomplete for `AC-REVIEW-10-05` (concurrent admin create), `AC-REVIEW-10-06` (two-admin update race), `AC-REVIEW-10-08` (customer edit followed by public and owner reads), `AC-REVIEW-10-09` (hidden-product admin/history retention), and `AC-REVIEW-10-11` (real browser failure/retry flow) (`feature-verification.md:60-69`).
+- Additional deterministic/provider coverage remains partial for `AC-REVIEW-10-01`, `AC-REVIEW-10-02`, `AC-REVIEW-10-03`, and `AC-REVIEW-10-10`; the feature report does not confirm their complete required success projections, boundary, ordering, and preservation assertions (`feature-verification.md:19-21,28-29,66-67`).
+- The approved `CCR-003` is frozen at `PURCHASED-REVIEW-API@4`, but complete revision 4 re-verification cannot be accepted while `INT-03` and the feature verification gate remain incomplete.
 
 ## Open Items / Non-blocking Observations
 
-None.
+- No explicit verification waiver was found in the current artifacts. Therefore no missing verification item is treated as waived or non-blocking.
+- Existing build chunk-size warnings are non-blocking (`feature-verification.md:71-74`).

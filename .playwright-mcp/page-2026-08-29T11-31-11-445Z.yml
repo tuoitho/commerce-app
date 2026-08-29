@@ -1,0 +1,155 @@
+- generic [ref=f2e37]:
+  - complementary [ref=f2e38]:
+    - generic [ref=f2e44]:
+      - heading "AuraPhone Admin" [level=1] [ref=f2e45]
+      - paragraph [ref=f2e46]: Management Portal
+    - navigation [ref=f2e47]:
+      - link "Tổng quan" [ref=f2e48] [cursor=pointer]:
+        - /url: /
+      - link "Sản phẩm" [ref=f2e55] [cursor=pointer]:
+        - /url: /products
+      - link "Đơn hàng" [ref=f2e61] [cursor=pointer]:
+        - /url: /orders
+      - link "Trả hàng" [ref=f2e66] [cursor=pointer]:
+        - /url: /return-requests
+      - link "Danh mục" [ref=f2e71] [cursor=pointer]:
+        - /url: /categories
+      - link "Đánh giá" [active] [ref=f2e78] [cursor=pointer]:
+        - /url: /reviews
+      - generic "Sắp ra mắt" [ref=f2e82]: Người dùng
+      - generic "Sắp ra mắt" [ref=f2e89]: Cài đặt
+    - generic [ref=f2e95]:
+      - generic [ref=f2e96]: IN
+      - generic [ref=f2e97]:
+        - paragraph [ref=f2e98]: Quản trị viên
+        - paragraph [ref=f2e99]: int03-admin@example.com
+      - generic [ref=f2e100]: Admin
+  - generic [ref=f2e101]:
+    - banner [ref=f2e102]:
+      - heading "Bảng điều khiển quản trị hệ thống AuraPhone" [level=2] [ref=f2e104]
+      - generic [ref=f2e105]:
+        - generic [ref=f2e106]:
+          - generic [ref=f2e107]: Đang đăng nhập
+          - text: int03-admin@example.com
+        - button "Đăng xuất" [ref=f2e108] [cursor=pointer]
+    - main [ref=f2e112]:
+      - generic [ref=f2e162]:
+        - generic [ref=f2e163]:
+          - generic [ref=f2e164]:
+            - heading "Đánh giá khách hàng" [level=1] [ref=f2e165]
+            - paragraph [ref=f2e166]: Đọc đánh giá và gửi một phản hồi chính thức từ cửa hàng.
+          - button "Làm mới" [ref=f2e167] [cursor=pointer]
+        - generic [ref=f2e173]:
+          - generic [ref=f2e175]:
+            - region [ref=f2e176]:
+              - generic [ref=f2e177]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e178]
+                - generic [ref=f2e179]: Đã mua hàng
+              - generic "5 trên 5 sao" [ref=f2e180]
+              - paragraph [ref=f2e191]: Runtime fixture review
+              - paragraph [ref=f2e192]: Cập nhật 18:27 29/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e193]:
+              - generic [ref=f2e194]:
+                - heading "Phản hồi hiện tại" [level=3] [ref=f2e195]
+                - paragraph [ref=f2e196]: Phản hồi runtime
+                - paragraph [ref=f2e197]: Cập nhật 18:27 29/08/2026
+              - generic [ref=f2e198]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e199]: Phản hồi runtime
+              - generic [ref=f2e200]: 16/1000
+              - button "Lưu thay đổi" [ref=f2e203] [cursor=pointer]
+          - generic [ref=f2e205]:
+            - region [ref=f2e206]:
+              - generic [ref=f2e207]:
+                - heading "Xiaomi 15" [level=2] [ref=f2e208]
+                - generic [ref=f2e209]: Đã mua hàng
+              - generic "4 trên 5 sao" [ref=f2e210]
+              - paragraph [ref=f2e221]: ok tạm
+              - paragraph [ref=f2e222]: "Dung lượng: 256GB · Màu sắc: Đen"
+              - paragraph [ref=f2e223]: Cập nhật 11:39 28/08/2026
+            - region "Phản hồi cửa hàng cho Xiaomi 15" [ref=f2e224]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e226]
+              - generic [ref=f2e227]: Nội dung phản hồi cho Xiaomi 15
+              - textbox "Nội dung phản hồi cho Xiaomi 15" [ref=f2e228]
+              - generic [ref=f2e229]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e232] [cursor=pointer]
+          - generic [ref=f2e234]:
+            - region [ref=f2e235]:
+              - generic [ref=f2e236]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e237]
+                - generic [ref=f2e238]: Đã mua hàng
+              - generic "4 trên 5 sao" [ref=f2e239]
+              - paragraph [ref=f2e250]: Da cap nhat danh gia sau 1 tuan su dung!
+              - paragraph [ref=f2e251]: "Dung lượng: 128GB"
+              - paragraph [ref=f2e252]: Cập nhật 10:07 28/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e253]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e255]
+              - generic [ref=f2e256]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e257]
+              - generic [ref=f2e258]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e261] [cursor=pointer]
+          - generic [ref=f2e263]:
+            - region [ref=f2e264]:
+              - generic [ref=f2e265]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e266]
+                - generic [ref=f2e267]: Đã mua hàng
+              - generic "4 trên 5 sao" [ref=f2e268]
+              - paragraph [ref=f2e279]: Da cap nhat danh gia sau 1 tuan su dung!
+              - paragraph [ref=f2e280]: "Dung lượng: 128GB"
+              - paragraph [ref=f2e281]: Cập nhật 10:07 28/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e282]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e284]
+              - generic [ref=f2e285]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e286]
+              - generic [ref=f2e287]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e290] [cursor=pointer]
+          - generic [ref=f2e292]:
+            - region [ref=f2e293]:
+              - generic [ref=f2e294]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e295]
+                - generic [ref=f2e296]: Đã mua hàng
+              - generic "4 trên 5 sao" [ref=f2e297]
+              - paragraph [ref=f2e308]: Da cap nhat danh gia sau 1 tuan su dung!
+              - paragraph [ref=f2e309]: "Dung lượng: 128GB"
+              - paragraph [ref=f2e310]: Cập nhật 10:06 28/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e311]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e313]
+              - generic [ref=f2e314]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e315]
+              - generic [ref=f2e316]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e319] [cursor=pointer]
+          - generic [ref=f2e321]:
+            - region [ref=f2e322]:
+              - generic [ref=f2e323]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e324]
+                - generic [ref=f2e325]: Đã mua hàng
+              - generic "4 trên 5 sao" [ref=f2e326]
+              - paragraph [ref=f2e337]: Da cap nhat danh gia sau 1 tuan su dung!
+              - paragraph [ref=f2e338]: "Dung lượng: 128GB"
+              - paragraph [ref=f2e339]: Cập nhật 10:06 28/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e340]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e342]
+              - generic [ref=f2e343]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e344]
+              - generic [ref=f2e345]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e348] [cursor=pointer]
+          - generic [ref=f2e350]:
+            - region [ref=f2e351]:
+              - generic [ref=f2e352]:
+                - heading "iPhone 16 Pro" [level=2] [ref=f2e353]
+                - generic [ref=f2e354]: Đã mua hàng
+              - generic "5 trên 5 sao" [ref=f2e355]
+              - paragraph [ref=f2e366]: San pham dung rat tot, dung dung luong, dong goi can than!
+              - paragraph [ref=f2e367]: "Dung lượng: 128GB"
+              - paragraph [ref=f2e368]: Cập nhật 10:06 28/08/2026
+            - region "Phản hồi cửa hàng cho iPhone 16 Pro" [ref=f2e369]:
+              - heading "Tạo phản hồi cửa hàng" [level=3] [ref=f2e371]
+              - generic [ref=f2e372]: Nội dung phản hồi cho iPhone 16 Pro
+              - textbox "Nội dung phản hồi cho iPhone 16 Pro" [ref=f2e373]
+              - generic [ref=f2e374]: 0/1000
+              - button "Gửi phản hồi" [ref=f2e377] [cursor=pointer]
+        - generic [ref=f2e378]:
+          - paragraph [ref=f2e379]: Tổng cộng 7 đánh giá
+          - generic [ref=f2e380]:
+            - button "Trước" [disabled]
+            - generic [ref=f2e381]: Trang 1 / 1
+            - button "Sau" [disabled]

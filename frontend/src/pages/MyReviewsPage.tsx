@@ -344,6 +344,25 @@ export function MyReviewsPage() {
                       )}
                     </div>
 
+                    {review.response && (
+                      <div className="border-l-2 border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-1.5">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-xs font-bold text-emerald-800">
+                            {review.response.authorLabel}
+                          </p>
+                          <time
+                            className="text-[11px] text-slate-400"
+                            dateTime={review.response.updatedAt}
+                          >
+                            {formatDate(review.response.updatedAt)}
+                          </time>
+                        </div>
+                        <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                          {review.response.content}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Media Items */}
                     {review.media && review.media.length > 0 && (
                       <div className="flex flex-wrap gap-2.5 pt-1">

@@ -55,6 +55,7 @@ describe('ProductReviewsSection', () => {
         verifiedPurchase: true,
         createdAt: '2026-08-28T00:00:00Z',
         updatedAt: '2026-08-28T00:00:00Z',
+        response: null,
         viewer: { isOwner: true, canEdit: true, remainingEdits: 1 },
       },
     ]
@@ -109,6 +110,7 @@ describe('ProductReviewsSection', () => {
         verifiedPurchase: true,
         createdAt: '2026-08-28T00:00:00Z',
         updatedAt: '2026-08-28T00:00:00Z',
+        response: null,
       },
     ]
 
@@ -137,5 +139,65 @@ describe('ProductReviewsSection', () => {
     await waitFor(() => {
       expect(screen.getByAltText('Full preview')).toBeInTheDocument()
     })
+  })
+
+  it('renders the nullable store response as literal plain text without admin details', async () => {
+    const literalContent = '<img src=x onerror="window.__responseXss=true"> Cảm ơn bạn'
+    const mockReviews = [
+      {
+        id: 'rev-with-response',
+        productId: 'prod-1',
+        variantId: 'var-1',
+        purchasedOptions: [],
+        rating: 5,
+        comment: 'Đánh giá đã chỉnh sửa',
+        media: [],
+        authorLabel: 'Khách hàng đã mua hàng',
+        verifiedPurchase: true,
+        createdAt: '2026-08-28T00:00:00Z',
+        updatedAt: '2026-08-28T01:00:00Z',
+        response: {
+          content: literalContent,
+          authorLabel: 'Phản hồi từ cửa hàng',
+          createdAt: '2026-08-28T00:30:00Z',
+          updatedAt: '2026-08-28T00:45:00Z',
+        },
+      },
+      {
+        id: 'rev-without-response',
+        productId: 'prod-1',
+        variantId: 'var-2',
+        purchasedOptions: [],
+        rating: 4,
+        comment: 'Không có phản hồi',
+        media: [],
+        authorLabel: 'Khách hàng đã mua hàng',
+        verifiedPurchase: true,
+        createdAt: '2026-08-27T00:00:00Z',
+        updatedAt: '2026-08-27T00:00:00Z',
+        response: null,
+      },
+    ] satisfies Review[]
+
+    vi.spyOn(reviewsApi, 'listProductReviews').mockResolvedValueOnce({
+      data: mockReviews,
+      message: 'Danh sách đánh giá',
+      meta: {
+        timestamp: '2026-08-28T02:00:00Z',
+        pagination: { page: 1, limit: 5, total: 2, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    const { container } = render(
+      <ProductReviewsSection
+        productId="prod-1"
+        reviewSummary={{ averageRating: 4.5, reviewCount: 2 }}
+      />
+    )
+
+    expect(await screen.findByText('Phản hồi từ cửa hàng')).toBeInTheDocument()
+    expect(screen.getByText(literalContent)).toBeInTheDocument()
+    expect(container.querySelector('img[src="x"]')).not.toBeInTheDocument()
+    expect(screen.queryByText(/version|admin/i)).not.toBeInTheDocument()
   })
 })

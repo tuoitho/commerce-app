@@ -362,6 +362,13 @@ export interface ReviewViewerState {
   remainingEdits: number
 }
 
+export interface StoreReviewResponse {
+  content: string
+  authorLabel: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Review {
   id: string
   orderItemId?: string
@@ -375,6 +382,7 @@ export interface Review {
   authorLabel: string
   createdAt: string
   updatedAt: string
+  response: StoreReviewResponse | null
   viewer?: ReviewViewerState | null
 }
 
@@ -421,5 +429,4 @@ export interface OwnedReviewHistoryItem {
   review: Review
   product: ReviewHistoryProduct
 }
-
 

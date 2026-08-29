@@ -284,7 +284,7 @@ func (r *ReviewRepository) GetReviewByID(ctx context.Context, reviewID string) (
 		remainingEdits = 1
 	}
 
-	return &domain.Review{
+	review := &domain.Review{
 		ID:               reviewRow.ID,
 		OrderItemID:      reviewRow.OrderItemID,
 		UserID:           reviewRow.UserID,
@@ -304,7 +304,14 @@ func (r *ReviewRepository) GetReviewByID(ctx context.Context, reviewID string) (
 			CanEdit:        canEdit,
 			RemainingEdits: remainingEdits,
 		},
-	}, nil
+	}
+	responseRow, responseErr := q.GetReviewResponse(ctx, reviewID)
+	if responseErr == nil {
+		review.Response = &domain.StoreReviewResponse{Content: responseRow.Content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: responseRow.CreatedAt, UpdatedAt: responseRow.UpdatedAt}
+	} else if !errors.Is(responseErr, pgx.ErrNoRows) {
+		return nil, responseErr
+	}
+	return review, nil
 }
 
 func (r *ReviewRepository) GetReviewForUser(ctx context.Context, reviewID, userID string) (*domain.Review, error) {
@@ -339,10 +346,10 @@ func (r *ReviewRepository) UpdateReview(ctx context.Context, reviewID, userID st
 
 	normComment := domain.NormalizeComment(comment)
 	reviewRow, err := q.UpdateReviewConditional(ctx, sqlc.UpdateReviewConditionalParams{
-		ID:       reviewID,
-		UserID:   userID,
-		Rating:   int32(rating),
-		Comment:  normComment,
+		ID:      reviewID,
+		UserID:  userID,
+		Rating:  int32(rating),
+		Comment: normComment,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -406,6 +413,14 @@ func (r *ReviewRepository) UpdateReview(ctx context.Context, reviewID, userID st
 		}
 	}
 
+	var response *domain.StoreReviewResponse
+	responseRow, responseErr := q.GetReviewResponse(ctx, reviewID)
+	if responseErr == nil {
+		response = &domain.StoreReviewResponse{Content: responseRow.Content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: responseRow.CreatedAt, UpdatedAt: responseRow.UpdatedAt}
+	} else if !errors.Is(responseErr, pgx.ErrNoRows) {
+		return nil, nil, responseErr
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -436,6 +451,7 @@ func (r *ReviewRepository) UpdateReview(ctx context.Context, reviewID, userID st
 			CanEdit:        false,
 			RemainingEdits: 0,
 		},
+		Response: response,
 	}, removedObjectKeys, nil
 }
 
@@ -553,6 +569,7 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 			UpdatedAt:        row.UpdatedAt,
 			EditedAt:         editedAt,
 			Viewer:           viewer,
+			Response:         storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time),
 		}
 	}
 
@@ -746,6 +763,7 @@ func (r *ReviewRepository) ListOwnerReviews(ctx context.Context, userID string, 
 					CanEdit:        canEdit,
 					RemainingEdits: remainingEdits,
 				},
+				Response: storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time),
 			},
 			Product: domain.ReviewHistoryProduct{
 				ID:         row.ProductID,
@@ -755,5 +773,107 @@ func (r *ReviewRepository) ListOwnerReviews(ctx context.Context, userID string, 
 		}
 	}
 
+	return items, total, nil
+}
+
+func storeResponse(content string, valid bool, createdAt, updatedAt time.Time) *domain.StoreReviewResponse {
+	if !valid {
+		return nil
+	}
+	return &domain.StoreReviewResponse{Content: content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: createdAt, UpdatedAt: updatedAt}
+}
+
+func (r *ReviewRepository) CreateReviewResponse(ctx context.Context, reviewID, adminID, content string) (*domain.AdminStoreReviewResponse, error) {
+	q := sqlc.New(r.db)
+	row, err := q.InsertReviewResponse(ctx, sqlc.InsertReviewResponseParams{ReviewID: reviewID, AdminID: adminID, Content: content})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			exists, existsErr := q.ReviewExists(ctx, reviewID)
+			if existsErr != nil {
+				return nil, existsErr
+			}
+			if !exists {
+				return nil, domain.ErrReviewNotFound
+			}
+			return nil, domain.ErrReviewResponseConflict
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, domain.ErrReviewResponseConflict
+		}
+		return nil, err
+	}
+	return &domain.AdminStoreReviewResponse{StoreReviewResponse: domain.StoreReviewResponse{Content: row.Content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Version: int(row.Version)}, nil
+}
+
+func (r *ReviewRepository) UpdateReviewResponse(ctx context.Context, reviewID, adminID, content string, version int) (*domain.AdminStoreReviewResponse, error) {
+	q := sqlc.New(r.db)
+	row, err := q.UpdateReviewResponse(ctx, sqlc.UpdateReviewResponseParams{ReviewID: reviewID, AdminID: adminID, Content: content, Version: int32(version)})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			exists, existsErr := q.ReviewExists(ctx, reviewID)
+			if existsErr != nil {
+				return nil, existsErr
+			}
+			if !exists {
+				return nil, domain.ErrReviewNotFound
+			}
+			return nil, domain.ErrReviewResponseConflict
+		}
+		return nil, err
+	}
+	return &domain.AdminStoreReviewResponse{StoreReviewResponse: domain.StoreReviewResponse{Content: row.Content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Version: int(row.Version)}, nil
+}
+
+func (r *ReviewRepository) ListAdminReviews(ctx context.Context, page, limit int) ([]domain.AdminReviewItem, int64, error) {
+	q := sqlc.New(r.db)
+	total, err := q.CountAdminReviews(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := q.ListAdminReviews(ctx, sqlc.ListAdminReviewsParams{LimitCount: int32(limit), OffsetCount: int32((page - 1) * limit)})
+	if err != nil {
+		return nil, 0, err
+	}
+	reviewIDs := make([]string, len(rows))
+	for i, row := range rows {
+		reviewIDs[i] = row.ID
+	}
+	mediaByReview := make(map[string][]domain.ReviewMedia)
+	if len(reviewIDs) > 0 {
+		mediaRows, mediaErr := q.ListReviewMediaByReviewIDs(ctx, reviewIDs)
+		if mediaErr != nil {
+			return nil, 0, mediaErr
+		}
+		for _, media := range mediaRows {
+			mediaByReview[media.ReviewID] = append(mediaByReview[media.ReviewID], domain.ReviewMedia{ID: media.ID, ReviewID: media.ReviewID, ObjectKey: media.ObjectKey, Type: domain.MediaType(media.Type), MimeType: media.MimeType, SizeBytes: media.SizeBytes, Position: int(media.Position), URL: domain.FormatMediaURL(media.ID), CreatedAt: media.CreatedAt})
+		}
+	}
+	items := make([]domain.AdminReviewItem, len(rows))
+	for i, row := range rows {
+		var options []domain.PurchasedOption
+		_ = json.Unmarshal([]byte(row.PurchasedOptions), &options)
+		if options == nil {
+			options = []domain.PurchasedOption{}
+		}
+		var publicPath *string
+		if row.IsProductPublic {
+			path := fmt.Sprintf("/products/%s", row.ProductID)
+			publicPath = &path
+		}
+		var version *int
+		if row.ResponseVersion.Valid {
+			v := int(row.ResponseVersion.Int32)
+			version = &v
+		}
+		media := mediaByReview[row.ID]
+		if media == nil {
+			media = []domain.ReviewMedia{}
+		}
+		items[i] = domain.AdminReviewItem{
+			Review:  domain.Review{ID: row.ID, OrderItemID: row.OrderItemID, ProductID: row.ProductID, VariantID: row.VariantID, PurchasedOptions: options, Rating: int(row.Rating), Comment: row.Comment, Media: media, VerifiedPurchase: true, AuthorLabel: domain.DefaultAuthorLabel, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Viewer: nil, Response: storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time)},
+			Product: domain.ReviewHistoryProduct{ID: row.ProductID, Name: row.PurchasedProductName, PublicPath: publicPath}, ResponseVersion: version,
+		}
+	}
 	return items, total, nil
 }

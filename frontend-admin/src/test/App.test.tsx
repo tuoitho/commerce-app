@@ -76,4 +76,14 @@ describe('App Shell', () => {
       expect(screen.getByLabelText(/tên sản phẩm/i)).toBeInTheDocument()
     })
   })
+
+  it('protects and renders the admin reviews route', async () => {
+    window.history.pushState({}, '', '/reviews')
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Đánh giá khách hàng' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Đánh giá' })).toBeInTheDocument()
+    })
+  })
 })

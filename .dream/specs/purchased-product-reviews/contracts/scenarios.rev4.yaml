@@ -1,0 +1,144 @@
+contract: PURCHASED-REVIEW-API
+revision: 4
+status: FROZEN
+inherits:
+  contract: PURCHASED-REVIEW-API
+  revision: 3
+
+scenarios:
+  - id: PURCHASED-REVIEW-API-R4-001
+    requirement: REQ-REVIEW-10
+    given: authenticated admin A and reviews with and without a store response
+    when: A requests GET /api/v1/admin/reviews?page=1&limit=10
+    then:
+      status: 200
+      assertions:
+        - items are ordered by review.updatedAt descending then review.id descending
+        - each item has product identity and review.response is nullable
+        - review.viewer is null for every admin item
+        - product.id equals review.productId and a non-null product.publicPath equals /products/{product.id}
+        - responseVersion is null exactly when review.response is null and otherwise is an integer of at least 1
+        - no admin identity is returned
+        - meta.pagination describes the full review collection
+
+  - id: PURCHASED-REVIEW-API-R4-002
+    requirement: REQ-REVIEW-10
+    given: authenticated admin A and review R has no response
+    when: A posts content with surrounding whitespace to /api/v1/admin/reviews/{R}/response
+    then:
+      status: 201
+      assertions:
+        - exactly one response exists for R
+        - content is trimmed and version is 1
+        - authorLabel is Phản hồi từ cửa hàng
+
+  - id: PURCHASED-REVIEW-API-R4-003
+    requirement: REQ-REVIEW-10
+    given: authenticated admin B read response version 1 created by another admin
+    when: B puts valid content and version 1 to the response operation
+    then:
+      status: 200
+      assertions:
+        - the same response has the new content
+        - version is 2 and updatedAt advances while createdAt is unchanged
+
+  - id: PURCHASED-REVIEW-API-R4-004
+    requirement: REQ-REVIEW-10
+    given: response version 2 exists but admin B submits version 1
+    when: B updates the response
+    then:
+      status: 409
+      errorCode: review_response_conflict
+      assertions:
+        - version 2 content is not overwritten
+
+  - id: PURCHASED-REVIEW-API-R4-005
+    requirement: REQ-REVIEW-10
+    given: two admins concurrently create a response for the same unresponded review
+    when: both create operations complete
+    then:
+      assertions:
+        - exactly one operation returns 201
+        - exactly one operation returns 409 with review_response_conflict
+        - exactly one response exists
+
+  - id: PURCHASED-REVIEW-API-R4-006
+    requirement: REQ-REVIEW-10
+    given: content is empty after trim or exceeds 1000 characters
+    when: an admin creates or updates a response
+    then:
+      status: 400
+      errorCode: validation_error
+      assertions:
+        - error.fields.content is present
+        - the current response remains unchanged
+
+  - id: PURCHASED-REVIEW-API-R4-007
+    requirement: REQ-REVIEW-10
+    given: an anonymous caller, invalid token caller, or authenticated customer
+    when: the caller lists admin reviews or mutates a response
+    then:
+      assertions:
+        - missing token returns 401 unauthorized
+        - invalid token returns 401 invalid_token
+        - authenticated non-admin returns 403 forbidden
+        - no response state changes
+
+  - id: PURCHASED-REVIEW-API-R4-008
+    requirement: REQ-REVIEW-10
+    given: authenticated admin A and the review ID does not exist
+    when: A creates or updates a response
+    then:
+      status: 404
+      errorCode: review_not_found
+
+  - id: PURCHASED-REVIEW-API-R4-009
+    requirement: REQ-REVIEW-10
+    given: review R has a committed store response containing HTML or script syntax
+    when: public product reviews or owner history is read
+    then:
+      status: 200
+      assertions:
+        - review.response carries the literal plain-text content and authorLabel
+        - review.response exposes no admin identity or version
+        - consumers render content as text and execute no markup
+
+  - id: PURCHASED-REVIEW-API-R4-010
+    requirement: REQ-REVIEW-10
+    given: review R has a response and its customer successfully edits R
+    when: public reviews and owner history are read again
+    then:
+      status: 200
+      assertions:
+        - R contains the current customer review fields
+        - R retains the same store response
+
+  - id: PURCHASED-REVIEW-API-R4-011
+    requirement: REQ-REVIEW-10
+    given: a responded review belongs to a product that is no longer public
+    when: owner history and the admin collection are read
+    then:
+      status: 200
+      assertions:
+        - both reads retain the response
+        - product.publicPath is null
+        - the existing public product route remains unavailable
+
+  - id: PURCHASED-REVIEW-API-R4-012
+    requirement: REQ-REVIEW-10
+    given: invalid page, limit, reviewId, version, malformed JSON, or unknown request fields
+    when: the corresponding admin operation is requested
+    then:
+      status: 400
+      errorCode: validation_error
+      assertions:
+        - error.fields identifies page, limit, reviewId, version, or body as applicable
+
+  - id: PURCHASED-REVIEW-API-R4-013
+    requirement: REQ-REVIEW-10
+    given: raw content has surrounding whitespace and exactly 1000 characters after trimming
+    when: an authenticated admin creates or updates a response
+    then:
+      assertions:
+        - the request succeeds with 201 on create or 200 on update
+        - returned content is the trimmed 1000-character value

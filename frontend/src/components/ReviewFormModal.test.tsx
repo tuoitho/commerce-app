@@ -84,6 +84,7 @@ describe('ReviewFormModal', () => {
       verifiedPurchase: true,
       createdAt: '2026-08-28T00:00:00Z',
       updatedAt: '2026-08-28T00:00:00Z',
+      response: null,
     }
 
     vi.spyOn(reviewsApi, 'createOrderItemReview').mockResolvedValueOnce(mockCreatedReview)
@@ -130,6 +131,7 @@ describe('ReviewFormModal', () => {
       authorLabel: 'Khách hàng đã mua hàng',
       createdAt: '2026-08-28T00:00:00Z',
       updatedAt: '2026-08-28T00:00:00Z',
+      response: null,
     }
 
     render(

@@ -295,3 +295,85 @@ func TestReviewHandler_ListOwnedReviews(t *testing.T) {
 	})
 }
 
+func TestReviewHandler_AdminReviewResponseContractValidationAndAuth(t *testing.T) {
+	jwtMgr := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+	customerToken, _ := jwtMgr.GenerateAccessToken("11111111-1111-1111-1111-111111111111", domain.RoleCustomer, 15*time.Minute)
+	adminToken, _ := jwtMgr.GenerateAccessToken("99999999-9999-9999-9999-999999999999", domain.RoleAdmin, 15*time.Minute)
+	engine := setupReviewTestEngine(reviewuc.New(reviewuc.Dependencies{Reviews: repository.NewReviewRepository(nil), Storage: storage.NewMemoryStorage("test-bucket")}), jwtMgr)
+
+	tests := []struct {
+		name, method, target, token, body string
+		status                            int
+		contains                          []string
+	}{
+		{name: "R4-007 missing token", method: http.MethodGet, target: "/api/v1/admin/reviews", status: 401, contains: []string{`"code":"unauthorized"`, `"data":null`}},
+		{name: "R4-007 invalid token", method: http.MethodGet, target: "/api/v1/admin/reviews", token: "invalid", status: 401, contains: []string{`"code":"invalid_token"`}},
+		{name: "R4-007 customer forbidden", method: http.MethodGet, target: "/api/v1/admin/reviews", token: customerToken, status: 403, contains: []string{`"code":"forbidden"`, "Bạn không có quyền phản hồi đánh giá"}},
+		{name: "R4-012 invalid page", method: http.MethodGet, target: "/api/v1/admin/reviews?page=0", token: adminToken, status: 400, contains: []string{`"code":"validation_error"`, `"page":`}},
+		{name: "R4-012 invalid review id", method: http.MethodPost, target: "/api/v1/admin/reviews/not-a-uuid/response", token: adminToken, body: `{"content":"ok"}`, status: 400, contains: []string{`"reviewId":`}},
+		{name: "R4-006 whitespace content", method: http.MethodPost, target: "/api/v1/admin/reviews/22222222-2222-2222-2222-222222222222/response", token: adminToken, body: `{"content":"   "}`, status: 400, contains: []string{`"content":`}},
+		{name: "R4-012 unknown field", method: http.MethodPost, target: "/api/v1/admin/reviews/22222222-2222-2222-2222-222222222222/response", token: adminToken, body: `{"content":"ok","adminId":"x"}`, status: 400, contains: []string{`"body":`}},
+		{name: "R4-012 invalid version", method: http.MethodPut, target: "/api/v1/admin/reviews/22222222-2222-2222-2222-222222222222/response", token: adminToken, body: `{"content":"ok","version":0}`, status: 400, contains: []string{`"version":`}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.body))
+			if tt.token != "" {
+				req.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+			if tt.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d: %s", w.Code, tt.status, w.Body.String())
+			}
+			for _, value := range tt.contains {
+				if !strings.Contains(w.Body.String(), value) {
+					t.Fatalf("response missing %q: %s", value, w.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestReviewHandler_Rev4TypedValidationAndVietnameseAdminAuthMessages(t *testing.T) {
+	jwtMgr := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+	adminToken, _ := jwtMgr.GenerateAccessToken("99999999-9999-9999-9999-999999999999", domain.RoleAdmin, 15*time.Minute)
+	engine := setupReviewTestEngine(reviewuc.New(reviewuc.Dependencies{Reviews: repository.NewReviewRepository(nil), Storage: storage.NewMemoryStorage("test-bucket")}), jwtMgr)
+
+	tests := []struct {
+		name, method, target, auth, body, field, message string
+	}{
+		{name: "typed content is a content field error", method: http.MethodPost, target: "/api/v1/admin/reviews/22222222-2222-2222-2222-222222222222/response", auth: "Bearer " + adminToken, body: `{"content":123}`, field: `"content":`, message: "Dữ liệu không hợp lệ"},
+		{name: "typed version is a version field error", method: http.MethodPut, target: "/api/v1/admin/reviews/22222222-2222-2222-2222-222222222222/response", auth: "Bearer " + adminToken, body: `{"content":"ok","version":"1"}`, field: `"version":`, message: "Dữ liệu không hợp lệ"},
+		{name: "missing auth uses Vietnamese message", method: http.MethodGet, target: "/api/v1/admin/reviews", message: "Vui lòng đăng nhập để phản hồi đánh giá"},
+		{name: "malformed auth uses Vietnamese message", method: http.MethodGet, target: "/api/v1/admin/reviews", auth: "Basic abc", field: `"code":"unauthorized"`, message: "Vui lòng đăng nhập để phản hồi đánh giá"},
+		{name: "invalid token uses Vietnamese message", method: http.MethodGet, target: "/api/v1/admin/reviews", auth: "Bearer invalid", field: `"code":"invalid_token"`, message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.body))
+			if tt.auth != "" {
+				req.Header.Set("Authorization", tt.auth)
+			}
+			if tt.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			if w.Code != http.StatusBadRequest && tt.method != http.MethodGet {
+				t.Fatalf("status = %d, want 400: %s", w.Code, w.Body.String())
+			}
+			if tt.field != "" && !strings.Contains(w.Body.String(), tt.field) {
+				t.Fatalf("response missing field %q: %s", tt.field, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), tt.message) {
+				t.Fatalf("response missing Vietnamese message %q: %s", tt.message, w.Body.String())
+			}
+		})
+	}
+}

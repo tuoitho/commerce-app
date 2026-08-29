@@ -42,6 +42,24 @@ func (g *guard) AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
+func (g *guard) AdminReviewAuthRequired(c *gin.Context) {
+	tokenStr, ok := strings.CutPrefix(c.GetHeader("Authorization"), bearerPrefix)
+	if !ok || strings.TrimSpace(tokenStr) == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "Vui lòng đăng nhập để phản hồi đánh giá", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(strings.TrimSpace(tokenStr))
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
+		c.Abort()
+		return
+	}
+	c.Set(contextUserKey, userID)
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
 func (g *guard) RequireCustomerAuthForFavorites(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
