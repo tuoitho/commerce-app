@@ -9,13 +9,16 @@ import (
 
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security"
-	"commerce-backend/internal/security/jwt"
 )
 
 const (
 	minPasswordLen = 8
 	issuer         = "commerce-backend"
 )
+
+type TokenGenerator interface {
+	GenerateAccessToken(userID, role string, ttl time.Duration) (string, error)
+}
 
 type Repositories struct {
 	Users    domain.UserRepository
@@ -24,7 +27,7 @@ type Repositories struct {
 
 type UseCase struct {
 	repos                Repositories
-	jwt                  *jwt.Manager
+	jwt                  TokenGenerator
 	accessTTL            time.Duration
 	refreshTTL           time.Duration
 	hashPassword         func(string) (string, error)
@@ -34,7 +37,7 @@ type UseCase struct {
 
 type Dependencies struct {
 	Repos                Repositories
-	JWT                  *jwt.Manager
+	JWT                  TokenGenerator
 	AccessTTL            time.Duration
 	RefreshTTL           time.Duration
 	HashPassword         func(string) (string, error)

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -176,4 +177,34 @@ func NormalizeStoreReviewResponseContent(content string) (string, error) {
 		return "", NewValidationError(map[string]string{"content": "Nội dung phản hồi phải có từ 1 đến 1000 ký tự"})
 	}
 	return trimmed, nil
+}
+
+type OrderItemEligibility struct {
+	OrderItemID string
+	OrderID     string
+	VariantID   string
+	ProductID   string
+	UserID      string
+	OrderStatus string
+	Options     []PurchasedOption
+}
+
+type ReviewRepository interface {
+	CheckEligibility(ctx context.Context, orderID, orderItemID, userID string) (*OrderItemEligibility, error)
+	CreateReview(ctx context.Context, orderID, orderItemID, userID string, rating int, comment string, mediaList []ReviewMedia) (*Review, error)
+	GetReviewByID(ctx context.Context, reviewID string) (*Review, error)
+	GetReviewForUser(ctx context.Context, reviewID, userID string) (*Review, error)
+	UpdateReview(ctx context.Context, reviewID, userID string, rating int, comment string, newMediaList []ReviewMedia) (*Review, []string, error)
+	GetProductReviews(ctx context.Context, productID string, page, limit int, currentUserID string) ([]Review, int64, error)
+	GetProductReviewSummary(ctx context.Context, productID string) (*ReviewSummary, error)
+	GetReferencedReviewMediaByID(ctx context.Context, mediaID string) (*ReviewMedia, error)
+	IsObjectKeyReferenced(ctx context.Context, objectKey string) (bool, error)
+	ListAllReferencedObjectKeys(ctx context.Context) ([]string, error)
+	ListOwnerReviews(ctx context.Context, userID string, page, limit int) ([]OwnedReviewHistoryItem, int64, error)
+	CreateReviewResponse(ctx context.Context, reviewID, adminID, content string) (*AdminStoreReviewResponse, error)
+	UpdateReviewResponse(ctx context.Context, reviewID, adminID, content string, version int) (*AdminStoreReviewResponse, error)
+	ListAdminReviews(ctx context.Context, page, limit int, sort, productID, search string) ([]AdminReviewItem, int64, error)
+	VoteReview(ctx context.Context, reviewID, userID string, isHelpful bool) (*ReviewVoteResult, error)
+	UnvoteReview(ctx context.Context, reviewID, userID string) (*ReviewVoteResult, error)
+	GetAdminReviewStats(ctx context.Context) (*AdminReviewStats, error)
 }

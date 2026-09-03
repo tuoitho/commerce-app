@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
-	"commerce-backend/internal/storage"
 	reviewuc "commerce-backend/internal/usecase/review"
 )
 
@@ -38,7 +37,7 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 	// First fetch with full object to get metadata (stat)
 	mediaObj, err := h.uc.GetPublicMedia(c.Request.Context(), mediaID, -1, -1)
 	if err != nil {
-		if errors.Is(err, domain.ErrReviewMediaNotFound) || errors.Is(err, storage.ErrObjectNotFound) {
+		if errors.Is(err, domain.ErrReviewMediaNotFound) {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -135,7 +134,7 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 		// Fetch byte range
 		rangeObj, err := h.uc.GetPublicMedia(c.Request.Context(), mediaID, start, end)
 		if err != nil {
-			if errors.Is(err, domain.ErrReviewMediaNotFound) || errors.Is(err, storage.ErrObjectNotFound) {
+			if errors.Is(err, domain.ErrReviewMediaNotFound) {
 				c.Status(http.StatusNotFound)
 				return
 			}

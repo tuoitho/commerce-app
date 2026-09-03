@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"commerce-backend/internal/domain"
 	"commerce-backend/internal/storage"
 	"commerce-backend/internal/usecase/review"
 )
@@ -146,3 +147,67 @@ func TestValidationErrors(t *testing.T) {
 		}
 	})
 }
+
+type stubReviewRepo struct {
+	domain.ReviewRepository
+	getReviewForUserFn func(ctx context.Context, reviewID, userID string) (*domain.Review, error)
+	voteReviewFn       func(ctx context.Context, reviewID, userID string, isHelpful bool) (*domain.ReviewVoteResult, error)
+}
+
+func (s *stubReviewRepo) GetReviewForUser(ctx context.Context, reviewID, userID string) (*domain.Review, error) {
+	if s.getReviewForUserFn != nil {
+		return s.getReviewForUserFn(ctx, reviewID, userID)
+	}
+	return nil, nil
+}
+
+func (s *stubReviewRepo) VoteReview(ctx context.Context, reviewID, userID string, isHelpful bool) (*domain.ReviewVoteResult, error) {
+	if s.voteReviewFn != nil {
+		return s.voteReviewFn(ctx, reviewID, userID, isHelpful)
+	}
+	return nil, nil
+}
+
+func TestReviewUseCase_WithFakeRepository(t *testing.T) {
+	ctx := context.Background()
+	stub := &stubReviewRepo{
+		getReviewForUserFn: func(ctx context.Context, reviewID, userID string) (*domain.Review, error) {
+			return &domain.Review{ID: reviewID, Comment: "Great product!"}, nil
+		},
+		voteReviewFn: func(ctx context.Context, reviewID, userID string, isHelpful bool) (*domain.ReviewVoteResult, error) {
+			v := "helpful"
+			return &domain.ReviewVoteResult{
+				ReviewID:     reviewID,
+				HelpfulCount: 1,
+				ViewerVote:   &v,
+			}, nil
+		},
+	}
+
+	uc := review.New(review.Dependencies{
+		Reviews: stub,
+		Storage: storage.NewMemoryStorage("test-bucket"),
+	})
+
+	t.Run("GetOwnedReview succeeds via domain interface", func(t *testing.T) {
+		validReviewID := "11111111-2222-3333-4444-555555555555"
+		rev, err := uc.GetOwnedReview(ctx, validReviewID, "user-456")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if rev.ID != validReviewID || rev.Comment != "Great product!" {
+			t.Errorf("unexpected review: %+v", rev)
+		}
+	})
+
+	t.Run("VoteReview succeeds via domain interface", func(t *testing.T) {
+		res, err := uc.VoteReview(ctx, "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "helpful")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.HelpfulCount != 1 {
+			t.Errorf("expected HelpfulCount=1, got %d", res.HelpfulCount)
+		}
+	})
+}
+

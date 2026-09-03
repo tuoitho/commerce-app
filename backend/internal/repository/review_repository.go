@@ -28,17 +28,9 @@ func NewReviewRepository(db reviewDB) *ReviewRepository {
 	return &ReviewRepository{db: db}
 }
 
-type OrderItemEligibility struct {
-	OrderItemID string
-	OrderID     string
-	VariantID   string
-	ProductID   string
-	UserID      string
-	OrderStatus string
-	Options     []domain.PurchasedOption
-}
+var _ domain.ReviewRepository = (*ReviewRepository)(nil)
 
-func (r *ReviewRepository) CheckEligibility(ctx context.Context, orderID, orderItemID, userID string) (*OrderItemEligibility, error) {
+func (r *ReviewRepository) CheckEligibility(ctx context.Context, orderID, orderItemID, userID string) (*domain.OrderItemEligibility, error) {
 	if _, err := uuid.Parse(orderID); err != nil {
 		return nil, domain.ErrOrderNotFound
 	}
@@ -89,7 +81,7 @@ func (r *ReviewRepository) CheckEligibility(ctx context.Context, orderID, orderI
 		_ = json.Unmarshal([]byte(targetItem.Options), &options)
 	}
 
-	return &OrderItemEligibility{
+	return &domain.OrderItemEligibility{
 		OrderItemID: targetItem.ID,
 		OrderID:     orderRow.ID,
 		VariantID:   targetItem.VariantID,

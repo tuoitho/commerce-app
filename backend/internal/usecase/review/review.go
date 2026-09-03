@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,7 +15,6 @@ import (
 	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
-	"commerce-backend/internal/repository"
 	"commerce-backend/internal/storage"
 )
 
@@ -56,14 +56,14 @@ type EditInput struct {
 }
 
 type Dependencies struct {
-	Reviews     *repository.ReviewRepository
+	Reviews     domain.ReviewRepository
 	Storage     storage.Storage
 	Logger      *slog.Logger
 	GracePeriod time.Duration
 }
 
 type UseCase struct {
-	reviews     *repository.ReviewRepository
+	reviews     domain.ReviewRepository
 	storage     storage.Storage
 	logger      *slog.Logger
 	gracePeriod time.Duration
@@ -555,7 +555,14 @@ func (uc *UseCase) GetPublicMedia(ctx context.Context, mediaID string, start, en
 	}
 
 	// 2. Fetch object from storage
-	return uc.storage.GetObject(ctx, media.ObjectKey, start, end)
+	obj, err := uc.storage.GetObject(ctx, media.ObjectKey, start, end)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotFound) {
+			return nil, domain.ErrReviewMediaNotFound
+		}
+		return nil, err
+	}
+	return obj, nil
 }
 
 func (uc *UseCase) ListProductReviews(ctx context.Context, productID string, page, limit int, currentUserID string) ([]domain.Review, int64, error) {
