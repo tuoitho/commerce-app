@@ -23,9 +23,10 @@ import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { Button } from './ui/button'
+import { Skeleton } from './ui/skeleton'
 
 export function Header() {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
   const { badgeCount } = useCart()
   const { success } = useToast()
   const navigate = useNavigate()
@@ -345,7 +346,9 @@ export function Header() {
 
             {/* Auth / Account */}
             <div className="hidden sm:flex items-center">
-              {isAuthenticated && user ? (
+              {isLoading ? (
+                <Skeleton data-testid="auth-loading-skeleton" className="h-11 w-28 rounded-xl" />
+              ) : isAuthenticated && user ? (
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 max-w-[170px] truncate">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs uppercase shrink-0">
@@ -514,7 +517,9 @@ export function Header() {
 
           {/* Mobile Auth */}
           <div className="pt-2 border-t border-slate-100">
-            {isAuthenticated && user ? (
+            {isLoading ? (
+              <Skeleton data-testid="mobile-auth-loading-skeleton" className="h-11 w-full rounded-xl" />
+            ) : isAuthenticated && user ? (
               <div className="space-y-3">
                 <div className="px-3.5 py-2.5 rounded-xl bg-slate-50 text-xs font-medium text-slate-700">
                   Tài khoản: <span className="font-bold text-slate-900">{user.email}</span>
