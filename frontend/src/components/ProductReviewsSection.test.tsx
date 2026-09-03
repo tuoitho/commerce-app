@@ -32,7 +32,7 @@ describe('ProductReviewsSection', () => {
     })
   })
 
-  it('renders reviews list with author label, verified purchase badge, options and comment', async () => {
+  it('renders the masked public author label with review details', async () => {
     const mockReviews: Review[] = [
       {
         id: 'rev-1',
@@ -51,7 +51,7 @@ describe('ProductReviewsSection', () => {
             url: '/media/reviews/med-1',
           },
         ],
-        authorLabel: 'Khách hàng đã mua hàng',
+        authorLabel: 't***@gmail.com',
         verifiedPurchase: true,
         createdAt: '2026-08-28T00:00:00Z',
         updatedAt: '2026-08-28T00:00:00Z',
@@ -79,7 +79,7 @@ describe('ProductReviewsSection', () => {
     await waitFor(() => {
       expect(screen.getByText('Đánh giá từ khách hàng')).toBeInTheDocument()
       expect(screen.getByText('5.0')).toBeInTheDocument()
-      expect(screen.getByText('Khách hàng đã mua hàng')).toBeInTheDocument()
+      expect(screen.getByText('t***@gmail.com')).toBeInTheDocument()
       expect(screen.getByText('Đã mua hàng')).toBeInTheDocument()
       expect(screen.getByText(/Màu sắc: Titan Tự Nhiên/i)).toBeInTheDocument()
       expect(screen.getByText('Máy dùng rất mượt và pin trâu!')).toBeInTheDocument()

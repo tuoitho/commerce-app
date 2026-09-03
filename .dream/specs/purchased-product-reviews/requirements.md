@@ -21,6 +21,7 @@ Tính năng phục vụ hai nhóm người dùng:
 - **Dòng hàng chờ đánh giá**: Dòng hàng đủ điều kiện đánh giá của một khách hàng.
 - **Lịch sử đánh giá cá nhân**: Danh sách trạng thái hiện tại của mọi đánh giá do khách hàng đang đăng nhập đã gửi; đây không phải lịch sử các phiên bản trước và sau khi chỉnh sửa.
 - **Phản hồi của cửa hàng**: Nội dung văn bản hiện tại do một quản trị viên tạo cho một đánh giá; mỗi đánh giá có tối đa một phản hồi và phản hồi không tạo thành luồng bình luận.
+- **Email đã che**: Dạng nhận diện tác giả chỉ dùng trong danh sách đánh giá công khai, giữ ký tự đầu tiên của phần trước dấu `@`, thay phần còn lại bằng đúng ba dấu `*` và giữ nguyên phần từ dấu `@` trở đi; ví dụ `test@gmail.com` thành `t***@gmail.com`.
 
 ## Phạm Vi
 
@@ -267,13 +268,14 @@ tôi muốn đọc các đánh giá đã xác minh,
 
 Khi người dùng mở section đánh giá của một sản phẩm công khai, hệ thống phải hiển thị đánh giá từ mọi dòng hàng đã được đánh giá của sản phẩm đó theo thứ tự mới cập nhật gần nhất trước, hỗ trợ phân trang và cung cấp điểm sao, nhận xét, thông tin phân loại đã mua, danh sách media theo thứ tự, nhãn mua hàng đã xác minh, thời điểm tạo, thời điểm cập nhật và trạng thái còn quyền chỉnh sửa cho chính người xem nếu đã đăng nhập.
 
-Hệ thống phải hiển thị tác giả bằng nhãn trung lập "Khách hàng đã mua hàng" và không công khai email, mã người dùng hoặc dữ liệu cá nhân khác.
+Hệ thống phải hiển thị tác giả bằng email đã che được tạo từ email của khách hàng theo dạng `t***@gmail.com`. Quy tắc này chỉ áp dụng cho danh sách đánh giá công khai; hệ thống không được công khai email đầy đủ, mã người dùng hoặc dữ liệu tài khoản khác dưới dạng metadata tác giả. Quy tắc này không kiểm duyệt hoặc thay đổi nội dung nhận xét hay phản hồi cửa hàng do người dùng chủ động nhập.
 
 #### Bất Biến
 
 - `INV-REVIEW-05-01` — Mọi đánh giá trong danh sách công khai đều mang trạng thái mua hàng đã xác minh.
 - `INV-REVIEW-05-02` — Thứ tự giữa các đánh giá có cùng thời điểm cập nhật phải ổn định giữa các lần đọc khi dữ liệu không thay đổi.
 - `INV-REVIEW-05-03` — Media đã bị loại khỏi một đánh giá sau chỉnh sửa không còn xuất hiện qua bề mặt công khai của tính năng.
+- `INV-REVIEW-05-04` — Metadata tác giả công khai chỉ chứa email đã che; không chứa email đầy đủ hoặc mã người dùng lấy từ tài khoản, và việc che luôn thay phần còn lại của phần trước dấu `@` bằng đúng ba dấu `*` bất kể độ dài ban đầu.
 
 #### Hành Vi Lỗi / Phụ Thuộc Trạng Thái
 
@@ -289,7 +291,7 @@ Cho trước sản phẩm có nhiều đánh giá, khi bất kỳ người dùng
 
 **AC-REVIEW-05-02**
 
-Cho trước một đánh giá công khai, khi hiển thị đánh giá, thì có nhãn "Khách hàng đã mua hàng" và không có email hoặc mã người dùng của tác giả.
+Cho trước tác giả có email `test@gmail.com`, khi hiển thị đánh giá công khai của tác giả đó, thì nhãn tác giả là `t***@gmail.com` và không có metadata chứa email đầy đủ hoặc mã người dùng của tác giả.
 
 **AC-REVIEW-05-03**
 
@@ -301,7 +303,7 @@ Cho trước đánh giá có nhiều ảnh và video, khi người dùng xem tr�
 
 **AC-REVIEW-05-05**
 
-Cho trước nhiều khách hàng hoặc nhiều dòng hàng đã gửi đánh giá cho một sản phẩm, khi mở section đánh giá trên trang chi tiết sản phẩm, thì tổng quan và danh sách bao gồm mọi đánh giá của sản phẩm, đồng thời mỗi đánh giá cho biết phân loại đã mua mà không làm lộ dữ liệu cá nhân.
+Cho trước nhiều khách hàng hoặc nhiều dòng hàng đã gửi đánh giá cho một sản phẩm, khi mở section đánh giá trên trang chi tiết sản phẩm, thì tổng quan và danh sách bao gồm mọi đánh giá của sản phẩm, đồng thời mỗi đánh giá cho biết phân loại đã mua mà không làm lộ email đầy đủ, mã người dùng hoặc dữ liệu cá nhân khác ngoài email đã che.
 
 ### REQ-REVIEW-06 — Tổng Hợp Điểm Đánh Giá Chính Xác
 

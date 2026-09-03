@@ -564,7 +564,7 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 			Comment:          row.Comment,
 			Media:            mediaList,
 			VerifiedPurchase: true,
-			AuthorLabel:      domain.DefaultAuthorLabel,
+			AuthorLabel:      domain.MaskAuthorEmail(row.AuthorEmail),
 			CreatedAt:        row.CreatedAt,
 			UpdatedAt:        row.UpdatedAt,
 			EditedAt:         editedAt,

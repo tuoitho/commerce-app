@@ -44,8 +44,14 @@
 
 ## Process Safety
 
-- Use systematic debugging and test-driven development for behavior fixes. - Use one persistent implementation owner per coherent workstream. Frontend,
-  backend, admin, or service workstreams may execute independently only after
-  their shared contracts are stable. Keep work in one owner when the work
-  materially shares mutable domain abstractions, files, or unresolved behavior.
-- Never run dev servers, watch tests, or other long-lived commands unbounded in the foreground. Use a background/session mechanism or an explicit timeout, verify readiness, capture logs/PID where applicable, and stop the process afterward.
+* Use systematic debugging and test-driven development for behavior fixes.
+* Use one persistent implementation owner per coherent workstream. Frontend, backend, admin, or service workstreams may execute independently only after shared contracts are stable. Keep work under one owner when it materially shares mutable abstractions, files, runtime state, or unresolved behavior.
+* Never run dev servers, watch tests, workers, log followers, or other long-lived commands unbounded in the foreground.
+* A long-lived process is safely backgrounded only when the invoking **agent tool call itself has returned**, not merely when the shell has spawned the process or printed its PID.
+* Do not treat successful PID output as proof of detachment. Some runtimes or harnesses may continue waiting on inherited process, console, pipe, or job handles after the launcher script has completed.
+* Prefer background/session mechanisms that are verified to release the active harness. If a mechanism causes the tool call to remain open after emitting its expected output, treat that mechanism as unsafe for that harness and switch strategies.
+* Capture PID and stdout/stderr where practical, but avoid pipe or redirection arrangements that can keep the launcher or harness attached to the child process.
+* Separate process startup from readiness verification. Use bounded readiness polling with explicit timeouts.
+* Use the lifecycle: **spawn → tool call returns → process alive → readiness check → verification → terminate → confirm cleanup**.
+* If the launcher emits its expected result but the tool invocation remains open, fail the launcher attempt rather than waiting indefinitely. Inspect process state, preserve any spawned PID for cleanup, and retry with a more strongly detached mechanism.
+* Every long-running process started for verification must have a recorded cleanup strategy, including recovery cleanup for partially successful launcher attempts.

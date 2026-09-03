@@ -517,10 +517,12 @@ const listProductReviews = `-- name: ListProductReviews :many
 SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        pr.rating, pr.comment, pr.created_at, pr.updated_at, pr.edited_at,
        oi.options::text AS purchased_options,
+       u.email AS author_email,
        rr.content AS response_content, rr.created_at AS response_created_at,
        rr.updated_at AS response_updated_at
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
+JOIN users u ON u.id = pr.user_id
 LEFT JOIN review_responses rr ON rr.review_id = pr.id
 WHERE pr.product_id = $1
 ORDER BY pr.updated_at DESC, pr.id DESC
@@ -545,6 +547,7 @@ type ListProductReviewsRow struct {
 	UpdatedAt         time.Time
 	EditedAt          pgtype.Timestamptz
 	PurchasedOptions  string
+	AuthorEmail       string
 	ResponseContent   pgtype.Text
 	ResponseCreatedAt pgtype.Timestamptz
 	ResponseUpdatedAt pgtype.Timestamptz
@@ -571,6 +574,7 @@ func (q *Queries) ListProductReviews(ctx context.Context, arg ListProductReviews
 			&i.UpdatedAt,
 			&i.EditedAt,
 			&i.PurchasedOptions,
+			&i.AuthorEmail,
 			&i.ResponseContent,
 			&i.ResponseCreatedAt,
 			&i.ResponseUpdatedAt,

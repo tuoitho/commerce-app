@@ -143,6 +143,15 @@ func NormalizeComment(comment string) string {
 	return strings.TrimSpace(comment)
 }
 
+func MaskAuthorEmail(email string) string {
+	at := strings.LastIndexByte(email, '@')
+	if at <= 0 || at == len(email)-1 {
+		return DefaultAuthorLabel
+	}
+	local := []rune(email[:at])
+	return string(local[0]) + "***" + email[at:]
+}
+
 func NormalizeStoreReviewResponseContent(content string) (string, error) {
 	trimmed := strings.TrimSpace(content)
 	if len([]rune(trimmed)) < 1 || len([]rune(trimmed)) > MaxStoreResponseLength {

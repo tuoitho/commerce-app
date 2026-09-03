@@ -83,6 +83,26 @@ func TestNormalizeComment(t *testing.T) {
 	}
 }
 
+func TestMaskAuthorEmail(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{name: "standard email", email: "test@gmail.com", want: "t***@gmail.com"},
+		{name: "long local part", email: "lengthy.local@example.org", want: "l***@example.org"},
+		{name: "short local part", email: "a@example.com", want: "a***@example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MaskAuthorEmail(tt.email); got != tt.want {
+				t.Fatalf("MaskAuthorEmail(%q) = %q; want %q", tt.email, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeStoreReviewResponseContent(t *testing.T) {
 	tests := []struct {
 		name    string

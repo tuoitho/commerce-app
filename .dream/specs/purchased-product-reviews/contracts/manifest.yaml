@@ -146,3 +146,42 @@ contracts:
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev3.yaml
       - .dream/specs/purchased-product-reviews/contracts/scenarios.rev4.yaml
+
+  - id: PURCHASED-REVIEW-API
+    revision: 5
+    status: FROZEN
+    requirements:
+      - REQ-REVIEW-01
+      - REQ-REVIEW-02
+      - REQ-REVIEW-03
+      - REQ-REVIEW-04
+      - REQ-REVIEW-05
+      - REQ-REVIEW-06
+      - REQ-REVIEW-07
+      - REQ-REVIEW-08
+      - REQ-REVIEW-09
+      - REQ-REVIEW-10
+    providers: [backend-review]
+    consumers: [frontend-review, frontend-admin-review]
+    compatibility:
+      classification: breaking-public-author-label-semantics
+      inherits: PURCHASED-REVIEW-API@4
+      rollout: backend-provider-and-frontend-public-review-consumer-must-deploy-revision-5-together; provider-5-consumer-4-and-provider-4-consumer-5-are-unsupported; frontend-admin-revision-4-consumer-remains-compatible
+      breaking_changes:
+        - public Review authorLabel changes from the fixed neutral label to a backend-masked current account email
+        - public product review collection uses a distinct PublicReview representation while mutation, owned and admin representations retain Review
+      unchanged:
+        - endpoint, envelope, field name and string type
+        - mutation, owned review history and admin authorLabel semantics
+        - all review response, media, viewer, pagination, validation and authorization semantics
+    artifacts:
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev2.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev3.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev4.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/api.openapi.rev5.overlay.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev2.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev3.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev4.yaml
+      - .dream/specs/purchased-product-reviews/contracts/scenarios.rev5.yaml

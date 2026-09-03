@@ -1,10 +1,10 @@
 # Feature Verification
 
 **Feature:** `purchased-product-reviews`
-**Contract baseline:** `PURCHASED-REVIEW-API@4` (inherits `@3`), `PURCHASED-REVIEW-MEDIA@1`
+**Contract baseline:** `PURCHASED-REVIEW-API@5` (inherits `@4` and `@3`), `PURCHASED-REVIEW-MEDIA@1`
 **Status:** Needs Fix
 
-The implementation compiles and all fresh package/database checks pass. The final gate is not Verified because the current deterministic tests and retained runtime evidence do not prove every revision 4 scenario, especially concurrent response creation, all admin success/read projections, and the complete browser failure/conflict workflow.
+The implementation compiles and fresh package/database/runtime checks pass for the exercised paths. The final gate remains Needs Fix because the current evidence does not prove every revision 5 rollout obligation, especially the explicit compatibility reject matrix, complete browser failure/conflict workflow, and representative mobile visual checks.
 
 ## Requirement Traceability Matrix
 
@@ -33,12 +33,21 @@ The implementation compiles and all fresh package/database checks pass. The fina
 | Inherited behavior | Implementation | Tests / Evidence | Result |
 |---|---|---|---|
 | `PURCHASED-REVIEW-API@3` owner isolation, current-state history, stable pagination, hidden-product identity/link state | `backend/internal/repository/review_repository.go:680-773`; `backend/internal/delivery/http/review_handler.go` owner route; `frontend/src/pages/MyReviewsPage.tsx:330-364` | `evidence/tasks/BE-04.md:14-25`; `evidence/tasks/INT-02.md:14-19`; fresh root tests and integration pass | Pass, with revision-4 response propagation only partially re-exercised |
-| Public review reads remain anonymous, verified, and include nullable `response` without admin version/identity | `backend/internal/domain/review.go:74-91`; public repository projection `backend/internal/repository/review_repository.go:300-312`; `frontend/src/components/ProductReviewsSection.tsx:233-243` | `frontend/src/api/reviews.test.ts:102-141`; `ProductReviewsSection.test.tsx:144-204`; no fresh live anonymous API response capture | Partial |
+| Public review reads remain anonymous, verified, and include nullable `response` without admin version/identity | `backend/internal/domain/review.go:74-91`; public repository projection `backend/internal/repository/review_repository.go:300-312`; `frontend/src/components/ProductReviewsSection.tsx:233-243` | `frontend/src/api/reviews.test.ts:102-141`; `ProductReviewsSection.test.tsx:144-204`; live anonymous HTTP and browser capture in `evidence/tasks/INT-04.md` | Pass for exercised revision-5 path |
 | Admin projection keeps `viewer: null`, product identity/link state, response and opaque `responseVersion` | `backend/internal/repository/review_repository.go:828-878`; `backend/internal/domain/review.go:109-113` | `review_repository_integration_test.go:249-263`; `ReviewsPage.test.tsx:90-145` | Pass for repository/component coverage |
+
+### Revision 5 Extension
+
+| Requirement / scenario | Implementation | Tests / evidence | Result |
+|---|---|---|---|
+| `REQ-REVIEW-05`, `PURCHASED-REVIEW-API-R5-001`..`R5-004` | `backend/internal/domain/review.go:146-154`; `backend/db/queries/reviews.sql:77-90`; `backend/internal/repository/review_repository.go:557-573` | Domain masking tests, repository integration email-change test, bounded live HTTP matrix | Pass for exercised provider paths |
+| `PURCHASED-REVIEW-API-R5-003`, `R5-006` | Owner/admin projections retain the neutral label; admin consumer does not use `PublicReview` | Live owner/admin HTTP reads, admin package tests and browser admin collection load | Partial: explicit provider/public-consumer incompatibility reject matrix is not separately executed |
+| `PURCHASED-REVIEW-API-R5-007` | User-entered comment/response text is not redacted and identity metadata is absent | Public component test and live public HTTP privacy assertion | Pass for exercised paths |
+| Public consumer browser path | Product review section renders provider-supplied masked label | Playwright public product snapshot and zero-error console artifact | Pass at the exercised desktop viewport; mobile visual evidence remains absent |
 
 ## Task Completion And Contract Alignment
 
-`tasks.md` marks `BE-05`, `FE-05`, `AD-01`, and `INT-03` completed and each declares `PURCHASED-REVIEW-API@4`. The frozen overlay and scenarios are present at `contracts/api.openapi.rev4.overlay.yaml` and `contracts/scenarios.rev4.yaml`. This verification does not accept task checkboxes as proof; the gaps above remain despite those statuses.
+`tasks.md` retains revision 5 tasks as pending until the missing compatibility, browser failure/retry, and visual gates are executed. The frozen revision 5 overlay and scenarios are present at `contracts/api.openapi.rev5.overlay.yaml` and `contracts/scenarios.rev5.yaml`.
 
 Implementation boundaries match the design for admin auth (`router.go:173-185`), one-to-one persistence and versioned update (`reviews.sql:270-289,739-757`), response joins (`review_repository.go:308-312,766`), direct Full Status Envelope helpers (`review_handler.go:391-433`), and text-only rendering. No admin identity or response version is included in customer-facing response types.
 
@@ -66,7 +75,9 @@ No concrete implementation defect was established by the fresh checks. The gate 
 - `AC-REVIEW-10-01`, `AC-REVIEW-10-02`, `AC-REVIEW-10-10`: success HTTP envelopes, exact projection fields, ordering, and unchanged review fields are not all asserted by deterministic provider tests.
 - `AC-REVIEW-10-03`: exact 1000-character accepted boundary is not independently covered by a fresh provider test.
 - `AC-REVIEW-10-11`: real browser failure/retry evidence is absent; current proof is component-level.
-- Inherited impacted public/owner read behavior with a committed response lacks a fresh live anonymous HTTP capture; current proof is unit/component/repository plus prior runtime claims.
+- Some inherited revision-4 browser failure/retry and visual obligations remain component-level; public anonymous HTTP read-back is now covered by the revision-5 runtime evidence.
+- `PURCHASED-REVIEW-API-R5-006`: explicit rollout matrix reject cases are not recorded as a deterministic compatibility artifact.
+- `INT-04` browser scope: mobile viewport and email-change browser read are not evidenced.
 
 ## Non-blocking Observations
 

@@ -7,6 +7,7 @@
 | PURCHASED-REVIEW-API | 2 | FROZEN |
 | PURCHASED-REVIEW-API | 3 | FROZEN |
 | PURCHASED-REVIEW-API | 4 | FROZEN |
+| PURCHASED-REVIEW-API | 5 | FROZEN |
 | PURCHASED-REVIEW-MEDIA | 1 | FROZEN |
 
 ## Execution DAG
@@ -23,6 +24,11 @@ FE-03 -> FE-04 --/
 BE-04 -> BE-05 -------\
 FE-04 -> FE-05 --------> INT-03
 AD-01 ----------------/
+
+INT-03 -> BE-06 --\
+INT-03 -> FE-06 ---> INT-04
+BE-06 -> AD-02 ---/
+AD-01 -> AD-02
 ```
 
 `BE-01`, `BE-02`, `BE-03` dùng cùng một persistent owner vì chia sẻ schema, transaction, MinIO lifecycle và read model. `FE-01`, `FE-02`, `FE-03` dùng cùng một persistent owner vì chia sẻ API types, mutation state và UI review. Hai workstream có thể bắt đầu song song từ contract revision 1 đã đóng băng.
@@ -205,7 +211,7 @@ verification:
     scope: stable updatedAt/id pagination, anonymous/owner viewer state, variant snapshot, quantity-one pending count
   - type: typecheck
     scope: make -C backend test && make -C backend vet
-status: completed
+status: stale
 verified_against:
   PURCHASED-REVIEW-API: 2
 ```
@@ -319,7 +325,7 @@ verification:
     scope: public product review pagination and media interaction
   - type: visual
     scope: representative mobile and desktop product detail widths
-status: completed
+status: stale
 verified_against:
   PURCHASED-REVIEW-API: 2
   PURCHASED-REVIEW-MEDIA: 1
@@ -449,7 +455,7 @@ verification:
     scope: product and order surfaces at representative mobile and desktop widths
   - type: typecheck
     scope: root make test && root make build after make db-up
-status: completed
+status: stale
 verified_against:
   PURCHASED-REVIEW-API: 2
   PURCHASED-REVIEW-MEDIA: 1
@@ -737,3 +743,143 @@ verified_against:
   PURCHASED-REVIEW-API: 3
   PURCHASED-REVIEW-MEDIA: 1
 ```
+
+## Revision 5 Extension: Email Tác Giả Đã Che
+
+### BE-06 — Cung cấp masked author label cho public reviews
+
+```yaml
+id: BE-06
+owner: backend-review
+outcome: Public product review collection tạo authorLabel từ email tài khoản theo quy tắc revision 5 mà không serialize email đầy đủ hoặc user ID dưới dạng author metadata; mọi representation không-public và nội dung người dùng giữ nguyên semantics hiện có.
+requirements:
+  - REQ-REVIEW-05
+acceptance_criteria:
+  - AC-REVIEW-05-02
+  - AC-REVIEW-05-05
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 5
+    role: provider
+depends_on:
+  - BE-05
+  - INT-03
+risk: high
+verification:
+  - type: unit
+    scope: fixed-three-asterisk masking for one-character and long local-parts, domain preservation, and unchanged user-entered comment/response
+  - type: integration-db
+    scope: public query joins current users.email, reflects an account email change on the next read, and leaves owned/admin projections neutral
+  - type: provider-contract
+    scope: PURCHASED-REVIEW-API-R5-001 through PURCHASED-REVIEW-API-R5-007
+  - type: runtime-http
+    scope: capture logs for successful anonymous/authenticated public reads and invalid-product/error paths; assert fixture account email and author user ID are absent
+  - type: typecheck
+    scope: make -C backend gen && make -C backend test && make -C backend vet
+status: pending
+verified_against: {}
+```
+
+**Architectural constraints:** masking thuộc backend public-read boundary; không gửi raw account email cho frontend, không persist masked label/snapshot, không thay schema database và không thay comment/response do người dùng nhập.
+
+### FE-06 — Hiển thị masked author label trong product review section
+
+```yaml
+id: FE-06
+owner: frontend-review
+outcome: Product review section hiển thị nguyên văn public authorLabel revision 5 trên desktop/mobile, không tự tạo masked email ở client và không làm thay đổi nhãn trên mutation hoặc lịch sử cá nhân.
+requirements:
+  - REQ-REVIEW-05
+acceptance_criteria:
+  - AC-REVIEW-05-02
+  - AC-REVIEW-05-05
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 5
+    role: consumer
+depends_on:
+  - FE-05
+  - INT-03
+risk: normal
+verification:
+  - type: consumer-contract
+    scope: PURCHASED-REVIEW-API-R5-001 through PURCHASED-REVIEW-API-R5-003, PURCHASED-REVIEW-API-R5-006 and PURCHASED-REVIEW-API-R5-007
+  - type: component
+    scope: masked label rendering, anonymous viewer state, neutral owned/mutation fixtures, and literal comment/response text containing an email
+  - type: typecheck
+    scope: npm run lint && npm test && npm run build in frontend
+status: pending
+verified_against: {}
+```
+
+**Architectural constraints:** frontend chỉ render `authorLabel` từ contract; không nhận raw email, không có masking helper phía client và không redesign review card.
+
+### AD-02 — Xác minh admin revision 4 tương thích provider revision 5
+
+```yaml
+id: AD-02
+owner: frontend-admin-review
+outcome: Frontend admin revision 4 tiếp tục tiêu thụ admin review representation trung lập từ provider revision 5 mà không nhận public masked author semantics hoặc cần thay đổi UI.
+requirements:
+  - REQ-REVIEW-05
+acceptance_criteria:
+  - AC-REVIEW-05-02
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 5
+    role: consumer
+depends_on:
+  - AD-01
+  - BE-06
+risk: normal
+verification:
+  - type: consumer-contract
+    scope: PURCHASED-REVIEW-API-R5-003 and PURCHASED-REVIEW-API-R5-006 against the existing admin revision 4 consumer
+  - type: compatibility
+    scope: assert provider 5/public consumer 4 and provider 4/public consumer 5 are rejected by the rollout matrix while provider 5/admin consumer 4 is accepted
+  - type: typecheck
+    scope: npm run lint && npm test && npm run build in frontend-admin
+status: pending
+verified_against: {}
+```
+
+**Architectural constraints:** đây là compatibility gate, không phải admin feature change; admin `Review.authorLabel` vẫn là `Khách hàng đã mua hàng` và không dùng `PublicReview`.
+
+### INT-04 — Xác minh revision 5 xuyên backend và browser
+
+```yaml
+id: INT-04
+owner: review-integration
+outcome: Runtime lắp ráp chứng minh public reviews hiển thị email đã che đúng revision 5, không lộ account identity metadata, phản ánh email hiện tại và không làm đổi các representation không-public hoặc nội dung do người dùng nhập.
+requirements:
+  - REQ-REVIEW-05
+acceptance_criteria:
+  - AC-REVIEW-05-01
+  - AC-REVIEW-05-02
+  - AC-REVIEW-05-05
+contracts:
+  - id: PURCHASED-REVIEW-API
+    revision: 5
+    role: verifier
+depends_on:
+  - BE-06
+  - FE-06
+  - AD-02
+  - INT-03
+risk: high
+verification:
+  - type: provider-contract
+    scope: execute inherited revision 4 scenarios after supersession plus PURCHASED-REVIEW-API-R5-001 through PURCHASED-REVIEW-API-R5-007
+  - type: runtime-http
+    scope: anonymous/current-owner public reads, one-character and long local-parts, account email change, raw author metadata absence, captured-log privacy on success/error paths, neutral owned/mutation/admin labels, and unchanged literal comment/response
+  - type: compatibility
+    scope: execute the revision matrix gate and run the frontend-admin revision 4 consumer against the assembled provider revision 5
+  - type: browser
+    scope: anonymous product review section renders masked labels and unchanged plain-text customer/store content
+  - type: typecheck
+    scope: root make test && root make build
+status: pending
+verified_against: {}
+```
+
+**Architectural constraints:** dùng account/review fixtures thật qua PostgreSQL và HTTP; không chứng minh privacy chỉ bằng frontend mock; revision 5 implementation không bắt đầu trước revision 4 integration gate và acceptance cần chứng minh admin revision 4 compatibility.

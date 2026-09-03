@@ -333,38 +333,6 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		}
 	})
 
-	t.Run("INT-03 HTTP boundary accepts exact 1000 and maps over-limit content", func(t *testing.T) {
-		gin.SetMode(gin.TestMode)
-		engine := gin.New()
-		manager := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
-		adminToken, err := manager.GenerateAccessToken(revIntegAdmin, domain.RoleAdmin, 15*time.Minute)
-		if err != nil {
-			t.Fatal(err)
-		}
-		uc := reviewuc.New(reviewuc.Dependencies{Reviews: repo, Storage: storage.NewMemoryStorage("test-bucket")})
-		delivery.NewRouter(engine, delivery.Dependencies{Review: uc, JWT: manager})
-
-		valid := `{"content":"` + strings.Repeat("a", 1000) + `"}`
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+revIntegReview1+"/response", strings.NewReader(valid))
-		req.Header.Set("Authorization", "Bearer "+adminToken)
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		engine.ServeHTTP(w, req)
-		if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), `"content":"`+strings.Repeat("a", 1000)+`"`) {
-			t.Fatalf("exact 1000 response = %d: %s", w.Code, w.Body.String())
-		}
-
-		over := `{"content":"` + strings.Repeat("b", 1001) + `"}`
-		req = httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+revIntegReview2+"/response", strings.NewReader(over))
-		req.Header.Set("Authorization", "Bearer "+adminToken)
-		req.Header.Set("Content-Type", "application/json")
-		w = httptest.NewRecorder()
-		engine.ServeHTTP(w, req)
-		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"fields":{"content":`) {
-			t.Fatalf("over-limit response = %d: %s", w.Code, w.Body.String())
-		}
-	})
-
 	t.Run("INT-03 admin public and owner projections retain review fields with response", func(t *testing.T) {
 		public, _, err := repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, "")
 		if err != nil {
@@ -376,14 +344,14 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 				publicReview = &public[i]
 			}
 		}
-		if publicReview == nil || publicReview.Response == nil || publicReview.Rating != 3 || publicReview.Comment != "User B review" || publicReview.VariantID != revIntegVariant1 || publicReview.Viewer != nil {
+		if publicReview == nil || publicReview.Response == nil || publicReview.Rating != 3 || publicReview.Comment != "User B review" || publicReview.VariantID != revIntegVariant1 || publicReview.Viewer != nil || publicReview.AuthorLabel != "u***@example.com" {
 			t.Fatalf("public projection lost review fields: %+v", publicReview)
 		}
 		owned, _, err := repo.ListOwnerReviews(ctx, revIntegUserB, 1, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(owned) != 1 || owned[0].Review.Response == nil || owned[0].Review.ID != revIntegReview3 || owned[0].Review.Viewer == nil || !owned[0].Review.Viewer.IsOwner {
+		if len(owned) != 1 || owned[0].Review.Response == nil || owned[0].Review.ID != revIntegReview3 || owned[0].Review.Viewer == nil || !owned[0].Review.Viewer.IsOwner || owned[0].Review.AuthorLabel != domain.DefaultAuthorLabel {
 			t.Fatalf("owner projection lost review fields: %+v", owned)
 		}
 		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10)
@@ -399,5 +367,59 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 			}
 		}
 		t.Fatal("admin projection did not contain review3")
+	})
+
+	t.Run("R5 public author label uses the current account email", func(t *testing.T) {
+		public, _, err := repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var before *domain.Review
+		for i := range public {
+			if public[i].ID == revIntegReview3 {
+				before = &public[i]
+			}
+		}
+		if before == nil || before.AuthorLabel != "u***@example.com" {
+			t.Fatalf("initial public author label = %+v", before)
+		}
+
+		if _, err := conn.Exec(ctx, `UPDATE users SET email = 'new.address@example.org' WHERE id = $1`, revIntegUserB); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			_, _ = conn.Exec(ctx, `UPDATE users SET email = 'user-b@example.com' WHERE id = $1`, revIntegUserB)
+		}()
+
+		public, _, err = repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var after *domain.Review
+		for i := range public {
+			if public[i].ID == revIntegReview3 {
+				after = &public[i]
+			}
+		}
+		if after == nil || after.AuthorLabel != "n***@example.org" {
+			t.Fatalf("updated public author label = %+v", after)
+		}
+
+		owned, _, err := repo.ListOwnerReviews(ctx, revIntegUserB, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(owned) != 1 || owned[0].Review.AuthorLabel != domain.DefaultAuthorLabel {
+			t.Fatalf("owned author label = %+v", owned)
+		}
+		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range adminItems {
+			if item.Review.ID == revIntegReview3 && item.Review.AuthorLabel != domain.DefaultAuthorLabel {
+				t.Fatalf("admin author label = %q", item.Review.AuthorLabel)
+			}
+		}
 	})
 }

@@ -1,0 +1,117 @@
+overlay: 1.0.0
+info:
+  title: Purchased Product Reviews API Revision 5
+  version: 5.0.0
+actions:
+  - target: $.tags
+    description: Remove the malformed nested tag array inherited from the frozen revision 4 overlay before restoring the effective tag list.
+    remove: true
+
+  - target: $
+    description: Restore the complete effective tag list with the admin tag as a Tag Object rather than a nested array.
+    update:
+      tags:
+        - name: Product reviews
+          description: Public review summary and paginated verified reviews.
+        - name: Review mutations
+          description: Authenticated create, read-own, and single-edit operations.
+        - name: Order review state
+          description: Personalized review eligibility and pending item count.
+        - name: Review media
+          description: Public raw media bytes proxied from private MinIO storage.
+        - name: Admin review responses
+          description: Admin-only review discovery and single store-response mutations.
+
+  - target: $.components.schemas.Review.required
+    description: Remove the malformed nested required array inherited from the frozen revision 4 overlay before restoring required fields.
+    remove: true
+
+  - target: $.components.schemas.Review
+    description: Restore the complete Review required list with response as a scalar array entry.
+    update:
+      required:
+        - id
+        - productId
+        - variantId
+        - purchasedOptions
+        - rating
+        - comment
+        - media
+        - verifiedPurchase
+        - authorLabel
+        - createdAt
+        - updatedAt
+        - viewer
+        - response
+
+  - target: $.components.schemas
+    description: Add a public-only review representation with a backend-masked author label.
+    update:
+      PublicReview:
+        type: object
+        additionalProperties: false
+        required:
+          - id
+          - productId
+          - variantId
+          - purchasedOptions
+          - rating
+          - comment
+          - media
+          - verifiedPurchase
+          - authorLabel
+          - createdAt
+          - updatedAt
+          - viewer
+          - response
+        properties:
+          id: { type: string, format: uuid }
+          productId: { type: string, format: uuid }
+          variantId: { type: string, format: uuid }
+          purchasedOptions:
+            type: array
+            items: { $ref: '#/components/schemas/PurchasedOption' }
+          rating:
+            type: integer
+            minimum: 1
+            maximum: 5
+          comment:
+            type: string
+            maxLength: 1000
+            description: Trimmed plain text; consumers must render it as text, never as HTML.
+          media:
+            type: array
+            maxItems: 5
+            description: Ordered contiguously; each item's position equals its zero-based array index and URL equals /media/reviews/{id}.
+            items:
+              oneOf:
+                - $ref: '#/components/schemas/ImageReviewMedia'
+                - $ref: '#/components/schemas/VideoReviewMedia'
+            contains:
+              $ref: '#/components/schemas/VideoReviewMedia'
+            minContains: 0
+            maxContains: 2
+          verifiedPurchase:
+            type: boolean
+            const: true
+          authorLabel:
+            type: string
+            pattern: '^[^@]\*{3}@[^@]+$'
+            description: Backend-masked current account email. Preserve the first character of the local-part, replace every remaining local-part character with exactly three literal asterisks regardless of original length, and preserve the complete domain. The provider must not serialize the full account email or author user ID as metadata. User-entered review comments and store responses remain literal plain text and are not redacted by this rule.
+            examples: [t***@gmail.com, a***@example.com]
+          createdAt: { type: string, format: date-time }
+          updatedAt: { type: string, format: date-time }
+          viewer:
+            oneOf:
+              - type: 'null'
+              - $ref: '#/components/schemas/EditableReviewViewerState'
+              - $ref: '#/components/schemas/FinalReviewViewerState'
+          response:
+            oneOf:
+              - type: 'null'
+              - $ref: '#/components/schemas/StoreReviewResponse'
+
+  - target: $.components.schemas.ReviewListEnvelope.properties.data.items
+    description: Product review collections use the public-only masked author representation.
+    update:
+      $ref: '#/components/schemas/PublicReview'

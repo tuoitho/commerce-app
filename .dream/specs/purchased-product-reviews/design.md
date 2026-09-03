@@ -13,6 +13,7 @@ Thiết kế phải bảo đảm:
 - đánh giá và media công khai luôn phản ánh cùng một phiên bản đã hoàn tất;
 - MinIO hoặc PostgreSQL lỗi không làm lộ media mồ côi;
 - tổng quan sản phẩm, section đánh giá và trạng thái trong đơn hàng dùng cùng nguồn dữ liệu;
+- danh sách đánh giá công khai nhận diện tác giả bằng email đã che mà không đưa email đầy đủ qua HTTP boundary;
 - khách hàng có một read model phân trang để xem toàn bộ đánh giá của chính mình mà không tạo nguồn sự thật hoặc lịch sử phiên bản mới;
   - quản trị viên có thể phản hồi mà không có quyền sửa, ẩn hoặc xóa nội dung đánh giá của khách hàng;
   - mỗi đánh giá có tối đa một phản hồi cửa hàng và cập nhật đồng thời không ghi đè âm thầm;
@@ -96,6 +97,12 @@ Thiết kế này cho phép mọi admin sửa cùng một phản hồi nhưng ng
 
 Phản hồi cùng timestamp cập nhật là intrinsic review data và xuất hiện ở public review collection, owned-review/history và admin collection. Admin identity chỉ phục vụ authorization/audit nội bộ, không thuộc public representation. Admin capability/version chỉ có trong admin representation, không được suy ra từ public viewer state.
 
+### 3.7 Che Email Tại Public Read Boundary
+
+Backend public review query ghép `product_reviews.user_id` với email hiện tại trong `users`, sau đó tạo nhãn tác giả bằng cách giữ ký tự đầu tiên của local-part, thay toàn bộ phần còn lại bằng đúng `***` và giữ nguyên domain. Email đầy đủ và user ID lấy từ tài khoản chỉ tồn tại trong persistence/application boundary và không được đưa vào author metadata, domain response field hoặc log. Comment của khách hàng và phản hồi cửa hàng là nội dung do người dùng nhập, tiếp tục được trả nguyên văn dạng plain text và không bị quét, che hoặc từ chối vì trùng một địa chỉ email.
+
+Public review representation sở hữu semantics nhãn đã che. Mutation response, owned-review/history và admin representation tiếp tục dùng nhãn trung lập hiện có, vì vậy contract revision mới phải phân biệt public representation với các representation không-public thay vì đổi semantics của `Review` dùng chung trên mọi endpoint. Không lưu snapshot email hoặc nhãn đã che vào `product_reviews`; nếu email tài khoản thay đổi, lần đọc công khai tiếp theo phản ánh email hiện tại đã che.
+
 ## 4. Sở Hữu Dữ Liệu
 
 ### 4.1 Product Review
@@ -152,6 +159,10 @@ Phản hồi cửa hàng sở hữu review ID duy nhất, nội dung đã trim, 
 
 Admin collection là projection phân trang từ review hiện tại, thông tin nhận biết sản phẩm và phản hồi hiện tại. Nó không tạo nguồn sự thật thứ hai và không cấp mutation nào lên rating, comment, media hoặc verified-purchase state. Thứ tự `(review.updated_at DESC, review.id DESC)` phản ánh yêu cầu danh sách review cập nhật gần nhất; thay đổi riêng phản hồi không đổi thứ tự review.
 
+### 4.7 Nhãn Tác Giả Công Khai
+
+`users.email` tiếp tục là nguồn sự thật duy nhất của email tài khoản. Public review projection chỉ sử dụng giá trị này để tạo `authorLabel` đã che trong lúc đọc; không bổ sung cột, snapshot hoặc nguồn sự thật mới. Owned-review/history, mutation và admin projection không cần đọc email để tạo nhãn tác giả.
+
 ## 5. Luồng Hành Vi
 
 ### 5.1 Đọc Trang Chi Tiết Sản Phẩm
@@ -159,7 +170,7 @@ Admin collection là projection phân trang từ review hiện tại, thông tin
 1. Catalog trả product detail và review summary thật thay cho số liệu tĩnh.
 2. Frontend render summary và trạng thái "Chưa có đánh giá" khi count bằng 0.
 3. Section đánh giá gọi collection phân trang công khai, optional customer auth để nhận viewer state cho review của chính người xem.
-4. Mỗi review hiển thị nhãn tác giả trung lập, phân loại đã mua, rating, comment, thời gian và media.
+4. Backend trả nhãn tác giả đã che từ email tài khoản mà không trả email đầy đủ; frontend hiển thị nguyên văn nhãn này cùng phân loại đã mua, rating, comment, thời gian và media.
 5. Pagination dùng `updated_at DESC, id DESC` để không đổi thứ tự khi timestamp bằng nhau.
 
 ### 5.2 Tạo Đánh Giá
@@ -229,7 +240,7 @@ Khi MinIO hoạt động liên tục, mọi object không tham chiếu phải h�
 - Object key do server sinh, không ghép trực tiếp tên file hoặc user input.
 - MinIO bucket private; credential chỉ đến từ Viper config, không trả về API và không ghi log.
 - Ownership được kiểm tra lại trong transaction, không tin product ID, variant ID, user ID hoặc media ID từ client.
-- Review công khai không chứa email, user ID, original filename hoặc MinIO location.
+- Author metadata của review công khai chỉ chứa email đã che trong `authorLabel`; không serialize email đầy đủ hoặc user ID lấy từ tài khoản, original filename hay MinIO location. Nội dung comment/response do người dùng nhập không thuộc author metadata và không bị thay đổi bởi quy tắc này.
 - Comment render dạng text; image có accessible description sinh từ ngữ cảnh sản phẩm/vị trí, video dùng native controls và keyboard semantics.
 - Route mutation yêu cầu customer auth; route danh sách và media là public; optional auth chỉ bổ sung viewer state, không đổi dữ liệu intrinsic.
 - Route phản hồi và admin review collection dùng admin auth guard hiện có; customer token và anonymous caller không có quyền mutation.
@@ -271,9 +282,9 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** Backend review/order/catalog HTTP delivery  
 **Consumer(s):** Frontend khách hàng  
-**Purpose:** Tạo/sửa review multipart, đọc collection review kèm phản hồi cửa hàng, mở rộng product summary và order-item review state
+**Purpose:** Tạo/sửa review multipart, đọc collection review kèm phản hồi cửa hàng và masked author label, mở rộng product summary và order-item review state
 **Authentication / caller context:** Customer auth cho mutation và order state; public với optional customer auth cho product reviews  
-**Material state or failure semantics:** Eligibility theo order item, concurrency, one-edit limit, validation media, response tùy chọn, pagination, Full Status Envelope
+**Material state or failure semantics:** Eligibility theo order item, concurrency, one-edit limit, validation media, response tùy chọn, public-only masked author semantics, pagination, Full Status Envelope
 **Contract artifact required:** Yes  
 **Requirement IDs traced to boundary:** REQ-REVIEW-01, REQ-REVIEW-02, REQ-REVIEW-03, REQ-REVIEW-04, REQ-REVIEW-05, REQ-REVIEW-06, REQ-REVIEW-07, REQ-REVIEW-08, REQ-REVIEW-09, REQ-REVIEW-10
 **Verification / Proof level:** provider-contract, runtime-http, component, browser
@@ -315,7 +326,7 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 
 **Producer / provider:** Frontend review UI  
 **Consumer(s):** Khách hàng và người xem sản phẩm  
-**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section và lịch sử cá nhân có phản hồi cửa hàng, cùng responsive media viewer
+**Purpose:** Form tạo/sửa, preview media, one-edit warning, order-item actions, product review section hiển thị masked author label và lịch sử cá nhân có phản hồi cửa hàng, cùng responsive media viewer
 **Authentication / caller context:** Authenticated mutations; public read; safe login return  
 **Material state or failure semantics:** Loading/empty/error/success, preserve form on retry, accessible controls, desktop/mobile layout  
 **Contract artifact required:** No, tiêu thụ BND-REVIEW-HTTP và BND-REVIEW-MEDIA-CONTENT  
@@ -363,7 +374,7 @@ Database thay đổi bằng migration up/down mới; sqlc được regenerate. M
 | REQ-REVIEW-02 | Validation rating/comment/media, proxy upload, cleanup khi lỗi | unit + provider-contract + runtime-http | Validator tests, multipart contract tests, backend + MinIO runtime checks |
 | REQ-REVIEW-03 | Một review/order item dưới concurrency và retry sau state reload | integration-db + component + runtime-http | Concurrent repository test, frontend retry-state test và HTTP concurrency check |
 | REQ-REVIEW-04 | Một edit thành công, atomic media manifest, failed edit không tiêu hao | integration-db + provider-contract + runtime-http + component | Conditional update tests, contract scenarios, MinIO failure injection, form tests |
-| REQ-REVIEW-05 | Public pagination, neutral author, variant snapshot, ordered media | provider-contract + component + browser | API contract tests, section render tests, browser pagination/media interaction |
+| REQ-REVIEW-05 | Public pagination, che email phía backend, không lộ email đầy đủ/user ID trong author metadata hoặc log, variant snapshot, ordered media | unit + integration-db + provider-contract + runtime-http + component | Masking tests, public query join tests, API contract tests, captured-log assertions và section render tests |
 | REQ-REVIEW-06 | Count/average đúng và cập nhật sau edit | integration-db + provider-contract + component | Aggregate query tests, response contract, summary rendering |
 | REQ-REVIEW-07 | Review state theo từng order item và awaitingReview semantics | integration-db + component + browser | Join/count tests, order page tests, create-review user flow |
 | REQ-REVIEW-08 | Auth, envelope, safe return, keyboard, retry state | provider-contract + component + browser + visual | Auth/error contract tests, keyboard tests, full login-return/upload flow, desktop/mobile inspection |
@@ -386,6 +397,7 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 8. Hai khách hàng có nhiều review, xác nhận lịch sử của mỗi người chỉ trả review thuộc owner theo thứ tự ổn định; review của sản phẩm đã ẩn vẫn nhận biết được nhưng không có product link.
 9. Hai admin cùng tạo rồi cùng sửa response từ một version; xác nhận mỗi cuộc đua chỉ một mutation thành công và public/owned reads thấy state đã commit.
 10. Customer sửa review đã có response và product sau đó bị ẩn; xác nhận response được giữ trong owned history/admin collection, còn public product route/link vẫn không khả dụng.
+11. Tác giả có email `test@gmail.com`; xác nhận public review trả `authorLabel` là `t***@gmail.com`, không chứa email đầy đủ/user ID, còn mutation, owned history và admin review vẫn dùng nhãn trung lập hiện có; log được capture trong public read thành công và lỗi không chứa email đầy đủ hoặc author user ID.
 
 ## 12. Tác Động Và Tương Thích
 
@@ -398,6 +410,8 @@ Các scenario cần backend, PostgreSQL và MinIO thật:
 - Frontend admin bổ sung protected review route, collection phân trang và form tạo/sửa response; không bổ sung moderation hoặc mutation lên review của khách hàng.
 - PostgreSQL bổ sung state một-một của response và concurrency version; review/media/order invariants hiện có không đổi.
 - Public product review, owned review và history representations được mở rộng bằng response tùy chọn; client phải xử lý trạng thái không có response.
+- Public product review query đọc email hiện tại từ `users` để tạo nhãn đã che tại backend; thay đổi query cần regenerate sqlc nhưng không thay đổi schema hoặc cần migration.
+- Public review `authorLabel` đổi semantics từ hằng số sang masked email, trong khi mutation, owned history và admin giữ nhãn trung lập; backend provider và frontend public-review consumer phải phối hợp theo contract revision mới.
 - Existing product, order, return, favorite và catalog visibility behavior phải được giữ ngoài các phần mở rộng đã nêu.
 
 ## 13. Ranh Giới Contract Cần Đóng Băng
@@ -414,5 +428,6 @@ Tính năng có shared boundary giữa backend và frontend nên phải author e
 - collection lịch sử review cá nhân, owner isolation, pagination, product identity/link availability và owner edit state.
 - admin review collection, response create/update precondition, validation/auth/not-found/conflict semantics;
 - response tùy chọn trong public và owned review representations, không lộ admin identity.
+- public review representation với masked `authorLabel`, quy tắc che chính xác, và bằng chứng không trả email đầy đủ/user ID; các representation không-public tiếp tục dùng nhãn trung lập.
 
 Chi tiết field, endpoint, status, example và scenario ID không được coi là ổn định cho tới khi contract được review và chuyển sang `FROZEN`.

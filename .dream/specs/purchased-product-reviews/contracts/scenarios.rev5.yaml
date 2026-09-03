@@ -1,0 +1,93 @@
+contract: PURCHASED-REVIEW-API
+revision: 5
+status: FROZEN
+inherits:
+  contract: PURCHASED-REVIEW-API
+  revision: 4
+supersedes:
+  - PURCHASED-REVIEW-API-018
+
+scenarios:
+  - id: PURCHASED-REVIEW-API-R5-001
+    requirement: REQ-REVIEW-05
+    given: a public product review belongs to a customer whose current account email is test@gmail.com and its user-entered content contains no email address
+    when: GET /api/v1/products/{productId}/reviews is called
+    then:
+      status: 200
+      assertions:
+        - the review authorLabel is t***@gmail.com
+        - no author metadata field contains the complete account email test@gmail.com
+        - no author metadata field contains the author user ID
+        - every review viewer is null for the anonymous caller
+        - no original filename, bucket, or object key is present
+        - reviews are ordered by updatedAt descending then id descending
+
+  - id: PURCHASED-REVIEW-API-R5-002
+    requirement: REQ-REVIEW-05
+    given: public reviews belong to customers with current emails a@example.com and lengthy.local@example.org
+    when: the product review collection is read
+    then:
+      status: 200
+      assertions:
+        - a@example.com produces authorLabel a***@example.com
+        - lengthy.local@example.org produces authorLabel l***@example.org
+        - both labels contain exactly three literal asterisks regardless of original local-part length
+
+  - id: PURCHASED-REVIEW-API-R5-003
+    requirement: REQ-REVIEW-05
+    given: the same review is returned by the public collection, owned review, owned history, and admin collection operations
+    when: each read operation is called by its authorized caller
+    then:
+      responses:
+        publicCollection: { status: 200 }
+        ownedReview: { status: 200 }
+        ownedHistory: { status: 200 }
+        adminCollection: { status: 200 }
+      assertions:
+        - only the public product review collection uses the masked email authorLabel
+        - owned review, owned history, and admin review representations retain authorLabel Khách hàng đã mua hàng
+        - no author metadata field returns the complete customer account email or author user ID
+
+  - id: PURCHASED-REVIEW-API-R5-004
+    requirement: REQ-REVIEW-05
+    given: a review author account email changes from test@gmail.com to new.address@example.org
+    when: the public product review collection is read after the account change
+    then:
+      status: 200
+      assertions:
+        - authorLabel is n***@example.org
+        - no review snapshot or previous masked label is returned
+
+  - id: PURCHASED-REVIEW-API-R5-005
+    requirement: REQ-REVIEW-05
+    given: an authenticated customer creates and later edits a review
+    when: POST create and PUT edit operations succeed
+    then:
+      responses:
+        create: { status: 201 }
+        edit: { status: 200 }
+      assertions:
+        - both mutation responses retain authorLabel Khách hàng đã mua hàng
+        - neither mutation response serializes the complete customer account email or author user ID as metadata
+
+  - id: PURCHASED-REVIEW-API-R5-006
+    requirement: REQ-REVIEW-05
+    given: revision 5 changes public authorLabel semantics while revision 4 requires the fixed neutral label
+    when: backend and frontend public-review versions are selected for deployment
+    then:
+      assertions:
+        - provider revision 5 and public-review consumer revision 5 must be deployed together
+        - provider revision 5 with public-review consumer revision 4 is unsupported
+        - provider revision 4 with public-review consumer revision 5 is unsupported
+        - the frontend-admin revision 4 consumer remains compatible because admin review authorLabel semantics do not change
+
+  - id: PURCHASED-REVIEW-API-R5-007
+    requirement: REQ-REVIEW-05
+    given: a public review comment or store response literally contains test@gmail.com as user-entered plain text
+    when: the public product review collection is read
+    then:
+      status: 200
+      assertions:
+        - authorLabel is still the masked account email
+        - the user-entered comment or response remains unchanged and is rendered as plain text
+        - no separate author metadata field exposes the complete account email or author user ID
