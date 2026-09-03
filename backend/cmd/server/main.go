@@ -27,6 +27,7 @@ func main() {
 	if err != nil {
 		appLogger.Error("failed to initialize application graph",
 			"category", "app_init",
+			"error", err.Error(),
 		)
 		os.Exit(1)
 	}
@@ -35,6 +36,7 @@ func main() {
 	if err := app.Run(ctx); err != nil {
 		appLogger.Error("application run error",
 			"category", "app_runtime",
+			"error", err.Error(),
 		)
 		os.Exit(1)
 	}

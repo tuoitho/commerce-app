@@ -322,7 +322,7 @@ func (uc *ReviewUseCase) UpdateReview(
 	return review, nil
 }
 
-func (uc *ReviewUseCase) GetPublicReviews(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (uc *ReviewUseCase) GetPublicReviews(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	if _, err := uuid.Parse(productID); err != nil {
 		return nil, domain.ErrProductNotFound
 	}
@@ -341,7 +341,7 @@ func (uc *ReviewUseCase) GetPublicReviews(ctx context.Context, productID string,
 		limit = 10
 	}
 
-	return uc.repo.GetPublicReviewsByProductID(ctx, productID, page, limit)
+	return uc.repo.GetPublicReviewsByProductID(ctx, productID, viewerUserID, page, limit)
 }
 
 func (uc *ReviewUseCase) GetReviewMedia(ctx context.Context, mediaID string) (*domain.ReviewMedia, error) {
@@ -410,4 +410,35 @@ func (u *ReviewUseCase) UpdateAdminReply(ctx context.Context, reviewID string, r
 	}
 	return u.repo.UpdateAdminReply(ctx, reviewID, reply)
 }
+
+func (uc *ReviewUseCase) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+	if vote != nil && !vote.IsValid() {
+		return nil, domain.NewValidationError(map[string]string{
+			"vote": "Giá trị bình chọn không hợp lệ",
+		})
+	}
+	return uc.repo.SetReviewVote(ctx, reviewID, userID, vote)
+}
+
+func (uc *ReviewUseCase) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if _, err := uuid.Parse(replyID); err != nil {
+		return nil, domain.ErrReviewReplyNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+	if vote != nil && !vote.IsValid() {
+		return nil, domain.NewValidationError(map[string]string{
+			"vote": "Giá trị bình chọn không hợp lệ",
+		})
+	}
+	return uc.repo.SetReviewReplyVote(ctx, replyID, userID, vote)
+}
+
 

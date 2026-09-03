@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -223,7 +224,14 @@ func (h *reviewHandler) getPublicReviews(c *gin.Context) {
 		limit = l
 	}
 
-	res, err := h.uc.GetPublicReviews(c.Request.Context(), productID, page, limit)
+	var viewerUserID *string
+	if callerRole(c) == domain.RoleCustomer {
+		if uid := callerUserID(c); uid != "" {
+			viewerUserID = &uid
+		}
+	}
+
+	res, err := h.uc.GetPublicReviews(c.Request.Context(), productID, viewerUserID, page, limit)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -375,3 +383,91 @@ func (h *reviewHandler) getMedia(c *gin.Context) {
 	c.Status(http.StatusOK)
 	_, _ = io.Copy(c.Writer, stream)
 }
+
+func parseHelpfulnessVoteBody(c *gin.Context) (*domain.HelpfulnessVote, bool) {
+	var raw map[string]json.RawMessage
+	if err := c.ShouldBindJSON(&raw); err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"vote": "Giá trị bình chọn không hợp lệ",
+		}))
+		return nil, false
+	}
+	rawVote, exists := raw["vote"]
+	if !exists {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"vote": "Trường vote là bắt buộc",
+		}))
+		return nil, false
+	}
+	if string(rawVote) == "null" {
+		return nil, true
+	}
+	var voteStr string
+	if err := json.Unmarshal(rawVote, &voteStr); err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"vote": "Giá trị bình chọn không hợp lệ",
+		}))
+		return nil, false
+	}
+	v := domain.HelpfulnessVote(voteStr)
+	if !v.IsValid() {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"vote": "Giá trị bình chọn không hợp lệ",
+		}))
+		return nil, false
+	}
+	return &v, true
+}
+
+func (h *reviewHandler) setReviewHelpfulness(c *gin.Context) {
+	userID := callerUserID(c)
+	if userID == "" {
+		writeError(c, domain.ErrInvalidToken)
+		return
+	}
+
+	reviewID := c.Param("reviewId")
+	if reviewID == "" {
+		reviewID = c.Param("id")
+	}
+
+	vote, ok := parseHelpfulnessVoteBody(c)
+	if !ok {
+		return
+	}
+
+	state, err := h.uc.SetReviewVote(c.Request.Context(), reviewID, userID, vote)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "Cập nhật bình chọn thành công", state)
+}
+
+func (h *reviewHandler) setReplyHelpfulness(c *gin.Context) {
+	userID := callerUserID(c)
+	if userID == "" {
+		writeError(c, domain.ErrInvalidToken)
+		return
+	}
+
+	replyID := c.Param("replyId")
+	if replyID == "" {
+		replyID = c.Param("id")
+	}
+
+	vote, ok := parseHelpfulnessVoteBody(c)
+	if !ok {
+		return
+	}
+
+	state, err := h.uc.SetReviewReplyVote(c.Request.Context(), replyID, userID, vote)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "Cập nhật bình chọn thành công", state)
+}
+

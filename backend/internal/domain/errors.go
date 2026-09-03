@@ -38,6 +38,7 @@ var (
 	ErrReturnTransitionNotAllowed = errors.New("return transition not allowed")
 	ErrOrderItemNotFound       = errors.New("order item not found")
 	ErrReviewNotFound          = errors.New("review not found")
+	ErrReviewReplyNotFound     = errors.New("review reply not found")
 	ErrReviewNotEligible       = errors.New("review not eligible")
 	ErrReviewAlreadyExists     = errors.New("review already exists")
 	ErrReviewEditLimitReached  = errors.New("review edit limit reached")

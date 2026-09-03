@@ -127,15 +127,13 @@ type ProductOptionValue struct {
 }
 
 type ProductReview struct {
-	ID             string
-	OrderItemID    string
-	Rating         int16
-	Comment        string
-	EditCount      int16
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	AdminReply     pgtype.Text
-	AdminRepliedAt pgtype.Timestamptz
+	ID          string
+	OrderItemID string
+	Rating      int16
+	Comment     string
+	EditCount   int16
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type ProductVariant struct {
@@ -185,6 +183,16 @@ type ReturnRequestItem struct {
 	ReceivedVariantID pgtype.UUID
 }
 
+type ReviewHelpfulnessVote struct {
+	ID        string
+	UserID    string
+	ReviewID  pgtype.UUID
+	ReplyID   pgtype.UUID
+	Vote      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type ReviewMedium struct {
 	ID        string
 	ReviewID  string
@@ -194,6 +202,14 @@ type ReviewMedium struct {
 	SizeBytes int64
 	Position  int16
 	CreatedAt time.Time
+}
+
+type ReviewReply struct {
+	ID        string
+	ReviewID  string
+	Content   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type User struct {

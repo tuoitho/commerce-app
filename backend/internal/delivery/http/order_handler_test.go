@@ -145,10 +145,22 @@ func (f *fakeReviewRepoForHandler) ListReviewsByOrderItemIDs(ctx context.Context
 func (f *fakeReviewRepoForHandler) GetReviewMediaByID(ctx context.Context, mediaID string) (*domain.ReviewMedia, error) {
 	return nil, nil
 }
-func (f *fakeReviewRepoForHandler) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (f *fakeReviewRepoForHandler) GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	return nil, nil
 }
 func (f *fakeReviewRepoForHandler) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForHandler) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
 	return nil, nil
 }
 
@@ -1014,13 +1026,3 @@ func TestOrderHTTP_UndoCancel(t *testing.T) {
 	})
 }
 
-
-
-
-func (m *fakeReviewRepoForHandler) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
-	return &domain.AdminReviewsResult{}, nil
-}
-
-func (m *fakeReviewRepoForHandler) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
-	return &domain.Review{}, nil
-}

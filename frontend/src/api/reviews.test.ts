@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createOrderItemReview, updateOrderItemReview, getProductReviews, getUserReviews } from './reviews'
+import {
+  createOrderItemReview,
+  updateOrderItemReview,
+  getProductReviews,
+  getUserReviews,
+  setReviewHelpfulness,
+  setReplyHelpfulness,
+} from './reviews'
 import * as client from './client'
 import type { Review, ProductReviewsResponse, UserReviewsResponse } from './types'
 
@@ -100,6 +107,11 @@ describe('reviews API module', () => {
             purchase: { model: 'Black 128GB', options: [] },
             media: [],
             createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 0,
+              unhelpfulCount: 0,
+              viewerVote: null,
+            },
           },
         ],
       },
@@ -121,7 +133,49 @@ describe('reviews API module', () => {
 
     const result = await getProductReviews('prod-1', { page: 2, limit: 5 })
     expect(result).toEqual(mockResponse)
-    expect(spy).toHaveBeenCalledWith('/products/prod-1/reviews?page=2&limit=5')
+    expect(spy).toHaveBeenCalledWith('/products/prod-1/reviews?page=2&limit=5', {
+      retryWithoutAuthOnRefreshFailure: true,
+    })
+  })
+
+  it('setReviewHelpfulness calls apiClient with PUT /reviews/{reviewId}/helpfulness and vote payload', async () => {
+    const mockState = {
+      helpfulCount: 5,
+      unhelpfulCount: 1,
+      viewerVote: 'helpful' as const,
+    }
+
+    const spy = vi.spyOn(client, 'apiClient').mockResolvedValue(mockState)
+
+    const result = await setReviewHelpfulness('rev-123', 'helpful')
+    expect(result).toEqual(mockState)
+    expect(spy).toHaveBeenCalledWith('/reviews/rev-123/helpfulness', {
+      method: 'PUT',
+      body: { vote: 'helpful' },
+    })
+
+    await setReviewHelpfulness('rev-123', null)
+    expect(spy).toHaveBeenCalledWith('/reviews/rev-123/helpfulness', {
+      method: 'PUT',
+      body: { vote: null },
+    })
+  })
+
+  it('setReplyHelpfulness calls apiClient with PUT /review-replies/{replyId}/helpfulness and vote payload', async () => {
+    const mockState = {
+      helpfulCount: 2,
+      unhelpfulCount: 0,
+      viewerVote: 'unhelpful' as const,
+    }
+
+    const spy = vi.spyOn(client, 'apiClient').mockResolvedValue(mockState)
+
+    const result = await setReplyHelpfulness('rep-456', 'unhelpful')
+    expect(result).toEqual(mockState)
+    expect(spy).toHaveBeenCalledWith('/review-replies/rep-456/helpfulness', {
+      method: 'PUT',
+      body: { vote: 'unhelpful' },
+    })
   })
 
   it('getUserReviews calls apiClientWithMeta with query params', async () => {
@@ -172,3 +226,4 @@ describe('reviews API module', () => {
     expect(spy).toHaveBeenCalledWith('/reviews/me?rating=5&page=2&limit=10')
   })
 })
+

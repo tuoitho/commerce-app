@@ -350,6 +350,14 @@ export interface UpdateReviewInput {
   video?: File
 }
 
+export type HelpfulnessVote = 'helpful' | 'unhelpful'
+
+export interface HelpfulnessState {
+  helpfulCount: number
+  unhelpfulCount: number
+  viewerVote: HelpfulnessVote | null
+}
+
 export interface PublicReviewer {
   maskedEmail: string | null
 }
@@ -367,9 +375,13 @@ export interface PublicReview {
   purchase: PublicPurchase
   media: ReviewMedia[]
   createdAt: string
+  helpfulness: HelpfulnessState
   adminReply?: string | null
+  adminReplyId?: string
+  adminReplyHelpfulness?: HelpfulnessState
   adminRepliedAt?: string | null
 }
+
 
 export interface ProductReviewSummary {
   totalReviews: number

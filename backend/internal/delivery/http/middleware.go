@@ -42,6 +42,29 @@ func (g *guard) AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
+func (g *guard) OptionalAuth(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.Next()
+		return
+	}
+	tokenStr, ok := strings.CutPrefix(authHeader, bearerPrefix)
+	if !ok || tokenStr == "" {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "invalid or expired token", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(tokenStr)
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "invalid or expired token", nil)
+		c.Abort()
+		return
+	}
+	c.Set(contextUserKey, userID)
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
 func (g *guard) RequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		currentRole := callerRole(c)

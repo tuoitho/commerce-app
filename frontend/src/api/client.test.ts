@@ -183,4 +183,101 @@ describe('apiClient', () => {
     expect(headers['Content-Type']).toBeUndefined()
     expect(callArgs[1].body).toBe(formData)
   })
+
+  it('retries once without Authorization header when retryWithoutAuthOnRefreshFailure is true and 401 refresh fails', async () => {
+    tokenStore.setToken('expired-token')
+
+    const anonymousSuccess = {
+      success: true,
+      message: 'OK',
+      data: { reviews: [], summary: { totalReviews: 0, averageRating: '0.0', ratingCounts: {} } },
+      error: null,
+      meta: { timestamp: '2026-08-28T00:00:00.000Z' },
+    }
+
+    const fetchMock = vi.fn()
+      // First call to /products/1/reviews returns 401
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'invalid_token', message: 'Token expired' },
+        }),
+      })
+      // Second call is /auth/refresh which fails with 401
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'unauthorized', message: 'Refresh token expired' },
+        }),
+      })
+      // Third call is retrying /products/1/reviews without Authorization header
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => anonymousSuccess,
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await apiClient('/products/1/reviews', {
+      retryWithoutAuthOnRefreshFailure: true,
+    })
+
+    expect(result).toEqual(anonymousSuccess.data)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    // Call 1: initial request with Authorization
+    expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer expired-token')
+
+    // Call 2: refresh request
+    expect(fetchMock.mock.calls[1][0]).toContain('/auth/refresh')
+
+    // Call 3: retry without Authorization
+    expect(fetchMock.mock.calls[2][1].headers['Authorization']).toBeUndefined()
+
+    // Token store cleared
+    expect(tokenStore.getToken()).toBeNull()
+  })
+
+  it('does not retry without Authorization header when retryWithoutAuthOnRefreshFailure is not enabled (e.g. PUT) and throws 401', async () => {
+    tokenStore.setToken('expired-token')
+
+    const fetchMock = vi.fn()
+      // First call to PUT /reviews/1/helpfulness returns 401
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'invalid_token', message: 'Token expired' },
+        }),
+      })
+      // Second call is /auth/refresh which fails
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'unauthorized', message: 'Refresh token expired' },
+        }),
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      apiClient('/reviews/1/helpfulness', {
+        method: 'PUT',
+        body: { vote: 'helpful' },
+      })
+    ).rejects.toThrow(ApiError)
+
+    // Only 2 calls: initial and refresh
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(tokenStore.getToken()).toBeNull()
+  })
 })
+

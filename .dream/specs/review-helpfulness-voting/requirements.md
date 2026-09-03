@@ -54,6 +54,10 @@ Tính năng cho phép khách hàng thể hiện một đánh giá sản phẩm h
 
 3.4. IF đánh giá hoặc phản hồi mục tiêu không tồn tại tại thời điểm xử lý THEN hệ thống SHALL không thay đổi dữ liệu bình chọn và thông báo nội dung không còn khả dụng bằng tiếng Việt.
 
+3.5. WHEN phiên đăng nhập hết hạn trong lúc người xem đang ở trang sản phẩm và làm mới phiên thất bại khi tải, tải lại hoặc chuyển trang đánh giá THEN hệ thống SHALL chuyển người xem sang trạng thái chưa đăng nhập và thử lại yêu cầu danh sách công khai một lần mà không dùng thông tin xác thực.
+
+3.6. WHEN người xem kích hoạt một lựa chọn bình chọn sau khi hệ thống đã chuyển sang trạng thái chưa đăng nhập do làm mới phiên thất bại THEN hệ thống SHALL thực hiện luồng yêu cầu đăng nhập và quay lại đúng trang được quy định tại 3.1.
+
 ### Yêu cầu 4: Phân biệt đánh giá và phản hồi người bán
 
 **User Story:** Là khách hàng, tôi muốn bình chọn độc lập cho đánh giá và phản hồi người bán, để đánh giá đúng từng nội dung.
@@ -64,11 +68,13 @@ Tính năng cho phép khách hàng thể hiện một đánh giá sản phẩm h
 
 4.2. WHEN khách hàng bình chọn cho phản hồi người bán THEN hệ thống SHALL chỉ thay đổi bình chọn và tổng số của phản hồi đó.
 
-4.3. WHEN người bán chỉnh sửa nội dung một phản hồi hiện có THEN hệ thống SHALL giữ nguyên các bình chọn đã có của phản hồi đó.
+4.3. WHEN khách hàng chỉnh sửa nội dung đánh giá hiện có THEN hệ thống SHALL giữ nguyên các bình chọn đã có của đánh giá đó.
 
-4.4. WHEN người bán xóa một phản hồi THEN hệ thống SHALL không còn hiển thị hoặc chấp nhận bình chọn cho phản hồi đã xóa.
+4.4. WHEN người bán chỉnh sửa nội dung một phản hồi hiện có THEN hệ thống SHALL giữ nguyên các bình chọn đã có của phản hồi đó.
 
-4.5. WHEN người bán tạo lại phản hồi sau khi đã xóa THEN hệ thống SHALL coi đó là nội dung phản hồi mới với hai tổng số bắt đầu từ 0 và không có lựa chọn hiện tại của khách hàng.
+4.5. WHEN người bán xóa một phản hồi THEN hệ thống SHALL không còn hiển thị hoặc chấp nhận bình chọn cho phản hồi đã xóa.
+
+4.6. WHEN người bán tạo lại phản hồi sau khi đã xóa THEN hệ thống SHALL coi đó là nội dung phản hồi mới với hai tổng số bắt đầu từ 0 và không có lựa chọn hiện tại của khách hàng.
 
 ### Yêu cầu 5: Tính nhất quán khi tải danh sách
 
@@ -83,6 +89,8 @@ Tính năng cho phép khách hàng thể hiện một đánh giá sản phẩm h
 5.3. WHEN yêu cầu danh sách đến từ người xem chưa đăng nhập THEN hệ thống SHALL không biểu thị bất kỳ lựa chọn nào là lựa chọn của người xem.
 
 5.4. WHEN một thao tác bình chọn thành công THEN kết quả trả về SHALL chứa trạng thái lựa chọn hiện tại và hai tổng số mới nhất của đúng nội dung được thao tác.
+
+5.5. WHEN giao diện trao đổi dữ liệu bình chọn với dịch vụ THEN phản hồi thành công và thất bại SHALL tuân theo Full Status Envelope hiện có của `/api/v1`, với dữ liệu chính nằm trực tiếp trong thuộc tính `data`.
 
 ### Yêu cầu 6: Bảo toàn hành vi hiện có
 

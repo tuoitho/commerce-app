@@ -316,7 +316,7 @@ func TestReviewRepositoryIntegration(t *testing.T) {
 		_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE order_item_id IN ($1, $2, $3)", testOrderItemA, testOrderItemB, testOrderItemC)
 
 		// 1. Initial 0 reviews
-		res0, err := repo.GetPublicReviewsByProductID(ctx, testProduct, 1, 10)
+		res0, err := repo.GetPublicReviewsByProductID(ctx, testProduct, nil, 1, 10)
 		require.NoError(t, err)
 		require.NotNil(t, res0)
 		assert.Equal(t, int64(0), res0.Summary.TotalReviews)
@@ -351,7 +351,7 @@ func TestReviewRepositoryIntegration(t *testing.T) {
 		}()
 
 		// 3. Query public reviews
-		res, err := repo.GetPublicReviewsByProductID(ctx, testProduct, 1, 10)
+		res, err := repo.GetPublicReviewsByProductID(ctx, testProduct, nil, 1, 10)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Equal(t, int64(2), res.Summary.TotalReviews)
@@ -553,5 +553,610 @@ func TestReviewRepositoryIntegration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), resOther.Total)
 		assert.Empty(t, resOther.Reviews)
+	})
+
+	t.Run("AdminReply_Lifecycle_Integration", func(t *testing.T) {
+		// Clean up
+		_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE order_item_id = $1", testOrderItemA)
+
+		// 1. Create initial review
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Đánh giá gốc của khách hàng",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, rev)
+		assert.Nil(t, rev.AdminReply)
+		assert.Nil(t, rev.AdminRepliedAt)
+
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		// 2. Create admin reply
+		replyText1 := "Cảm ơn bạn đã phản hồi!"
+		updatedRev1, err := repo.UpdateAdminReply(ctx, rev.ID, &replyText1)
+		require.NoError(t, err)
+		require.NotNil(t, updatedRev1)
+		require.NotNil(t, updatedRev1.AdminReply)
+		assert.Equal(t, replyText1, *updatedRev1.AdminReply)
+		require.NotNil(t, updatedRev1.AdminRepliedAt)
+
+		// Verify reply entity in database
+		var replyID1 string
+		var content1 string
+		err = pool.QueryRow(ctx, "SELECT id, content FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyID1, &content1)
+		require.NoError(t, err)
+		assert.Equal(t, replyText1, content1)
+		assert.NotEmpty(t, replyID1)
+
+		// Verify GetReviewByID returns reply
+		getByID, err := repo.GetReviewByID(ctx, rev.ID)
+		require.NoError(t, err)
+		require.NotNil(t, getByID.AdminReply)
+		assert.Equal(t, replyText1, *getByID.AdminReply)
+		require.NotNil(t, getByID.AdminRepliedAt)
+
+		// Verify GetReviewByOrderItemID returns reply
+		getByItem, err := repo.GetReviewByOrderItemID(ctx, testOrderItemA)
+		require.NoError(t, err)
+		require.NotNil(t, getByItem.AdminReply)
+		assert.Equal(t, replyText1, *getByItem.AdminReply)
+
+		// Verify ListReviewsByOrderItemIDs returns reply
+		byItems, err := repo.ListReviewsByOrderItemIDs(ctx, []string{testOrderItemA})
+		require.NoError(t, err)
+		require.Contains(t, byItems, testOrderItemA)
+		require.NotNil(t, byItems[testOrderItemA].AdminReply)
+		assert.Equal(t, replyText1, *byItems[testOrderItemA].AdminReply)
+
+		// Verify GetPublicReviewsByProductID returns reply
+		publicRes, err := repo.GetPublicReviewsByProductID(ctx, testProduct, nil, 1, 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, publicRes.Reviews)
+		require.NotNil(t, publicRes.Reviews[0].AdminReply)
+		assert.Equal(t, replyText1, *publicRes.Reviews[0].AdminReply)
+
+		// Verify GetUserReviews returns reply
+		userRes, err := repo.GetUserReviews(ctx, testUserID, 0, 1, 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, userRes.Reviews)
+		require.NotNil(t, userRes.Reviews[0].AdminReply)
+		assert.Equal(t, replyText1, *userRes.Reviews[0].AdminReply)
+
+		// Verify GetAdminReviews returns reply
+		adminRes, err := repo.GetAdminReviews(ctx, 0, "yes", 1, 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, adminRes.Reviews)
+		require.NotNil(t, adminRes.Reviews[0].AdminReply)
+		assert.Equal(t, replyText1, *adminRes.Reviews[0].AdminReply)
+
+		// 3. Add votes to review and reply
+		var reviewVoteID, replyVoteID string
+		err = pool.QueryRow(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, NULL, 'helpful')
+			RETURNING id
+		`, testUserID, rev.ID).Scan(&reviewVoteID)
+		require.NoError(t, err)
+
+		err = pool.QueryRow(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, $2, 'helpful')
+			RETURNING id
+		`, testUserID, replyID1).Scan(&replyVoteID)
+		require.NoError(t, err)
+
+		// 4. Update reply: same UUID preserved, reply vote preserved (Req 4.4)
+		replyText2 := "Cảm ơn bạn rất nhiều vì đã đánh giá 5 sao!"
+		updatedRev2, err := repo.UpdateAdminReply(ctx, rev.ID, &replyText2)
+		require.NoError(t, err)
+		require.NotNil(t, updatedRev2.AdminReply)
+		assert.Equal(t, replyText2, *updatedRev2.AdminReply)
+
+		var replyIDAfterUpdate string
+		var contentAfterUpdate string
+		err = pool.QueryRow(ctx, "SELECT id, content FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyIDAfterUpdate, &contentAfterUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, replyID1, replyIDAfterUpdate, "Reply UUID must be preserved across updates")
+		assert.Equal(t, replyText2, contentAfterUpdate)
+
+		var replyVoteCountAfterUpdate int
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", replyVoteID).Scan(&replyVoteCountAfterUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, 1, replyVoteCountAfterUpdate, "Reply vote must remain intact when reply is edited")
+
+		// 5. Update review: review vote preserved (Req 4.3)
+		updatedReview, _, err := repo.UpdateReview(ctx, domain.UpdateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			ReviewID:    rev.ID,
+			Rating:      5,
+			Comment:     "Đánh giá sau khi chỉnh sửa",
+		})
+		require.NoError(t, err)
+		assert.True(t, updatedReview.Edited)
+
+		var reviewVoteCountAfterUpdate int
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", reviewVoteID).Scan(&reviewVoteCountAfterUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, 1, reviewVoteCountAfterUpdate, "Review vote must remain intact when review is edited")
+
+		// 6. Delete reply: deletes reply entity and cascades reply votes (Req 4.5)
+		deletedRev, err := repo.UpdateAdminReply(ctx, rev.ID, nil)
+		require.NoError(t, err)
+		assert.Nil(t, deletedRev.AdminReply)
+		assert.Nil(t, deletedRev.AdminRepliedAt)
+
+		var replyCountAfterDelete int
+		_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyCountAfterDelete)
+		assert.Equal(t, 0, replyCountAfterDelete, "Reply entity must be deleted")
+
+		var replyVoteCountAfterDelete int
+		_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", replyVoteID).Scan(&replyVoteCountAfterDelete)
+		assert.Equal(t, 0, replyVoteCountAfterDelete, "Reply vote must be cascade deleted when reply is deleted")
+
+		// Review vote must still exist
+		var reviewVoteCountStillExists int
+		_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", reviewVoteID).Scan(&reviewVoteCountStillExists)
+		assert.Equal(t, 1, reviewVoteCountStillExists, "Review vote must NOT be affected by reply deletion")
+
+		// 7. Recreate reply: gets a NEW UUID and starts with 0 votes (Req 4.6)
+		recreatedText := "Phản hồi mới sau khi đã xóa"
+		recreatedRev, err := repo.UpdateAdminReply(ctx, rev.ID, &recreatedText)
+		require.NoError(t, err)
+		require.NotNil(t, recreatedRev.AdminReply)
+		assert.Equal(t, recreatedText, *recreatedRev.AdminReply)
+
+		var replyID2 string
+		err = pool.QueryRow(ctx, "SELECT id FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyID2)
+		require.NoError(t, err)
+		assert.NotEqual(t, replyID1, replyID2, "Recreated reply must generate a new UUID")
+
+		var recreatedReplyVotesCount int
+		_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE reply_id = $1", replyID2).Scan(&recreatedReplyVotesCount)
+		assert.Equal(t, 0, recreatedReplyVotesCount, "Recreated reply starts with 0 votes")
+	})
+
+	t.Run("GetPublicReviews_HelpfulnessAggregationAndViewerState", func(t *testing.T) {
+		// Clean up
+		_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE order_item_id IN ($1, $2, $3)", testOrderItemA, testOrderItemB, testOrderItemC)
+
+		// 1. Create two reviews
+		revA, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Đánh giá A",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", revA.ID)
+		}()
+
+		revB, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemB,
+			Rating:      4,
+			Comment:     "Đánh giá B",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", revB.ID)
+		}()
+
+		// 2. Add reply to revA
+		replyText := "Phản hồi từ shop cho đánh giá A"
+		_, err = repo.UpdateAdminReply(ctx, revA.ID, &replyText)
+		require.NoError(t, err)
+
+		var replyIDA string
+		err = pool.QueryRow(ctx, "SELECT id FROM review_replies WHERE review_id = $1", revA.ID).Scan(&replyIDA)
+		require.NoError(t, err)
+
+		// 3. Insert votes:
+		// revA: testUserID -> helpful, otherUserID -> helpful (total: helpful=2, unhelpful=0)
+		_, err = pool.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, NULL, 'helpful'), ($3, $2, NULL, 'helpful')
+		`, testUserID, revA.ID, otherUserID)
+		require.NoError(t, err)
+
+		// revB: otherUserID -> unhelpful (total: helpful=0, unhelpful=1)
+		_, err = pool.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, NULL, 'unhelpful')
+		`, otherUserID, revB.ID)
+		require.NoError(t, err)
+
+		// replyIDA: testUserID -> helpful, otherUserID -> unhelpful (total: helpful=1, unhelpful=1)
+		_, err = pool.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, $2, 'helpful'), ($3, NULL, $2, 'unhelpful')
+		`, testUserID, replyIDA, otherUserID)
+		require.NoError(t, err)
+
+		// 4. Test Anonymous (viewerUserID == nil)
+		anonRes, err := repo.GetPublicReviewsByProductID(ctx, testProduct, nil, 1, 10)
+		require.NoError(t, err)
+		require.Len(t, anonRes.Reviews, 2)
+
+		// Reviews are ordered newest first: revB was created after revA (or check by ID)
+		var anonRevA, anonRevB *domain.PublicReview
+		for i := range anonRes.Reviews {
+			if anonRes.Reviews[i].ID == revA.ID {
+				anonRevA = &anonRes.Reviews[i]
+			} else if anonRes.Reviews[i].ID == revB.ID {
+				anonRevB = &anonRes.Reviews[i]
+			}
+		}
+		require.NotNil(t, anonRevA)
+		require.NotNil(t, anonRevB)
+
+		// revA assertions for Anonymous
+		assert.Equal(t, int64(2), anonRevA.Helpfulness.HelpfulCount)
+		assert.Equal(t, int64(0), anonRevA.Helpfulness.UnhelpfulCount)
+		assert.Nil(t, anonRevA.Helpfulness.ViewerVote)
+		require.NotNil(t, anonRevA.AdminReply)
+		assert.Equal(t, replyText, *anonRevA.AdminReply)
+		require.NotNil(t, anonRevA.AdminReplyID)
+		assert.Equal(t, replyIDA, *anonRevA.AdminReplyID)
+		require.NotNil(t, anonRevA.AdminReplyHelpfulness)
+		assert.Equal(t, int64(1), anonRevA.AdminReplyHelpfulness.HelpfulCount)
+		assert.Equal(t, int64(1), anonRevA.AdminReplyHelpfulness.UnhelpfulCount)
+		assert.Nil(t, anonRevA.AdminReplyHelpfulness.ViewerVote)
+
+		// revB assertions for Anonymous (no reply)
+		assert.Equal(t, int64(0), anonRevB.Helpfulness.HelpfulCount)
+		assert.Equal(t, int64(1), anonRevB.Helpfulness.UnhelpfulCount)
+		assert.Nil(t, anonRevB.Helpfulness.ViewerVote)
+		assert.Nil(t, anonRevB.AdminReply)
+		assert.Nil(t, anonRevB.AdminReplyID)
+		assert.Nil(t, anonRevB.AdminReplyHelpfulness)
+
+		// 5. Test Customer 1 (testUserID)
+		uid1 := testUserID
+		cust1Res, err := repo.GetPublicReviewsByProductID(ctx, testProduct, &uid1, 1, 10)
+		require.NoError(t, err)
+		var cust1RevA, cust1RevB *domain.PublicReview
+		for i := range cust1Res.Reviews {
+			if cust1Res.Reviews[i].ID == revA.ID {
+				cust1RevA = &cust1Res.Reviews[i]
+			} else if cust1Res.Reviews[i].ID == revB.ID {
+				cust1RevB = &cust1Res.Reviews[i]
+			}
+		}
+		require.NotNil(t, cust1RevA)
+		require.NotNil(t, cust1RevB)
+
+		// revA for Customer 1: helpful vote on review and helpful vote on reply
+		require.NotNil(t, cust1RevA.Helpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *cust1RevA.Helpfulness.ViewerVote)
+		require.NotNil(t, cust1RevA.AdminReplyHelpfulness)
+		require.NotNil(t, cust1RevA.AdminReplyHelpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *cust1RevA.AdminReplyHelpfulness.ViewerVote)
+
+		// revB for Customer 1: no vote
+		assert.Nil(t, cust1RevB.Helpfulness.ViewerVote)
+
+		// 6. Test Customer 2 (otherUserID)
+		uid2 := otherUserID
+		cust2Res, err := repo.GetPublicReviewsByProductID(ctx, testProduct, &uid2, 1, 10)
+		require.NoError(t, err)
+		var cust2RevA, cust2RevB *domain.PublicReview
+		for i := range cust2Res.Reviews {
+			if cust2Res.Reviews[i].ID == revA.ID {
+				cust2RevA = &cust2Res.Reviews[i]
+			} else if cust2Res.Reviews[i].ID == revB.ID {
+				cust2RevB = &cust2Res.Reviews[i]
+			}
+		}
+		require.NotNil(t, cust2RevA)
+		require.NotNil(t, cust2RevB)
+
+		// revA for Customer 2: helpful vote on review, unhelpful vote on reply
+		require.NotNil(t, cust2RevA.Helpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *cust2RevA.Helpfulness.ViewerVote)
+		require.NotNil(t, cust2RevA.AdminReplyHelpfulness)
+		require.NotNil(t, cust2RevA.AdminReplyHelpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *cust2RevA.AdminReplyHelpfulness.ViewerVote)
+
+		// revB for Customer 2: unhelpful vote on review
+		require.NotNil(t, cust2RevB.Helpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *cust2RevB.Helpfulness.ViewerVote)
+
+		// 7. Test Customer 3 (non-voting user)
+		nonVotingUID := "22222222-3333-4444-5555-666666666666"
+		cust3Res, err := repo.GetPublicReviewsByProductID(ctx, testProduct, &nonVotingUID, 1, 10)
+		require.NoError(t, err)
+		for _, r := range cust3Res.Reviews {
+			assert.Nil(t, r.Helpfulness.ViewerVote)
+			if r.AdminReplyHelpfulness != nil {
+				assert.Nil(t, r.AdminReplyHelpfulness.ViewerVote)
+			}
+		}
+	})
+
+	t.Run("SetReviewVote_SetChangeRemoveIdempotency", func(t *testing.T) {
+		// 1. Create a review
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Vote review test",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		helpful := domain.HelpfulnessVoteHelpful
+		unhelpful := domain.HelpfulnessVoteUnhelpful
+
+		// 2. Set helpful vote
+		state1, err := repo.SetReviewVote(ctx, rev.ID, testUserID, &helpful)
+		require.NoError(t, err)
+		require.NotNil(t, state1)
+		assert.Equal(t, int64(1), state1.HelpfulCount)
+		assert.Equal(t, int64(0), state1.UnhelpfulCount)
+		require.NotNil(t, state1.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *state1.ViewerVote)
+
+		// 3. Idempotent same-state vote (send helpful again) -> no count increase
+		state1Idempotent, err := repo.SetReviewVote(ctx, rev.ID, testUserID, &helpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), state1Idempotent.HelpfulCount)
+		assert.Equal(t, int64(0), state1Idempotent.UnhelpfulCount)
+		require.NotNil(t, state1Idempotent.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *state1Idempotent.ViewerVote)
+
+		// 4. Change vote to unhelpful -> helpful decreases, unhelpful increases
+		state2, err := repo.SetReviewVote(ctx, rev.ID, testUserID, &unhelpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), state2.HelpfulCount)
+		assert.Equal(t, int64(1), state2.UnhelpfulCount)
+		require.NotNil(t, state2.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *state2.ViewerVote)
+
+		// 5. Remove vote (vote = nil) -> unhelpful decreases to 0, viewerVote is nil
+		state3, err := repo.SetReviewVote(ctx, rev.ID, testUserID, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), state3.HelpfulCount)
+		assert.Equal(t, int64(0), state3.UnhelpfulCount)
+		assert.Nil(t, state3.ViewerVote)
+
+		// 6. Non-existent review -> ErrReviewNotFound
+		_, err = repo.SetReviewVote(ctx, "00000000-0000-0000-0000-000000000000", testUserID, &helpful)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrReviewNotFound, err)
+	})
+
+	t.Run("SetReviewReplyVote_SetChangeRemoveIdempotency_AndStaleUUID", func(t *testing.T) {
+		// 1. Create a review and reply
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Reply vote test",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		replyText := "Phản hồi thử nghiệm vote"
+		_, err = repo.UpdateAdminReply(ctx, rev.ID, &replyText)
+		require.NoError(t, err)
+
+		var replyID string
+		err = pool.QueryRow(ctx, "SELECT id FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyID)
+		require.NoError(t, err)
+
+		helpful := domain.HelpfulnessVoteHelpful
+		unhelpful := domain.HelpfulnessVoteUnhelpful
+
+		// 2. Set helpful on reply
+		rpState1, err := repo.SetReviewReplyVote(ctx, replyID, testUserID, &helpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), rpState1.HelpfulCount)
+		assert.Equal(t, int64(0), rpState1.UnhelpfulCount)
+		require.NotNil(t, rpState1.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *rpState1.ViewerVote)
+
+		// 3. Change to unhelpful on reply
+		rpState2, err := repo.SetReviewReplyVote(ctx, replyID, testUserID, &unhelpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), rpState2.HelpfulCount)
+		assert.Equal(t, int64(1), rpState2.UnhelpfulCount)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *rpState2.ViewerVote)
+
+		// 4. Remove vote on reply
+		rpState3, err := repo.SetReviewReplyVote(ctx, replyID, testUserID, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), rpState3.HelpfulCount)
+		assert.Equal(t, int64(0), rpState3.UnhelpfulCount)
+		assert.Nil(t, rpState3.ViewerVote)
+
+		// 5. Non-existent reply -> ErrReviewReplyNotFound
+		_, err = repo.SetReviewReplyVote(ctx, "00000000-0000-0000-0000-000000000000", testUserID, &helpful)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrReviewReplyNotFound, err)
+
+		// 6. Delete reply and recreate reply -> old replyID returns ErrReviewReplyNotFound (Req 4.6)
+		_, err = repo.UpdateAdminReply(ctx, rev.ID, nil) // delete
+		require.NoError(t, err)
+
+		recreatedReply := "Phản hồi tạo lại mới"
+		_, err = repo.UpdateAdminReply(ctx, rev.ID, &recreatedReply)
+		require.NoError(t, err)
+
+		// Vote on old stale replyID must fail with ErrReviewReplyNotFound
+		_, err = repo.SetReviewReplyVote(ctx, replyID, testUserID, &helpful)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrReviewReplyNotFound, err)
+	})
+
+	t.Run("TargetIsolation_ReviewAndReplyVotesAreIndependent", func(t *testing.T) {
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Isolation test",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		replyText := "Phản hồi isolation test"
+		_, err = repo.UpdateAdminReply(ctx, rev.ID, &replyText)
+		require.NoError(t, err)
+
+		var replyID string
+		err = pool.QueryRow(ctx, "SELECT id FROM review_replies WHERE review_id = $1", rev.ID).Scan(&replyID)
+		require.NoError(t, err)
+
+		helpful := domain.HelpfulnessVoteHelpful
+		unhelpful := domain.HelpfulnessVoteUnhelpful
+
+		// Customer 1 votes helpful on review
+		rState, err := repo.SetReviewVote(ctx, rev.ID, testUserID, &helpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), rState.HelpfulCount)
+		assert.Equal(t, int64(0), rState.UnhelpfulCount)
+
+		// Customer 1 votes unhelpful on reply
+		rpState, err := repo.SetReviewReplyVote(ctx, replyID, testUserID, &unhelpful)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), rpState.HelpfulCount)
+		assert.Equal(t, int64(1), rpState.UnhelpfulCount)
+
+		// Verify review counts are still (1, 0)
+		uid := testUserID
+		pubRes, err := repo.GetPublicReviewsByProductID(ctx, testProduct, &uid, 1, 10)
+		require.NoError(t, err)
+		require.NotEmpty(t, pubRes.Reviews)
+		assert.Equal(t, int64(1), pubRes.Reviews[0].Helpfulness.HelpfulCount)
+		assert.Equal(t, int64(0), pubRes.Reviews[0].Helpfulness.UnhelpfulCount)
+		require.NotNil(t, pubRes.Reviews[0].Helpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *pubRes.Reviews[0].Helpfulness.ViewerVote)
+
+		require.NotNil(t, pubRes.Reviews[0].AdminReplyHelpfulness)
+		assert.Equal(t, int64(0), pubRes.Reviews[0].AdminReplyHelpfulness.HelpfulCount)
+		assert.Equal(t, int64(1), pubRes.Reviews[0].AdminReplyHelpfulness.UnhelpfulCount)
+		require.NotNil(t, pubRes.Reviews[0].AdminReplyHelpfulness.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *pubRes.Reviews[0].AdminReplyHelpfulness.ViewerVote)
+	})
+
+	t.Run("SameUser_ConcurrentVotes_EndInSingleValidState", func(t *testing.T) {
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Same user concurrent test",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		helpful := domain.HelpfulnessVoteHelpful
+		unhelpful := domain.HelpfulnessVoteUnhelpful
+
+		var wg sync.WaitGroup
+		votes := []*domain.HelpfulnessVote{&helpful, &unhelpful, nil, &helpful}
+		results := make([]*domain.HelpfulnessState, len(votes))
+		errs := make([]error, len(votes))
+
+		for i := 0; i < len(votes); i++ {
+			idx := i
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				res, err := repo.SetReviewVote(ctx, rev.ID, testUserID, votes[idx])
+				results[idx] = res
+				errs[idx] = err
+			}()
+		}
+		wg.Wait()
+
+		for i := 0; i < len(votes); i++ {
+			require.NoError(t, errs[i])
+			require.NotNil(t, results[i])
+			assert.GreaterOrEqual(t, results[i].HelpfulCount, int64(0))
+			assert.GreaterOrEqual(t, results[i].UnhelpfulCount, int64(0))
+			assert.LessOrEqual(t, results[i].HelpfulCount+results[i].UnhelpfulCount, int64(1))
+		}
+
+		// Verify database has at most 1 vote row for (testUserID, rev.ID)
+		var rowCount int
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE user_id = $1 AND review_id = $2", testUserID, rev.ID).Scan(&rowCount)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, rowCount, 1)
+	})
+
+	t.Run("TwoCustomer_ConcurrentVotes_LockSerialization", func(t *testing.T) {
+		rev, err := repo.CreateReview(ctx, domain.CreateReviewInput{
+			UserID:      testUserID,
+			OrderID:     testOrderID,
+			OrderItemID: testOrderItemA,
+			Rating:      5,
+			Comment:     "Two customer concurrency test",
+		})
+		require.NoError(t, err)
+		defer func() {
+			_, _ = pool.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", rev.ID)
+		}()
+
+		helpful := domain.HelpfulnessVoteHelpful
+
+		var wg sync.WaitGroup
+		results := make([]*domain.HelpfulnessState, 2)
+		errs := make([]error, 2)
+		users := []string{testUserID, otherUserID}
+
+		for i := 0; i < 2; i++ {
+			idx := i
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				res, err := repo.SetReviewVote(ctx, rev.ID, users[idx], &helpful)
+				results[idx] = res
+				errs[idx] = err
+			}()
+		}
+		wg.Wait()
+
+		require.NoError(t, errs[0])
+		require.NoError(t, errs[1])
+		require.NotNil(t, results[0])
+		require.NotNil(t, results[1])
+
+		// Due to target row FOR UPDATE serialization:
+		// One writer commits first -> its response total is 1
+		// Second writer commits second -> its response total is 2
+		total1 := results[0].HelpfulCount + results[0].UnhelpfulCount
+		total2 := results[1].HelpfulCount + results[1].UnhelpfulCount
+
+		totals := []int64{total1, total2}
+		assert.Contains(t, totals, int64(1), "One serialized writer must observe total count 1")
+		assert.Contains(t, totals, int64(2), "The second serialized writer must observe total count 2")
+
+		// Final database count must be 2
+		var finalHelpfulCount, finalUnhelpfulCount int64
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FILTER (WHERE vote = 'helpful')::bigint, COUNT(*) FILTER (WHERE vote = 'unhelpful')::bigint FROM review_helpfulness_votes WHERE review_id = $1", rev.ID).Scan(&finalHelpfulCount, &finalUnhelpfulCount)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), finalHelpfulCount)
+		assert.Equal(t, int64(0), finalUnhelpfulCount)
 	})
 }

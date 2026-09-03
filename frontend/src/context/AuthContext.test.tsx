@@ -136,4 +136,70 @@ describe('AuthContext (Customer Store)', () => {
     expect(result.current.role).toBeNull()
     expect(tokenStore.getToken()).toBeNull()
   })
+
+  it('synchronizes anonymous state when tokenStore is cleared externally (e.g. failed refresh)', async () => {
+    const customerUser = { id: 'user-1', email: 'customer@auraphone.vn', role: 'customer' }
+    tokenStore.setToken('token-customer-123')
+    vi.mocked(authApi.getMe).mockResolvedValueOnce(customerUser)
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true)
+    })
+
+    // Simulate external clear (e.g. from apiClient on failed refresh)
+    act(() => {
+      tokenStore.clearToken()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(false)
+      expect(result.current.user).toBeNull()
+      expect(result.current.accessToken).toBeNull()
+    })
+  })
+
+  it('synchronizes new access token when tokenStore is updated via refresh', async () => {
+    const customerUser = { id: 'user-1', email: 'customer@auraphone.vn', role: 'customer' }
+    tokenStore.setToken('token-customer-123')
+    vi.mocked(authApi.getMe).mockResolvedValueOnce(customerUser)
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true)
+      expect(result.current.accessToken).toBe('token-customer-123')
+    })
+
+    // Simulate token update from refresh
+    act(() => {
+      tokenStore.setToken('token-customer-refreshed')
+    })
+
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true)
+      expect(result.current.accessToken).toBe('token-customer-refreshed')
+      expect(result.current.user).toEqual(customerUser)
+    })
+  })
+
+  it('synchronously initializes authenticated state from cached user to prevent reload flicker', async () => {
+    const cachedCustomer = { id: 'user-cached-1', email: 'cached@auraphone.vn', role: 'customer' }
+    tokenStore.setToken('cached-token-123')
+    tokenStore.setUser(cachedCustomer)
+    vi.mocked(authApi.getMe).mockResolvedValueOnce(cachedCustomer)
+
+    // Should not reject or require waiting to be authenticated
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    expect(result.current.isAuthenticated).toBe(true)
+    expect(result.current.user).toEqual(cachedCustomer)
+    expect(result.current.role).toBe('customer')
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+  })
 })
+

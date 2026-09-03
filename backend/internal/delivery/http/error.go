@@ -88,6 +88,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 404, "order_item_not_found", "Không tìm thấy sản phẩm trong đơn hàng", nil)
 	case errors.Is(err, domain.ErrReviewNotFound):
 		respondError(c, 404, "review_not_found", "Không tìm thấy đánh giá", nil)
+	case errors.Is(err, domain.ErrReviewReplyNotFound):
+		respondError(c, 404, "review_reply_not_found", "Không tìm thấy phản hồi đánh giá", nil)
 	case errors.Is(err, domain.ErrReviewNotEligible):
 		respondError(c, 409, "review_not_eligible", "Sản phẩm chưa đủ điều kiện đánh giá", nil)
 	case errors.Is(err, domain.ErrReviewAlreadyExists):

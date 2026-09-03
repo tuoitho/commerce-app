@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { getProductReviews } from '@/api/reviews'
-import type {
-  PublicReview,
-  ProductReviewSummary,
-  ReviewMedia,
+import { useNavigate, useLocation } from 'react-router-dom'
+import { getProductReviews, setReviewHelpfulness, setReplyHelpfulness } from '@/api/reviews'
+import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
+import {
+  ApiError,
+  type PublicReview,
+  type ProductReviewSummary,
+  type ReviewMedia,
+  type HelpfulnessVote,
+  type HelpfulnessState,
 } from '@/api/types'
-import { formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -17,6 +23,8 @@ import {
   ChevronRight,
   MessageSquare,
   AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
   X,
 } from 'lucide-react'
 
@@ -29,6 +37,11 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
   productId,
   onSummaryLoaded,
 }) => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { error: toastError } = useToast()
+
   const [reviews, setReviews] = useState<PublicReview[]>([])
   const [summary, setSummary] = useState<ProductReviewSummary | null>(null)
   const [page, setPage] = useState(1)
@@ -36,10 +49,16 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedImage, setExpandedImage] = useState<string | null>(null)
+  const [pendingTargetIds, setPendingTargetIds] = useState<Set<string>>(new Set())
+
+  const isTargetPending = useCallback(
+    (targetId: string) => pendingTargetIds.has(targetId),
+    [pendingTargetIds]
+  )
 
   const fetchReviews = useCallback(
     async (targetPage: number) => {
-      if (!productId) return
+      if (!productId || authLoading) return
       setIsLoading(true)
       setError(null)
       try {
@@ -60,16 +79,81 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
         setIsLoading(false)
       }
     },
-    [productId, onSummaryLoaded]
+    [productId, authLoading, onSummaryLoaded]
   )
 
   useEffect(() => {
-    fetchReviews(1)
-  }, [fetchReviews])
+    if (!authLoading) {
+      fetchReviews(1)
+    }
+  }, [authLoading, fetchReviews])
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
     fetchReviews(newPage)
+  }
+
+  const handleVote = async (
+    targetType: 'review' | 'reply',
+    targetId: string,
+    clickedVote: HelpfulnessVote,
+    currentHelpfulness?: HelpfulnessState
+  ) => {
+    if (isTargetPending(targetId)) return
+
+    if (!isAuthenticated) {
+      const redirectPath = encodeURIComponent(location.pathname + location.search)
+      navigate(`/login?redirect=${redirectPath}`)
+      return
+    }
+
+    const currentVote = currentHelpfulness?.viewerVote || null
+    const desiredVote: HelpfulnessVote | null = currentVote === clickedVote ? null : clickedVote
+
+    setPendingTargetIds((prev) => new Set(prev).add(targetId))
+
+    try {
+      let newState: HelpfulnessState
+      if (targetType === 'review') {
+        newState = await setReviewHelpfulness(targetId, desiredVote)
+      } else {
+        newState = await setReplyHelpfulness(targetId, desiredVote)
+      }
+
+      setReviews((prev) =>
+        prev.map((r) => {
+          if (targetType === 'review' && r.id === targetId) {
+            return { ...r, helpfulness: newState }
+          }
+          if (targetType === 'reply' && r.adminReplyId === targetId) {
+            return { ...r, adminReplyHelpfulness: newState }
+          }
+          return r
+        })
+      )
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 401 || err.code === 'invalid_token' || err.code === 'unauthorized')
+      ) {
+        const redirectPath = encodeURIComponent(location.pathname + location.search)
+        navigate(`/login?redirect=${redirectPath}`)
+        return
+      }
+      if (err instanceof ApiError && err.message) {
+        toastError(err.message)
+      } else if (err instanceof Error && err.message) {
+        toastError(err.message)
+      } else {
+        toastError('Không thể cập nhật bình chọn. Vui lòng thử lại.')
+      }
+    } finally {
+      setPendingTargetIds((prev) => {
+        const next = new Set(prev)
+        next.delete(targetId)
+        return next
+      })
+    }
   }
 
   const renderStars = (rating: number, max = 5, sizeClass = 'w-4 h-4') => {
@@ -92,6 +176,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
 
   const totalReviewsCount = summary?.totalReviews || 0
   const avgRatingNum = Number(summary?.averageRating) || 0
+  const isSectionLoading = authLoading || isLoading
 
   return (
     <section
@@ -132,7 +217,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
       )}
 
       {/* Loading state */}
-      {isLoading && (
+      {isSectionLoading && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 rounded-2xl bg-slate-50/80 border border-slate-200/80">
             <div className="md:col-span-4 space-y-3 flex flex-col items-center justify-center">
@@ -154,7 +239,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
       )}
 
       {/* Loaded Content */}
-      {!isLoading && !error && (
+      {!isSectionLoading && !error && (
         <div className="space-y-8">
           {/* Summary & Rating Distribution Box */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-50/90 to-emerald-50/30 border border-slate-200/80">
@@ -223,6 +308,11 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
             <div className="space-y-4 divide-y divide-slate-100">
               {reviews.map((rev) => {
                 const reviewerEmail = rev.reviewer?.maskedEmail || 'Khách hàng AuraPhone'
+                const isRevPending = isTargetPending(rev.id)
+                const isRevHelpful = rev.helpfulness?.viewerVote === 'helpful'
+                const isRevUnhelpful = rev.helpfulness?.viewerVote === 'unhelpful'
+                const revHelpfulCount = rev.helpfulness?.helpfulCount ?? 0
+                const revUnhelpfulCount = rev.helpfulness?.unhelpfulCount ?? 0
 
                 return (
                   <div key={rev.id} className="pt-5 first:pt-0 space-y-3">
@@ -241,7 +331,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                               variant="outline"
                               className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold gap-1 py-0.5"
                             >
-                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Đã mua tại AuraPhone</span>
                             </Badge>
                           </div>
@@ -317,9 +407,60 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                       </div>
                     )}
 
+                    {/* Review Helpfulness Voting Controls */}
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        aria-label={`Hữu ích (${revHelpfulCount})`}
+                        aria-pressed={isRevHelpful}
+                        disabled={isRevPending}
+                        onClick={() => handleVote('review', rev.id, 'helpful', rev.helpfulness)}
+                        className={cn(
+                          'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                          'disabled:opacity-50 disabled:cursor-not-allowed',
+                          isRevHelpful
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400/50 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                        )}
+                      >
+                        <ThumbsUp
+                          className={cn(
+                            'w-4 h-4 transition-all shrink-0',
+                            isRevHelpful ? 'fill-emerald-600 text-emerald-600 scale-105' : 'text-slate-500 fill-none'
+                          )}
+                        />
+                        <span>{`Hữu ích (${revHelpfulCount})`}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-label={`Không hữu ích (${revUnhelpfulCount})`}
+                        aria-pressed={isRevUnhelpful}
+                        disabled={isRevPending}
+                        onClick={() => handleVote('review', rev.id, 'unhelpful', rev.helpfulness)}
+                        className={cn(
+                          'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                          'disabled:opacity-50 disabled:cursor-not-allowed',
+                          isRevUnhelpful
+                            ? 'bg-slate-100 border-slate-300 text-slate-900 font-bold ring-1 ring-slate-400/50 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                        )}
+                      >
+                        <ThumbsDown
+                          className={cn(
+                            'w-4 h-4 transition-all shrink-0',
+                            isRevUnhelpful ? 'fill-slate-700 text-slate-700 scale-105' : 'text-slate-500 fill-none'
+                          )}
+                        />
+                        <span>{`Không hữu ích (${revUnhelpfulCount})`}</span>
+                      </button>
+                    </div>
+
                     {/* Admin Reply */}
                     {rev.adminReply && (
-                      <div className="mt-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 p-4 space-y-2">
+                      <div className="mt-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 p-4 space-y-3">
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="secondary"
@@ -337,6 +478,77 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                         <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
                           {rev.adminReply}
                         </p>
+
+                        {/* Admin Reply Helpfulness Controls */}
+                        {rev.adminReplyId && rev.adminReplyHelpfulness && (
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60">
+                            <button
+                              type="button"
+                              aria-label={`Hữu ích (${rev.adminReplyHelpfulness.helpfulCount})`}
+                              aria-pressed={rev.adminReplyHelpfulness.viewerVote === 'helpful'}
+                              disabled={isTargetPending(rev.adminReplyId)}
+                              onClick={() =>
+                                handleVote(
+                                  'reply',
+                                  rev.adminReplyId!,
+                                  'helpful',
+                                  rev.adminReplyHelpfulness
+                                )
+                              }
+                              className={cn(
+                                'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                                'disabled:opacity-50 disabled:cursor-not-allowed',
+                                rev.adminReplyHelpfulness.viewerVote === 'helpful'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400/50 shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                              )}
+                            >
+                              <ThumbsUp
+                                className={cn(
+                                  'w-4 h-4 transition-all shrink-0',
+                                  rev.adminReplyHelpfulness.viewerVote === 'helpful'
+                                    ? 'fill-emerald-600 text-emerald-600 scale-105'
+                                    : 'text-slate-500 fill-none'
+                                )}
+                              />
+                              <span>{`Hữu ích (${rev.adminReplyHelpfulness.helpfulCount})`}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              aria-label={`Không hữu ích (${rev.adminReplyHelpfulness.unhelpfulCount})`}
+                              aria-pressed={rev.adminReplyHelpfulness.viewerVote === 'unhelpful'}
+                              disabled={isTargetPending(rev.adminReplyId)}
+                              onClick={() =>
+                                handleVote(
+                                  'reply',
+                                  rev.adminReplyId!,
+                                  'unhelpful',
+                                  rev.adminReplyHelpfulness
+                                )
+                              }
+                              className={cn(
+                                'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                                'disabled:opacity-50 disabled:cursor-not-allowed',
+                                rev.adminReplyHelpfulness.viewerVote === 'unhelpful'
+                                  ? 'bg-slate-100 border-slate-300 text-slate-900 font-bold ring-1 ring-slate-400/50 shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                              )}
+                            >
+                              <ThumbsDown
+                                className={cn(
+                                  'w-4 h-4 transition-all shrink-0',
+                                  rev.adminReplyHelpfulness.viewerVote === 'unhelpful'
+                                    ? 'fill-slate-700 text-slate-700 scale-105'
+                                    : 'text-slate-500 fill-none'
+                                )}
+                              />
+                              <span>{`Không hữu ích (${rev.adminReplyHelpfulness.unhelpfulCount})`}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -408,4 +620,5 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
     </section>
   )
 }
+
 

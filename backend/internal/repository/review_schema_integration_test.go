@@ -398,17 +398,33 @@ func TestReviewSchemaIntegration(t *testing.T) {
 	})
 
 	t.Run("MigrationUpDown_CleanExecution", func(t *testing.T) {
-		// Test down migration
 		root, err := filepath.Abs(filepath.Join("..", ".."))
 		if err != nil {
 			t.Fatal(err)
 		}
-		downSQL, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000013_create_product_reviews.down.sql"))
+
+		down15, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000015_create_review_replies_and_votes.down.sql"))
 		if err != nil {
-			t.Fatalf("read down migration: %v", err)
+			t.Fatalf("read down migration 15: %v", err)
 		}
-		if _, err := conn.Exec(ctx, string(downSQL)); err != nil {
-			t.Fatalf("execute down migration: %v", err)
+		down14, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000014_add_admin_reply_to_reviews.down.sql"))
+		if err != nil {
+			t.Fatalf("read down migration 14: %v", err)
+		}
+		down13, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000013_create_product_reviews.down.sql"))
+		if err != nil {
+			t.Fatalf("read down migration 13: %v", err)
+		}
+
+		// Down in reverse order
+		if _, err := conn.Exec(ctx, string(down15)); err != nil {
+			t.Fatalf("execute down migration 15: %v", err)
+		}
+		if _, err := conn.Exec(ctx, string(down14)); err != nil {
+			t.Fatalf("execute down migration 14: %v", err)
+		}
+		if _, err := conn.Exec(ctx, string(down13)); err != nil {
+			t.Fatalf("execute down migration 13: %v", err)
 		}
 
 		// Confirm tables do not exist
@@ -426,13 +442,28 @@ func TestReviewSchemaIntegration(t *testing.T) {
 			t.Fatal("expected review_media table to be dropped")
 		}
 
-		// Re-apply up migration
-		upSQL, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000013_create_product_reviews.up.sql"))
+		// Re-apply up migrations in order
+		up13, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000013_create_product_reviews.up.sql"))
 		if err != nil {
-			t.Fatalf("read up migration: %v", err)
+			t.Fatalf("read up migration 13: %v", err)
 		}
-		if _, err := conn.Exec(ctx, string(upSQL)); err != nil {
-			t.Fatalf("re-apply up migration: %v", err)
+		up14, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000014_add_admin_reply_to_reviews.up.sql"))
+		if err != nil {
+			t.Fatalf("read up migration 14: %v", err)
+		}
+		up15, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000015_create_review_replies_and_votes.up.sql"))
+		if err != nil {
+			t.Fatalf("read up migration 15: %v", err)
+		}
+
+		if _, err := conn.Exec(ctx, string(up13)); err != nil {
+			t.Fatalf("re-apply up migration 13: %v", err)
+		}
+		if _, err := conn.Exec(ctx, string(up14)); err != nil {
+			t.Fatalf("re-apply up migration 14: %v", err)
+		}
+		if _, err := conn.Exec(ctx, string(up15)); err != nil {
+			t.Fatalf("re-apply up migration 15: %v", err)
 		}
 
 		// Confirm tables exist again
@@ -451,10 +482,282 @@ func TestReviewSchemaIntegration(t *testing.T) {
 	})
 }
 
+func TestReviewRepliesAndVotesSchemaIntegration(t *testing.T) {
+	ctx := context.Background()
+	dbURL := integrationDatabaseURL()
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		t.Fatalf("connect integration database %s: %v", dbURL, err)
+	}
+	defer conn.Close(ctx)
+
+	seedReviewPrerequisites(t, ctx, conn)
+
+	const (
+		testUserID     = "11111111-2222-3333-4444-555555555551"
+		testOrderItemA = "99999999-1111-1111-1111-222222222221"
+	)
+
+	// Clean up reviews before test
+	_, _ = conn.Exec(ctx, "DELETE FROM product_reviews WHERE order_item_id = $1", testOrderItemA)
+
+	t.Run("ReviewReplies_TableAndConstraints", func(t *testing.T) {
+		var reviewID string
+		err := conn.QueryRow(ctx, `
+			INSERT INTO product_reviews (order_item_id, rating, comment)
+			VALUES ($1, 5, 'Review for reply test')
+			RETURNING id
+		`, testOrderItemA).Scan(&reviewID)
+		if err != nil {
+			t.Fatalf("insert review failed: %v", err)
+		}
+		defer func() {
+			_, _ = conn.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", reviewID)
+		}()
+
+		// 1. Insert valid reply
+		var replyID string
+		err = conn.QueryRow(ctx, `
+			INSERT INTO review_replies (review_id, content)
+			VALUES ($1, 'Cảm ơn bạn đã phản hồi!')
+			RETURNING id
+		`, reviewID).Scan(&replyID)
+		if err != nil {
+			t.Fatalf("insert reply failed: %v", err)
+		}
+
+		// 2. Unique review_id constraint: cannot insert 2nd reply for same review
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_replies (review_id, content)
+			VALUES ($1, 'Second reply attempt')
+		`, reviewID)
+		if err == nil {
+			t.Fatal("expected error on duplicate reply for same review_id, got nil")
+		}
+
+		// 3. Content length constraints: empty content (0 chars) must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_replies (review_id, content)
+			VALUES (gen_random_uuid(), '')
+		`)
+		if err == nil {
+			t.Fatal("expected error for empty reply content, got nil")
+		}
+
+		// Content length > 1000 chars must fail
+		tooLongReply := strings.Repeat("x", 1001)
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_replies (review_id, content)
+			VALUES (gen_random_uuid(), $1)
+		`, tooLongReply)
+		if err == nil {
+			t.Fatal("expected error for reply content > 1000 chars, got nil")
+		}
+	})
+
+	t.Run("ReviewHelpfulnessVotes_ConstraintsAndCascade", func(t *testing.T) {
+		var reviewID string
+		err := conn.QueryRow(ctx, `
+			INSERT INTO product_reviews (order_item_id, rating, comment)
+			VALUES ($1, 5, 'Review for vote test')
+			RETURNING id
+		`, testOrderItemA).Scan(&reviewID)
+		if err != nil {
+			t.Fatalf("insert review failed: %v", err)
+		}
+		defer func() {
+			_, _ = conn.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", reviewID)
+		}()
+
+		var replyID string
+		err = conn.QueryRow(ctx, `
+			INSERT INTO review_replies (review_id, content)
+			VALUES ($1, 'Reply for vote test')
+			RETURNING id
+		`, reviewID).Scan(&replyID)
+		if err != nil {
+			t.Fatalf("insert reply failed: %v", err)
+		}
+
+		// 1. Valid vote for review
+		var reviewVoteID string
+		err = conn.QueryRow(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, NULL, 'helpful')
+			RETURNING id
+		`, testUserID, reviewID).Scan(&reviewVoteID)
+		if err != nil {
+			t.Fatalf("insert review vote failed: %v", err)
+		}
+
+		// 2. Target check: both review_id and reply_id non-null must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, $3, 'helpful')
+		`, testUserID, reviewID, replyID)
+		if err == nil {
+			t.Fatal("expected error for both review_id and reply_id non-null, got nil")
+		}
+
+		// Target check: both review_id and reply_id null must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, NULL, 'helpful')
+		`, testUserID)
+		if err == nil {
+			t.Fatal("expected error for both review_id and reply_id null, got nil")
+		}
+
+		// 3. Vote value check: invalid vote string must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, $2, 'awesome')
+		`, testUserID, replyID)
+		if err == nil {
+			t.Fatal("expected error for invalid vote value 'awesome', got nil")
+		}
+
+		// 4. Unique (user_id, review_id) constraint: duplicate vote on same review must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, $2, NULL, 'unhelpful')
+		`, testUserID, reviewID)
+		if err == nil {
+			t.Fatal("expected unique violation on duplicate (user_id, review_id), got nil")
+		}
+
+		// 5. Valid vote for reply
+		var replyVoteID string
+		err = conn.QueryRow(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, $2, 'unhelpful')
+			RETURNING id
+		`, testUserID, replyID).Scan(&replyVoteID)
+		if err != nil {
+			t.Fatalf("insert reply vote failed: %v", err)
+		}
+
+		// 6. Unique (user_id, reply_id) constraint: duplicate vote on same reply must fail
+		_, err = conn.Exec(ctx, `
+			INSERT INTO review_helpfulness_votes (user_id, review_id, reply_id, vote)
+			VALUES ($1, NULL, $2, 'helpful')
+		`, testUserID, replyID)
+		if err == nil {
+			t.Fatal("expected unique violation on duplicate (user_id, reply_id), got nil")
+		}
+
+		// 7. Cascade delete: deleting reply cascades to reply vote
+		_, err = conn.Exec(ctx, "DELETE FROM review_replies WHERE id = $1", replyID)
+		if err != nil {
+			t.Fatalf("delete reply failed: %v", err)
+		}
+		var replyVoteCount int
+		_ = conn.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", replyVoteID).Scan(&replyVoteCount)
+		if replyVoteCount != 0 {
+			t.Fatalf("expected reply vote to be cascaded and deleted, got count %d", replyVoteCount)
+		}
+
+		// Review vote should still exist
+		var reviewVoteCount int
+		_ = conn.QueryRow(ctx, "SELECT COUNT(*) FROM review_helpfulness_votes WHERE id = $1", reviewVoteID).Scan(&reviewVoteCount)
+		if reviewVoteCount != 1 {
+			t.Fatalf("expected review vote to still exist, got count %d", reviewVoteCount)
+		}
+	})
+
+	t.Run("Migration000015_UpDownAndBackfill", func(t *testing.T) {
+		root, err := filepath.Abs(filepath.Join("..", ".."))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downSQL, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000015_create_review_replies_and_votes.down.sql"))
+		if err != nil {
+			t.Fatalf("read migration 15 down: %v", err)
+		}
+
+		upSQL, err := os.ReadFile(filepath.Join(root, "db", "migrations", "000015_create_review_replies_and_votes.up.sql"))
+		if err != nil {
+			t.Fatalf("read migration 15 up: %v", err)
+		}
+
+		// First, execute down migration 15 to restore product_reviews.admin_reply schema
+		if _, err := conn.Exec(ctx, string(downSQL)); err != nil {
+			t.Fatalf("execute migration 15 down: %v", err)
+		}
+
+		// Insert review with admin_reply in schema 14
+		var reviewID string
+		testReplyText := "Phản hồi mẫu trước migration"
+		err = conn.QueryRow(ctx, `
+			INSERT INTO product_reviews (order_item_id, rating, comment, admin_reply, admin_replied_at)
+			VALUES ($1, 5, 'Comment test backfill', $2, now())
+			RETURNING id
+		`, testOrderItemA, testReplyText).Scan(&reviewID)
+		if err != nil {
+			t.Fatalf("insert review with admin_reply in schema 14: %v", err)
+		}
+		defer func() {
+			_, _ = conn.Exec(ctx, "DELETE FROM product_reviews WHERE id = $1", reviewID)
+		}()
+
+		// Execute up migration 15: should backfill into review_replies and drop admin_reply from product_reviews
+		if _, err := conn.Exec(ctx, string(upSQL)); err != nil {
+			t.Fatalf("execute migration 15 up: %v", err)
+		}
+
+		// Verify review_replies has the backfilled reply
+		var backfilledContent string
+		err = conn.QueryRow(ctx, `
+			SELECT content FROM review_replies WHERE review_id = $1
+		`, reviewID).Scan(&backfilledContent)
+		if err != nil {
+			t.Fatalf("query backfilled reply: %v", err)
+		}
+		if backfilledContent != testReplyText {
+			t.Fatalf("expected backfilled content %q, got %q", testReplyText, backfilledContent)
+		}
+
+		// Verify product_reviews no longer has admin_reply column
+		var colExists bool
+		_ = conn.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name = 'product_reviews' AND column_name = 'admin_reply'
+			)
+		`).Scan(&colExists)
+		if colExists {
+			t.Fatal("expected admin_reply column to be dropped from product_reviews")
+		}
+
+		// Execute down migration 15: should restore admin_reply column and copy data back
+		if _, err := conn.Exec(ctx, string(downSQL)); err != nil {
+			t.Fatalf("execute migration 15 down after backfill: %v", err)
+		}
+
+		var restoredReply string
+		err = conn.QueryRow(ctx, `
+			SELECT admin_reply FROM product_reviews WHERE id = $1
+		`, reviewID).Scan(&restoredReply)
+		if err != nil {
+			t.Fatalf("query restored admin_reply: %v", err)
+		}
+		if restoredReply != testReplyText {
+			t.Fatalf("expected restored reply %q, got %q", testReplyText, restoredReply)
+		}
+
+		// Re-apply up migration 15 for subsequent tests
+		if _, err := conn.Exec(ctx, string(upSQL)); err != nil {
+			t.Fatalf("re-apply migration 15 up: %v", err)
+		}
+	})
+}
+
 func seedReviewPrerequisites(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	t.Helper()
 	const (
 		testUserID      = "11111111-2222-3333-4444-555555555551"
+		otherUserID     = "11111111-2222-3333-4444-555555555552"
 		testCategory    = "10000000-0000-0000-0000-000000000001"
 		testProduct     = "aaaaaaaa-1111-1111-1111-111111111111"
 		testVariant     = "aaaaaaaa-1111-1111-1111-111111111112"
@@ -464,12 +767,13 @@ func seedReviewPrerequisites(t *testing.T, ctx context.Context, conn *pgx.Conn) 
 		testOrderItemC  = "99999999-1111-1111-1111-222222222223"
 	)
 
-	// User
+	// Users
 	_, _ = conn.Exec(ctx, `
 		INSERT INTO users (id, email, password_hash, role)
-		VALUES ($1, 'reviewer@example.com', 'hash', 'customer')
+		VALUES ($1, 'reviewer@example.com', 'hash', 'customer'),
+		       ($2, 'other@example.com', 'hash', 'customer')
 		ON CONFLICT (id) DO NOTHING
-	`, testUserID)
+	`, testUserID, otherUserID)
 
 	// Category
 	_, _ = conn.Exec(ctx, `

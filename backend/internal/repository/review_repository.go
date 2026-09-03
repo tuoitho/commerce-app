@@ -33,18 +33,12 @@ func pgTimestamptzToTimePtr(t pgtype.Timestamptz) *time.Time {
 	return &t.Time
 }
 
-func strPtrToPgText(s *string) pgtype.Text {
-	if s == nil {
-		return pgtype.Text{Valid: false}
+func pgUUIDToStrPtr(u pgtype.UUID) *string {
+	if !u.Valid {
+		return nil
 	}
-	return pgtype.Text{String: *s, Valid: true}
-}
-
-func timePtrToPgTimestamptz(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{Valid: false}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
+	s := uuid.UUID(u.Bytes).String()
+	return &s
 }
 
 type ReviewRepository struct {
@@ -420,16 +414,18 @@ func (r *ReviewRepository) GetReviewByID(ctx context.Context, id string) (*domai
 	}
 
 	return &domain.Review{
-		ID:          row.ID,
-		OrderItemID: row.OrderItemID,
-		Rating:      row.Rating,
-		Comment:     row.Comment,
-		EditCount:   row.EditCount,
-		Media:       mediaList,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
-		Edited:      row.EditCount > 0,
-		CanEdit:     row.EditCount == 0,
+		ID:             row.ID,
+		OrderItemID:    row.OrderItemID,
+		Rating:         row.Rating,
+		Comment:        row.Comment,
+		EditCount:      row.EditCount,
+		Media:          mediaList,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		Edited:         row.EditCount > 0,
+		CanEdit:        row.EditCount == 0,
+		AdminReply:     pgTextToStrPtr(row.AdminReply),
+		AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
 	}, nil
 }
 
@@ -464,16 +460,18 @@ func (r *ReviewRepository) GetReviewByOrderItemID(ctx context.Context, orderItem
 	}
 
 	return &domain.Review{
-		ID:          row.ID,
-		OrderItemID: row.OrderItemID,
-		Rating:      row.Rating,
-		Comment:     row.Comment,
-		EditCount:   row.EditCount,
-		Media:       mediaList,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
-		Edited:      row.EditCount > 0,
-		CanEdit:     row.EditCount == 0,
+		ID:             row.ID,
+		OrderItemID:    row.OrderItemID,
+		Rating:         row.Rating,
+		Comment:        row.Comment,
+		EditCount:      row.EditCount,
+		Media:          mediaList,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		Edited:         row.EditCount > 0,
+		CanEdit:        row.EditCount == 0,
+		AdminReply:     pgTextToStrPtr(row.AdminReply),
+		AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
 	}, nil
 }
 
@@ -524,16 +522,18 @@ func (r *ReviewRepository) ListReviewsByOrderItemIDs(ctx context.Context, orderI
 			media = []domain.ReviewMedia{}
 		}
 		result[row.OrderItemID] = &domain.Review{
-			ID:          row.ID,
-			OrderItemID: row.OrderItemID,
-			Rating:      row.Rating,
-			Comment:     row.Comment,
-			EditCount:   row.EditCount,
-			Media:       media,
-			CreatedAt:   row.CreatedAt,
-			UpdatedAt:   row.UpdatedAt,
-			Edited:      row.EditCount > 0,
-			CanEdit:     row.EditCount == 0,
+			ID:             row.ID,
+			OrderItemID:    row.OrderItemID,
+			Rating:         row.Rating,
+			Comment:        row.Comment,
+			EditCount:      row.EditCount,
+			Media:          media,
+			CreatedAt:      row.CreatedAt,
+			UpdatedAt:      row.UpdatedAt,
+			Edited:         row.EditCount > 0,
+			CanEdit:        row.EditCount == 0,
+			AdminReply:     pgTextToStrPtr(row.AdminReply),
+			AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
 		}
 	}
 
@@ -563,7 +563,7 @@ func (r *ReviewRepository) GetReviewMediaByID(ctx context.Context, mediaID strin
 	}, nil
 }
 
-func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	q := sqlc.New(r.db)
 
 	summaryRow, err := q.GetReviewSummaryByProductID(ctx, productID)
@@ -603,8 +603,12 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 	}
 
 	var reviewIDs []string
+	var replyIDs []string
 	for _, row := range reviewRows {
 		reviewIDs = append(reviewIDs, row.ID)
+		if row.AdminReply.Valid && row.AdminReplyID.Valid {
+			replyIDs = append(replyIDs, uuid.UUID(row.AdminReplyID.Bytes).String())
+		}
 	}
 
 	mediaMap := make(map[string][]domain.ReviewMedia)
@@ -628,6 +632,82 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 		}
 	}
 
+	type voteCounts struct {
+		helpful   int64
+		unhelpful int64
+	}
+
+	reviewCountsMap := make(map[string]voteCounts, len(reviewIDs))
+	if len(reviewIDs) > 0 {
+		counts, err := q.GetReviewHelpfulnessCountsByReviewIDs(ctx, reviewIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range counts {
+			if c.ReviewID.Valid {
+				rid := uuid.UUID(c.ReviewID.Bytes).String()
+				reviewCountsMap[rid] = voteCounts{
+					helpful:   c.HelpfulCount,
+					unhelpful: c.UnhelpfulCount,
+				}
+			}
+		}
+	}
+
+	replyCountsMap := make(map[string]voteCounts, len(replyIDs))
+	if len(replyIDs) > 0 {
+		counts, err := q.GetReviewReplyHelpfulnessCountsByReplyIDs(ctx, replyIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range counts {
+			if c.ReplyID.Valid {
+				rpid := uuid.UUID(c.ReplyID.Bytes).String()
+				replyCountsMap[rpid] = voteCounts{
+					helpful:   c.HelpfulCount,
+					unhelpful: c.UnhelpfulCount,
+				}
+			}
+		}
+	}
+
+	reviewViewerVoteMap := make(map[string]domain.HelpfulnessVote)
+	replyViewerVoteMap := make(map[string]domain.HelpfulnessVote)
+
+	if viewerUserID != nil && *viewerUserID != "" {
+		if len(reviewIDs) > 0 {
+			userReviewVotes, err := q.GetUserReviewVotesByReviewIDs(ctx, sqlc.GetUserReviewVotesByReviewIDsParams{
+				UserID:    *viewerUserID,
+				ReviewIds: reviewIDs,
+			})
+			if err != nil {
+				return nil, err
+			}
+			for _, uv := range userReviewVotes {
+				if uv.ReviewID.Valid {
+					rid := uuid.UUID(uv.ReviewID.Bytes).String()
+					reviewViewerVoteMap[rid] = domain.HelpfulnessVote(uv.Vote)
+				}
+			}
+		}
+
+		if len(replyIDs) > 0 {
+			userReplyVotes, err := q.GetUserReplyVotesByReplyIDs(ctx, sqlc.GetUserReplyVotesByReplyIDsParams{
+				UserID:   *viewerUserID,
+				ReplyIds: replyIDs,
+			})
+			if err != nil {
+				return nil, err
+			}
+			for _, uv := range userReplyVotes {
+				if uv.ReplyID.Valid {
+					rpid := uuid.UUID(uv.ReplyID.Bytes).String()
+					replyViewerVoteMap[rpid] = domain.HelpfulnessVote(uv.Vote)
+				}
+			}
+		}
+	}
+
 	publicReviews := make([]domain.PublicReview, 0, len(reviewRows))
 	for _, row := range reviewRows {
 		var options []domain.CartOption
@@ -643,6 +723,44 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 			media = []domain.ReviewMedia{}
 		}
 
+		rCounts := reviewCountsMap[row.ID]
+		var rViewerVote *domain.HelpfulnessVote
+		if v, ok := reviewViewerVoteMap[row.ID]; ok {
+			vCopy := v
+			rViewerVote = &vCopy
+		}
+		helpfulness := domain.HelpfulnessState{
+			HelpfulCount:   rCounts.helpful,
+			UnhelpfulCount: rCounts.unhelpful,
+			ViewerVote:     rViewerVote,
+		}
+
+		var adminReply *string
+		var adminRepliedAt *time.Time
+		var adminReplyID *string
+		var adminReplyHelpfulness *domain.HelpfulnessState
+
+		if row.AdminReply.Valid && row.AdminReplyID.Valid {
+			replyIDStr := uuid.UUID(row.AdminReplyID.Bytes).String()
+			adminReplyID = &replyIDStr
+			adminReply = &row.AdminReply.String
+			if row.AdminRepliedAt.Valid {
+				adminRepliedAt = &row.AdminRepliedAt.Time
+			}
+
+			rpCounts := replyCountsMap[replyIDStr]
+			var rpViewerVote *domain.HelpfulnessVote
+			if v, ok := replyViewerVoteMap[replyIDStr]; ok {
+				vCopy := v
+				rpViewerVote = &vCopy
+			}
+			adminReplyHelpfulness = &domain.HelpfulnessState{
+				HelpfulCount:   rpCounts.helpful,
+				UnhelpfulCount: rpCounts.unhelpful,
+				ViewerVote:     rpViewerVote,
+			}
+		}
+
 		publicReviews = append(publicReviews, domain.PublicReview{
 			ID:      row.ID,
 			Rating:  row.Rating,
@@ -654,12 +772,15 @@ func (r *ReviewRepository) GetPublicReviewsByProductID(ctx context.Context, prod
 				Model:   row.Model,
 				Options: options,
 			},
-			Media:     media,
-			Edited:    row.EditCount > 0,
-			AdminReply:     pgTextToStrPtr(row.AdminReply),
-			AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
+			Media:                 media,
+			Helpfulness:           helpfulness,
+			AdminReply:            adminReply,
+			AdminRepliedAt:        adminRepliedAt,
+			AdminReplyID:          adminReplyID,
+			AdminReplyHelpfulness: adminReplyHelpfulness,
+			Edited:                row.EditCount > 0,
+			CreatedAt:             row.CreatedAt,
+			UpdatedAt:             row.UpdatedAt,
 		})
 	}
 
@@ -897,19 +1018,20 @@ func (r *ReviewRepository) GetAdminReviews(ctx context.Context, ratingFilter int
 }
 
 func (r *ReviewRepository) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
-	q := sqlc.New(r.db)
-
-	var replyTime *time.Time
-	if reply != nil {
-		now := time.Now()
-		replyTime = &now
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.ErrReviewNotFound
 	}
 
-	row, err := q.UpdateAdminReply(ctx, sqlc.UpdateAdminReplyParams{
-		ID:             reviewID,
-		AdminReply:     strPtrToPgText(reply),
-		AdminRepliedAt: timePtrToPgTimestamptz(replyTime),
-	})
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := sqlc.New(tx)
+
+	// Lock parent review to verify existence and serialize reply lifecycle
+	reviewRow, err := q.LockReviewByID(ctx, reviewID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrReviewNotFound
@@ -917,18 +1039,203 @@ func (r *ReviewRepository) UpdateAdminReply(ctx context.Context, reviewID string
 		return nil, err
 	}
 
-	// Just return a partial Review with the updated fields, or fetch full.
-	// Since we are just updating, let's just return the struct. Media is not needed for the immediate return.
+	// Check if a reply exists and lock it FOR UPDATE
+	replyRow, err := q.LockReviewReplyByReviewID(ctx, reviewID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	var updatedReply *string
+	var updatedRepliedAt *time.Time
+
+	if reply != nil {
+		content := *reply
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Create new reply
+			inserted, err := q.InsertReviewReply(ctx, sqlc.InsertReviewReplyParams{
+				ReviewID: reviewID,
+				Content:  content,
+			})
+			if err != nil {
+				return nil, err
+			}
+			updatedReply = &inserted.Content
+			updatedRepliedAt = &inserted.UpdatedAt
+		} else {
+			// Update existing reply (keeps UUID and existing votes)
+			updated, err := q.UpdateReviewReply(ctx, sqlc.UpdateReviewReplyParams{
+				ID:      replyRow.ID,
+				Content: content,
+			})
+			if err != nil {
+				return nil, err
+			}
+			updatedReply = &updated.Content
+			updatedRepliedAt = &updated.UpdatedAt
+		}
+	} else {
+		// reply == nil -> Delete existing reply if any
+		if err == nil {
+			if err := q.DeleteReviewReply(ctx, replyRow.ID); err != nil {
+				return nil, err
+			}
+		}
+		updatedReply = nil
+		updatedRepliedAt = nil
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
 	return &domain.Review{
-		ID:             row.ID,
-		OrderItemID:    row.OrderItemID,
-		Rating:         row.Rating,
-		Comment:        row.Comment,
-		EditCount:      row.EditCount,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
-		AdminReply:     pgTextToStrPtr(row.AdminReply),
-		AdminRepliedAt: pgTimestamptzToTimePtr(row.AdminRepliedAt),
+		ID:             reviewRow.ID,
+		OrderItemID:    reviewRow.OrderItemID,
+		Rating:         reviewRow.Rating,
+		Comment:        reviewRow.Comment,
+		EditCount:      reviewRow.EditCount,
+		CreatedAt:      reviewRow.CreatedAt,
+		UpdatedAt:      reviewRow.UpdatedAt,
+		Edited:         reviewRow.EditCount > 0,
+		CanEdit:        reviewRow.EditCount == 0,
+		AdminReply:     updatedReply,
+		AdminRepliedAt: updatedRepliedAt,
 	}, nil
 }
+
+func (r *ReviewRepository) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	parsedReviewID, err := uuid.Parse(reviewID)
+	if err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := sqlc.New(tx)
+
+	// Lock target review row FOR UPDATE
+	_, err = q.LockReviewByID(ctx, reviewID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrReviewNotFound
+		}
+		return nil, err
+	}
+
+	reviewPgUUID := pgtype.UUID{Bytes: parsedReviewID, Valid: true}
+
+	if vote == nil {
+		if err := q.DeleteReviewVote(ctx, sqlc.DeleteReviewVoteParams{
+			UserID:   userID,
+			ReviewID: reviewPgUUID,
+		}); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := q.UpsertReviewVote(ctx, sqlc.UpsertReviewVoteParams{
+			UserID:   userID,
+			ReviewID: reviewPgUUID,
+			Vote:     string(*vote),
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	counts, err := q.GetReviewHelpfulnessCountsByID(ctx, reviewPgUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	var viewerVote *domain.HelpfulnessVote
+	if vote != nil {
+		vCopy := *vote
+		viewerVote = &vCopy
+	}
+
+	return &domain.HelpfulnessState{
+		HelpfulCount:   counts.HelpfulCount,
+		UnhelpfulCount: counts.UnhelpfulCount,
+		ViewerVote:     viewerVote,
+	}, nil
+}
+
+func (r *ReviewRepository) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	parsedReplyID, err := uuid.Parse(replyID)
+	if err != nil {
+		return nil, domain.ErrReviewReplyNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := sqlc.New(tx)
+
+	// Lock target review_replies row FOR UPDATE
+	_, err = q.LockReviewReplyByID(ctx, replyID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrReviewReplyNotFound
+		}
+		return nil, err
+	}
+
+	replyPgUUID := pgtype.UUID{Bytes: parsedReplyID, Valid: true}
+
+	if vote == nil {
+		if err := q.DeleteReviewReplyVote(ctx, sqlc.DeleteReviewReplyVoteParams{
+			UserID:  userID,
+			ReplyID: replyPgUUID,
+		}); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := q.UpsertReviewReplyVote(ctx, sqlc.UpsertReviewReplyVoteParams{
+			UserID:  userID,
+			ReplyID: replyPgUUID,
+			Vote:    string(*vote),
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	counts, err := q.GetReviewReplyHelpfulnessCountsByID(ctx, replyPgUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	var viewerVote *domain.HelpfulnessVote
+	if vote != nil {
+		vCopy := *vote
+		viewerVote = &vCopy
+	}
+
+	return &domain.HelpfulnessState{
+		HelpfulCount:   counts.HelpfulCount,
+		UnhelpfulCount: counts.UnhelpfulCount,
+		ViewerVote:     viewerVote,
+	}, nil
+}
+
+
 

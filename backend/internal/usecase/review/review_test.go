@@ -21,10 +21,12 @@ type mockReviewRepo struct {
 	getByItemFn    func(ctx context.Context, orderItemID string) (*domain.Review, error)
 	listByItemsFn  func(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error)
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
-	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
+	getPublicFn    func(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error)
 	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
 	getAdminReviewsFn func(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error)
 	updateAdminReplyFn func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error)
+	setReviewVoteFn func(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error)
+	setReviewReplyVoteFn func(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error)
 }
 
 func (m *mockReviewRepo) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -69,9 +71,9 @@ func (m *mockReviewRepo) GetReviewMediaByID(ctx context.Context, mediaID string)
 	return nil, nil
 }
 
-func (m *mockReviewRepo) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (m *mockReviewRepo) GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	if m.getPublicFn != nil {
-		return m.getPublicFn(ctx, productID, page, limit)
+		return m.getPublicFn(ctx, productID, viewerUserID, page, limit)
 	}
 	return nil, nil
 }
@@ -93,6 +95,20 @@ func (m *mockReviewRepo) GetAdminReviews(ctx context.Context, ratingFilter int16
 func (m *mockReviewRepo) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
 	if m.updateAdminReplyFn != nil {
 		return m.updateAdminReplyFn(ctx, reviewID, reply)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepo) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if m.setReviewVoteFn != nil {
+		return m.setReviewVoteFn(ctx, reviewID, userID, vote)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepo) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if m.setReviewReplyVoteFn != nil {
+		return m.setReviewReplyVoteFn(ctx, replyID, userID, vote)
 	}
 	return nil, nil
 }
@@ -472,6 +488,218 @@ func TestAdminReviews_UseCase(t *testing.T) {
 		require.Len(t, res.Reviews, 1)
 		assert.Equal(t, "rev-1", res.Reviews[0].ID)
 		assert.Equal(t, int64(1), res.Total)
+	})
+}
+
+func TestGetPublicReviews_UseCase(t *testing.T) {
+	ctx := context.Background()
+	productID := uuid.NewString()
+	viewerID := uuid.NewString()
+
+	t.Run("Invalid product UUID returns ErrProductNotFound", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.GetPublicReviews(ctx, "invalid-product-uuid", nil, 1, 10)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrProductNotFound, err)
+	})
+
+	t.Run("Delegates to repo with nil viewerUserID for anonymous", func(t *testing.T) {
+		var capturedViewerID *string
+		var capturedPage, capturedLimit int
+		repo := &mockReviewRepo{
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
+				capturedViewerID = viewerUserID
+				capturedPage = page
+				capturedLimit = limit
+				return &domain.ProductReviewsResult{
+					Summary: domain.ProductReviewSummary{
+						TotalReviews: 0,
+					},
+					Reviews: []domain.PublicReview{},
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.GetPublicReviews(ctx, productID, nil, 0, 20)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Nil(t, capturedViewerID)
+		assert.Equal(t, 1, capturedPage, "Page normalized to 1")
+		assert.Equal(t, 10, capturedLimit, "Limit normalized to 10")
+	})
+
+	t.Run("Delegates to repo with customer viewerUserID", func(t *testing.T) {
+		var capturedViewerID *string
+		repo := &mockReviewRepo{
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
+				capturedViewerID = viewerUserID
+				return &domain.ProductReviewsResult{
+					Summary: domain.ProductReviewSummary{
+						TotalReviews: 1,
+					},
+					Reviews: []domain.PublicReview{
+						{ID: "rev-1"},
+					},
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.GetPublicReviews(ctx, productID, &viewerID, 1, 5)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+		require.NotNil(t, capturedViewerID)
+		assert.Equal(t, viewerID, *capturedViewerID)
+		assert.Len(t, res.Reviews, 1)
+	})
+}
+
+func TestHelpfulnessVoting_UseCase(t *testing.T) {
+	ctx := context.Background()
+	reviewID := uuid.NewString()
+	replyID := uuid.NewString()
+	userID := uuid.NewString()
+	helpfulVote := domain.HelpfulnessVoteHelpful
+	unhelpfulVote := domain.HelpfulnessVoteUnhelpful
+	invalidVote := domain.HelpfulnessVote("invalid")
+
+	t.Run("SetReviewVote - Invalid Review UUID returns ErrReviewNotFound", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewVote(ctx, "invalid-review-id", userID, &helpfulVote)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrReviewNotFound, err)
+	})
+
+	t.Run("SetReviewVote - Invalid User UUID returns ErrInvalidToken", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewVote(ctx, reviewID, "invalid-user-id", &helpfulVote)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrInvalidToken, err)
+	})
+
+	t.Run("SetReviewVote - Invalid Vote value returns ValidationError with fields.vote", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewVote(ctx, reviewID, userID, &invalidVote)
+		require.Error(t, err)
+		var valErr *domain.ValidationError
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "vote")
+	})
+
+	t.Run("SetReviewVote - Successful helpful vote delegates to repo", func(t *testing.T) {
+		var capturedReviewID, capturedUserID string
+		var capturedVote *domain.HelpfulnessVote
+		repo := &mockReviewRepo{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedReviewID = rID
+				capturedUserID = uID
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   1,
+					UnhelpfulCount: 0,
+					ViewerVote:     v,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.SetReviewVote(ctx, reviewID, userID, &helpfulVote)
+		require.NoError(t, err)
+		assert.Equal(t, reviewID, capturedReviewID)
+		assert.Equal(t, userID, capturedUserID)
+		require.NotNil(t, capturedVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *capturedVote)
+		assert.Equal(t, int64(1), res.HelpfulCount)
+		assert.Equal(t, int64(0), res.UnhelpfulCount)
+		require.NotNil(t, res.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *res.ViewerVote)
+	})
+
+	t.Run("SetReviewVote - Successful unhelpful vote delegates to repo", func(t *testing.T) {
+		repo := &mockReviewRepo{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				return &domain.HelpfulnessState{
+					HelpfulCount:   0,
+					UnhelpfulCount: 1,
+					ViewerVote:     v,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.SetReviewVote(ctx, reviewID, userID, &unhelpfulVote)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), res.HelpfulCount)
+		assert.Equal(t, int64(1), res.UnhelpfulCount)
+		require.NotNil(t, res.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *res.ViewerVote)
+	})
+
+	t.Run("SetReviewVote - Remove vote (nil) delegates to repo", func(t *testing.T) {
+		var capturedVote *domain.HelpfulnessVote
+		repo := &mockReviewRepo{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   0,
+					UnhelpfulCount: 0,
+					ViewerVote:     nil,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.SetReviewVote(ctx, reviewID, userID, nil)
+		require.NoError(t, err)
+		assert.Nil(t, capturedVote)
+		assert.Equal(t, int64(0), res.HelpfulCount)
+		assert.Equal(t, int64(0), res.UnhelpfulCount)
+		assert.Nil(t, res.ViewerVote)
+	})
+
+	t.Run("SetReviewReplyVote - Invalid Reply UUID returns ErrReviewReplyNotFound", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewReplyVote(ctx, "invalid-reply-id", userID, &helpfulVote)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrReviewReplyNotFound, err)
+	})
+
+	t.Run("SetReviewReplyVote - Invalid User UUID returns ErrInvalidToken", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewReplyVote(ctx, replyID, "invalid-user-id", &helpfulVote)
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrInvalidToken, err)
+	})
+
+	t.Run("SetReviewReplyVote - Invalid Vote value returns ValidationError with fields.vote", func(t *testing.T) {
+		uc := NewReviewUseCase(&mockReviewRepo{}, nil, nil)
+		_, err := uc.SetReviewReplyVote(ctx, replyID, userID, &invalidVote)
+		require.Error(t, err)
+		var valErr *domain.ValidationError
+		require.True(t, errors.As(err, &valErr))
+		assert.Contains(t, valErr.Fields, "vote")
+	})
+
+	t.Run("SetReviewReplyVote - Successful vote delegates to repo", func(t *testing.T) {
+		var capturedReplyID, capturedUserID string
+		var capturedVote *domain.HelpfulnessVote
+		repo := &mockReviewRepo{
+			setReviewReplyVoteFn: func(ctx context.Context, rpID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedReplyID = rpID
+				capturedUserID = uID
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   3,
+					UnhelpfulCount: 1,
+					ViewerVote:     v,
+				}, nil
+			},
+		}
+		uc := NewReviewUseCase(repo, nil, nil)
+		res, err := uc.SetReviewReplyVote(ctx, replyID, userID, &helpfulVote)
+		require.NoError(t, err)
+		assert.Equal(t, replyID, capturedReplyID)
+		assert.Equal(t, userID, capturedUserID)
+		require.NotNil(t, capturedVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *capturedVote)
+		assert.Equal(t, int64(3), res.HelpfulCount)
+		assert.Equal(t, int64(1), res.UnhelpfulCount)
 	})
 }
 

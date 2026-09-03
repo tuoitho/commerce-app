@@ -273,4 +273,37 @@ describe('Header Component', () => {
       expect(reviewLinks[1]).toHaveAttribute('href', '/reviews')
     })
   })
+
+  it('renders loading skeleton and does NOT render login button while auth state is loading without user', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: 'pending-token',
+      isAuthenticated: false,
+      isLoading: true,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    // Desktop skeleton should be rendered, not the login button
+    expect(screen.getByTestId('auth-loading-skeleton')).toBeInTheDocument()
+    expect(screen.queryByText('Đăng nhập')).not.toBeInTheDocument()
+
+    // Open mobile menu
+    const menuButton = screen.getByRole('button', { name: /toggle menu/i })
+    fireEvent.click(menuButton)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-auth-loading-skeleton')).toBeInTheDocument()
+      expect(screen.queryByText('Đăng nhập / Đăng ký')).not.toBeInTheDocument()
+    })
+  })
 })

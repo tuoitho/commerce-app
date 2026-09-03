@@ -29,10 +29,12 @@ type mockReviewRepoForHTTP struct {
 	getByItemFn    func(ctx context.Context, orderItemID string) (*domain.Review, error)
 	listByItemsFn  func(ctx context.Context, orderItemIDs []string) (map[string]*domain.Review, error)
 	getMediaByIDFn func(ctx context.Context, mediaID string) (*domain.ReviewMedia, error)
-	getPublicFn    func(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error)
+	getPublicFn    func(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error)
 	getUserReviewsFn func(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error)
 	getAdminReviewsFn func(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error)
 	updateAdminReplyFn func(ctx context.Context, reviewID string, reply *string) (*domain.Review, error)
+	setReviewVoteFn func(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error)
+	setReviewReplyVoteFn func(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error)
 }
 
 func (m *mockReviewRepoForHTTP) CreateReview(ctx context.Context, input domain.CreateReviewInput) (*domain.Review, error) {
@@ -77,9 +79,9 @@ func (m *mockReviewRepoForHTTP) GetReviewMediaByID(ctx context.Context, mediaID 
 	return nil, nil
 }
 
-func (m *mockReviewRepoForHTTP) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (m *mockReviewRepoForHTTP) GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	if m.getPublicFn != nil {
-		return m.getPublicFn(ctx, productID, page, limit)
+		return m.getPublicFn(ctx, productID, viewerUserID, page, limit)
 	}
 	return nil, nil
 }
@@ -87,6 +89,34 @@ func (m *mockReviewRepoForHTTP) GetPublicReviewsByProductID(ctx context.Context,
 func (m *mockReviewRepoForHTTP) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
 	if m.getUserReviewsFn != nil {
 		return m.getUserReviewsFn(ctx, userID, ratingFilter, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepoForHTTP) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
+	if m.getAdminReviewsFn != nil {
+		return m.getAdminReviewsFn(ctx, ratingFilter, hasReplyFilter, page, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepoForHTTP) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	if m.updateAdminReplyFn != nil {
+		return m.updateAdminReplyFn(ctx, reviewID, reply)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepoForHTTP) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if m.setReviewVoteFn != nil {
+		return m.setReviewVoteFn(ctx, reviewID, userID, vote)
+	}
+	return nil, nil
+}
+
+func (m *mockReviewRepoForHTTP) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	if m.setReviewReplyVoteFn != nil {
+		return m.setReviewReplyVoteFn(ctx, replyID, userID, vote)
 	}
 	return nil, nil
 }
@@ -359,10 +389,24 @@ func TestGetPublicReviews_HTTPHandler(t *testing.T) {
 	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
 	store := reviewmedia.NewFakeStore()
 	productID := uuid.NewString()
+	customerID := uuid.NewString()
+	adminID := uuid.NewString()
 
-	t.Run("Success 200 with reviews and summary", func(t *testing.T) {
+	customerToken, err := jwtMgr.GenerateAccessToken(customerID, domain.RoleCustomer, 2*time.Hour)
+	require.NoError(t, err)
+
+	adminToken, err := jwtMgr.GenerateAccessToken(adminID, domain.RoleAdmin, 2*time.Hour)
+	require.NoError(t, err)
+
+	t.Run("Anonymous GET without token returns vote counts with viewerVote null and preserves envelope", func(t *testing.T) {
+		var capturedViewerID *string
+		replyText := "Cảm ơn bạn đã đánh giá"
+		replyID := uuid.NewString()
+		repliedAt := time.Now().UTC().Add(-30 * time.Minute)
+
 		repo := &mockReviewRepoForHTTP{
-			getPublicFn: func(ctx context.Context, pID string, page, limit int) (*domain.ProductReviewsResult, error) {
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
+				capturedViewerID = viewerUserID
 				masked := "c***@gmail.com"
 				return &domain.ProductReviewsResult{
 					Summary: domain.ProductReviewSummary{
@@ -376,16 +420,52 @@ func TestGetPublicReviews_HTTPHandler(t *testing.T) {
 						{
 							ID:      uuid.NewString(),
 							Rating:  5,
-							Comment: "Tuyệt vời",
+							Comment: "Đánh giá có reply",
 							Reviewer: domain.PublicReviewer{
 								MaskedEmail: &masked,
 							},
 							Purchase: domain.PublicPurchase{
 								Model: "256GB",
 							},
-							Media:     []domain.ReviewMedia{},
+							Media: []domain.ReviewMedia{},
+							Helpfulness: domain.HelpfulnessState{
+								HelpfulCount:   10,
+								UnhelpfulCount: 2,
+								ViewerVote:     nil,
+							},
+							AdminReply:     &replyText,
+							AdminRepliedAt: &repliedAt,
+							AdminReplyID:   &replyID,
+							AdminReplyHelpfulness: &domain.HelpfulnessState{
+								HelpfulCount:   4,
+								UnhelpfulCount: 0,
+								ViewerVote:     nil,
+							},
 							CreatedAt: time.Now().UTC(),
 							UpdatedAt: time.Now().UTC(),
+						},
+						{
+							ID:      uuid.NewString(),
+							Rating:  4,
+							Comment: "Đánh giá không có reply",
+							Reviewer: domain.PublicReviewer{
+								MaskedEmail: &masked,
+							},
+							Purchase: domain.PublicPurchase{
+								Model: "128GB",
+							},
+							Media: []domain.ReviewMedia{},
+							Helpfulness: domain.HelpfulnessState{
+								HelpfulCount:   0,
+								UnhelpfulCount: 0,
+								ViewerVote:     nil,
+							},
+							AdminReply:            nil,
+							AdminRepliedAt:        nil,
+							AdminReplyID:          nil,
+							AdminReplyHelpfulness: nil,
+							CreatedAt:             time.Now().UTC().Add(-1 * time.Hour),
+							UpdatedAt:             time.Now().UTC().Add(-1 * time.Hour),
 						},
 					},
 					Total: 2,
@@ -400,19 +480,170 @@ func TestGetPublicReviews_HTTPHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Nil(t, capturedViewerID, "Anonymous request must pass nil viewerUserID")
+
+		var rawResp map[string]interface{}
+		err = json.Unmarshal(w.Body.Bytes(), &rawResp)
+		require.NoError(t, err)
+		assert.True(t, rawResp["success"].(bool))
+		assert.Equal(t, "Lấy danh sách đánh giá thành công", rawResp["message"])
+
+		data := rawResp["data"].(map[string]interface{})
+		reviews := data["reviews"].([]interface{})
+		require.Len(t, reviews, 2)
+
+		// Review 1 with reply
+		rev1 := reviews[0].(map[string]interface{})
+		h1 := rev1["helpfulness"].(map[string]interface{})
+		assert.Equal(t, float64(10), h1["helpfulCount"])
+		assert.Equal(t, float64(2), h1["unhelpfulCount"])
+		assert.Nil(t, h1["viewerVote"])
+		assert.Equal(t, replyText, rev1["adminReply"])
+		assert.Equal(t, replyID, rev1["adminReplyId"])
+		repHelp1 := rev1["adminReplyHelpfulness"].(map[string]interface{})
+		assert.Equal(t, float64(4), repHelp1["helpfulCount"])
+		assert.Equal(t, float64(0), repHelp1["unhelpfulCount"])
+		assert.Nil(t, repHelp1["viewerVote"])
+
+		// Review 2 without reply: reply fields omitted
+		rev2 := reviews[1].(map[string]interface{})
+		h2 := rev2["helpfulness"].(map[string]interface{})
+		assert.Equal(t, float64(0), h2["helpfulCount"])
+		assert.Equal(t, float64(0), h2["unhelpfulCount"])
+		assert.Nil(t, h2["viewerVote"])
+		assert.Nil(t, rev2["adminReply"])
+		assert.Nil(t, rev2["adminReplyId"])
+		assert.Nil(t, rev2["adminReplyHelpfulness"])
+	})
+
+	t.Run("Customer GET with valid token passes viewer ID and receives personalized viewerVote", func(t *testing.T) {
+		var capturedViewerID *string
+		helpfulVote := domain.HelpfulnessVoteHelpful
+
+		repo := &mockReviewRepoForHTTP{
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
+				capturedViewerID = viewerUserID
+				masked := "c***@gmail.com"
+				return &domain.ProductReviewsResult{
+					Summary: domain.ProductReviewSummary{
+						TotalReviews:  1,
+						AverageRating: "5.0",
+						RatingCounts:  map[string]int64{"5": 1},
+					},
+					Reviews: []domain.PublicReview{
+						{
+							ID:      uuid.NewString(),
+							Rating:  5,
+							Comment: "Đánh giá có vote của customer",
+							Reviewer: domain.PublicReviewer{
+								MaskedEmail: &masked,
+							},
+							Helpfulness: domain.HelpfulnessState{
+								HelpfulCount:   5,
+								UnhelpfulCount: 1,
+								ViewerVote:     &helpfulVote,
+							},
+							CreatedAt: time.Now().UTC(),
+							UpdatedAt: time.Now().UTC(),
+						},
+					},
+					Total: 1,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/products/%s/reviews", productID), nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		require.NotNil(t, capturedViewerID)
+		assert.Equal(t, customerID, *capturedViewerID)
+
+		var rawResp map[string]interface{}
+		err = json.Unmarshal(w.Body.Bytes(), &rawResp)
+		require.NoError(t, err)
+		data := rawResp["data"].(map[string]interface{})
+		reviews := data["reviews"].([]interface{})
+		require.Len(t, reviews, 1)
+
+		rev := reviews[0].(map[string]interface{})
+		h := rev["helpfulness"].(map[string]interface{})
+		assert.Equal(t, "helpful", h["viewerVote"])
+		assert.Equal(t, float64(5), h["helpfulCount"])
+		assert.Equal(t, float64(1), h["unhelpfulCount"])
+	})
+
+	t.Run("Admin GET with valid token allows viewing without viewer selection (viewerVote null)", func(t *testing.T) {
+		var capturedViewerID *string
+
+		repo := &mockReviewRepoForHTTP{
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
+				capturedViewerID = viewerUserID
+				return &domain.ProductReviewsResult{
+					Summary: domain.ProductReviewSummary{
+						TotalReviews:  0,
+						AverageRating: "0.0",
+						RatingCounts:  map[string]int64{},
+					},
+					Reviews: []domain.PublicReview{},
+					Total:   0,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/products/%s/reviews", productID), nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Nil(t, capturedViewerID, "Admin request must not set viewerUserID for customer personal votes")
+	})
+
+	t.Run("Invalid or expired token returns 401 invalid_token so client can refresh", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/products/%s/reviews", productID), nil)
+		req.Header.Set("Authorization", "Bearer invalid-or-expired-token")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		var resp ResponseEnvelope
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.True(t, resp.Success)
-		assert.Equal(t, "Lấy danh sách đánh giá thành công", resp.Message)
-		require.NotNil(t, resp.Meta.Pagination)
-		assert.Equal(t, 2, resp.Meta.Pagination.Total)
-		assert.Equal(t, 1, resp.Meta.Pagination.TotalPages)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "invalid_token", resp.Error.Code)
+	})
+
+	t.Run("Malformed Authorization header returns 401 invalid_token", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		// Basic auth instead of Bearer
+		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/products/%s/reviews", productID), nil)
+		req.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "invalid_token", resp.Error.Code)
 	})
 
 	t.Run("Success 200 with 0 reviews", func(t *testing.T) {
 		repo := &mockReviewRepoForHTTP{
-			getPublicFn: func(ctx context.Context, pID string, page, limit int) (*domain.ProductReviewsResult, error) {
+			getPublicFn: func(ctx context.Context, pID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 				return &domain.ProductReviewsResult{
 					Summary: domain.ProductReviewSummary{
 						TotalReviews:  0,
@@ -608,17 +839,452 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 	})
 }
 
+func TestSetReviewHelpfulness_HTTPHandler(t *testing.T) {
+	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
+	customerID := uuid.NewString()
+	adminID := uuid.NewString()
+	reviewID := uuid.NewString()
 
-func (m *mockReviewRepoForHTTP) GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*domain.AdminReviewsResult, error) {
-	if m.getAdminReviewsFn != nil {
-		return m.getAdminReviewsFn(ctx, ratingFilter, hasReplyFilter, page, limit)
-	}
-	return &domain.AdminReviewsResult{}, nil
+	customerToken, err := jwtMgr.GenerateAccessToken(customerID, domain.RoleCustomer, 2*time.Hour)
+	require.NoError(t, err)
+
+	adminToken, err := jwtMgr.GenerateAccessToken(adminID, domain.RoleAdmin, 2*time.Hour)
+	require.NoError(t, err)
+
+	store := reviewmedia.NewFakeStore()
+
+	t.Run("200 OK - Vote helpful returns direct HelpfulnessState in Full Status Envelope", func(t *testing.T) {
+		helpful := domain.HelpfulnessVoteHelpful
+		var capturedReviewID, capturedUserID string
+		var capturedVote *domain.HelpfulnessVote
+
+		repo := &mockReviewRepoForHTTP{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedReviewID = rID
+				capturedUserID = uID
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   13,
+					UnhelpfulCount: 2,
+					ViewerVote:     &helpful,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, reviewID, capturedReviewID)
+		assert.Equal(t, customerID, capturedUserID)
+		require.NotNil(t, capturedVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *capturedVote)
+
+		var resp struct {
+			Success bool                    `json:"success"`
+			Message string                  `json:"message"`
+			Data    domain.HelpfulnessState `json:"data"`
+			Error   interface{}             `json:"error"`
+			Meta    struct {
+				Timestamp string `json:"timestamp"`
+			} `json:"meta"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		assert.Equal(t, "Cập nhật bình chọn thành công", resp.Message)
+		assert.Nil(t, resp.Error)
+		assert.Equal(t, int64(13), resp.Data.HelpfulCount)
+		assert.Equal(t, int64(2), resp.Data.UnhelpfulCount)
+		require.NotNil(t, resp.Data.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *resp.Data.ViewerVote)
+	})
+
+	t.Run("200 OK - Vote unhelpful", func(t *testing.T) {
+		unhelpful := domain.HelpfulnessVoteUnhelpful
+		repo := &mockReviewRepoForHTTP{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				return &domain.HelpfulnessState{
+					HelpfulCount:   12,
+					UnhelpfulCount: 3,
+					ViewerVote:     &unhelpful,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "unhelpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Success bool                    `json:"success"`
+			Data    domain.HelpfulnessState `json:"data"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		assert.Equal(t, int64(12), resp.Data.HelpfulCount)
+		assert.Equal(t, int64(3), resp.Data.UnhelpfulCount)
+		require.NotNil(t, resp.Data.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteUnhelpful, *resp.Data.ViewerVote)
+	})
+
+	t.Run("200 OK - Remove vote with null", func(t *testing.T) {
+		var capturedVote *domain.HelpfulnessVote
+		repo := &mockReviewRepoForHTTP{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   12,
+					UnhelpfulCount: 2,
+					ViewerVote:     nil,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": null}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Nil(t, capturedVote)
+		var resp struct {
+			Success bool                    `json:"success"`
+			Data    domain.HelpfulnessState `json:"data"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		assert.Nil(t, resp.Data.ViewerVote)
+	})
+
+	t.Run("400 Bad Request - Missing vote field in body", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "validation_error", resp.Error.Code)
+		assert.Contains(t, resp.Error.Fields, "vote")
+	})
+
+	t.Run("400 Bad Request - Invalid vote string value", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "HELPFUL"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "validation_error", resp.Error.Code)
+		assert.Contains(t, resp.Error.Fields, "vote")
+	})
+
+	t.Run("400 Bad Request - Malformed JSON body", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `not-json`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "validation_error", resp.Error.Code)
+	})
+
+	t.Run("401 Unauthorized - Missing Authorization header", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "unauthorized", resp.Error.Code)
+	})
+
+	t.Run("401 Unauthorized - Invalid or expired token", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer bad-token")
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "invalid_token", resp.Error.Code)
+	})
+
+	t.Run("403 Forbidden - Admin token is rejected", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "forbidden", resp.Error.Code)
+		assert.Equal(t, "Bạn không có quyền thực hiện thao tác này", resp.Message)
+	})
+
+	t.Run("404 Not Found - Non-existent review returns review_not_found with Vietnamese message", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				return nil, domain.ErrReviewNotFound
+			},
+		}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "review_not_found", resp.Error.Code)
+		assert.Equal(t, "Không tìm thấy đánh giá", resp.Message)
+	})
+
+	t.Run("500 Internal Server Error - Unexpected repo error", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{
+			setReviewVoteFn: func(ctx context.Context, rID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				return nil, assert.AnError
+			},
+		}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/reviews/%s/helpfulness", reviewID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "internal", resp.Error.Code)
+	})
 }
 
-func (m *mockReviewRepoForHTTP) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
-	if m.updateAdminReplyFn != nil {
-		return m.updateAdminReplyFn(ctx, reviewID, reply)
-	}
-	return &domain.Review{}, nil
+func TestSetReplyHelpfulness_HTTPHandler(t *testing.T) {
+	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
+	customerID := uuid.NewString()
+	adminID := uuid.NewString()
+	replyID := uuid.NewString()
+
+	customerToken, err := jwtMgr.GenerateAccessToken(customerID, domain.RoleCustomer, 2*time.Hour)
+	require.NoError(t, err)
+
+	adminToken, err := jwtMgr.GenerateAccessToken(adminID, domain.RoleAdmin, 2*time.Hour)
+	require.NoError(t, err)
+
+	store := reviewmedia.NewFakeStore()
+
+	t.Run("200 OK - Vote helpful on reply returns direct HelpfulnessState in Full Status Envelope", func(t *testing.T) {
+		helpful := domain.HelpfulnessVoteHelpful
+		var capturedReplyID, capturedUserID string
+		var capturedVote *domain.HelpfulnessVote
+
+		repo := &mockReviewRepoForHTTP{
+			setReviewReplyVoteFn: func(ctx context.Context, rpID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				capturedReplyID = rpID
+				capturedUserID = uID
+				capturedVote = v
+				return &domain.HelpfulnessState{
+					HelpfulCount:   5,
+					UnhelpfulCount: 1,
+					ViewerVote:     &helpful,
+				}, nil
+			},
+		}
+
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/review-replies/%s/helpfulness", replyID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, replyID, capturedReplyID)
+		assert.Equal(t, customerID, capturedUserID)
+		require.NotNil(t, capturedVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *capturedVote)
+
+		var resp struct {
+			Success bool                    `json:"success"`
+			Message string                  `json:"message"`
+			Data    domain.HelpfulnessState `json:"data"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		assert.Equal(t, "Cập nhật bình chọn thành công", resp.Message)
+		assert.Equal(t, int64(5), resp.Data.HelpfulCount)
+		assert.Equal(t, int64(1), resp.Data.UnhelpfulCount)
+		require.NotNil(t, resp.Data.ViewerVote)
+		assert.Equal(t, domain.HelpfulnessVoteHelpful, *resp.Data.ViewerVote)
+	})
+
+	t.Run("400 Bad Request - Missing vote field in body", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/review-replies/%s/helpfulness", replyID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "validation_error", resp.Error.Code)
+		assert.Contains(t, resp.Error.Fields, "vote")
+	})
+
+	t.Run("401 Unauthorized - Missing Authorization header", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/review-replies/%s/helpfulness", replyID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("403 Forbidden - Admin token is rejected", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/review-replies/%s/helpfulness", replyID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "forbidden", resp.Error.Code)
+		assert.Equal(t, "Bạn không có quyền thực hiện thao tác này", resp.Message)
+	})
+
+	t.Run("404 Not Found - Non-existent reply returns review_reply_not_found with Vietnamese message", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{
+			setReviewReplyVoteFn: func(ctx context.Context, rpID, uID string, v *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+				return nil, domain.ErrReviewReplyNotFound
+			},
+		}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := `{"vote": "helpful"}`
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/review-replies/%s/helpfulness", replyID), bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "review_reply_not_found", resp.Error.Code)
+		assert.Equal(t, "Không tìm thấy phản hồi đánh giá", resp.Message)
+	})
 }
+

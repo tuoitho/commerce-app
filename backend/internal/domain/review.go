@@ -124,18 +124,38 @@ type PublicPurchase struct {
 	Options []CartOption `json:"options"`
 }
 
+type HelpfulnessVote string
+
+const (
+	HelpfulnessVoteHelpful   HelpfulnessVote = "helpful"
+	HelpfulnessVoteUnhelpful HelpfulnessVote = "unhelpful"
+)
+
+func (v HelpfulnessVote) IsValid() bool {
+	return v == HelpfulnessVoteHelpful || v == HelpfulnessVoteUnhelpful
+}
+
+type HelpfulnessState struct {
+	HelpfulCount   int64            `json:"helpfulCount"`
+	UnhelpfulCount int64            `json:"unhelpfulCount"`
+	ViewerVote     *HelpfulnessVote `json:"viewerVote"`
+}
+
 type PublicReview struct {
-	AdminReply    *string       `json:"adminReply,omitempty"`
-	AdminRepliedAt *time.Time  `json:"adminRepliedAt,omitempty"`
-	ID        string         `json:"id"`
-	Rating    int16          `json:"rating"`
-	Comment   string         `json:"comment"`
-	Reviewer  PublicReviewer `json:"reviewer"`
-	Purchase  PublicPurchase `json:"purchase"`
-	Media     []ReviewMedia  `json:"media"`
-	Edited    bool           `json:"edited"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID                    string            `json:"id"`
+	Rating                int16             `json:"rating"`
+	Comment               string            `json:"comment"`
+	Reviewer              PublicReviewer    `json:"reviewer"`
+	Purchase              PublicPurchase    `json:"purchase"`
+	Media                 []ReviewMedia     `json:"media"`
+	Helpfulness           HelpfulnessState  `json:"helpfulness"`
+	AdminReply            *string           `json:"adminReply,omitempty"`
+	AdminRepliedAt        *time.Time        `json:"adminRepliedAt,omitempty"`
+	AdminReplyID          *string           `json:"adminReplyId,omitempty"`
+	AdminReplyHelpfulness *HelpfulnessState `json:"adminReplyHelpfulness,omitempty"`
+	Edited                bool              `json:"edited"`
+	CreatedAt             time.Time         `json:"createdAt"`
+	UpdatedAt             time.Time         `json:"updatedAt"`
 }
 
 type ProductReviewSummary struct {
@@ -221,10 +241,12 @@ type ReviewRepository interface {
 	GetReviewByOrderItemID(ctx context.Context, orderItemID string) (*Review, error)
 	ListReviewsByOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]*Review, error)
 	GetReviewMediaByID(ctx context.Context, mediaID string) (*ReviewMedia, error)
-	GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*ProductReviewsResult, error)
+	GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*ProductReviewsResult, error)
 	GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*UserReviewsResult, error)
 	GetAdminReviews(ctx context.Context, ratingFilter int16, hasReplyFilter string, page, limit int) (*AdminReviewsResult, error)
 	UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*Review, error)
+	SetReviewVote(ctx context.Context, reviewID, userID string, vote *HelpfulnessVote) (*HelpfulnessState, error)
+	SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *HelpfulnessVote) (*HelpfulnessState, error)
 }
 
 type ReviewObjectInfo struct {

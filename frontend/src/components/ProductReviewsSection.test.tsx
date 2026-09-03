@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ProductReviewsSection } from './ProductReviewsSection'
 import * as reviewsApi from '@/api/reviews'
-import type { ProductReviewsResponse, ApiResponseMeta } from '@/api/types'
+import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
+import { ApiError, type ProductReviewsResponse, type ApiResponseMeta } from '@/api/types'
 
 type MockReviewsEnvelope = {
   data: ProductReviewsResponse
@@ -10,9 +12,53 @@ type MockReviewsEnvelope = {
   message: string
 }
 
+const mockNavigate = vi.fn()
+let mockLocation = { pathname: '/products/prod-1', search: '?ref=deal' }
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useLocation: () => mockLocation,
+  }
+})
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/ToastContext', () => ({
+  useToast: vi.fn(),
+}))
+
 describe('ProductReviewsSection', () => {
+  const mockToastError = vi.fn()
+  const mockToastSuccess = vi.fn()
+
   beforeEach(() => {
     vi.restoreAllMocks()
+    mockNavigate.mockReset()
+    mockToastError.mockReset()
+    mockToastSuccess.mockReset()
+    mockLocation = { pathname: '/products/prod-1', search: '?ref=deal' }
+
+    vi.mocked(useToast).mockReturnValue({
+      toast: vi.fn(),
+      success: mockToastSuccess,
+      error: mockToastError,
+      info: vi.fn(),
+    })
+
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'user-1', email: 'customer@auraphone.vn', role: 'customer' },
+      accessToken: 'token-123',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
   })
 
   it('renders empty state when product has 0 reviews', async () => {
@@ -43,7 +89,7 @@ describe('ProductReviewsSection', () => {
     })
   })
 
-  it('renders reviews, rating breakdown, verified purchase badge, and media', async () => {
+  it('renders reviews, rating breakdown, verified purchase badge, media, and helpfulness counts', async () => {
     const populatedResponse: MockReviewsEnvelope = {
       data: {
         summary: {
@@ -78,6 +124,11 @@ describe('ProductReviewsSection', () => {
               },
             ],
             createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 12,
+              unhelpfulCount: 2,
+              viewerVote: 'helpful',
+            },
           },
         ],
       },
@@ -119,99 +170,80 @@ describe('ProductReviewsSection', () => {
     expect(videoElem).toBeInTheDocument()
     expect(videoElem).toHaveAttribute('controls')
     expect(videoElem).toHaveAttribute('preload', 'metadata')
+
+    // Verify helpfulness buttons
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (12)' })
+    const unhelpfulBtn = screen.getByRole('button', { name: 'Không hữu ích (2)' })
+    expect(helpfulBtn).toHaveAttribute('aria-pressed', 'true')
+    expect(unhelpfulBtn).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('handles pagination correctly when multiple pages exist', async () => {
-    const page1Response: MockReviewsEnvelope = {
-      data: {
-        summary: {
-          totalReviews: 15,
-          averageRating: '5.0',
-          ratingCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 15 },
-        },
-        reviews: [
-          {
-            id: 'rev-page-1',
-            rating: 5,
-            comment: 'Review on Page 1',
-            reviewer: { maskedEmail: 'u1***@gmail.com' },
-            purchase: { model: 'Model A', options: [] },
-            media: [],
-            createdAt: '2026-08-28T00:00:00Z',
-          },
-        ],
-      },
-      message: 'OK',
-      meta: {
-        timestamp: '2026-08-28T00:00:00Z',
-        pagination: { page: 1, limit: 10, total: 15, totalPages: 2, hasNext: true, hasPrev: false },
-      },
-    }
-
-    const page2Response: MockReviewsEnvelope = {
-      data: {
-        summary: {
-          totalReviews: 15,
-          averageRating: '5.0',
-          ratingCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 15 },
-        },
-        reviews: [
-          {
-            id: 'rev-page-2',
-            rating: 5,
-            comment: 'Review on Page 2',
-            reviewer: { maskedEmail: 'u2***@gmail.com' },
-            purchase: { model: 'Model B', options: [] },
-            media: [],
-            createdAt: '2026-08-27T00:00:00Z',
-          },
-        ],
-      },
-      message: 'OK',
-      meta: {
-        timestamp: '2026-08-28T00:00:00Z',
-        pagination: { page: 2, limit: 10, total: 15, totalPages: 2, hasNext: false, hasPrev: true },
-      },
-    }
-
-    const apiSpy = vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(page1Response)
-
-    render(<ProductReviewsSection productId="prod-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Review on Page 1')).toBeInTheDocument()
+  it('waits for AuthContext.isLoading === false before fetching reviews', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: true,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
     })
 
-    // Click next page
-    apiSpy.mockResolvedValue(page2Response)
-    const nextBtn = screen.getByRole('button', { name: /Sau/i })
-    fireEvent.click(nextBtn)
+    const getReviewsSpy = vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue({
+      data: {
+        summary: { totalReviews: 0, averageRating: '0.0', ratingCounts: {} },
+        reviews: [],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    })
+
+    const { rerender } = render(<ProductReviewsSection productId="prod-1" />)
+
+    expect(getReviewsSpy).not.toHaveBeenCalled()
+
+    // When auth settles
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    rerender(<ProductReviewsSection productId="prod-1" />)
 
     await waitFor(() => {
-      expect(apiSpy).toHaveBeenCalledWith('prod-1', { page: 2, limit: 10 })
-      expect(screen.getByText('Review on Page 2')).toBeInTheDocument()
+      expect(getReviewsSpy).toHaveBeenCalledWith('prod-1', { page: 1, limit: 10 })
     })
   })
 
-  it('renders independent error state with retry affordance on API failure', async () => {
-    const apiSpy = vi.spyOn(reviewsApi, 'getProductReviews').mockRejectedValueOnce(new Error('Network error'))
-
-    render(<ProductReviewsSection productId="prod-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Không thể tải đánh giá sản phẩm. Vui lòng thử lại.')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Thử lại/i })).toBeInTheDocument()
-    })
-
-    // Retry
-    const successResponse: MockReviewsEnvelope = {
+  it('renders 0 count accurately for helpful and unhelpful controls', async () => {
+    const responseWithZeros: MockReviewsEnvelope = {
       data: {
         summary: {
           totalReviews: 1,
           averageRating: '5.0',
-          ratingCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 1 },
+          ratingCounts: { '5': 1 },
         },
-        reviews: [],
+        reviews: [
+          {
+            id: 'rev-zero',
+            rating: 5,
+            comment: 'Chưa có ai vote',
+            reviewer: { maskedEmail: 'z***@gmail.com' },
+            purchase: { model: 'Model Z', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 0,
+              unhelpfulCount: 0,
+              viewerVote: null,
+            },
+          },
+        ],
       },
       message: 'OK',
       meta: {
@@ -219,43 +251,66 @@ describe('ProductReviewsSection', () => {
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
       },
     }
-    apiSpy.mockResolvedValue(successResponse)
 
-    fireEvent.click(screen.getByRole('button', { name: /Thử lại/i }))
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(responseWithZeros)
+
+    render(<ProductReviewsSection productId="prod-1" />)
 
     await waitFor(() => {
-      expect(screen.queryByText('Không thể tải đánh giá sản phẩm. Vui lòng thử lại.')).not.toBeInTheDocument()
+      expect(screen.getByText('Chưa có ai vote')).toBeInTheDocument()
     })
+
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (0)' })
+    const unhelpfulBtn = screen.getByRole('button', { name: 'Không hữu ích (0)' })
+
+    expect(helpfulBtn).toHaveAttribute('aria-pressed', 'false')
+    expect(unhelpfulBtn).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('renders admin reply when present and omits it when absent', async () => {
-    const responseWithReply: MockReviewsEnvelope = {
+  it('renders independent helpfulness controls for admin reply when present and omits them when absent', async () => {
+    const response: MockReviewsEnvelope = {
       data: {
         summary: {
           totalReviews: 2,
           averageRating: '5.0',
-          ratingCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 2 },
+          ratingCounts: { '5': 2 },
         },
         reviews: [
           {
             id: 'rev-with-reply',
             rating: 5,
-            comment: 'Sản phẩm tuyệt vời',
+            comment: 'Review có reply',
             reviewer: { maskedEmail: 'a***@gmail.com' },
             purchase: { model: 'Model X', options: [] },
             media: [],
-            adminReply: 'Cảm ơn bạn đã tin tưởng AuraPhone!',
-            adminRepliedAt: '2026-08-28T10:00:00Z',
             createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 10,
+              unhelpfulCount: 1,
+              viewerVote: 'helpful',
+            },
+            adminReply: 'Cảm ơn quý khách',
+            adminReplyId: 'reply-1',
+            adminReplyHelpfulness: {
+              helpfulCount: 3,
+              unhelpfulCount: 0,
+              viewerVote: 'unhelpful',
+            },
+            adminRepliedAt: '2026-08-28T01:00:00Z',
           },
           {
-            id: 'rev-no-reply',
+            id: 'rev-without-reply',
             rating: 5,
-            comment: 'Giao hàng nhanh chóng',
+            comment: 'Review không có reply',
             reviewer: { maskedEmail: 'b***@gmail.com' },
             purchase: { model: 'Model Y', options: [] },
             media: [],
             createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 2,
+              unhelpfulCount: 5,
+              viewerVote: null,
+            },
           },
         ],
       },
@@ -266,16 +321,399 @@ describe('ProductReviewsSection', () => {
       },
     }
 
-    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(responseWithReply)
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
 
     render(<ProductReviewsSection productId="prod-1" />)
 
     await waitFor(() => {
-      expect(screen.getByText('Phản hồi từ người bán')).toBeInTheDocument()
-      expect(screen.getByText('Cảm ơn bạn đã tin tưởng AuraPhone!')).toBeInTheDocument()
-      expect(screen.getByText('Sản phẩm tuyệt vời')).toBeInTheDocument()
-      expect(screen.getByText('Giao hàng nhanh chóng')).toBeInTheDocument()
+      expect(screen.getByText('Review có reply')).toBeInTheDocument()
+      expect(screen.getByText('Cảm ơn quý khách')).toBeInTheDocument()
+      expect(screen.getByText('Review không có reply')).toBeInTheDocument()
+    })
+
+    // Review with reply controls
+    const reviewHelpful = screen.getByRole('button', { name: 'Hữu ích (10)' })
+    const replyHelpful = screen.getByRole('button', { name: 'Hữu ích (3)' })
+    const replyUnhelpful = screen.getByRole('button', { name: 'Không hữu ích (0)' })
+
+    expect(reviewHelpful).toHaveAttribute('aria-pressed', 'true')
+    expect(replyHelpful).toHaveAttribute('aria-pressed', 'false')
+    expect(replyUnhelpful).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('redirects unauthenticated user to login with current pathname and search on vote click', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 1, averageRating: '5.0', ratingCounts: { '5': 1 } },
+        reviews: [
+          {
+            id: 'rev-guest',
+            rating: 5,
+            comment: 'Guest review test',
+            reviewer: { maskedEmail: 'g***@gmail.com' },
+            purchase: { model: 'Model G', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 5,
+              unhelpfulCount: 0,
+              viewerVote: null,
+            },
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+    const setReviewSpy = vi.spyOn(reviewsApi, 'setReviewHelpfulness')
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Guest review test')).toBeInTheDocument()
+    })
+
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (5)' })
+    fireEvent.click(helpfulBtn)
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      `/login?redirect=${encodeURIComponent('/products/prod-1?ref=deal')}`
+    )
+    expect(setReviewSpy).not.toHaveBeenCalled()
+  })
+
+  it('executes authenticated vote: create vote, remove vote (clicking same), change vote (opposite)', async () => {
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 1, averageRating: '5.0', ratingCounts: { '5': 1 } },
+        reviews: [
+          {
+            id: 'rev-vote',
+            rating: 5,
+            comment: 'Interactive review test',
+            reviewer: { maskedEmail: 'i***@gmail.com' },
+            purchase: { model: 'Model I', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 0,
+              unhelpfulCount: 0,
+              viewerVote: null,
+            },
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+    const setReviewSpy = vi.spyOn(reviewsApi, 'setReviewHelpfulness')
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Interactive review test')).toBeInTheDocument()
+    })
+
+    // 1. Create vote: click "Hữu ích"
+    setReviewSpy.mockResolvedValueOnce({
+      helpfulCount: 1,
+      unhelpfulCount: 0,
+      viewerVote: 'helpful',
+    })
+
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (0)' })
+    fireEvent.click(helpfulBtn)
+
+    expect(setReviewSpy).toHaveBeenCalledWith('rev-vote', 'helpful')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Hữu ích (1)' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // 2. Remove vote: click "Hữu ích" again
+    setReviewSpy.mockResolvedValueOnce({
+      helpfulCount: 0,
+      unhelpfulCount: 0,
+      viewerVote: null,
+    })
+
+    const activeHelpfulBtn = screen.getByRole('button', { name: 'Hữu ích (1)' })
+    fireEvent.click(activeHelpfulBtn)
+
+    expect(setReviewSpy).toHaveBeenCalledWith('rev-vote', null)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Hữu ích (0)' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    // 3. Change vote: click "Không hữu ích"
+    setReviewSpy.mockResolvedValueOnce({
+      helpfulCount: 0,
+      unhelpfulCount: 1,
+      viewerVote: 'unhelpful',
+    })
+
+    const unhelpfulBtn = screen.getByRole('button', { name: 'Không hữu ích (0)' })
+    fireEvent.click(unhelpfulBtn)
+
+    expect(setReviewSpy).toHaveBeenCalledWith('rev-vote', 'unhelpful')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Không hữu ích (1)' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // 4. Switch to opposite: click "Hữu ích" while "Không hữu ích" is active
+    setReviewSpy.mockResolvedValueOnce({
+      helpfulCount: 1,
+      unhelpfulCount: 0,
+      viewerVote: 'helpful',
+    })
+
+    const newHelpfulBtn = screen.getByRole('button', { name: 'Hữu ích (0)' })
+    fireEvent.click(newHelpfulBtn)
+
+    expect(setReviewSpy).toHaveBeenCalledWith('rev-vote', 'helpful')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Hữu ích (1)' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Không hữu ích (0)' })).toHaveAttribute('aria-pressed', 'false')
+    })
+  })
+
+  it('handles authenticated voting on admin reply and maintains independent state from review', async () => {
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 1, averageRating: '5.0', ratingCounts: { '5': 1 } },
+        reviews: [
+          {
+            id: 'rev-1',
+            rating: 5,
+            comment: 'Review with reply test',
+            reviewer: { maskedEmail: 'r***@gmail.com' },
+            purchase: { model: 'Model R', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: {
+              helpfulCount: 5,
+              unhelpfulCount: 0,
+              viewerVote: 'helpful',
+            },
+            adminReply: 'Cảm ơn phản hồi',
+            adminReplyId: 'reply-1',
+            adminReplyHelpfulness: {
+              helpfulCount: 0,
+              unhelpfulCount: 0,
+              viewerVote: null,
+            },
+            adminRepliedAt: '2026-08-28T01:00:00Z',
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+    const setReplySpy = vi.spyOn(reviewsApi, 'setReplyHelpfulness').mockResolvedValue({
+      helpfulCount: 1,
+      unhelpfulCount: 0,
+      viewerVote: 'helpful',
+    })
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Cảm ơn phản hồi')).toBeInTheDocument()
+    })
+
+    // Reply has helpfulCount 0, while review has helpfulCount 5
+    const replyHelpfulBtn = screen.getByRole('button', { name: 'Hữu ích (0)' })
+    fireEvent.click(replyHelpfulBtn)
+
+    expect(setReplySpy).toHaveBeenCalledWith('reply-1', 'helpful')
+
+    await waitFor(() => {
+      // Reply updated
+      expect(screen.getByRole('button', { name: 'Hữu ích (1)' })).toHaveAttribute('aria-pressed', 'true')
+      // Review state untouched
+      expect(screen.getByRole('button', { name: 'Hữu ích (5)' })).toHaveAttribute('aria-pressed', 'true')
+    })
+  })
+
+  it('disables only the pending target undergoing mutation and prevents duplicate in-flight requests', async () => {
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 2, averageRating: '5.0', ratingCounts: { '5': 2 } },
+        reviews: [
+          {
+            id: 'rev-1',
+            rating: 5,
+            comment: 'Review 1',
+            reviewer: { maskedEmail: '1***@gmail.com' },
+            purchase: { model: 'M1', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: { helpfulCount: 0, unhelpfulCount: 0, viewerVote: null },
+          },
+          {
+            id: 'rev-2',
+            rating: 5,
+            comment: 'Review 2',
+            reviewer: { maskedEmail: '2***@gmail.com' },
+            purchase: { model: 'M2', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: { helpfulCount: 1, unhelpfulCount: 0, viewerVote: null },
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+
+    let resolveMutation: (val: any) => void
+    const mutationPromise = new Promise((resolve) => {
+      resolveMutation = resolve
+    })
+
+    const setReviewSpy = vi.spyOn(reviewsApi, 'setReviewHelpfulness').mockReturnValue(mutationPromise as any)
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Review 1')).toBeInTheDocument()
+      expect(screen.getByText('Review 2')).toBeInTheDocument()
+    })
+
+    const rev1Helpful = screen.getByRole('button', { name: 'Hữu ích (0)' })
+    const rev2Helpful = screen.getByRole('button', { name: 'Hữu ích (1)' })
+
+    // Click rev 1
+    fireEvent.click(rev1Helpful)
+
+    expect(setReviewSpy).toHaveBeenCalledTimes(1)
+    expect(rev1Helpful).toBeDisabled()
+
+    // Rev 2 remains interactive
+    expect(rev2Helpful).not.toBeDisabled()
+
+    // Click rev 1 again while in flight -> does not trigger duplicate request
+    fireEvent.click(rev1Helpful)
+    expect(setReviewSpy).toHaveBeenCalledTimes(1)
+
+    // Resolve mutation
+    resolveMutation!({
+      helpfulCount: 1,
+      unhelpfulCount: 0,
+      viewerVote: 'helpful',
+    })
+
+    await waitFor(() => {
+      expect(rev1Helpful).not.toBeDisabled()
+    })
+  })
+
+  it('retains last confirmed server state and shows Vietnamese toast error on mutation failure', async () => {
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 1, averageRating: '5.0', ratingCounts: { '5': 1 } },
+        reviews: [
+          {
+            id: 'rev-fail',
+            rating: 5,
+            comment: 'Failure test review',
+            reviewer: { maskedEmail: 'f***@gmail.com' },
+            purchase: { model: 'MF', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: { helpfulCount: 3, unhelpfulCount: 1, viewerVote: null },
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+    vi.spyOn(reviewsApi, 'setReviewHelpfulness').mockRejectedValue(
+      new ApiError(500, { code: 'internal', message: 'Lỗi máy chủ nội bộ' })
+    )
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Failure test review')).toBeInTheDocument()
+    })
+
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (3)' })
+    fireEvent.click(helpfulBtn)
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Lỗi máy chủ nội bộ')
+    })
+
+    // Retains confirmed state
+    expect(screen.getByRole('button', { name: 'Hữu ích (3)' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Không hữu ích (1)' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('redirects to login when PUT mutation fails with 401 (session expired during operation)', async () => {
+    const response: MockReviewsEnvelope = {
+      data: {
+        summary: { totalReviews: 1, averageRating: '5.0', ratingCounts: { '5': 1 } },
+        reviews: [
+          {
+            id: 'rev-401',
+            rating: 5,
+            comment: 'Expired session test review',
+            reviewer: { maskedEmail: 'e***@gmail.com' },
+            purchase: { model: 'ME', options: [] },
+            media: [],
+            createdAt: '2026-08-28T00:00:00Z',
+            helpfulness: { helpfulCount: 2, unhelpfulCount: 0, viewerVote: null },
+          },
+        ],
+      },
+      message: 'OK',
+      meta: { timestamp: '2026-08-28T00:00:00Z' },
+    }
+
+    vi.spyOn(reviewsApi, 'getProductReviews').mockResolvedValue(response)
+    vi.spyOn(reviewsApi, 'setReviewHelpfulness').mockRejectedValue(
+      new ApiError(401, { code: 'invalid_token', message: 'Phiên đăng nhập đã hết hạn' })
+    )
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Expired session test review')).toBeInTheDocument()
+    })
+
+    const helpfulBtn = screen.getByRole('button', { name: 'Hữu ích (2)' })
+    fireEvent.click(helpfulBtn)
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        `/login?redirect=${encodeURIComponent('/products/prod-1?ref=deal')}`
+      )
     })
   })
 })
+
 

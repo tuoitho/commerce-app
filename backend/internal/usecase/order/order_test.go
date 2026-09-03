@@ -1259,7 +1259,7 @@ func (f *fakeReviewRepoForOrder) ListReviewsByOrderItemIDs(ctx context.Context, 
 func (f *fakeReviewRepoForOrder) GetReviewMediaByID(ctx context.Context, mediaID string) (*domain.ReviewMedia, error) {
 	return nil, nil
 }
-func (f *fakeReviewRepoForOrder) GetPublicReviewsByProductID(ctx context.Context, productID string, page, limit int) (*domain.ProductReviewsResult, error) {
+func (f *fakeReviewRepoForOrder) GetPublicReviewsByProductID(ctx context.Context, productID string, viewerUserID *string, page, limit int) (*domain.ProductReviewsResult, error) {
 	return nil, nil
 }
 func (f *fakeReviewRepoForOrder) GetUserReviews(ctx context.Context, userID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
@@ -1269,6 +1269,12 @@ func (f *fakeReviewRepoForOrder) GetAdminReviews(ctx context.Context, ratingFilt
 	return nil, nil
 }
 func (f *fakeReviewRepoForOrder) UpdateAdminReply(ctx context.Context, reviewID string, reply *string) (*domain.Review, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForOrder) SetReviewReplyVote(ctx context.Context, replyID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {
 	return nil, nil
 }
 

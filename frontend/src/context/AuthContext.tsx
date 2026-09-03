@@ -17,9 +17,26 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [user, setUser] = useState<User | null>(() => {
+    const token = tokenStore.getToken()
+    if (!token) return null
+    return tokenStore.getUser()
+  })
+  const [accessToken, setAccessToken] = useState<string | null>(() => tokenStore.getToken())
+  const [isLoading, setIsLoading] = useState<boolean>(() => Boolean(tokenStore.getToken()))
+
+  // Subscribe to token changes across the application in the same tab
+  useEffect(() => {
+    const unsubscribe = tokenStore.subscribe((token) => {
+      if (!token) {
+        setUser(null)
+        setAccessToken(null)
+      } else {
+        setAccessToken(token)
+      }
+    })
+    return unsubscribe
+  }, [])
 
   // Restore session from localStorage on initial app load
   useEffect(() => {
@@ -40,9 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isMounted) {
           if (currentUser && currentUser.role !== 'admin') {
             setUser(currentUser)
+            tokenStore.setUser(currentUser)
             setAccessToken(existingToken)
           } else {
             setUser(null)
+            tokenStore.setUser(null)
             setAccessToken(null)
             tokenStore.clearToken()
           }
@@ -54,10 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (isMounted) {
             if (session?.user && session.user.role !== 'admin') {
               setUser(session.user)
+              tokenStore.setUser(session.user)
               setAccessToken(session.accessToken)
               tokenStore.setToken(session.accessToken)
             } else {
               setUser(null)
+              tokenStore.setUser(null)
               setAccessToken(null)
               tokenStore.clearToken()
             }
@@ -65,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           if (isMounted) {
             setUser(null)
+            tokenStore.setUser(null)
             setAccessToken(null)
             tokenStore.clearToken()
           }
@@ -94,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
     }
     setUser(session.user)
+    tokenStore.setUser(session.user)
     setAccessToken(session.accessToken)
     tokenStore.setToken(session.accessToken)
   }, [])
@@ -110,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
     }
     setUser(session.user)
+    tokenStore.setUser(session.user)
     setAccessToken(session.accessToken)
     tokenStore.setToken(session.accessToken)
   }, [])
@@ -119,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout()
     } finally {
       setUser(null)
+      tokenStore.setUser(null)
       setAccessToken(null)
       tokenStore.clearToken()
     }

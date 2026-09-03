@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
   skipAuthRefresh?: boolean
+  retryWithoutAuthOnRefreshFailure?: boolean
 }
 
 export interface ApiResponseWithMeta<T> {
@@ -53,7 +54,7 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 export async function fetchEnvelope<T>(path: string, options: RequestOptions = {}): Promise<ApiResponseEnvelope<T>> {
-  const { body, headers = {}, skipAuthRefresh = false, ...rest } = options
+  const { body, headers = {}, skipAuthRefresh = false, retryWithoutAuthOnRefreshFailure = false, ...rest } = options
 
   const formattedPath = path.startsWith('/') ? path : `/${path}`
   const url = `${BASE_URL}${formattedPath}`
@@ -90,11 +91,16 @@ export async function fetchEnvelope<T>(path: string, options: RequestOptions = {
   if (response.status === 401 && !skipAuthRefresh && !isAuthRoute) {
     const newToken = await refreshAccessToken()
     if (newToken) {
-      requestHeaders['Authorization'] = `Bearer ${newToken}`
-      fetchOptions.headers = requestHeaders
-      response = await fetch(url, fetchOptions)
+      const retryHeaders = { ...requestHeaders, Authorization: `Bearer ${newToken}` }
+      response = await fetch(url, { ...fetchOptions, headers: retryHeaders })
+    } else if (retryWithoutAuthOnRefreshFailure) {
+      const retryHeaders = { ...requestHeaders }
+      delete retryHeaders['Authorization']
+      response = await fetch(url, { ...fetchOptions, headers: retryHeaders })
     }
   }
+
+
 
   if (response.status === 204) {
     return {

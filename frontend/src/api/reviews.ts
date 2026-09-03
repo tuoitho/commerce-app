@@ -5,6 +5,8 @@ import type {
   Review,
   ProductReviewsResponse,
   UserReviewsResponse,
+  HelpfulnessVote,
+  HelpfulnessState,
 } from './types'
 
 export async function createOrderItemReview(
@@ -84,7 +86,29 @@ export async function getProductReviews(
   const queryString = searchParams.toString()
   const path = `/products/${productId}/reviews${queryString ? `?${queryString}` : ''}`
 
-  return apiClientWithMeta<ProductReviewsResponse>(path)
+  return apiClientWithMeta<ProductReviewsResponse>(path, {
+    retryWithoutAuthOnRefreshFailure: true,
+  })
+}
+
+export async function setReviewHelpfulness(
+  reviewId: string,
+  vote: HelpfulnessVote | null
+): Promise<HelpfulnessState> {
+  return apiClient<HelpfulnessState>(`/reviews/${reviewId}/helpfulness`, {
+    method: 'PUT',
+    body: { vote },
+  })
+}
+
+export async function setReplyHelpfulness(
+  replyId: string,
+  vote: HelpfulnessVote | null
+): Promise<HelpfulnessState> {
+  return apiClient<HelpfulnessState>(`/review-replies/${replyId}/helpfulness`, {
+    method: 'PUT',
+    body: { vote },
+  })
 }
 
 export async function getUserReviews(
@@ -106,3 +130,4 @@ export async function getUserReviews(
 
   return apiClientWithMeta<UserReviewsResponse>(path)
 }
+

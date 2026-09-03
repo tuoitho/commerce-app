@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security/jwt"
 	addressuc "commerce-backend/internal/usecase/address"
 	areauc "commerce-backend/internal/usecase/area"
@@ -59,6 +60,13 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	reviews.Use(guard.AuthRequired)
 	{
 		reviews.GET("/me", reviewHandler.getUserReviews)
+		reviews.PUT("/:reviewId/helpfulness", guard.RequireRole(domain.RoleCustomer), reviewHandler.setReviewHelpfulness)
+	}
+
+	reviewReplies := api.Group("/review-replies")
+	reviewReplies.Use(guard.AuthRequired, guard.RequireRole(domain.RoleCustomer))
+	{
+		reviewReplies.PUT("/:replyId/helpfulness", reviewHandler.setReplyHelpfulness)
 	}
 
 	catalogHandler := newCatalogHandler(deps.Catalog)
@@ -69,7 +77,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		products.GET("", catalogHandler.ListProducts)
 		products.GET("/featured", catalogHandler.ListFeaturedProducts)
 		products.GET("/:id", catalogHandler.GetProduct)
-		products.GET("/:id/reviews", reviewHandler.getPublicReviews)
+		products.GET("/:id/reviews", guard.OptionalAuth, reviewHandler.getPublicReviews)
 	}
 
 	areaHandler := newAreaHandler(deps.Area)
