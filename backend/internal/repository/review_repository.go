@@ -482,9 +482,10 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 	}
 
 	reviewRows, err := q.ListProductReviews(ctx, sqlc.ListProductReviewsParams{
-		ProductID:   productID,
-		LimitCount:  int32(limit),
-		OffsetCount: int32(offset),
+		CurrentUserID: currentUserID,
+		ProductID:     productID,
+		LimitCount:    int32(limit),
+		OffsetCount:   int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -541,16 +542,24 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 		}
 
 		var viewer *domain.ReviewViewerState
-		if currentUserID != "" && currentUserID == row.UserID {
-			canEdit := editedAt == nil
+		if currentUserID != "" {
+			isOwner := currentUserID == row.UserID
+			canEdit := isOwner && editedAt == nil
 			remainingEdits := 0
 			if canEdit {
 				remainingEdits = 1
 			}
+			var userVote *string
+			if row.ViewerVote != "" {
+				v := row.ViewerVote
+				userVote = &v
+			}
 			viewer = &domain.ReviewViewerState{
-				IsOwner:        true,
+				IsOwner:        isOwner,
 				CanEdit:        canEdit,
 				RemainingEdits: remainingEdits,
+				CanVote:        true,
+				Vote:           userVote,
 			}
 		}
 
@@ -570,6 +579,8 @@ func (r *ReviewRepository) GetProductReviews(ctx context.Context, productID stri
 			EditedAt:         editedAt,
 			Viewer:           viewer,
 			Response:         storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time),
+			HelpfulCount:     row.HelpfulCount,
+			UnhelpfulCount:   row.UnhelpfulCount,
 		}
 	}
 
@@ -825,13 +836,25 @@ func (r *ReviewRepository) UpdateReviewResponse(ctx context.Context, reviewID, a
 	return &domain.AdminStoreReviewResponse{StoreReviewResponse: domain.StoreReviewResponse{Content: row.Content, AuthorLabel: domain.StoreResponseAuthorLabel, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Version: int(row.Version)}, nil
 }
 
-func (r *ReviewRepository) ListAdminReviews(ctx context.Context, page, limit int) ([]domain.AdminReviewItem, int64, error) {
+func (r *ReviewRepository) ListAdminReviews(ctx context.Context, page, limit int, sort, productID, search string) ([]domain.AdminReviewItem, int64, error) {
+	if r.db == nil {
+		return []domain.AdminReviewItem{}, 0, nil
+	}
 	q := sqlc.New(r.db)
-	total, err := q.CountAdminReviews(ctx)
+	total, err := q.CountAdminReviewsFiltered(ctx, sqlc.CountAdminReviewsFilteredParams{
+		ProductID: productID,
+		Search:    search,
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.ListAdminReviews(ctx, sqlc.ListAdminReviewsParams{LimitCount: int32(limit), OffsetCount: int32((page - 1) * limit)})
+	rows, err := q.ListAdminReviews(ctx, sqlc.ListAdminReviewsParams{
+		ProductID:   productID,
+		Search:      search,
+		SortBy:      sort,
+		LimitCount:  int32(limit),
+		OffsetCount: int32((page - 1) * limit),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -871,9 +894,122 @@ func (r *ReviewRepository) ListAdminReviews(ctx context.Context, page, limit int
 			media = []domain.ReviewMedia{}
 		}
 		items[i] = domain.AdminReviewItem{
-			Review:  domain.Review{ID: row.ID, OrderItemID: row.OrderItemID, ProductID: row.ProductID, VariantID: row.VariantID, PurchasedOptions: options, Rating: int(row.Rating), Comment: row.Comment, Media: media, VerifiedPurchase: true, AuthorLabel: domain.DefaultAuthorLabel, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Viewer: nil, Response: storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time)},
-			Product: domain.ReviewHistoryProduct{ID: row.ProductID, Name: row.PurchasedProductName, PublicPath: publicPath}, ResponseVersion: version,
+			Review: domain.Review{
+				ID:               row.ID,
+				OrderItemID:      row.OrderItemID,
+				ProductID:        row.ProductID,
+				VariantID:        row.VariantID,
+				PurchasedOptions: options,
+				Rating:           int(row.Rating),
+				Comment:          row.Comment,
+				Media:            media,
+				VerifiedPurchase: true,
+				AuthorLabel:      domain.DefaultAuthorLabel,
+				CreatedAt:        row.CreatedAt,
+				UpdatedAt:        row.UpdatedAt,
+				Viewer:           nil,
+				Response:         storeResponse(row.ResponseContent.String, row.ResponseContent.Valid, row.ResponseCreatedAt.Time, row.ResponseUpdatedAt.Time),
+				HelpfulCount:     row.HelpfulCount,
+				UnhelpfulCount:   row.UnhelpfulCount,
+			},
+			Product:         domain.ReviewHistoryProduct{ID: row.ProductID, Name: row.PurchasedProductName, PublicPath: publicPath},
+			ResponseVersion: version,
 		}
 	}
 	return items, total, nil
+}
+
+func (r *ReviewRepository) VoteReview(ctx context.Context, reviewID, userID string, isHelpful bool) (*domain.ReviewVoteResult, error) {
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	q := sqlc.New(r.db)
+	exists, err := q.ReviewExists(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, domain.ErrReviewNotFound
+	}
+
+	if err := q.UpsertReviewVote(ctx, sqlc.UpsertReviewVoteParams{
+		ReviewID:  reviewID,
+		UserID:    userID,
+		IsHelpful: isHelpful,
+	}); err != nil {
+		return nil, err
+	}
+
+	stats, err := q.GetReviewVoteStats(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+
+	viewerVote := "unhelpful"
+	if isHelpful {
+		viewerVote = "helpful"
+	}
+
+	return &domain.ReviewVoteResult{
+		ReviewID:       reviewID,
+		HelpfulCount:   stats.HelpfulCount,
+		UnhelpfulCount: stats.UnhelpfulCount,
+		ViewerVote:     &viewerVote,
+	}, nil
+}
+
+func (r *ReviewRepository) UnvoteReview(ctx context.Context, reviewID, userID string) (*domain.ReviewVoteResult, error) {
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	q := sqlc.New(r.db)
+	exists, err := q.ReviewExists(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, domain.ErrReviewNotFound
+	}
+
+	if err := q.DeleteReviewVote(ctx, sqlc.DeleteReviewVoteParams{
+		ReviewID: reviewID,
+		UserID:   userID,
+	}); err != nil {
+		return nil, err
+	}
+
+	stats, err := q.GetReviewVoteStats(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.ReviewVoteResult{
+		ReviewID:       reviewID,
+		HelpfulCount:   stats.HelpfulCount,
+		UnhelpfulCount: stats.UnhelpfulCount,
+		ViewerVote:     nil,
+	}, nil
+}
+
+func (r *ReviewRepository) GetAdminReviewStats(ctx context.Context) (*domain.AdminReviewStats, error) {
+	if r.db == nil {
+		return &domain.AdminReviewStats{}, nil
+	}
+	q := sqlc.New(r.db)
+	row, err := q.GetAdminReviewStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.AdminReviewStats{
+		TotalReviews:    row.TotalReviews,
+		TotalHelpful:    row.TotalHelpful,
+		TotalUnhelpful:  row.TotalUnhelpful,
+		UnansweredCount: row.UnansweredCount,
+	}, nil
 }

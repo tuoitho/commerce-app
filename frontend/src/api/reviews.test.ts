@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createOrderItemReview, editOwnedReview, getOwnedReview, listProductReviews, listOwnedReviews } from './reviews'
+import { createOrderItemReview, editOwnedReview, getOwnedReview, listProductReviews, listOwnedReviews, voteReview, unvoteReview } from './reviews'
 import { tokenStore } from './tokenStore'
 
 describe('Reviews API Client', () => {
@@ -183,5 +183,71 @@ describe('Reviews API Client', () => {
     }))
     expect(result.data).toEqual(mockOwnedList)
     expect(result.meta.pagination?.total).toBe(1)
+  })
+
+  it('voteReview sends PUT request with vote type and returns ReviewVoteResult', async () => {
+    tokenStore.setToken('test-token')
+    const mockVoteResult = {
+      reviewId: 'rev-1',
+      helpfulCount: 1,
+      unhelpfulCount: 0,
+      viewerVote: 'helpful',
+    }
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'Ghi nhận biểu quyết thành công',
+        data: mockVoteResult,
+        error: null,
+        meta: { timestamp: '2026-09-03T12:00:00Z' },
+      }),
+    } as unknown as Response)
+
+    const result = await voteReview('rev-1', 'helpful')
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/reviews/rev-1/vote', expect.objectContaining({
+      method: 'PUT',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-token',
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ vote: 'helpful' }),
+    }))
+    expect(result).toEqual(mockVoteResult)
+  })
+
+  it('unvoteReview sends DELETE request and returns ReviewVoteResult with null viewerVote', async () => {
+    tokenStore.setToken('test-token')
+    const mockUnvoteResult = {
+      reviewId: 'rev-1',
+      helpfulCount: 0,
+      unhelpfulCount: 0,
+      viewerVote: null,
+    }
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'Hủy biểu quyết thành công',
+        data: mockUnvoteResult,
+        error: null,
+        meta: { timestamp: '2026-09-03T12:00:00Z' },
+      }),
+    } as unknown as Response)
+
+    const result = await unvoteReview('rev-1')
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/reviews/rev-1/vote', expect.objectContaining({
+      method: 'DELETE',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-token',
+      }),
+    }))
+    expect(result).toEqual(mockUnvoteResult)
   })
 })

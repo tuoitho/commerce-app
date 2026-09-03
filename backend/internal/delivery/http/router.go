@@ -73,6 +73,8 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		reviews.GET("", reviewHandler.ListOwnedReviews)
 		reviews.GET("/:reviewId", reviewHandler.GetOwnedReview)
 		reviews.PUT("/:reviewId", reviewHandler.EditOwnedReview)
+		reviews.PUT("/:reviewId/vote", reviewHandler.VoteReview)
+		reviews.DELETE("/:reviewId/vote", reviewHandler.UnvoteReview)
 	}
 
 	favoriteHandler := newFavoriteHandler(deps.Favorites)
@@ -180,6 +182,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		c.Next()
 	})
 	{
+		adminReviews.GET("/stats", reviewHandler.GetAdminReviewStats)
 		adminReviews.GET("", reviewHandler.ListAdminReviews)
 		adminReviews.POST("/:reviewId/response", reviewHandler.CreateStoreResponse)
 		adminReviews.PUT("/:reviewId/response", reviewHandler.UpdateStoreResponse)

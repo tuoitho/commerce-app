@@ -54,9 +54,11 @@ type ReviewMedia struct {
 }
 
 type ReviewViewerState struct {
-	IsOwner        bool `json:"isOwner"`
-	CanEdit        bool `json:"canEdit"`
-	RemainingEdits int  `json:"remainingEdits"`
+	IsOwner        bool    `json:"isOwner"`
+	CanEdit        bool    `json:"canEdit"`
+	RemainingEdits int     `json:"remainingEdits"`
+	CanVote        bool    `json:"canVote"`
+	Vote           *string `json:"vote"`
 }
 
 type StoreReviewResponse struct {
@@ -88,6 +90,22 @@ type Review struct {
 	EditedAt         *time.Time           `json:"-"`
 	Viewer           *ReviewViewerState   `json:"viewer"`
 	Response         *StoreReviewResponse `json:"response"`
+	HelpfulCount     int64                `json:"helpfulCount"`
+	UnhelpfulCount   int64                `json:"unhelpfulCount"`
+}
+
+type ReviewVoteResult struct {
+	ReviewID       string  `json:"reviewId"`
+	HelpfulCount   int64   `json:"helpfulCount"`
+	UnhelpfulCount int64   `json:"unhelpfulCount"`
+	ViewerVote     *string `json:"viewerVote"`
+}
+
+type AdminReviewStats struct {
+	TotalReviews    int64 `json:"totalReviews"`
+	TotalHelpful    int64 `json:"totalHelpful"`
+	TotalUnhelpful  int64 `json:"totalUnhelpful"`
+	UnansweredCount int64 `json:"unansweredCount"`
 }
 
 type ReviewSummary struct {

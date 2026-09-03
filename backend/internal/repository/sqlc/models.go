@@ -184,6 +184,14 @@ type ReturnRequestItem struct {
 	Quantity        int64
 }
 
+type ReviewHelpfulVote struct {
+	ReviewID  string
+	UserID    string
+	IsHelpful bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type ReviewMedium struct {
 	ID        string
 	ReviewID  string

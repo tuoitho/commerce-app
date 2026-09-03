@@ -10,12 +10,17 @@ import {
   MessageSquare,
   Loader2,
   AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { ReviewFormModal } from '@/components/ReviewFormModal'
-import { listProductReviews } from '@/api/reviews'
-import type { Review, ReviewMedia, ReviewSummary, PaginationMeta } from '@/api/types'
+import { listProductReviews, voteReview, unvoteReview } from '@/api/reviews'
+import type { Review, ReviewMedia, ReviewSummary, PaginationMeta, ReviewVoteType } from '@/api/types'
+import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
+import { cn } from '@/lib/utils'
 
 export interface ProductReviewsSectionProps {
   productId: string
@@ -45,6 +50,98 @@ export function ProductReviewsSection({
 
   // Edit review modal state
   const [editingReview, setEditingReview] = useState<Review | null>(null)
+
+  // Auth and toast hooks for voting
+  const { isAuthenticated } = useAuth()
+  const { info, error: toastError } = useToast()
+  const [votingReviewId, setVotingReviewId] = useState<string | null>(null)
+
+  const handleVote = async (rev: Review, targetVote: ReviewVoteType) => {
+    if (!isAuthenticated) {
+      info('Vui lòng đăng nhập để đánh giá mức độ hữu ích', 'Bạn cần đăng nhập tài khoản để biểu quyết đánh giá này')
+      return
+    }
+
+    const prevReview = rev
+    const currentVote = rev.viewer?.vote ?? null
+    const isTogglingOff = currentVote === targetVote
+
+    let nextHelpful = rev.helpfulCount ?? 0
+    let nextUnhelpful = rev.unhelpfulCount ?? 0
+    let nextVote: ReviewVoteType | null = null
+
+    if (isTogglingOff) {
+      if (currentVote === 'helpful') nextHelpful = Math.max(0, nextHelpful - 1)
+      if (currentVote === 'unhelpful') nextUnhelpful = Math.max(0, nextUnhelpful - 1)
+      nextVote = null
+    } else {
+      if (currentVote === 'helpful') nextHelpful = Math.max(0, nextHelpful - 1)
+      if (currentVote === 'unhelpful') nextUnhelpful = Math.max(0, nextUnhelpful - 1)
+
+      if (targetVote === 'helpful') nextHelpful += 1
+      if (targetVote === 'unhelpful') nextUnhelpful += 1
+      nextVote = targetVote
+    }
+
+    // Optimistic update
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.id === rev.id
+          ? {
+              ...r,
+              helpfulCount: nextHelpful,
+              unhelpfulCount: nextUnhelpful,
+              viewer: r.viewer
+                ? { ...r.viewer, vote: nextVote, canVote: true }
+                : { isOwner: false, canEdit: false, remainingEdits: 0, canVote: true, vote: nextVote },
+            }
+          : r
+      )
+    )
+
+    setVotingReviewId(rev.id)
+    try {
+      if (isTogglingOff) {
+        const res = await unvoteReview(rev.id)
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.id === rev.id
+              ? {
+                  ...r,
+                  helpfulCount: res.helpfulCount,
+                  unhelpfulCount: res.unhelpfulCount,
+                  viewer: r.viewer
+                    ? { ...r.viewer, vote: res.viewerVote, canVote: true }
+                    : { isOwner: false, canEdit: false, remainingEdits: 0, canVote: true, vote: res.viewerVote },
+                }
+              : r
+          )
+        )
+      } else {
+        const res = await voteReview(rev.id, targetVote)
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.id === rev.id
+              ? {
+                  ...r,
+                  helpfulCount: res.helpfulCount,
+                  unhelpfulCount: res.unhelpfulCount,
+                  viewer: r.viewer
+                    ? { ...r.viewer, vote: res.viewerVote, canVote: true }
+                    : { isOwner: false, canEdit: false, remainingEdits: 0, canVote: true, vote: res.viewerVote },
+                }
+              : r
+          )
+        )
+      }
+    } catch {
+      // Rollback on error
+      setReviews((prev) => prev.map((r) => (r.id === rev.id ? prevReview : r)))
+      toastError('Không thể thực hiện biểu quyết', 'Vui lòng thử lại sau')
+    } finally {
+      setVotingReviewId(null)
+    }
+  }
 
   const fetchReviews = useCallback(
     async (page: number) => {
@@ -271,6 +368,60 @@ export function ProductReviewsSection({
                     ))}
                   </div>
                 )}
+
+                {/* Helpfulness Voting Controls */}
+                <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100/80">
+                  <span className="text-xs text-slate-500">Đánh giá này có hữu ích không?</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleVote(rev, 'helpful')}
+                      disabled={votingReviewId === rev.id}
+                      aria-label="Đánh dấu hữu ích"
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer disabled:opacity-50',
+                        rev.viewer?.vote === 'helpful'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-1 ring-emerald-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      )}
+                    >
+                      <ThumbsUp
+                        className={cn(
+                          'w-3.5 h-3.5',
+                          rev.viewer?.vote === 'helpful' ? 'fill-emerald-600 text-emerald-600' : 'text-slate-500'
+                        )}
+                      />
+                      <span>Hữu ích</span>
+                      {(rev.helpfulCount ?? 0) > 0 && (
+                        <span className="font-semibold text-emerald-800 ml-0.5">{rev.helpfulCount}</span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVote(rev, 'unhelpful')}
+                      disabled={votingReviewId === rev.id}
+                      aria-label="Đánh dấu không hữu ích"
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer disabled:opacity-50',
+                        rev.viewer?.vote === 'unhelpful'
+                          ? 'bg-rose-50 text-rose-700 border-rose-300 ring-1 ring-rose-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      )}
+                    >
+                      <ThumbsDown
+                        className={cn(
+                          'w-3.5 h-3.5',
+                          rev.viewer?.vote === 'unhelpful' ? 'fill-rose-600 text-rose-600' : 'text-slate-500'
+                        )}
+                      />
+                      <span>Không hữu ích</span>
+                      {(rev.unhelpfulCount ?? 0) > 0 && (
+                        <span className="font-semibold text-rose-800 ml-0.5">{rev.unhelpfulCount}</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

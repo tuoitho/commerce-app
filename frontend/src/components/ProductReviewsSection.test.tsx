@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ProductReviewsSection } from './ProductReviewsSection'
 import * as reviewsApi from '@/api/reviews'
 import type { Review } from '@/api/types'
+import * as authContext from '@/context/AuthContext'
+import * as toastContext from '@/context/ToastContext'
 
 describe('ProductReviewsSection', () => {
   beforeEach(() => {
@@ -199,5 +201,221 @@ describe('ProductReviewsSection', () => {
     expect(screen.getByText(literalContent)).toBeInTheDocument()
     expect(container.querySelector('img[src="x"]')).not.toBeInTheDocument()
     expect(screen.queryByText(/version|admin/i)).not.toBeInTheDocument()
+  })
+
+  it('displays helpfulCount and unhelpfulCount for guest without active votes (AC-VOTE-04-01)', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    const mockReview: Review = {
+      id: 'rev-vote-1',
+      productId: 'prod-1',
+      variantId: 'var-1',
+      purchasedOptions: [],
+      rating: 5,
+      comment: 'Review có 5 vote hữu ích, 1 vote không hữu ích',
+      media: [],
+      authorLabel: 'guest@example.com',
+      verifiedPurchase: true,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+      response: null,
+      helpfulCount: 5,
+      unhelpfulCount: 1,
+      viewer: null,
+    }
+
+    vi.spyOn(reviewsApi, 'listProductReviews').mockResolvedValueOnce({
+      data: [mockReview],
+      message: 'OK',
+      meta: {
+        timestamp: '2026-09-01T00:00:00Z',
+        pagination: { page: 1, limit: 5, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    expect(await screen.findByText('5')).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
+    const helpfulBtn = screen.getByRole('button', { name: 'Đánh dấu hữu ích' })
+    expect(helpfulBtn).not.toHaveClass('bg-emerald-50')
+  })
+
+  it('guest clicking vote button triggers login prompt without mutation (AC-VOTE-05-01)', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+    const infoSpy = vi.fn()
+    vi.spyOn(toastContext, 'useToast').mockReturnValue({
+      toast: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      info: infoSpy,
+    })
+    const voteSpy = vi.spyOn(reviewsApi, 'voteReview')
+
+    const mockReview: Review = {
+      id: 'rev-vote-guest',
+      productId: 'prod-1',
+      variantId: 'var-1',
+      purchasedOptions: [],
+      rating: 5,
+      comment: 'Review for guest vote click',
+      media: [],
+      authorLabel: 'guest@example.com',
+      verifiedPurchase: true,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+      response: null,
+      helpfulCount: 0,
+      unhelpfulCount: 0,
+      viewer: null,
+    }
+
+    vi.spyOn(reviewsApi, 'listProductReviews').mockResolvedValueOnce({
+      data: [mockReview],
+      message: 'OK',
+      meta: {
+        timestamp: '2026-09-01T00:00:00Z',
+        pagination: { page: 1, limit: 5, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    const helpfulBtn = await screen.findByRole('button', { name: /đánh dấu hữu ích/i })
+    fireEvent.click(helpfulBtn)
+
+    expect(infoSpy).toHaveBeenCalledWith('Vui lòng đăng nhập để đánh giá mức độ hữu ích', expect.any(String))
+    expect(voteSpy).not.toHaveBeenCalled()
+  })
+
+  it('logged-in user clicking selected button toggles off vote and calls unvoteReview (AC-VOTE-05-02)', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      user: { id: 'u-1', email: 'user@example.com', role: 'customer' },
+      accessToken: 'valid-token',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+    const unvoteSpy = vi.spyOn(reviewsApi, 'unvoteReview').mockResolvedValueOnce({
+      reviewId: 'rev-toggle',
+      helpfulCount: 2,
+      unhelpfulCount: 0,
+      viewerVote: null,
+    })
+
+    const mockReview: Review = {
+      id: 'rev-toggle',
+      productId: 'prod-1',
+      variantId: 'var-1',
+      purchasedOptions: [],
+      rating: 5,
+      comment: 'Review toggle unvote',
+      media: [],
+      authorLabel: 'author@example.com',
+      verifiedPurchase: true,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+      response: null,
+      helpfulCount: 3,
+      unhelpfulCount: 0,
+      viewer: { isOwner: false, canEdit: false, remainingEdits: 0, canVote: true, vote: 'helpful' },
+    }
+
+    vi.spyOn(reviewsApi, 'listProductReviews').mockResolvedValueOnce({
+      data: [mockReview],
+      message: 'OK',
+      meta: {
+        timestamp: '2026-09-01T00:00:00Z',
+        pagination: { page: 1, limit: 5, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    const helpfulBtn = await screen.findByRole('button', { name: /đánh dấu hữu ích/i })
+    expect(helpfulBtn).toHaveClass('bg-emerald-50')
+    expect(screen.getByText('3')).toBeInTheDocument()
+
+    // Click again to toggle off
+    fireEvent.click(helpfulBtn)
+
+    await waitFor(() => {
+      expect(unvoteSpy).toHaveBeenCalledWith('rev-toggle')
+      expect(screen.getByText('2')).toBeInTheDocument()
+      expect(helpfulBtn).not.toHaveClass('bg-emerald-50')
+    })
+  })
+
+  it('logged-in user clicking unselected button switches vote and calls voteReview (AC-VOTE-05-03)', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      user: { id: 'u-1', email: 'user@example.com', role: 'customer' },
+      accessToken: 'valid-token',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+    const voteSpy = vi.spyOn(reviewsApi, 'voteReview').mockResolvedValueOnce({
+      reviewId: 'rev-switch',
+      helpfulCount: 2,
+      unhelpfulCount: 2,
+      viewerVote: 'unhelpful',
+    })
+
+    const mockReview: Review = {
+      id: 'rev-switch',
+      productId: 'prod-1',
+      variantId: 'var-1',
+      purchasedOptions: [],
+      rating: 5,
+      comment: 'Review switch vote',
+      media: [],
+      authorLabel: 'author@example.com',
+      verifiedPurchase: true,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+      response: null,
+      helpfulCount: 3,
+      unhelpfulCount: 1,
+      viewer: { isOwner: false, canEdit: false, remainingEdits: 0, canVote: true, vote: 'helpful' },
+    }
+
+    vi.spyOn(reviewsApi, 'listProductReviews').mockResolvedValueOnce({
+      data: [mockReview],
+      message: 'OK',
+      meta: {
+        timestamp: '2026-09-01T00:00:00Z',
+        pagination: { page: 1, limit: 5, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+    })
+
+    render(<ProductReviewsSection productId="prod-1" />)
+
+    const unhelpfulBtn = await screen.findByRole('button', { name: /đánh dấu không hữu ích/i })
+    fireEvent.click(unhelpfulBtn)
+
+    await waitFor(() => {
+      expect(voteSpy).toHaveBeenCalledWith('rev-switch', 'unhelpful')
+      expect(unhelpfulBtn).toHaveClass('bg-rose-50')
+    })
   })
 })

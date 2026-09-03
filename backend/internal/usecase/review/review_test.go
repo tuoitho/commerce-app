@@ -100,4 +100,49 @@ func TestValidationErrors(t *testing.T) {
 		}
 		// Note: since repo is nil, let's test with mock or verify validation error structure
 	})
+
+	t.Run("VoteReview rejects invalid vote type", func(t *testing.T) {
+		_, err := uc.VoteReview(ctx, "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "invalid")
+		if err == nil {
+			t.Fatal("expected validation error for invalid vote type")
+		}
+	})
+
+	t.Run("VoteReview rejects invalid review UUID", func(t *testing.T) {
+		_, err := uc.VoteReview(ctx, "not-a-uuid", "22222222-2222-2222-2222-222222222222", "helpful")
+		if err == nil {
+			t.Fatal("expected validation error for invalid review UUID")
+		}
+	})
+
+	t.Run("UnvoteReview rejects invalid review UUID", func(t *testing.T) {
+		_, err := uc.UnvoteReview(ctx, "not-a-uuid", "22222222-2222-2222-2222-222222222222")
+		if err == nil {
+			t.Fatal("expected validation error for invalid review UUID")
+		}
+	})
+
+	t.Run("ListAdminReviews rejects invalid sort", func(t *testing.T) {
+		_, _, err := uc.ListAdminReviews(ctx, 1, 10, "invalid_sort", "", "")
+		if err == nil {
+			t.Fatal("expected validation error for invalid sort")
+		}
+	})
+
+	t.Run("ListAdminReviews rejects invalid product UUID", func(t *testing.T) {
+		_, _, err := uc.ListAdminReviews(ctx, 1, 10, "latest", "not-a-uuid", "")
+		if err == nil {
+			t.Fatal("expected validation error for invalid product UUID")
+		}
+	})
+
+	t.Run("GetAdminReviewStats with nil reviews returns empty stats", func(t *testing.T) {
+		stats, err := uc.GetAdminReviewStats(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if stats == nil || stats.TotalReviews != 0 {
+			t.Fatalf("expected empty stats, got %+v", stats)
+		}
+	})
 }

@@ -377,3 +377,141 @@ func TestReviewHandler_Rev4TypedValidationAndVietnameseAdminAuthMessages(t *test
 		})
 	}
 }
+
+func TestReviewHandler_VoteHelpfulness_AuthAndValidation(t *testing.T) {
+	jwtMgr := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+	customerToken, _ := jwtMgr.GenerateAccessToken("11111111-1111-1111-1111-111111111111", domain.RoleCustomer, 15*time.Minute)
+	adminToken, _ := jwtMgr.GenerateAccessToken("99999999-9999-9999-9999-999999999999", domain.RoleAdmin, 15*time.Minute)
+	engine := setupReviewTestEngine(reviewuc.New(reviewuc.Dependencies{Reviews: repository.NewReviewRepository(nil), Storage: storage.NewMemoryStorage("test-bucket")}), jwtMgr)
+
+	t.Run("Vote without auth returns 401", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPut, "/api/v1/reviews/22222222-2222-2222-2222-222222222222/vote", strings.NewReader(`{"vote":"helpful"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", w.Code)
+		}
+	})
+
+	t.Run("Vote with admin role returns 403", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPut, "/api/v1/reviews/22222222-2222-2222-2222-222222222222/vote", strings.NewReader(`{"vote":"helpful"}`))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want 403", w.Code)
+		}
+	})
+
+	t.Run("Vote with invalid reviewId returns 400", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPut, "/api/v1/reviews/invalid-uuid/vote", strings.NewReader(`{"vote":"helpful"}`))
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"reviewId":`) {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Vote with invalid vote type returns 400", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPut, "/api/v1/reviews/22222222-2222-2222-2222-222222222222/vote", strings.NewReader(`{"vote":"unknown"}`))
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"vote":`) {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Unvote without auth returns 401", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodDelete, "/api/v1/reviews/22222222-2222-2222-2222-222222222222/vote", nil)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", w.Code)
+		}
+	})
+
+	t.Run("Unvote with invalid reviewId returns 400", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodDelete, "/api/v1/reviews/invalid-uuid/vote", nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"reviewId":`) {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestReviewHandler_AdminStatsAndSort_AuthAndValidation(t *testing.T) {
+	jwtMgr := jwt.NewManager("super-secret-key-that-is-at-least-32-chars-long", "commerce-backend")
+	customerToken, _ := jwtMgr.GenerateAccessToken("11111111-1111-1111-1111-111111111111", domain.RoleCustomer, 15*time.Minute)
+	adminToken, _ := jwtMgr.GenerateAccessToken("99999999-9999-9999-9999-999999999999", domain.RoleAdmin, 15*time.Minute)
+	engine := setupReviewTestEngine(reviewuc.New(reviewuc.Dependencies{Reviews: repository.NewReviewRepository(nil), Storage: storage.NewMemoryStorage("test-bucket")}), jwtMgr)
+
+	t.Run("Admin stats without auth returns 401", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews/stats", nil)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", w.Code)
+		}
+	})
+
+	t.Run("Admin stats with customer token returns 403", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews/stats", nil)
+		req.Header.Set("Authorization", "Bearer "+customerToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want 403", w.Code)
+		}
+	})
+
+	t.Run("Admin stats with admin token returns 200 with stats structure", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews/stats", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200, body = %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"totalReviews":`) || !strings.Contains(w.Body.String(), `"totalHelpful":`) {
+			t.Fatalf("body missing metrics: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Admin reviews with invalid sort returns 400", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews?sort=invalid_sort", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"sort":`) {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Admin reviews with invalid productId returns 400", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews?productId=not-a-uuid", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"productId":`) {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Admin reviews with valid sort and productId returns 200", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/admin/reviews?sort=most_helpful&productId=33333333-3333-3333-3333-333333333333", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200, body = %s", w.Code, w.Body.String())
+		}
+	})
+}

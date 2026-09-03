@@ -80,12 +80,17 @@ SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        oi.options::text AS purchased_options,
        u.email AS author_email,
        rr.content AS response_content, rr.created_at AS response_created_at,
-       rr.updated_at AS response_updated_at
+       rr.updated_at AS response_updated_at,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count,
+       COALESCE(MAX(CASE WHEN @current_user_id::text != '' AND rhv.user_id = @current_user_id::uuid THEN (CASE WHEN rhv.is_helpful THEN 'helpful' ELSE 'unhelpful' END) ELSE NULL END), '')::text AS viewer_vote
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
 JOIN users u ON u.id = pr.user_id
 LEFT JOIN review_responses rr ON rr.review_id = pr.id
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id
 WHERE pr.product_id = @product_id
+GROUP BY pr.id, oi.options, u.email, rr.content, rr.created_at, rr.updated_at
 ORDER BY pr.updated_at DESC, pr.id DESC
 LIMIT @limit_count OFFSET @offset_count;
 
@@ -170,9 +175,58 @@ SELECT pr.id, pr.order_item_id, pr.product_id, pr.variant_id, pr.rating, pr.comm
              AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
        ) AS is_product_public,
        rr.content AS response_content, rr.created_at AS response_created_at,
-       rr.updated_at AS response_updated_at, rr.version AS response_version
+       rr.updated_at AS response_updated_at, rr.version AS response_version,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
 LEFT JOIN review_responses rr ON rr.review_id = pr.id
-ORDER BY pr.updated_at DESC, pr.id DESC
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id
+WHERE (@product_id::text = '' OR pr.product_id = @product_id::uuid)
+  AND (@search::text = '' OR oi.product_name ILIKE '%' || @search || '%')
+GROUP BY pr.id, oi.product_name, oi.options, rr.content, rr.created_at, rr.updated_at, rr.version
+ORDER BY
+    CASE WHEN @sort_by::text = 'most_helpful' THEN COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0) END DESC NULLS LAST,
+    CASE WHEN @sort_by::text = 'most_unhelpful' THEN COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0) END DESC NULLS LAST,
+    pr.updated_at DESC, pr.id DESC
 LIMIT @limit_count OFFSET @offset_count;
+
+-- name: CountAdminReviewsFiltered :one
+SELECT count(DISTINCT pr.id)::bigint
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+WHERE (@product_id::text = '' OR pr.product_id = @product_id::uuid)
+  AND (@search::text = '' OR oi.product_name ILIKE '%' || @search || '%');
+
+-- name: UpsertReviewVote :exec
+INSERT INTO review_helpful_votes (review_id, user_id, is_helpful, updated_at)
+VALUES (@review_id, @user_id, @is_helpful, now())
+ON CONFLICT (review_id, user_id)
+DO UPDATE SET is_helpful = EXCLUDED.is_helpful, updated_at = now();
+
+-- name: DeleteReviewVote :exec
+DELETE FROM review_helpful_votes
+WHERE review_id = @review_id AND user_id = @user_id;
+
+-- name: GetReviewVoteStats :one
+SELECT 
+    COALESCE(SUM(CASE WHEN is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+    COALESCE(SUM(CASE WHEN is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count
+FROM review_helpful_votes
+WHERE review_id = $1;
+
+-- name: GetReviewViewerVote :one
+SELECT 
+    CASE WHEN is_helpful THEN 'helpful' ELSE 'unhelpful' END AS vote
+FROM review_helpful_votes
+WHERE review_id = $1 AND user_id = $2;
+
+-- name: GetAdminReviewStats :one
+SELECT
+    count(DISTINCT pr.id)::bigint AS total_reviews,
+    COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS total_helpful,
+    COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS total_unhelpful,
+    count(DISTINCT pr.id) FILTER (WHERE rr.review_id IS NULL)::bigint AS unanswered_count
+FROM product_reviews pr
+LEFT JOIN review_responses rr ON rr.review_id = pr.id
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id;

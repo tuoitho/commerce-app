@@ -33,6 +33,15 @@ export interface AdminReview {
   updatedAt: string
   viewer: null
   response: StoreReviewResponse | null
+  helpfulCount?: number
+  unhelpfulCount?: number
+}
+
+export interface AdminReviewStats {
+  totalReviews: number
+  totalHelpful: number
+  totalUnhelpful: number
+  unansweredCount: number
 }
 
 export interface AdminReviewItem {
@@ -57,8 +66,29 @@ export interface UpdateStoreResponseInput extends StoreResponseInput {
   version: number
 }
 
-export function getAdminReviews(params: { page: number; limit: number }): Promise<ApiResponseWithMeta<AdminReviewItem[]>> {
+export interface GetAdminReviewsParams {
+  page: number
+  limit: number
+  sort?: 'latest' | 'most_helpful' | 'most_unhelpful'
+  productId?: string
+  search?: string
+}
+
+export function getAdminReviewStats(): Promise<AdminReviewStats> {
+  return apiClient<AdminReviewStats>('/admin/reviews/stats')
+}
+
+export function getAdminReviews(params: GetAdminReviewsParams): Promise<ApiResponseWithMeta<AdminReviewItem[]>> {
   const searchParams = new URLSearchParams({ page: String(params.page), limit: String(params.limit) })
+  if (params.sort) {
+    searchParams.set('sort', params.sort)
+  }
+  if (params.productId) {
+    searchParams.set('productId', params.productId)
+  }
+  if (params.search) {
+    searchParams.set('search', params.search)
+  }
   return apiClientWithMeta<AdminReviewItem[]>(`/admin/reviews?${searchParams}`)
 }
 

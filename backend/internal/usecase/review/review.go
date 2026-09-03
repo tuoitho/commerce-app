@@ -251,8 +251,58 @@ func (uc *UseCase) ListOwnedReviews(ctx context.Context, userID string, page, li
 	return uc.reviews.ListOwnerReviews(ctx, userID, page, limit)
 }
 
-func (uc *UseCase) ListAdminReviews(ctx context.Context, page, limit int) ([]domain.AdminReviewItem, int64, error) {
-	return uc.reviews.ListAdminReviews(ctx, page, limit)
+func (uc *UseCase) ListAdminReviews(ctx context.Context, page, limit int, sort, productID, search string) ([]domain.AdminReviewItem, int64, error) {
+	if sort == "" {
+		sort = "latest"
+	}
+	if sort != "latest" && sort != "most_helpful" && sort != "most_unhelpful" {
+		return nil, 0, domain.NewValidationError(map[string]string{"sort": "Giá trị sắp xếp không hợp lệ (latest, most_helpful, most_unhelpful)"})
+	}
+	if productID != "" {
+		if _, err := uuid.Parse(productID); err != nil {
+			return nil, 0, domain.NewValidationError(map[string]string{"productId": "Mã sản phẩm không hợp lệ"})
+		}
+	}
+	if uc == nil || uc.reviews == nil {
+		return []domain.AdminReviewItem{}, 0, nil
+	}
+	return uc.reviews.ListAdminReviews(ctx, page, limit, sort, productID, search)
+}
+
+func (uc *UseCase) VoteReview(ctx context.Context, reviewID, userID, voteType string) (*domain.ReviewVoteResult, error) {
+	if uc == nil || uc.reviews == nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.NewValidationError(map[string]string{"reviewId": "Mã đánh giá không hợp lệ"})
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if voteType != "helpful" && voteType != "unhelpful" {
+		return nil, domain.NewValidationError(map[string]string{"vote": "Loại biểu quyết phải là 'helpful' hoặc 'unhelpful'"})
+	}
+	return uc.reviews.VoteReview(ctx, reviewID, userID, voteType == "helpful")
+}
+
+func (uc *UseCase) UnvoteReview(ctx context.Context, reviewID, userID string) (*domain.ReviewVoteResult, error) {
+	if uc == nil || uc.reviews == nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	if _, err := uuid.Parse(reviewID); err != nil {
+		return nil, domain.NewValidationError(map[string]string{"reviewId": "Mã đánh giá không hợp lệ"})
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrReviewNotFound
+	}
+	return uc.reviews.UnvoteReview(ctx, reviewID, userID)
+}
+
+func (uc *UseCase) GetAdminReviewStats(ctx context.Context) (*domain.AdminReviewStats, error) {
+	if uc == nil || uc.reviews == nil {
+		return &domain.AdminReviewStats{}, nil
+	}
+	return uc.reviews.GetAdminReviewStats(ctx)
 }
 
 func (uc *UseCase) CreateStoreResponse(ctx context.Context, reviewID, adminID, content string) (*domain.AdminStoreReviewResponse, error) {

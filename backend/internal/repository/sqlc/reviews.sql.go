@@ -23,6 +23,26 @@ func (q *Queries) CountAdminReviews(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const countAdminReviewsFiltered = `-- name: CountAdminReviewsFiltered :one
+SELECT count(DISTINCT pr.id)::bigint
+FROM product_reviews pr
+JOIN order_items oi ON oi.id = pr.order_item_id
+WHERE ($1::text = '' OR pr.product_id = $1::uuid)
+  AND ($2::text = '' OR oi.product_name ILIKE '%' || $2 || '%')
+`
+
+type CountAdminReviewsFilteredParams struct {
+	ProductID string
+	Search    string
+}
+
+func (q *Queries) CountAdminReviewsFiltered(ctx context.Context, arg CountAdminReviewsFilteredParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminReviewsFiltered, arg.ProductID, arg.Search)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countOwnerReviews = `-- name: CountOwnerReviews :one
 SELECT count(*)::bigint AS count
 FROM product_reviews
@@ -67,6 +87,51 @@ WHERE review_id = $1
 func (q *Queries) DeleteReviewMediaByReviewID(ctx context.Context, reviewID string) error {
 	_, err := q.db.Exec(ctx, deleteReviewMediaByReviewID, reviewID)
 	return err
+}
+
+const deleteReviewVote = `-- name: DeleteReviewVote :exec
+DELETE FROM review_helpful_votes
+WHERE review_id = $1 AND user_id = $2
+`
+
+type DeleteReviewVoteParams struct {
+	ReviewID string
+	UserID   string
+}
+
+func (q *Queries) DeleteReviewVote(ctx context.Context, arg DeleteReviewVoteParams) error {
+	_, err := q.db.Exec(ctx, deleteReviewVote, arg.ReviewID, arg.UserID)
+	return err
+}
+
+const getAdminReviewStats = `-- name: GetAdminReviewStats :one
+SELECT
+    count(DISTINCT pr.id)::bigint AS total_reviews,
+    COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS total_helpful,
+    COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS total_unhelpful,
+    count(DISTINCT pr.id) FILTER (WHERE rr.review_id IS NULL)::bigint AS unanswered_count
+FROM product_reviews pr
+LEFT JOIN review_responses rr ON rr.review_id = pr.id
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id
+`
+
+type GetAdminReviewStatsRow struct {
+	TotalReviews    int64
+	TotalHelpful    int64
+	TotalUnhelpful  int64
+	UnansweredCount int64
+}
+
+func (q *Queries) GetAdminReviewStats(ctx context.Context) (GetAdminReviewStatsRow, error) {
+	row := q.db.QueryRow(ctx, getAdminReviewStats)
+	var i GetAdminReviewStatsRow
+	err := row.Scan(
+		&i.TotalReviews,
+		&i.TotalHelpful,
+		&i.TotalUnhelpful,
+		&i.UnansweredCount,
+	)
+	return i, err
 }
 
 const getProductReviewSummary = `-- name: GetProductReviewSummary :one
@@ -185,6 +250,45 @@ func (q *Queries) GetReviewResponse(ctx context.Context, reviewID string) (GetRe
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getReviewViewerVote = `-- name: GetReviewViewerVote :one
+SELECT 
+    CASE WHEN is_helpful THEN 'helpful' ELSE 'unhelpful' END AS vote
+FROM review_helpful_votes
+WHERE review_id = $1 AND user_id = $2
+`
+
+type GetReviewViewerVoteParams struct {
+	ReviewID string
+	UserID   string
+}
+
+func (q *Queries) GetReviewViewerVote(ctx context.Context, arg GetReviewViewerVoteParams) (string, error) {
+	row := q.db.QueryRow(ctx, getReviewViewerVote, arg.ReviewID, arg.UserID)
+	var vote string
+	err := row.Scan(&vote)
+	return vote, err
+}
+
+const getReviewVoteStats = `-- name: GetReviewVoteStats :one
+SELECT 
+    COALESCE(SUM(CASE WHEN is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+    COALESCE(SUM(CASE WHEN is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count
+FROM review_helpful_votes
+WHERE review_id = $1
+`
+
+type GetReviewVoteStatsRow struct {
+	HelpfulCount   int64
+	UnhelpfulCount int64
+}
+
+func (q *Queries) GetReviewVoteStats(ctx context.Context, reviewID string) (GetReviewVoteStatsRow, error) {
+	row := q.db.QueryRow(ctx, getReviewVoteStats, reviewID)
+	var i GetReviewVoteStatsRow
+	err := row.Scan(&i.HelpfulCount, &i.UnhelpfulCount)
 	return i, err
 }
 
@@ -336,15 +440,27 @@ SELECT pr.id, pr.order_item_id, pr.product_id, pr.variant_id, pr.rating, pr.comm
              AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
        ) AS is_product_public,
        rr.content AS response_content, rr.created_at AS response_created_at,
-       rr.updated_at AS response_updated_at, rr.version AS response_version
+       rr.updated_at AS response_updated_at, rr.version AS response_version,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
 LEFT JOIN review_responses rr ON rr.review_id = pr.id
-ORDER BY pr.updated_at DESC, pr.id DESC
-LIMIT $2 OFFSET $1
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id
+WHERE ($1::text = '' OR pr.product_id = $1::uuid)
+  AND ($2::text = '' OR oi.product_name ILIKE '%' || $2 || '%')
+GROUP BY pr.id, oi.product_name, oi.options, rr.content, rr.created_at, rr.updated_at, rr.version
+ORDER BY
+    CASE WHEN $3::text = 'most_helpful' THEN COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0) END DESC NULLS LAST,
+    CASE WHEN $3::text = 'most_unhelpful' THEN COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0) END DESC NULLS LAST,
+    pr.updated_at DESC, pr.id DESC
+LIMIT $5 OFFSET $4
 `
 
 type ListAdminReviewsParams struct {
+	ProductID   string
+	Search      string
+	SortBy      string
 	OffsetCount int32
 	LimitCount  int32
 }
@@ -366,10 +482,18 @@ type ListAdminReviewsRow struct {
 	ResponseCreatedAt    pgtype.Timestamptz
 	ResponseUpdatedAt    pgtype.Timestamptz
 	ResponseVersion      pgtype.Int4
+	HelpfulCount         int64
+	UnhelpfulCount       int64
 }
 
 func (q *Queries) ListAdminReviews(ctx context.Context, arg ListAdminReviewsParams) ([]ListAdminReviewsRow, error) {
-	rows, err := q.db.Query(ctx, listAdminReviews, arg.OffsetCount, arg.LimitCount)
+	rows, err := q.db.Query(ctx, listAdminReviews,
+		arg.ProductID,
+		arg.Search,
+		arg.SortBy,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -394,6 +518,8 @@ func (q *Queries) ListAdminReviews(ctx context.Context, arg ListAdminReviewsPara
 			&i.ResponseCreatedAt,
 			&i.ResponseUpdatedAt,
 			&i.ResponseVersion,
+			&i.HelpfulCount,
+			&i.UnhelpfulCount,
 		); err != nil {
 			return nil, err
 		}
@@ -519,20 +645,26 @@ SELECT pr.id, pr.order_item_id, pr.user_id, pr.product_id, pr.variant_id,
        oi.options::text AS purchased_options,
        u.email AS author_email,
        rr.content AS response_content, rr.created_at AS response_created_at,
-       rr.updated_at AS response_updated_at
+       rr.updated_at AS response_updated_at,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = true THEN 1 ELSE 0 END), 0)::bigint AS helpful_count,
+       COALESCE(SUM(CASE WHEN rhv.is_helpful = false THEN 1 ELSE 0 END), 0)::bigint AS unhelpful_count,
+       COALESCE(MAX(CASE WHEN $1::text != '' AND rhv.user_id = $1::uuid THEN (CASE WHEN rhv.is_helpful THEN 'helpful' ELSE 'unhelpful' END) ELSE NULL END), '')::text AS viewer_vote
 FROM product_reviews pr
 JOIN order_items oi ON oi.id = pr.order_item_id
 JOIN users u ON u.id = pr.user_id
 LEFT JOIN review_responses rr ON rr.review_id = pr.id
-WHERE pr.product_id = $1
+LEFT JOIN review_helpful_votes rhv ON rhv.review_id = pr.id
+WHERE pr.product_id = $2
+GROUP BY pr.id, oi.options, u.email, rr.content, rr.created_at, rr.updated_at
 ORDER BY pr.updated_at DESC, pr.id DESC
-LIMIT $3 OFFSET $2
+LIMIT $4 OFFSET $3
 `
 
 type ListProductReviewsParams struct {
-	ProductID   string
-	OffsetCount int32
-	LimitCount  int32
+	CurrentUserID string
+	ProductID     string
+	OffsetCount   int32
+	LimitCount    int32
 }
 
 type ListProductReviewsRow struct {
@@ -551,10 +683,18 @@ type ListProductReviewsRow struct {
 	ResponseContent   pgtype.Text
 	ResponseCreatedAt pgtype.Timestamptz
 	ResponseUpdatedAt pgtype.Timestamptz
+	HelpfulCount      int64
+	UnhelpfulCount    int64
+	ViewerVote        string
 }
 
 func (q *Queries) ListProductReviews(ctx context.Context, arg ListProductReviewsParams) ([]ListProductReviewsRow, error) {
-	rows, err := q.db.Query(ctx, listProductReviews, arg.ProductID, arg.OffsetCount, arg.LimitCount)
+	rows, err := q.db.Query(ctx, listProductReviews,
+		arg.CurrentUserID,
+		arg.ProductID,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -578,6 +718,9 @@ func (q *Queries) ListProductReviews(ctx context.Context, arg ListProductReviews
 			&i.ResponseContent,
 			&i.ResponseCreatedAt,
 			&i.ResponseUpdatedAt,
+			&i.HelpfulCount,
+			&i.UnhelpfulCount,
+			&i.ViewerVote,
 		); err != nil {
 			return nil, err
 		}
@@ -783,4 +926,22 @@ func (q *Queries) UpdateReviewResponse(ctx context.Context, arg UpdateReviewResp
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const upsertReviewVote = `-- name: UpsertReviewVote :exec
+INSERT INTO review_helpful_votes (review_id, user_id, is_helpful, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (review_id, user_id)
+DO UPDATE SET is_helpful = EXCLUDED.is_helpful, updated_at = now()
+`
+
+type UpsertReviewVoteParams struct {
+	ReviewID  string
+	UserID    string
+	IsHelpful bool
+}
+
+func (q *Queries) UpsertReviewVote(ctx context.Context, arg UpsertReviewVoteParams) error {
+	_, err := q.db.Exec(ctx, upsertReviewVote, arg.ReviewID, arg.UserID, arg.IsHelpful)
+	return err
 }

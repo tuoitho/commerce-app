@@ -1,10 +1,24 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { AlertCircle, ChevronLeft, ChevronRight, MessageSquareText, RefreshCw, Star } from 'lucide-react'
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Filter,
+  MessageSquareText,
+  RefreshCw,
+  Search,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+} from 'lucide-react'
 import {
   createStoreResponse,
   getAdminReviews,
+  getAdminReviewStats,
   updateStoreResponse,
   type AdminReviewItem,
   type AdminStoreReviewResponse,
@@ -13,6 +27,8 @@ import { ApiError } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateTime } from '@/lib/utils'
 
@@ -22,8 +38,24 @@ export function ReviewsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10)
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1
-  const queryKey = ['admin-reviews', page, PAGE_LIMIT] as const
-  const query = useQuery({ queryKey, queryFn: () => getAdminReviews({ page, limit: PAGE_LIMIT }) })
+  const sort = (searchParams.get('sort') as 'latest' | 'most_helpful' | 'most_unhelpful') || 'latest'
+  const productId = searchParams.get('productId') || undefined
+  const search = searchParams.get('search') || undefined
+
+  const [searchInput, setSearchInput] = useState(search || '')
+
+  // Overview Metrics Stats Query
+  const statsQuery = useQuery({
+    queryKey: ['admin-review-stats'] as const,
+    queryFn: getAdminReviewStats,
+  })
+  const stats = statsQuery.data
+
+  const queryKey = ['admin-reviews', page, PAGE_LIMIT, sort, productId, search] as const
+  const query = useQuery({
+    queryKey,
+    queryFn: () => getAdminReviews({ page, limit: PAGE_LIMIT, sort, productId, search }),
+  })
   const reviews = query.data?.data ?? []
   const pagination = query.data?.meta.pagination
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1)
@@ -34,6 +66,51 @@ export function ReviewsPage() {
     setSearchParams(params)
   }
 
+  const handleSortChange = (newSort: 'latest' | 'most_helpful' | 'most_unhelpful') => {
+    const params = new URLSearchParams(searchParams)
+    if (newSort === 'latest') {
+      params.delete('sort')
+    } else {
+      params.set('sort', newSort)
+    }
+    params.set('page', '1')
+    setSearchParams(params)
+  }
+
+  const handleSearchSubmit = () => {
+    const params = new URLSearchParams(searchParams)
+    const trimmed = searchInput.trim()
+    if (trimmed) {
+      params.set('search', trimmed)
+    } else {
+      params.delete('search')
+    }
+    params.set('page', '1')
+    setSearchParams(params)
+  }
+
+  const handleFilterByProduct = (targetProductId?: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (targetProductId) {
+      params.set('productId', targetProductId)
+    } else {
+      params.delete('productId')
+    }
+    params.set('page', '1')
+    setSearchParams(params)
+  }
+
+  const handleClearFilters = () => {
+    setSearchInput('')
+    const params = new URLSearchParams()
+    setSearchParams(params)
+  }
+
+  const handleRefreshAll = () => {
+    statsQuery.refetch()
+    query.refetch()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -41,11 +118,121 @@ export function ReviewsPage() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Đánh giá khách hàng</h1>
           <p className="mt-1 text-sm text-slate-500">Đọc đánh giá và gửi một phản hồi chính thức từ cửa hàng.</p>
         </div>
-        <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />
+        <Button variant="outline" onClick={handleRefreshAll} disabled={query.isFetching || statsQuery.isFetching}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching || statsQuery.isFetching ? 'animate-spin' : ''}`} />
           Làm mới
         </Button>
       </div>
+
+      {/* Overview Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+              <MessageSquareText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Tổng đánh giá</p>
+              <p className="text-xl font-bold text-slate-900">{stats?.totalReviews ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+              <ThumbsUp className="h-5 w-5 fill-emerald-600 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Đánh giá hữu ích</p>
+              <p className="text-xl font-bold text-emerald-700">{stats?.totalHelpful ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+              <ThumbsDown className="h-5 w-5 fill-rose-600 text-rose-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Đánh giá không hữu ích</p>
+              <p className="text-xl font-bold text-rose-700">{stats?.totalUnhelpful ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Chưa phản hồi</p>
+              <p className="text-xl font-bold text-amber-700">{stats?.unansweredCount ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+        <div className="flex flex-1 items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Tìm theo tên sản phẩm..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSearchSubmit()
+              }}
+              className="pl-9 h-9"
+              aria-label="Tìm kiếm sản phẩm"
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={handleSearchSubmit} className="h-9">
+            Tìm kiếm
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="w-52">
+            <Select
+              value={sort}
+              onChange={(e) => handleSortChange(e.target.value as 'latest' | 'most_helpful' | 'most_unhelpful')}
+              className="h-9 text-xs"
+              aria-label="Sắp xếp đánh giá"
+            >
+              <option value="latest">Mới nhất</option>
+              <option value="most_helpful">Nhiều hữu ích nhất</option>
+              <option value="most_unhelpful">Nhiều không hữu ích nhất</option>
+            </Select>
+          </div>
+
+          {(productId || search || sort !== 'latest') && (
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-xs text-slate-500 hover:text-slate-700">
+              <X className="mr-1 h-3.5 w-3.5" />
+              Xóa lọc
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {productId && (
+        <div className="flex items-center gap-2 bg-blue-50/80 border border-blue-200 px-3.5 py-2 rounded-xl text-xs text-blue-800">
+          <Filter className="h-3.5 w-3.5 text-blue-600" />
+          <span>Đang lọc theo mã sản phẩm: <strong>{productId}</strong></span>
+          <button
+            type="button"
+            onClick={() => handleFilterByProduct(undefined)}
+            className="ml-auto text-blue-600 hover:text-blue-800 cursor-pointer font-semibold p-1"
+            aria-label="Bỏ lọc theo sản phẩm"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {query.isLoading ? (
         <StatusCard icon={<RefreshCw className="h-6 w-6 animate-spin" />} title="Đang tải danh sách đánh giá..." />
@@ -65,7 +252,16 @@ export function ReviewsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {reviews.map((item) => <ReviewCard key={item.review.id} item={item} queryKey={queryKey} onReload={query.refetch} />)}
+          {reviews.map((item) => (
+            <ReviewCard
+              key={item.review.id}
+              item={item}
+              queryKey={queryKey}
+              activeProductId={productId}
+              onFilterByProduct={handleFilterByProduct}
+              onReload={query.refetch}
+            />
+          ))}
         </div>
       )}
 
@@ -90,10 +286,14 @@ export function ReviewsPage() {
 function ReviewCard({
   item,
   queryKey,
+  activeProductId,
+  onFilterByProduct,
   onReload,
 }: {
   item: AdminReviewItem
   queryKey: readonly unknown[]
+  activeProductId?: string
+  onFilterByProduct: (productId?: string) => void
   onReload: () => Promise<{ isSuccess: boolean }>
 }) {
   const queryClient = useQueryClient()
@@ -171,6 +371,27 @@ function ReviewCard({
           <div className="flex flex-wrap items-center gap-2">
             <h2 id={`review-title-${item.review.id}`} className="font-semibold text-slate-900">{item.product.name}</h2>
             <Badge variant="secondary">Đã mua hàng</Badge>
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 font-normal text-xs">
+              <ThumbsUp className="h-3 w-3 fill-emerald-600 text-emerald-600" /> {item.review.helpfulCount ?? 0} hữu ích
+            </Badge>
+            <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 gap-1 font-normal text-xs">
+              <ThumbsDown className="h-3 w-3 fill-rose-600 text-rose-600" /> {item.review.unhelpfulCount ?? 0} không hữu ích
+            </Badge>
+            {item.product.id !== activeProductId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onFilterByProduct(item.product.id)}
+                className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <Filter className="mr-1 h-3 w-3" />
+                Lọc theo sản phẩm này
+              </Button>
+            ) : (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[11px]">
+                Đang lọc theo sản phẩm này
+              </Badge>
+            )}
           </div>
           <div className="mt-2 flex items-center gap-1" aria-label={`${item.review.rating} trên 5 sao`}>
             {Array.from({ length: 5 }, (_, index) => (

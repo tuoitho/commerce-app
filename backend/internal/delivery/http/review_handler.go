@@ -374,12 +374,109 @@ func (h *reviewHandler) ListOwnedReviews(c *gin.Context) {
 	})
 }
 
+type reviewVoteInput struct {
+	Vote string `json:"vote"`
+}
+
+func (h *reviewHandler) VoteReview(c *gin.Context) {
+	reviewID := c.Param("reviewId")
+	if _, err := uuid.Parse(reviewID); err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+			"reviewId": "Mã đánh giá không hợp lệ",
+		})
+		return
+	}
+
+	userID := c.GetString(contextUserKey)
+	if userID == "" {
+		respondError(c, 401, "unauthorized", "Vui lòng đăng nhập để thực hiện biểu quyết", nil)
+		return
+	}
+
+	var input reviewVoteInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+			"vote": "Loại biểu quyết phải là 'helpful' hoặc 'unhelpful'",
+		})
+		return
+	}
+
+	if input.Vote != "helpful" && input.Vote != "unhelpful" {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+			"vote": "Loại biểu quyết phải là 'helpful' hoặc 'unhelpful'",
+		})
+		return
+	}
+
+	res, err := h.uc.VoteReview(c.Request.Context(), reviewID, userID, input.Vote)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "Ghi nhận biểu quyết thành công", res)
+}
+
+func (h *reviewHandler) UnvoteReview(c *gin.Context) {
+	reviewID := c.Param("reviewId")
+	if _, err := uuid.Parse(reviewID); err != nil {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+			"reviewId": "Mã đánh giá không hợp lệ",
+		})
+		return
+	}
+
+	userID := c.GetString(contextUserKey)
+	if userID == "" {
+		respondError(c, 401, "unauthorized", "Vui lòng đăng nhập để thực hiện biểu quyết", nil)
+		return
+	}
+
+	res, err := h.uc.UnvoteReview(c.Request.Context(), reviewID, userID)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "Hủy biểu quyết thành công", res)
+}
+
+func (h *reviewHandler) GetAdminReviewStats(c *gin.Context) {
+	stats, err := h.uc.GetAdminReviewStats(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Thống kê đánh giá", stats)
+}
+
 func (h *reviewHandler) ListAdminReviews(c *gin.Context) {
 	page, limit, ok := parseReviewPagination(c)
 	if !ok {
 		return
 	}
-	items, total, err := h.uc.ListAdminReviews(c.Request.Context(), page, limit)
+
+	sort := c.DefaultQuery("sort", "latest")
+	if sort != "latest" && sort != "most_helpful" && sort != "most_unhelpful" {
+		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+			"sort": "Giá trị sắp xếp không hợp lệ (latest, most_helpful, most_unhelpful)",
+		})
+		return
+	}
+
+	productID := c.Query("productId")
+	if productID != "" {
+		if _, err := uuid.Parse(productID); err != nil {
+			respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", map[string]string{
+				"productId": "Mã sản phẩm không hợp lệ",
+			})
+			return
+		}
+	}
+
+	search := c.Query("search")
+
+	items, total, err := h.uc.ListAdminReviews(c.Request.Context(), page, limit, sort, productID, search)
 	if err != nil {
 		writeError(c, err)
 		return

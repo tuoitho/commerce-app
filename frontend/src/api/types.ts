@@ -356,10 +356,14 @@ export interface PurchasedOption {
   valueLabel: string
 }
 
+export type ReviewVoteType = 'helpful' | 'unhelpful'
+
 export interface ReviewViewerState {
   isOwner: boolean
   canEdit: boolean
   remainingEdits: number
+  canVote?: boolean
+  vote?: ReviewVoteType | null
 }
 
 export interface StoreReviewResponse {
@@ -384,6 +388,15 @@ export interface Review {
   updatedAt: string
   response: StoreReviewResponse | null
   viewer?: ReviewViewerState | null
+  helpfulCount?: number
+  unhelpfulCount?: number
+}
+
+export interface ReviewVoteResult {
+  reviewId: string
+  helpfulCount: number
+  unhelpfulCount: number
+  viewerVote: ReviewVoteType | null
 }
 
 export interface CreateReviewMediaItem {

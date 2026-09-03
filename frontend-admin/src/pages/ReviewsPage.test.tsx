@@ -11,6 +11,7 @@ import { ReviewsPage } from './ReviewsPage'
 
 vi.mock('@/api/reviews', () => ({
   getAdminReviews: vi.fn(),
+  getAdminReviewStats: vi.fn(),
   createStoreResponse: vi.fn(),
   updateStoreResponse: vi.fn(),
 }))
@@ -83,7 +84,15 @@ function renderPage(initialEntry = '/reviews') {
 }
 
 describe('ReviewsPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(reviewsApi.getAdminReviewStats).mockResolvedValue({
+      totalReviews: 10,
+      totalHelpful: 6,
+      totalUnhelpful: 2,
+      unansweredCount: 4,
+    })
+  })
 
   it('renders loading, empty, error retry and paginated collection states', async () => {
     let resolveList!: (value: ReturnType<typeof list>) => void
@@ -220,6 +229,67 @@ describe('ReviewsPage', () => {
     expect(input).toHaveValue('Bản nháp chưa đồng bộ')
     expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Tải trạng thái mới' })).toBeEnabled()
+  })
+
+  it('renders overview metrics cards (AC-VOTE-06-01)', async () => {
+    vi.mocked(reviewsApi.getAdminReviews).mockResolvedValue(list([]))
+    vi.mocked(reviewsApi.getAdminReviewStats).mockResolvedValue({
+      totalReviews: 42,
+      totalHelpful: 35,
+      totalUnhelpful: 7,
+      unansweredCount: 12,
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('42')).toBeInTheDocument()
+    expect(screen.getByText('35')).toBeInTheDocument()
+    expect(screen.getByText('7')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('Tổng đánh giá')).toBeInTheDocument()
+    expect(screen.getByText('Đánh giá hữu ích')).toBeInTheDocument()
+    expect(screen.getByText('Đánh giá không hữu ích')).toBeInTheDocument()
+    expect(screen.getByText('Chưa phản hồi')).toBeInTheDocument()
+  })
+
+  it('renders helpful and unhelpful badges on review cards (AC-VOTE-06-04)', async () => {
+    const itemWithVotes: AdminReviewItem = {
+      ...unresponded,
+      review: {
+        ...unresponded.review,
+        helpfulCount: 8,
+        unhelpfulCount: 3,
+      },
+    }
+    vi.mocked(reviewsApi.getAdminReviews).mockResolvedValue(list([itemWithVotes]))
+
+    renderPage()
+
+    expect(await screen.findByText(/8 hữu ích/i)).toBeInTheDocument()
+    expect(screen.getByText(/3 không hữu ích/i)).toBeInTheDocument()
+  })
+
+  it('filters reviews by product when filter button is clicked (AC-VOTE-06-03)', async () => {
+    vi.mocked(reviewsApi.getAdminReviews).mockResolvedValue(list([unresponded]))
+
+    renderPage()
+
+    const filterBtn = await screen.findByRole('button', { name: 'Lọc theo sản phẩm này' })
+    fireEvent.click(filterBtn)
+
+    expect(await screen.findByText(/Đang lọc theo mã sản phẩm:/i)).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('productId=product-1')
+  })
+
+  it('sorts reviews when sort dropdown changes (AC-VOTE-06-02)', async () => {
+    vi.mocked(reviewsApi.getAdminReviews).mockResolvedValue(list([unresponded]))
+
+    renderPage()
+
+    const sortSelect = await screen.findByLabelText('Sắp xếp đánh giá')
+    fireEvent.change(sortSelect, { target: { value: 'most_helpful' } })
+
+    expect(screen.getByTestId('location')).toHaveTextContent('sort=most_helpful')
   })
 })
 

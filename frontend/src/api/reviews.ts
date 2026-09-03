@@ -6,6 +6,8 @@ import type {
   CreateReviewMediaItem,
   EditReviewPayload,
   EditReviewMediaItem,
+  ReviewVoteType,
+  ReviewVoteResult,
 } from './types'
 
 export async function computeFileSHA256(file: File): Promise<string> {
@@ -115,5 +117,23 @@ export async function listOwnedReviews(
 ): Promise<ApiResponseWithMeta<OwnedReviewHistoryItem[]>> {
   return apiClientWithMeta<OwnedReviewHistoryItem[]>(`/reviews?page=${page}&limit=${limit}`, {
     method: 'GET',
+  })
+}
+
+export async function voteReview(
+  reviewId: string,
+  vote: ReviewVoteType
+): Promise<ReviewVoteResult> {
+  return apiClient<ReviewVoteResult>(`/reviews/${reviewId}/vote`, {
+    method: 'PUT',
+    body: { vote },
+  })
+}
+
+export async function unvoteReview(
+  reviewId: string
+): Promise<ReviewVoteResult> {
+  return apiClient<ReviewVoteResult>(`/reviews/${reviewId}/vote`, {
+    method: 'DELETE',
   })
 }

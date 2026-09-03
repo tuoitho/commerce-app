@@ -65,6 +65,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		"000011_product_favorites.up.sql",
 		"000012_product_reviews.up.sql",
 		"000013_review_responses.up.sql",
+		"000014_review_helpful_votes.up.sql",
 	} {
 		applyMigration(t, ctx, conn, migration)
 	}
@@ -246,7 +247,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 			t.Fatal("hidden-product owner response not retained")
 		}
 
-		adminItems, total, err := repo.ListAdminReviews(ctx, 1, 10)
+		adminItems, total, err := repo.ListAdminReviews(ctx, 1, 10, "latest", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -354,7 +355,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		if len(owned) != 1 || owned[0].Review.Response == nil || owned[0].Review.ID != revIntegReview3 || owned[0].Review.Viewer == nil || !owned[0].Review.Viewer.IsOwner || owned[0].Review.AuthorLabel != domain.DefaultAuthorLabel {
 			t.Fatalf("owner projection lost review fields: %+v", owned)
 		}
-		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10)
+		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10, "latest", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -412,7 +413,7 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 		if len(owned) != 1 || owned[0].Review.AuthorLabel != domain.DefaultAuthorLabel {
 			t.Fatalf("owned author label = %+v", owned)
 		}
-		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10)
+		adminItems, _, err := repo.ListAdminReviews(ctx, 1, 10, "latest", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -422,4 +423,191 @@ func TestReviewRepository_OwnerHistory_Integration(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestReviewRepository_HelpfulnessAndAdminSorting_Integration(t *testing.T) {
+	ctx := context.Background()
+	container, err := postgres.Run(ctx, "postgres:17.6-alpine", postgres.WithDatabase("commerce"), postgres.WithUsername("commerce"), postgres.WithPassword("commerce"))
+	if err != nil {
+		t.Fatalf("Docker/Testcontainers is required: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := testcontainers.TerminateContainer(container); err != nil {
+			t.Errorf("terminate container: %v", err)
+		}
+	})
+	dbURL, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := connectIntegrationDB(t, ctx, dbURL)
+	defer conn.Close(ctx)
+	for _, migration := range []string{
+		"000001_create_users.up.sql",
+		"000002_create_catalog.up.sql",
+		"000003_phone_variants_cart.up.sql",
+		"000004_int64_stock_quantity.up.sql",
+		"000005_add_user_roles.up.sql",
+		"000006_add_brand_to_products.up.sql",
+		"000007_soft_delete_variant_integrity.up.sql",
+		"000008_category_admin_index.up.sql",
+		"000009_order_placement.up.sql",
+		"000010_order_returns.up.sql",
+		"000011_product_favorites.up.sql",
+		"000012_product_reviews.up.sql",
+		"000013_review_responses.up.sql",
+		"000014_review_helpful_votes.up.sql",
+	} {
+		applyMigration(t, ctx, conn, migration)
+	}
+
+	if _, err := conn.Exec(ctx, `
+		INSERT INTO users (id, email, password_hash, role) VALUES
+		($1, 'user-a@example.com', 'hash', 'customer'),
+		($2, 'user-b@example.com', 'hash', 'customer'),
+		($3, 'admin@example.com', 'hash', 'admin');
+	`, revIntegUserA, revIntegUserB, revIntegAdmin); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := conn.Exec(ctx, `
+		INSERT INTO categories (id, name) VALUES ($1, 'Smartphones');
+		INSERT INTO products (id, category_id, name, description, price, currency, stock_quantity, active) VALUES
+		($2, $1, 'Active Phone 1', 'Description', 10000000, 'VND', 10, true),
+		($3, $1, 'Active Phone 2', 'Description', 12000000, 'VND', 10, true);
+		INSERT INTO product_variants (id, product_id, price_vnd, stock_quantity, active) VALUES
+		($4, $2, 10000000, 10, true),
+		($5, $3, 12000000, 10, true);
+	`, revIntegCategory, revIntegProduct1, revIntegProduct2, revIntegVariant1, revIntegVariant2); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := conn.Exec(ctx, `
+		INSERT INTO orders (id, user_id, status, subtotal_vnd, shipping_fee_vnd, total_vnd, recipient_name, phone, province_name, ward_name, detail_address) VALUES
+		($1, $2, 'delivered', 10000000, 0, 10000000, 'User A', '0900000001', 'Province', 'Ward', '123 Street'),
+		($3, $2, 'delivered', 12000000, 0, 12000000, 'User A', '0900000001', 'Province', 'Ward', '123 Street');
+		INSERT INTO order_items (id, order_id, variant_id, product_id, brand_name, product_name, options, unit_price_vnd, quantity, line_total_vnd) VALUES
+		($4, $1, $5, $6, 'Brand', 'Active Phone 1', '[]'::jsonb, 10000000, 1, 10000000),
+		($7, $3, $8, $9, 'Brand', 'Active Phone 2', '[]'::jsonb, 12000000, 1, 12000000);
+	`, revIntegOrder1, revIntegUserA, revIntegOrder2, revIntegItem1, revIntegVariant1, revIntegProduct1, revIntegItem2, revIntegVariant2, revIntegProduct2); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := conn.Exec(ctx, `
+		INSERT INTO product_reviews (id, order_item_id, user_id, product_id, variant_id, rating, comment) VALUES
+		($1, $2, $3, $4, $5, 5, 'Rất tốt'),
+		($6, $7, $3, $8, $9, 3, 'Bình thường');
+	`, revIntegReview1, revIntegItem1, revIntegUserA, revIntegProduct1, revIntegVariant1, revIntegReview2, revIntegItem2, revIntegProduct2, revIntegVariant2); err != nil {
+		t.Fatal(err)
+	}
+
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	repo := NewReviewRepository(pool)
+
+	// 1. Vote helpful by user B
+	res, err := repo.VoteReview(ctx, revIntegReview1, revIntegUserB, true)
+	if err != nil {
+		t.Fatalf("VoteReview failed: %v", err)
+	}
+	if res.HelpfulCount != 1 || res.UnhelpfulCount != 0 || res.ViewerVote == nil || *res.ViewerVote != "helpful" {
+		t.Fatalf("unexpected vote result: %+v", res)
+	}
+
+	// 2. Author self-vote (REQ-VOTE-03)
+	resAuthor, err := repo.VoteReview(ctx, revIntegReview1, revIntegUserA, true)
+	if err != nil {
+		t.Fatalf("author VoteReview failed: %v", err)
+	}
+	if resAuthor.HelpfulCount != 2 || resAuthor.UnhelpfulCount != 0 || resAuthor.ViewerVote == nil || *resAuthor.ViewerVote != "helpful" {
+		t.Fatalf("unexpected author vote result: %+v", resAuthor)
+	}
+
+	// 3. Switch vote: User B switches to unhelpful
+	resSwitch, err := repo.VoteReview(ctx, revIntegReview1, revIntegUserB, false)
+	if err != nil {
+		t.Fatalf("switch vote failed: %v", err)
+	}
+	if resSwitch.HelpfulCount != 1 || resSwitch.UnhelpfulCount != 1 || resSwitch.ViewerVote == nil || *resSwitch.ViewerVote != "unhelpful" {
+		t.Fatalf("unexpected switch vote result: %+v", resSwitch)
+	}
+
+	// 4. GetProductReviews with authenticated viewer
+	reviews, total, err := repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, revIntegUserB)
+	if err != nil {
+		t.Fatalf("GetProductReviews failed: %v", err)
+	}
+	if total != 1 || len(reviews) != 1 {
+		t.Fatalf("expected 1 review, got %d", total)
+	}
+	r1 := reviews[0]
+	if r1.HelpfulCount != 1 || r1.UnhelpfulCount != 1 {
+		t.Fatalf("expected 1 helpful and 1 unhelpful, got %d, %d", r1.HelpfulCount, r1.UnhelpfulCount)
+	}
+	if r1.Viewer == nil || !r1.Viewer.CanVote || r1.Viewer.Vote == nil || *r1.Viewer.Vote != "unhelpful" {
+		t.Fatalf("unexpected viewer state for user B: %+v", r1.Viewer)
+	}
+
+	// 5. GetProductReviews with guest viewer
+	guestReviews, _, err := repo.GetProductReviews(ctx, revIntegProduct1, 1, 10, "")
+	if err != nil {
+		t.Fatalf("guest GetProductReviews failed: %v", err)
+	}
+	if guestReviews[0].Viewer != nil {
+		t.Fatalf("expected nil viewer for guest, got %+v", guestReviews[0].Viewer)
+	}
+
+	// 6. Unvote
+	resUnvote, err := repo.UnvoteReview(ctx, revIntegReview1, revIntegUserB)
+	if err != nil {
+		t.Fatalf("UnvoteReview failed: %v", err)
+	}
+	if resUnvote.HelpfulCount != 1 || resUnvote.UnhelpfulCount != 0 || resUnvote.ViewerVote != nil {
+		t.Fatalf("unexpected unvote result: %+v", resUnvote)
+	}
+
+	// 7. Vote review 2 as unhelpful
+	_, err = repo.VoteReview(ctx, revIntegReview2, revIntegUserB, false)
+	if err != nil {
+		t.Fatalf("VoteReview review 2 failed: %v", err)
+	}
+
+	// 8. Admin review stats
+	stats, err := repo.GetAdminReviewStats(ctx)
+	if err != nil {
+		t.Fatalf("GetAdminReviewStats failed: %v", err)
+	}
+	if stats.TotalReviews != 2 || stats.TotalHelpful != 1 || stats.TotalUnhelpful != 1 || stats.UnansweredCount != 2 {
+		t.Fatalf("unexpected admin stats: %+v", stats)
+	}
+
+	// 9. ListAdminReviews sorted by most_helpful
+	adminHelpful, _, err := repo.ListAdminReviews(ctx, 1, 10, "most_helpful", "", "")
+	if err != nil {
+		t.Fatalf("ListAdminReviews most_helpful failed: %v", err)
+	}
+	if len(adminHelpful) != 2 || adminHelpful[0].Review.ID != revIntegReview1 {
+		t.Fatalf("expected review 1 first in most_helpful, got %+v", adminHelpful)
+	}
+
+	// 10. ListAdminReviews sorted by most_unhelpful
+	adminUnhelpful, _, err := repo.ListAdminReviews(ctx, 1, 10, "most_unhelpful", "", "")
+	if err != nil {
+		t.Fatalf("ListAdminReviews most_unhelpful failed: %v", err)
+	}
+	if len(adminUnhelpful) != 2 || adminUnhelpful[0].Review.ID != revIntegReview2 {
+		t.Fatalf("expected review 2 first in most_unhelpful, got %+v", adminUnhelpful)
+	}
+
+	// 11. ListAdminReviews filtered by product ID
+	filtered, totalFiltered, err := repo.ListAdminReviews(ctx, 1, 10, "latest", revIntegProduct1, "")
+	if err != nil {
+		t.Fatalf("ListAdminReviews filtered failed: %v", err)
+	}
+	if totalFiltered != 1 || len(filtered) != 1 || filtered[0].Review.ProductID != revIntegProduct1 {
+		t.Fatalf("expected only product 1 reviews, got %+v", filtered)
+	}
 }
