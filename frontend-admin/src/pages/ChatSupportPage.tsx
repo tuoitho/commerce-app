@@ -116,7 +116,10 @@ export function ChatSupportPage() {
 
     queryClient.setQueryData<AdminChatMessage[]>(
       ['admin-conversation-messages', conversationId],
-      (old = []) => [...old, newMsg]
+      (old = []) =>
+        old.some((m) => m.id === newMsg.id)
+          ? old.map((m) => (m.id === newMsg.id ? newMsg : m))
+          : [...old, newMsg]
     )
 
     queryClient.setQueriesData<AdminConversation[]>(
@@ -144,7 +147,10 @@ export function ChatSupportPage() {
           seenMessageIdsRef.current.add(newMsg.id)
           queryClient.setQueryData<AdminChatMessage[]>(
             ['admin-conversation-messages', conversationId],
-            (old = []) => (old.some((m) => m.id === newMsg.id) ? old : [...old, newMsg])
+            (old = []) =>
+              old.some((m) => m.id === newMsg.id)
+                ? old.map((m) => (m.id === newMsg.id ? newMsg : m))
+                : [...old, newMsg]
           )
         }
         queryClient.invalidateQueries({ queryKey: ['admin-conversation-messages', conversationId] })

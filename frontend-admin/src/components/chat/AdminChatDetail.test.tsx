@@ -183,4 +183,30 @@ describe('AdminChatDetail', () => {
     fireEvent.click(screen.getByText('Thử lại'))
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
+
+  it('deduplicates messages with duplicate IDs safely without repeating elements', () => {
+    const duplicateMessages = [
+      mockMessages[0],
+      { ...mockMessages[0] }, // exact duplicate ID
+      mockMessages[1],
+    ]
+
+    render(
+      <MemoryRouter>
+        <AdminChatDetail
+          conversation={mockConversation}
+          messages={duplicateMessages}
+          isLoadingMessages={false}
+          isErrorMessages={false}
+          onRetryMessages={vi.fn()}
+          onSendMessage={vi.fn()}
+          onMarkAsRead={vi.fn()}
+        />
+      </MemoryRouter>
+    )
+
+    // Should only render 1 instance of msg-1
+    const renderedMsg1 = screen.getAllByTestId('admin-chat-message-msg-1')
+    expect(renderedMsg1.length).toBe(1)
+  })
 })

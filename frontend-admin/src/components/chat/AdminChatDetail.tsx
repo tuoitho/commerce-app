@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type UIEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, type UIEvent } from 'react'
 import { Clock, User, Check, CheckCheck, Loader2, AlertCircle, ZoomIn } from 'lucide-react'
 import type { AdminConversation, AdminChatMessage } from '@/api/chat'
 import { getAuthenticatedAdminMediaUrl } from '@/api/chat'
@@ -31,13 +31,23 @@ export function AdminChatDetail({
   onMarkAsRead,
   token,
 }: AdminChatDetailProps) {
+  // Deduplicate messages by ID to ensure unique React keys even during concurrent updates
+  const uniqueMessages = useMemo(() => {
+    const seen = new Set<string>()
+    return messages.filter((msg) => {
+      if (!msg.id || seen.has(msg.id)) return false
+      seen.add(msg.id)
+      return true
+    })
+  }, [messages])
+
   const [activeImage, setActiveImage] = useState<string | null>(null)
   const [unreadNewCount, setUnreadNewCount] = useState(0)
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const isAtBottomRef = useRef(true)
-  const prevMessagesLengthRef = useRef(messages.length)
+  const prevMessagesLengthRef = useRef(uniqueMessages.length)
   const prevConversationIdRef = useRef(conversation.id)
 
   const scrollToBottom = (smooth = false) => {
@@ -62,15 +72,15 @@ export function AdminChatDetail({
       prevConversationIdRef.current = conversation.id
       setUnreadNewCount(0)
       isAtBottomRef.current = true
-      prevMessagesLengthRef.current = messages.length
+      prevMessagesLengthRef.current = uniqueMessages.length
       setTimeout(() => scrollToBottom(false), 50)
     }
-  }, [conversation.id, messages.length])
+  }, [conversation.id, uniqueMessages.length])
 
   // Handle new incoming messages
   useEffect(() => {
-    const diff = messages.length - prevMessagesLengthRef.current
-    prevMessagesLengthRef.current = messages.length
+    const diff = uniqueMessages.length - prevMessagesLengthRef.current
+    prevMessagesLengthRef.current = uniqueMessages.length
 
     if (diff > 0) {
       if (isAtBottomRef.current) {
@@ -80,7 +90,7 @@ export function AdminChatDetail({
         setUnreadNewCount((prev) => prev + diff)
       }
     }
-  }, [messages.length, onMarkAsRead])
+  }, [uniqueMessages.length, onMarkAsRead])
 
   // Scroll listener
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -171,7 +181,7 @@ export function AdminChatDetail({
               Thử lại
             </button>
           </div>
-        ) : messages.length === 0 ? (
+        ) : uniqueMessages.length === 0 ? (
           <div
             data-testid="admin-messages-empty"
             className="flex flex-col items-center justify-center h-48 text-center text-slate-400"
@@ -184,7 +194,7 @@ export function AdminChatDetail({
             </p>
           </div>
         ) : (
-          messages.map((msg) => {
+          uniqueMessages.map((msg) => {
             const isAdmin = msg.senderRole === 'admin'
             return (
               <div
