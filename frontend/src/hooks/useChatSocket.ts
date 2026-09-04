@@ -30,6 +30,39 @@ export interface UseChatSocketReturn {
   disconnect: () => void
 }
 
+function closeSocketSafely(ws: WebSocket | null, reason: string): void {
+  if (!ws) return
+  try {
+    const connectingState =
+      typeof WebSocket !== 'undefined' && WebSocket.CONNECTING !== undefined
+        ? WebSocket.CONNECTING
+        : 0
+    const openState =
+      typeof WebSocket !== 'undefined' && WebSocket.OPEN !== undefined
+        ? WebSocket.OPEN
+        : 1
+
+    if (ws.readyState === connectingState) {
+      // Detach listeners and defer closing until handshake is completed
+      // to avoid "WebSocket is closed before the connection is established" warning
+      ws.onmessage = null
+      ws.onerror = null
+      ws.onclose = null
+      ws.onopen = () => {
+        try {
+          ws.close(1000, reason)
+        } catch {
+          // Ignore close error
+        }
+      }
+    } else if (ws.readyState === openState) {
+      ws.close(1000, reason)
+    }
+  } catch {
+    // Ignore close error
+  }
+}
+
 export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocketReturn {
   const {
     token,
@@ -141,11 +174,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
 
     // Defensive cleanup of any existing connection before opening a new one
     if (socketRef.current) {
-      try {
-        socketRef.current.close(1000, 'Reconnecting with fresh socket')
-      } catch {
-        // Ignore close error
-      }
+      closeSocketSafely(socketRef.current, 'Reconnecting with fresh socket')
       socketRef.current = null
     }
 
@@ -255,11 +284,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
     manualCloseRef.current = true
     clearTimers()
     if (socketRef.current) {
-      try {
-        socketRef.current.close(1000, 'Manual disconnect')
-      } catch {
-        // Ignore close error
-      }
+      closeSocketSafely(socketRef.current, 'Manual disconnect')
       socketRef.current = null
     }
     setIsConnected(false)
@@ -279,11 +304,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
       manualCloseRef.current = true
       clearTimers()
       if (socketRef.current) {
-        try {
-          socketRef.current.close(1000, 'Component unmounted')
-        } catch {
-          // Ignore close error
-        }
+        closeSocketSafely(socketRef.current, 'Component unmounted')
         socketRef.current = null
       }
       setIsConnected(false)

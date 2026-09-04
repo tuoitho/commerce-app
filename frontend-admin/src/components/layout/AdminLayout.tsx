@@ -37,6 +37,7 @@ export function AdminLayout() {
     onNewMessage: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-conversations-unread-badge'] })
       queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-conversation-messages'] })
     },
     onMessagesRead: (payload) => {
       if (payload.readerRole === 'admin') {

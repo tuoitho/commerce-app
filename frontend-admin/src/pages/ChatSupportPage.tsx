@@ -76,6 +76,7 @@ export function ChatSupportPage() {
     queryKey: ['admin-conversation-messages', conversationId],
     queryFn: () => getAdminConversationMessages(conversationId!),
     enabled: Boolean(conversationId),
+    refetchInterval: 5000,
   })
 
   // Seen messages deduplication
@@ -138,12 +139,15 @@ export function ChatSupportPage() {
     onNewMessage: (newMsg) => {
       const isCurrent = newMsg.conversationId === conversationId
 
-      if (isCurrent && !seenMessageIdsRef.current.has(newMsg.id)) {
-        seenMessageIdsRef.current.add(newMsg.id)
-        queryClient.setQueryData<AdminChatMessage[]>(
-          ['admin-conversation-messages', conversationId],
-          (old = []) => [...old, newMsg]
-        )
+      if (isCurrent) {
+        if (!seenMessageIdsRef.current.has(newMsg.id)) {
+          seenMessageIdsRef.current.add(newMsg.id)
+          queryClient.setQueryData<AdminChatMessage[]>(
+            ['admin-conversation-messages', conversationId],
+            (old = []) => (old.some((m) => m.id === newMsg.id) ? old : [...old, newMsg])
+          )
+        }
+        queryClient.invalidateQueries({ queryKey: ['admin-conversation-messages', conversationId] })
       }
 
       queryClient.setQueriesData<AdminConversation[]>(

@@ -24,6 +24,37 @@ export interface UseAdminChatSocketReturn {
   disconnect: () => void
 }
 
+function closeSocketSafely(ws: WebSocket | null, reason: string): void {
+  if (!ws) return
+  try {
+    const connectingState =
+      typeof WebSocket !== 'undefined' && WebSocket.CONNECTING !== undefined
+        ? WebSocket.CONNECTING
+        : 0
+    const openState =
+      typeof WebSocket !== 'undefined' && WebSocket.OPEN !== undefined
+        ? WebSocket.OPEN
+        : 1
+
+    if (ws.readyState === connectingState) {
+      ws.onmessage = null
+      ws.onerror = null
+      ws.onclose = null
+      ws.onopen = () => {
+        try {
+          ws.close(1000, reason)
+        } catch {
+          // Ignore close error
+        }
+      }
+    } else if (ws.readyState === openState) {
+      ws.close(1000, reason)
+    }
+  } catch {
+    // Ignore close error
+  }
+}
+
 export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): UseAdminChatSocketReturn {
   const {
     token,
@@ -112,11 +143,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
     clearTimers()
 
     if (socketRef.current) {
-      try {
-        socketRef.current.close(1000, 'Reconnecting with fresh socket')
-      } catch {
-        // Ignore close error
-      }
+      closeSocketSafely(socketRef.current, 'Reconnecting with fresh socket')
       socketRef.current = null
     }
 
@@ -217,11 +244,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
     manualCloseRef.current = true
     clearTimers()
     if (socketRef.current) {
-      try {
-        socketRef.current.close(1000, 'Manual disconnect')
-      } catch {
-        // Ignore close error
-      }
+      closeSocketSafely(socketRef.current, 'Manual disconnect')
       socketRef.current = null
     }
     setIsConnected(false)
@@ -241,11 +264,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
       manualCloseRef.current = true
       clearTimers()
       if (socketRef.current) {
-        try {
-          socketRef.current.close(1000, 'Component unmounted')
-        } catch {
-          // Ignore close error
-        }
+        closeSocketSafely(socketRef.current, 'Component unmounted')
         socketRef.current = null
       }
       setIsConnected(false)

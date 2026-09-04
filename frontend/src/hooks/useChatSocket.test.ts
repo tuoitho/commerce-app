@@ -7,10 +7,12 @@ import type { ChatMessage, WSEventPresence, WSEventMessagesRead } from '@/api/ch
 // Mock WebSocket class
 class MockWebSocket {
   static instances: MockWebSocket[] = []
+  static CONNECTING = 0
   static OPEN = 1
+  static CLOSING = 2
   static CLOSED = 3
 
-  readyState = MockWebSocket.OPEN
+  readyState = MockWebSocket.CONNECTING
   url: string
   onopen: (() => void) | null = null
   onclose: ((event: { code: number; reason: string }) => void) | null = null
@@ -23,8 +25,11 @@ class MockWebSocket {
     this.url = url
     MockWebSocket.instances.push(this)
     setTimeout(() => {
-      if (this.onopen && this.readyState === MockWebSocket.OPEN) {
-        this.onopen()
+      if (this.readyState === MockWebSocket.CONNECTING) {
+        this.readyState = MockWebSocket.OPEN
+        if (this.onopen) {
+          this.onopen()
+        }
       }
     }, 0)
   }
@@ -352,5 +357,27 @@ describe('useChatSocket', () => {
       vi.advanceTimersByTime(10000)
     })
     expect(MockWebSocket.instances.length).toBe(1)
+  })
+
+  it('defers closing safely when unmounted while still in CONNECTING state', async () => {
+    const { unmount } = renderHook(() =>
+      useChatSocket({ token: 'test-token-123', enabled: true })
+    )
+
+    const ws = MockWebSocket.instances[0]
+    expect(ws.readyState).toBe(MockWebSocket.CONNECTING)
+
+    // Unmount immediately without advancing timer (simulates immediate unmount / StrictMode cleanup)
+    unmount()
+
+    // Socket should not be closed immediately while connecting to avoid browser warning
+    expect(ws.readyState).toBe(MockWebSocket.CONNECTING)
+
+    // Once connection completes, the deferred close is triggered
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED)
   })
 })
