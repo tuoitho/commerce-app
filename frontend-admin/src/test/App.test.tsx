@@ -38,6 +38,7 @@ describe('App Shell', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /Tổng quan/i })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: /Sản phẩm/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Tin nhắn hỗ trợ/i })).toBeInTheDocument()
       expect(screen.getByText(/Người dùng/i)).toBeInTheDocument()
     })
   })

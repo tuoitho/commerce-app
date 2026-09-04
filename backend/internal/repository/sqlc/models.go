@@ -46,6 +46,38 @@ type Category struct {
 	CreatedAt time.Time
 }
 
+type ChatAttachment struct {
+	ID         string
+	MessageID  pgtype.UUID
+	UploaderID string
+	ObjectKey  string
+	FileType   string
+	FileName   string
+	FileSize   int64
+	MimeType   string
+	CreatedAt  time.Time
+}
+
+type ChatMessage struct {
+	ID              string
+	ConversationID  string
+	SenderID        string
+	SenderRole      string
+	Content         string
+	AttachedOrderID pgtype.UUID
+	CreatedAt       time.Time
+}
+
+type Conversation struct {
+	ID                 string
+	UserID             string
+	LastMessageAt      time.Time
+	CustomerLastReadAt time.Time
+	AdminLastReadAt    time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type Order struct {
 	ID             string
 	UserID         string
@@ -219,6 +251,7 @@ type User struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Role         string
+	LastActiveAt pgtype.Timestamptz
 }
 
 type VariantOptionValue struct {

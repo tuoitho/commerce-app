@@ -101,6 +101,9 @@ func TestConfig_Defaults(t *testing.T) {
 	if cfg.MinioBucket != "product-review-media" {
 		t.Errorf("expected MinioBucket 'product-review-media', got %q", cfg.MinioBucket)
 	}
+	if cfg.MinioChatBucket != "chat-media" {
+		t.Errorf("expected MinioChatBucket 'chat-media', got %q", cfg.MinioChatBucket)
+	}
 	if cfg.MinioUseSSL != false {
 		t.Errorf("expected MinioUseSSL false, got %v", cfg.MinioUseSSL)
 	}
@@ -477,6 +480,7 @@ func TestConfig_MinioCustomSettings(t *testing.T) {
 	os.Setenv("MINIO_ACCESS_KEY", "custom-access")
 	os.Setenv("MINIO_SECRET_KEY", "custom-secret")
 	os.Setenv("MINIO_BUCKET", "custom-review-bucket")
+	os.Setenv("MINIO_CHAT_BUCKET", "custom-chat-bucket")
 	os.Setenv("MINIO_USE_SSL", "true")
 
 	cfg, err := LoadWithFile("")
@@ -495,6 +499,9 @@ func TestConfig_MinioCustomSettings(t *testing.T) {
 	}
 	if cfg.MinioBucket != "custom-review-bucket" {
 		t.Errorf("expected MinioBucket 'custom-review-bucket', got %q", cfg.MinioBucket)
+	}
+	if cfg.MinioChatBucket != "custom-chat-bucket" {
+		t.Errorf("expected MinioChatBucket 'custom-chat-bucket', got %q", cfg.MinioChatBucket)
 	}
 	if cfg.MinioUseSSL != true {
 		t.Errorf("expected MinioUseSSL true, got %v", cfg.MinioUseSSL)

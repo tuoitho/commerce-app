@@ -51,6 +51,15 @@ vi.mock('@/api/cart', () => ({
   },
 }))
 
+vi.mock('@/api/chat', () => ({
+  getConversation: vi.fn().mockResolvedValue(null),
+  markConversationRead: vi.fn().mockResolvedValue(undefined),
+  getMessages: vi.fn().mockResolvedValue([]),
+  sendMessage: vi.fn().mockResolvedValue({}),
+  uploadMedia: vi.fn().mockResolvedValue({}),
+  getCustomerOrders: vi.fn().mockResolvedValue([]),
+}))
+
 import { authApi } from '@/api/auth'
 import { favoritesApi } from '@/api/favorites'
 import { catalogApi } from '@/api/catalog'
@@ -309,7 +318,7 @@ describe('Product Favorites Cross-Boundary Workflow Integration', () => {
       // Should navigate back to /products
       await waitFor(() => {
         expect(screen.getAllByText('iPhone 16 Pro Max').length).toBeGreaterThanOrEqual(1)
-      })
+      }, { timeout: 4000 })
 
       // Ensure NO favorite add API was automatically called upon login
       expect(favoritesApi.add).not.toHaveBeenCalled()

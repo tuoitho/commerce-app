@@ -20,10 +20,13 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	chatuc "commerce-backend/internal/usecase/chat"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
+	"commerce-backend/internal/delivery/ws"
+	"commerce-backend/internal/storage/chatmedia"
 	"commerce-backend/internal/storage/reviewmedia"
 )
 
@@ -35,6 +38,8 @@ type App struct {
 	AuthUC     *authuc.UseCase
 	OrderUC    *orderuc.UseCase
 	MediaStore *reviewmedia.Store
+	ChatMedia  *chatmedia.Store
+	WSHub      *ws.Hub
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -48,6 +53,17 @@ func (a *App) Run(ctx context.Context) error {
 			a.Logger.Error("minio validation failed", "category", "storage_init", "error", err)
 			return fmt.Errorf("validate minio bucket: %w", err)
 		}
+	}
+
+	if a.ChatMedia != nil {
+		if err := a.ChatMedia.ValidateBucketPrivate(ctx); err != nil {
+			a.Logger.Error("chat minio validation failed", "category", "storage_init", "error", err)
+			return fmt.Errorf("validate chat minio bucket: %w", err)
+		}
+	}
+
+	if a.WSHub != nil {
+		defer a.WSHub.Close()
 	}
 
 	if a.Config.AdminBootstrapEmail != "" && a.Config.AdminBootstrapPassword != "" {
@@ -202,7 +218,38 @@ func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.Use
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnUC *returnuc.UseCase, reviewUC *reviewuc.ReviewUseCase, favoriteUC *favoriteuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideChatRepository(pool *pgxpool.Pool) *repository.ChatRepository {
+	return repository.NewChatRepository(pool)
+}
+
+func provideChatMediaStore(cfg *config.Config) (*chatmedia.Store, error) {
+	return chatmedia.New(cfg)
+}
+
+func provideWSHub(repo *repository.ChatRepository, log *slog.Logger) *ws.Hub {
+	return ws.NewHub(repo, log)
+}
+
+func provideChatUseCase(repo *repository.ChatRepository, mediaStore *chatmedia.Store, hub *ws.Hub) *chatuc.UseCase {
+	return chatuc.New(repo, mediaStore, chatuc.WithBroadcaster(hub))
+}
+
+func provideGinRouter(
+	cfg *config.Config,
+	log *slog.Logger,
+	authUC *authuc.UseCase,
+	catalogUC *cataloguc.UseCase,
+	cartUC *cartuc.UseCase,
+	areaUC *areauc.UseCase,
+	addressUC *addressuc.UseCase,
+	orderUC *orderuc.UseCase,
+	returnUC *returnuc.UseCase,
+	reviewUC *reviewuc.ReviewUseCase,
+	favoriteUC *favoriteuc.UseCase,
+	chatUC *chatuc.UseCase,
+	wsHub *ws.Hub,
+	jwtMgr *jwt.Manager,
+) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -218,6 +265,8 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Return:       returnUC,
 		Review:       reviewUC,
 		Favorite:     favoriteUC,
+		Chat:         chatUC,
+		WSHub:        wsHub,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,
@@ -233,7 +282,17 @@ func provideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	}
 }
 
-func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *http.Server, authUC *authuc.UseCase, orderUC *orderuc.UseCase, mediaStore *reviewmedia.Store) *App {
+func provideApp(
+	cfg *config.Config,
+	log *slog.Logger,
+	pool *pgxpool.Pool,
+	srv *http.Server,
+	authUC *authuc.UseCase,
+	orderUC *orderuc.UseCase,
+	mediaStore *reviewmedia.Store,
+	chatMedia *chatmedia.Store,
+	wsHub *ws.Hub,
+) *App {
 	return &App{
 		Config:     cfg,
 		Logger:     log,
@@ -242,5 +301,7 @@ func provideApp(cfg *config.Config, log *slog.Logger, pool *pgxpool.Pool, srv *h
 		AuthUC:     authUC,
 		OrderUC:    orderUC,
 		MediaStore: mediaStore,
+		ChatMedia:  chatMedia,
+		WSHub:      wsHub,
 	}
 }

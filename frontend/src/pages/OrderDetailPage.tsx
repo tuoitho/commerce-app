@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   ShieldCheck,
   Star,
+  MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
@@ -30,6 +31,7 @@ import {
   type Review,
 } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
+import { orderToAttachedOrderCard } from '@/lib/chatUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -335,6 +337,20 @@ export function OrderDetailPage() {
     }
   }
 
+  // Handle Open Chat with Order context
+  const handleOpenChatWithOrder = () => {
+    if (!order) return
+    const card = orderToAttachedOrderCard(order)
+    window.dispatchEvent(
+      new CustomEvent('open-chat-with-order', {
+        detail: {
+          order: card,
+          orderId: order.id,
+        },
+      })
+    )
+  }
+
   // Loading skeleton
   if (authLoading || (isLoading && !order && !isNotFound && !errorMessage)) {
     return (
@@ -464,6 +480,16 @@ export function OrderDetailPage() {
 
             {/* Quick Actions in Header */}
             <div className="flex items-center gap-2 self-start sm:self-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenChatWithOrder}
+                className="rounded-xl text-xs gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-semibold"
+                data-testid="order-inquiry-header-btn"
+              >
+                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Hỏi đáp về đơn hàng</span>
+              </Button>
               <Link to="/orders">
                 <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5">
                   <ShoppingBag className="h-3.5 w-3.5" />
@@ -926,6 +952,18 @@ export function OrderDetailPage() {
                     Đơn hàng ở trạng thái không thể hủy
                   </div>
                 )}
+
+                {/* 6. Order Inquiry Button */}
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleOpenChatWithOrder}
+                  className="w-full rounded-2xl font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-2"
+                  data-testid="order-inquiry-card-btn"
+                >
+                  <MessageCircle className="h-4 w-4 text-emerald-600" />
+                  <span>Hỏi đáp về đơn hàng</span>
+                </Button>
               </div>
             </div>
 

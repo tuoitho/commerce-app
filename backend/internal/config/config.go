@@ -30,6 +30,7 @@ type Config struct {
 	MinioAccessKey         string
 	MinioSecretKey         string
 	MinioBucket            string
+	MinioChatBucket        string
 	MinioUseSSL            bool
 }
 
@@ -42,6 +43,7 @@ const (
 	defaultOrderConfirmTimeout = 30 * time.Minute
 	defaultShippingFeeVND      = domain.MoneyVND("0")
 	defaultMinioBucket         = "product-review-media"
+	defaultMinioChatBucket     = "chat-media"
 	defaultMinioUseSSL         = false
 )
 
@@ -78,6 +80,7 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"MINIO_ACCESS_KEY",
 		"MINIO_SECRET_KEY",
 		"MINIO_BUCKET",
+		"MINIO_CHAT_BUCKET",
 		"MINIO_USE_SSL",
 	}
 
@@ -265,7 +268,15 @@ func LoadWithFile(envFile string) (*Config, error) {
 		cfg.MinioBucket = minioBucket
 	}
 
-	// 16. MINIO_USE_SSL
+	// 16. MINIO_CHAT_BUCKET
+	minioChatBucket := strings.TrimSpace(v.GetString("MINIO_CHAT_BUCKET"))
+	if minioChatBucket == "" {
+		cfg.MinioChatBucket = defaultMinioChatBucket
+	} else {
+		cfg.MinioChatBucket = minioChatBucket
+	}
+
+	// 17. MINIO_USE_SSL
 	if v.IsSet("MINIO_USE_SSL") {
 		rawMinioSSL := strings.TrimSpace(v.GetString("MINIO_USE_SSL"))
 		if rawMinioSSL != "" {

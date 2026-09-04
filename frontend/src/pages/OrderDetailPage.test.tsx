@@ -536,4 +536,36 @@ describe('OrderDetailPage', () => {
       expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
     })
   })
+
+  it('renders "Hỏi đáp về đơn hàng" button and dispatches open-chat-with-order event on click', async () => {
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(baseMockOrder)
+
+    const eventListener = vi.fn()
+    window.addEventListener('open-chat-with-order', eventListener)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('order-inquiry-header-btn')).toBeInTheDocument()
+    })
+
+    const inquiryBtn = screen.getByTestId('order-inquiry-header-btn')
+    fireEvent.click(inquiryBtn)
+
+    expect(eventListener).toHaveBeenCalled()
+    const event = eventListener.mock.calls[0][0] as CustomEvent
+    expect(event.detail.orderId).toBe('ord-123456')
+    expect(event.detail.order.id).toBe('ord-123456')
+    expect(event.detail.order.totalVnd).toBe(60030000)
+
+    window.removeEventListener('open-chat-with-order', eventListener)
+  })
 })

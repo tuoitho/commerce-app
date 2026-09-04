@@ -10,14 +10,42 @@ import { Star,
   ShieldCheck,
   LogOut,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { listAdminConversations, type AdminConversation } from '@/api/chat'
+import { useAdminChatSocket } from '@/hooks/useAdminChatSocket'
 
 export function AdminLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const { data: unreadConversations = [] } = useQuery<AdminConversation[]>({
+    queryKey: ['admin-conversations-unread-badge'],
+    queryFn: () => listAdminConversations({ filter: 'unread' }),
+    refetchInterval: 15000,
+    enabled: Boolean(user),
+  })
+
+  // Maintain admin presence and instant unread badge updates across all admin pages
+  useAdminChatSocket({
+    enabled: Boolean(user),
+    onNewMessage: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-conversations-unread-badge'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-conversations'] })
+    },
+    onMessagesRead: (payload) => {
+      if (payload.readerRole === 'admin') {
+        queryClient.invalidateQueries({ queryKey: ['admin-conversations-unread-badge'] })
+      }
+    },
+  })
+
+  const totalChatUnread = unreadConversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)
 
   const handleLogout = async () => {
     await logout()
@@ -84,6 +112,30 @@ export function AdminLayout() {
           >
             <ShoppingBag className="h-4 w-4" />
             <span>Đơn hàng</span>
+          </NavLink>
+
+          <NavLink
+            to="/chat"
+            className={({ isActive }) =>
+              `flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-blue-50 text-blue-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`
+            }
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-4 w-4" />
+              <span>Tin nhắn hỗ trợ</span>
+            </div>
+            {totalChatUnread > 0 && (
+              <span
+                data-testid="sidebar-chat-unread-badge"
+                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white shadow-xs"
+              >
+                {totalChatUnread > 99 ? '99+' : totalChatUnread}
+              </span>
+            )}
           </NavLink>
 
           <NavLink

@@ -1,4 +1,5 @@
 import { ApiError, type ApiResponseEnvelope, type ApiResponseMeta, type ApiErrorDetail } from './types'
+export { ApiError }
 import { tokenStore } from './tokenStore'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'

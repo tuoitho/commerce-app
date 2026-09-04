@@ -43,6 +43,9 @@ var (
 	ErrReviewAlreadyExists     = errors.New("review already exists")
 	ErrReviewEditLimitReached  = errors.New("review edit limit reached")
 	ErrReviewMediaNotFound     = errors.New("review media not found")
+	ErrChatAttachmentNotFound  = errors.New("chat attachment not found")
+	ErrChatMediaForbidden      = errors.New("chat media forbidden")
+	ErrConversationNotFound    = errors.New("conversation not found")
 )
 
 type ValidationError struct {

@@ -98,6 +98,12 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "review_edit_limit_reached", "Đánh giá chỉ được chỉnh sửa một lần", nil)
 	case errors.Is(err, domain.ErrReviewMediaNotFound):
 		respondError(c, 404, "review_media_not_found", "Không tìm thấy tệp đính kèm", nil)
+	case errors.Is(err, domain.ErrChatAttachmentNotFound):
+		respondError(c, 404, "chat_attachment_not_found", "Không tìm thấy tệp đính kèm", nil)
+	case errors.Is(err, domain.ErrChatMediaForbidden):
+		respondError(c, 403, "forbidden", "Bạn không có quyền truy cập tệp đính kèm này", nil)
+	case errors.Is(err, domain.ErrConversationNotFound):
+		respondError(c, 404, "conversation_not_found", "Không tìm thấy cuộc hội thoại", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

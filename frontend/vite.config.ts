@@ -18,6 +18,7 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${process.env.HTTP_PORT ?? 18080}`,
         changeOrigin: true,
+        ws: true,
       },
       '/media': {
         target: `http://localhost:${process.env.HTTP_PORT ?? 18080}`,

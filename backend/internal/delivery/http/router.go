@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"commerce-backend/internal/delivery/ws"
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security/jwt"
 	addressuc "commerce-backend/internal/usecase/address"
@@ -29,6 +30,8 @@ type Dependencies struct {
 	Return       *returnuc.UseCase
 	Review       *reviewuc.ReviewUseCase
 	Favorite     *favoriteuc.UseCase
+	Chat         domain.ChatUseCase
+	WSHub        *ws.Hub
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -37,6 +40,11 @@ type Dependencies struct {
 
 func NewRouter(router *gin.Engine, deps Dependencies) {
 	api := router.Group("/api/v1")
+
+	if deps.WSHub != nil {
+		wsHandler := ws.NewHandler(deps.WSHub, deps.JWT)
+		api.GET("/chat/ws", wsHandler.ServeWS)
+	}
 
 	authHandler := newAuthHandler(deps.UseCase, deps.RefreshTTL, deps.CookieSecure)
 	guard := newGuard(deps.JWT)
@@ -55,6 +63,24 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	// Media binary routes outside /api/v1
 	router.GET("/media/reviews/:mediaId", reviewHandler.getMedia)
 	router.HEAD("/media/reviews/:mediaId", reviewHandler.getMedia)
+
+	if deps.Chat != nil {
+		chatMediaHandler := newChatMediaHandler(deps.Chat)
+		api.POST("/chat/media", guard.AuthRequired, chatMediaHandler.uploadMedia)
+		api.GET("/chat/media/:id", guard.MediaAuthRequired, chatMediaHandler.getMedia)
+		api.HEAD("/chat/media/:id", guard.MediaAuthRequired, chatMediaHandler.getMedia)
+
+		chatCustomerHandler := newChatCustomerHandler(deps.Chat)
+		chatGroup := api.Group("/chat")
+		chatGroup.Use(guard.AuthRequired)
+		{
+			chatGroup.GET("/conversation", chatCustomerHandler.getConversation)
+			chatGroup.GET("/messages", chatCustomerHandler.listMessages)
+			chatGroup.POST("/messages", chatCustomerHandler.sendMessage)
+			chatGroup.POST("/read", chatCustomerHandler.markRead)
+			chatGroup.GET("/orders", chatCustomerHandler.listOrders)
+		}
+	}
 
 	reviews := api.Group("/reviews")
 	reviews.Use(guard.AuthRequired)
@@ -180,6 +206,16 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminReviews.GET("", adminReviewHandler.ListReviews)
 			adminReviews.PUT("/:id/reply", adminReviewHandler.UpdateReply)
 			adminReviews.DELETE("/:id/reply", adminReviewHandler.DeleteReply)
+		}
+		if deps.Chat != nil {
+			chatAdminHandler := newChatAdminHandler(deps.Chat)
+			adminChat := admin.Group("/chat")
+			{
+				adminChat.GET("/conversations", chatAdminHandler.listConversations)
+				adminChat.GET("/conversations/:id/messages", chatAdminHandler.listMessages)
+				adminChat.POST("/conversations/:id/messages", chatAdminHandler.sendMessage)
+				adminChat.POST("/conversations/:id/read", chatAdminHandler.markRead)
+			}
 		}
 	}
 }

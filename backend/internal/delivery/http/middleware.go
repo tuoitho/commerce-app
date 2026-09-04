@@ -42,6 +42,30 @@ func (g *guard) AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
+func (g *guard) MediaAuthRequired(c *gin.Context) {
+	var tokenStr string
+	if authHeader := c.GetHeader("Authorization"); strings.HasPrefix(authHeader, bearerPrefix) {
+		tokenStr = strings.TrimPrefix(authHeader, bearerPrefix)
+	} else if qToken := c.Query("token"); qToken != "" {
+		tokenStr = qToken
+	}
+
+	if tokenStr == "" {
+		respondError(c, http.StatusUnauthorized, "unauthorized", "missing or malformed authorization header", nil)
+		c.Abort()
+		return
+	}
+	userID, role, err := g.manager.ParseAccessToken(tokenStr)
+	if err != nil {
+		respondError(c, http.StatusUnauthorized, "invalid_token", "invalid or expired token", nil)
+		c.Abort()
+		return
+	}
+	c.Set(contextUserKey, userID)
+	c.Set(contextRoleKey, role)
+	c.Next()
+}
+
 func (g *guard) OptionalAuth(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {

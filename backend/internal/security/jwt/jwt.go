@@ -59,3 +59,7 @@ func (m *Manager) ParseAccessToken(tokenStr string) (string, string, error) {
 	}
 	return claims.Subject, role, nil
 }
+
+func (m *Manager) ValidateToken(tokenStr string) (string, string, error) {
+	return m.ParseAccessToken(tokenStr)
+}
