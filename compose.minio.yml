@@ -31,6 +31,9 @@ services:
       mc mb --ignore-existing myminio/product-review-media;
       mc anonymous set none myminio/product-review-media;
       echo 'MinIO bucket product-review-media initialized as private';
+      mc mb --ignore-existing myminio/chat-media;
+      mc anonymous set none myminio/chat-media;
+      echo 'MinIO bucket chat-media initialized as private';
       exit 0;
       "
 
