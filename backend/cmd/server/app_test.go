@@ -70,7 +70,17 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil review use case")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, nil, nil, reviewUC, jwtMgr)
+	chatRepo := provideChatRepository(nil)
+	if chatRepo == nil {
+		t.Fatal("expected non-nil chat repo")
+	}
+
+	chatUC := provideChatUseCase(chatRepo, nil, orderRepo, log)
+	if chatUC == nil {
+		t.Fatal("expected non-nil chat use case")
+	}
+
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, nil, nil, reviewUC, chatUC, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

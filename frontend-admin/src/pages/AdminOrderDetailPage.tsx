@@ -15,6 +15,7 @@ import {
   User,
   MapPin,
   CreditCard,
+  MessageCircle,
 } from 'lucide-react'
 import {
   getAdminOrder,
@@ -273,6 +274,16 @@ export function AdminOrderDetailPage() {
 
         {/* Action Buttons based on Status */}
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/messages?orderId=${order.id}`)}
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            aria-label="Nhắn tin cho khách hàng"
+          >
+            <MessageCircle className="h-4 w-4 mr-2" />
+            Nhắn tin cho khách hàng
+          </Button>
+
           {order.status === 'confirmed' && (
             <Button
               variant="primary"

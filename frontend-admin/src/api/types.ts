@@ -10,6 +10,8 @@ export interface PaginationMeta {
 export interface ApiResponseMeta {
   timestamp: string
   pagination?: PaginationMeta
+  hasMore?: boolean
+  count?: number
 }
 
 export interface ApiErrorDetail {

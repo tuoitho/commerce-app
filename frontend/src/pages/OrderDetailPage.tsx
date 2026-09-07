@@ -18,8 +18,10 @@ import {
   ShieldCheck,
   Star,
   Edit3,
+  MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useChat } from '@/context/ChatContext'
 import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
 import { getOwnedReview } from '@/api/reviews'
@@ -135,6 +137,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const { success, error: toastError } = useToast()
+  const { openChat } = useChat()
 
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -397,6 +400,15 @@ export function OrderDetailPage() {
 
             {/* Quick Actions in Header */}
             <div className="flex items-center gap-2 self-start sm:self-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openChat(order.id)}
+                className="rounded-xl text-xs gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>Hỏi về đơn hàng này</span>
+              </Button>
               <Link to="/orders">
                 <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5">
                   <ShoppingBag className="h-3.5 w-3.5" />
@@ -664,6 +676,16 @@ export function OrderDetailPage() {
 
               {/* Status Action Buttons */}
               <div className="pt-4 border-t border-slate-100 space-y-3">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => openChat(order.id)}
+                  className="w-full rounded-2xl font-bold border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Hỏi về đơn hàng này</span>
+                </Button>
+
                 {/* 1. Pending Confirmation: Hủy đơn */}
                 {order.status === 'pending_confirmation' && (
                   <Button

@@ -16,6 +16,7 @@ import (
 	orderuc "commerce-backend/internal/usecase/order"
 	returnsuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
+	chatuc "commerce-backend/internal/usecase/chat"
 )
 
 type Dependencies struct {
@@ -28,6 +29,7 @@ type Dependencies struct {
 	Returns      *returnsuc.UseCase
 	Favorites    *favoriteuc.UseCase
 	Review       *reviewuc.UseCase
+	Chat         *chatuc.UseCase
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
 	CookieSecure bool
@@ -36,12 +38,14 @@ type Dependencies struct {
 
 func NewRouter(router *gin.Engine, deps Dependencies) {
 	reviewHandler := newReviewHandler(deps.Review)
-	mediaHandler := newMediaHandler(deps.Review)
+	mediaHandler := newMediaHandler(deps.Review, deps.Chat)
 
-	// Public media proxy route
+	// Public media proxy routes
 	router.GET("/media/reviews/:mediaId", mediaHandler.GetPublicMedia)
+	router.GET("/media/chat/:mediaId", mediaHandler.GetChatMedia)
 
 	api := router.Group("/api/v1")
+	api.GET("/media/chat/:mediaId", mediaHandler.GetChatMedia)
 
 	authHandler := newAuthHandler(deps.UseCase, deps.RefreshTTL, deps.CookieSecure)
 	guard := newGuard(deps.JWT)
@@ -130,6 +134,25 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.POST("/:id/items/:orderItemId/review", guard.RequireCustomerAuthForReviews, reviewHandler.Create)
 	}
 
+	hub := NewWSHub(deps.Logger)
+
+	wsHandler := newWSHandler(hub, deps.Chat, deps.JWT, deps.Logger)
+	api.GET("/chat/ws", wsHandler.HandleWS)
+
+	chatHandler := newChatHandler(deps.Chat, hub)
+	chat := api.Group("/chat")
+	chat.Use(guard.AuthRequired)
+	{
+		chat.GET("/conversation", chatHandler.CreateOrGetConversation)
+		chat.POST("/conversations", chatHandler.CreateOrGetConversation)
+		chat.GET("/conversations", chatHandler.ListCustomerConversations)
+		chat.GET("/conversations/:id", chatHandler.GetConversation)
+		chat.GET("/conversations/:id/messages", chatHandler.ListMessages)
+		chat.POST("/conversations/:id/messages", chatHandler.SendMessage)
+		chat.POST("/conversations/:id/read", chatHandler.MarkAsRead)
+		chat.GET("/unread-count", chatHandler.GetCustomerTotalUnread)
+	}
+
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)
 	adminOrderHandler := newAdminOrderHandler(deps.Order)
 	adminReturnHandler := newAdminReturnHandler(deps.Returns)
@@ -169,6 +192,16 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 			adminReturns.POST("/:id/reject", adminReturnHandler.Reject)
 			adminReturns.POST("/:id/receive", adminReturnHandler.Receive)
 			adminReturns.POST("/:id/refund", adminReturnHandler.RecordRefund)
+		}
+
+		adminChatHandler := newAdminChatHandler(deps.Chat, hub)
+		adminChat := admin.Group("/chat")
+		{
+			adminChat.GET("/conversations", adminChatHandler.ListConversations)
+			adminChat.GET("/conversations/:id", adminChatHandler.GetConversation)
+			adminChat.GET("/conversations/:id/messages", adminChatHandler.ListMessages)
+			adminChat.POST("/conversations/:id/messages", adminChatHandler.SendMessage)
+			adminChat.POST("/conversations/:id/read", adminChatHandler.MarkAsRead)
 		}
 	}
 

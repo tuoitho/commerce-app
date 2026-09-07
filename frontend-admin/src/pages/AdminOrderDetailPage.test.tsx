@@ -71,6 +71,7 @@ function renderWithClient(
         <Routes>
           <Route path="/orders/:id" element={ui} />
           <Route path="/orders" element={<div>Danh sách đơn hàng</div>} />
+          <Route path="/messages" element={<div>Tin nhắn trang đích</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -374,5 +375,21 @@ describe('AdminOrderDetailPage', () => {
     fireEvent.click(backBtn)
 
     expect(screen.getByText('Danh sách đơn hàng')).toBeInTheDocument()
+  })
+
+  it('renders "Nhắn tin cho khách hàng" button and navigates to /messages with orderId (AC-CHAT-04-02)', async () => {
+    vi.mocked(ordersApi.getAdminOrder).mockResolvedValue(mockOrder)
+
+    renderWithClient(<AdminOrderDetailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Nhắn tin cho khách hàng/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Nhắn tin cho khách hàng/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Tin nhắn trang đích')).toBeInTheDocument()
+    })
   })
 })

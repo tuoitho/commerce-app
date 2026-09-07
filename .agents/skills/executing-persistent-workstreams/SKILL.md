@@ -27,4 +27,4 @@ If implementation exposes a missing, contradictory, or incorrect frozen contract
 
 ## Context reset
 
-Retain the owner while the workstream remains coherent. Start a fresh owner when context has become dominated by obsolete attempts, or when the next tasks cross into a genuinely independent bounded context. A fresh owner must rediscover from repository artifacts, not inherit private reasoning transcripts.
+Retain the owner while the workstream remains coherent. Start a fresh owner (subagent) when context has become dominated by obsolete attempts, or when the next tasks cross into a genuinely independent bounded context. A fresh owner must rediscover from repository artifacts, not inherit private reasoning transcripts.

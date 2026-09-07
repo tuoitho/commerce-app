@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { OrderDetailPage } from './OrderDetailPage'
 import { useAuth } from '@/context/AuthContext'
+import { useChat } from '@/context/ChatContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
 import { ApiError, type Order } from '@/api/types'
@@ -10,6 +11,10 @@ import { ApiError, type Order } from '@/api/types'
 // Mock context hooks
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/ChatContext', () => ({
+  useChat: vi.fn(),
 }))
 
 // Mock API modules
@@ -66,6 +71,25 @@ describe('OrderDetailPage', () => {
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
+    })
+
+    vi.mocked(useChat).mockReturnValue({
+      isOpen: false,
+      setIsOpen: vi.fn(),
+      activeConversation: null,
+      conversations: [],
+      messages: [],
+      hasMore: false,
+      isLoadingOlder: false,
+      totalUnread: 0,
+      isLoading: false,
+      isSending: false,
+      openChat: vi.fn(),
+      selectConversation: vi.fn(),
+      closeChat: vi.fn(),
+      sendChatMessage: vi.fn(),
+      loadOlderMessages: vi.fn(),
+      refreshConversations: vi.fn(),
     })
 
     vi.mocked(ordersApi.getOrder).mockResolvedValue(baseMockOrder)
@@ -541,5 +565,44 @@ describe('OrderDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Sửa đánh giá/i })).toBeInTheDocument()
     })
+  })
+
+  it('renders "Hỏi về đơn hàng này" button and clicking opens chat with order id', async () => {
+    const mockOpenChat = vi.fn()
+    vi.mocked(useChat).mockReturnValue({
+      isOpen: false,
+      setIsOpen: vi.fn(),
+      activeConversation: null,
+      conversations: [],
+      messages: [],
+      hasMore: false,
+      isLoadingOlder: false,
+      totalUnread: 0,
+      isLoading: false,
+      isSending: false,
+      openChat: mockOpenChat,
+      selectConversation: vi.fn(),
+      closeChat: vi.fn(),
+      sendChatMessage: vi.fn(),
+      loadOlderMessages: vi.fn(),
+      refreshConversations: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /Hỏi về đơn hàng này/i })).toHaveLength(2)
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Hỏi về đơn hàng này/i })[0])
+    expect(mockOpenChat).toHaveBeenCalledWith('ord-123456')
   })
 })

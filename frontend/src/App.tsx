@@ -3,8 +3,10 @@ import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { CartProvider } from '@/context/CartContext'
 import { FavoritesProvider } from '@/context/FavoritesContext'
+import { ChatProvider } from '@/context/ChatContext'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { ChatWidget } from '@/components/chat/ChatWidget'
 import { HomePage } from '@/pages/HomePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { ProductDetailPage } from '@/pages/ProductDetailPage'
@@ -39,6 +41,7 @@ export function AppContent() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
+      <ChatWidget />
       <Footer />
     </div>
   )
@@ -50,9 +53,11 @@ export function App() {
       <AuthProvider>
         <CartProvider>
           <FavoritesProvider>
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
+            <ChatProvider>
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </ChatProvider>
           </FavoritesProvider>
         </CartProvider>
       </AuthProvider>

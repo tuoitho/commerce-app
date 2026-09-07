@@ -46,6 +46,40 @@ type Category struct {
 	CreatedAt time.Time
 }
 
+type ChatConversation struct {
+	ID                   string
+	UserID               string
+	CustomerLastReadAt   time.Time
+	AdminLastReadAt      time.Time
+	CustomerLastActiveAt time.Time
+	AdminLastActiveAt    pgtype.Timestamptz
+	LastMessageAt        time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
+type ChatMessage struct {
+	ID             string
+	ConversationID string
+	SenderID       string
+	SenderRole     string
+	Content        string
+	CreatedAt      time.Time
+	MessageType    string
+	OrderID        pgtype.UUID
+}
+
+type ChatMessageMedium struct {
+	ID          string
+	MessageID   string
+	MediaType   string
+	ObjectKey   string
+	ContentType string
+	FileSize    int64
+	FileName    string
+	CreatedAt   time.Time
+}
+
 type Order struct {
 	ID             string
 	UserID         string

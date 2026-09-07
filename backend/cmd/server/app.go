@@ -24,6 +24,7 @@ import (
 	orderuc "commerce-backend/internal/usecase/order"
 	returnsuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
+	chatuc "commerce-backend/internal/usecase/chat"
 	"commerce-backend/internal/storage"
 )
 
@@ -218,7 +219,20 @@ func provideReviewUseCase(repo *repository.ReviewRepository, store storage.Stora
 	})
 }
 
-func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnsUC *returnsuc.UseCase, favoriteUC *favoriteuc.UseCase, reviewUC *reviewuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
+func provideChatRepository(pool *pgxpool.Pool) *repository.ChatRepository {
+	return repository.NewChatRepository(pool)
+}
+
+func provideChatUseCase(repo *repository.ChatRepository, store storage.Storage, orderRepo *repository.OrderRepository, log *slog.Logger) *chatuc.UseCase {
+	return chatuc.NewUseCase(chatuc.Dependencies{
+		ChatRepo: repo,
+		Storage:  store,
+		Orders:   orderRepo,
+		Logger:   log,
+	})
+}
+
+func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCase, catalogUC *cataloguc.UseCase, cartUC *cartuc.UseCase, areaUC *areauc.UseCase, addressUC *addressuc.UseCase, orderUC *orderuc.UseCase, returnsUC *returnsuc.UseCase, favoriteUC *favoriteuc.UseCase, reviewUC *reviewuc.UseCase, chatUC *chatuc.UseCase, jwtMgr *jwt.Manager) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -234,6 +248,7 @@ func provideGinRouter(cfg *config.Config, log *slog.Logger, authUC *authuc.UseCa
 		Returns:      returnsUC,
 		Favorites:    favoriteUC,
 		Review:       reviewUC,
+		Chat:         chatUC,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
 		CookieSecure: cfg.CookieSecure,

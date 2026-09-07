@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,15 +13,18 @@ import (
 	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
+	"commerce-backend/internal/storage"
+	chatuc "commerce-backend/internal/usecase/chat"
 	reviewuc "commerce-backend/internal/usecase/review"
 )
 
 type mediaHandler struct {
-	uc *reviewuc.UseCase
+	reviewUC *reviewuc.UseCase
+	chatUC   *chatuc.UseCase
 }
 
-func newMediaHandler(uc *reviewuc.UseCase) *mediaHandler {
-	return &mediaHandler{uc: uc}
+func newMediaHandler(reviewUC *reviewuc.UseCase, chatUC *chatuc.UseCase) *mediaHandler {
+	return &mediaHandler{reviewUC: reviewUC, chatUC: chatUC}
 }
 
 func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
@@ -30,14 +34,36 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 		return
 	}
 
-	// 1. Check database reference and get object metadata from storage first (or full/range object)
+	h.serveMedia(c, func(ctx context.Context, start, end int64) (*storage.MediaObject, error) {
+		if h.reviewUC == nil {
+			return nil, domain.ErrReviewMediaNotFound
+		}
+		return h.reviewUC.GetPublicMedia(ctx, mediaID, start, end)
+	}, domain.ErrReviewMediaNotFound)
+}
+
+func (h *mediaHandler) GetChatMedia(c *gin.Context) {
+	mediaID := c.Param("mediaId")
+	if _, err := uuid.Parse(mediaID); err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	h.serveMedia(c, func(ctx context.Context, start, end int64) (*storage.MediaObject, error) {
+		if h.chatUC == nil {
+			return nil, domain.ErrChatMessageMediaNotFound
+		}
+		return h.chatUC.GetChatMedia(ctx, mediaID, start, end)
+	}, domain.ErrChatMessageMediaNotFound)
+}
+
+func (h *mediaHandler) serveMedia(c *gin.Context, fetcher func(ctx context.Context, start, end int64) (*storage.MediaObject, error), notFoundErr error) {
 	rangeHeader := c.GetHeader("Range")
 	ifNoneMatch := c.GetHeader("If-None-Match")
 
-	// First fetch with full object to get metadata (stat)
-	mediaObj, err := h.uc.GetPublicMedia(c.Request.Context(), mediaID, -1, -1)
+	mediaObj, err := fetcher(c.Request.Context(), -1, -1)
 	if err != nil {
-		if errors.Is(err, domain.ErrReviewMediaNotFound) {
+		if errors.Is(err, notFoundErr) || errors.Is(err, storage.ErrObjectNotFound) {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -80,7 +106,7 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 		}
 
 		spec := strings.TrimPrefix(rangeHeader, "bytes=")
-		if strings.Contains(spec, ",") { // Multiple ranges not supported
+		if strings.Contains(spec, ",") {
 			c.Header("Content-Range", fmt.Sprintf("bytes */%d", totalSize))
 			c.Status(http.StatusRequestedRangeNotSatisfiable)
 			return
@@ -94,7 +120,7 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 		}
 
 		var start, end int64
-		if parts[0] == "" { // Suffix range: -500
+		if parts[0] == "" { // Suffix range
 			suffixLen, err := strconv.ParseInt(parts[1], 10, 64)
 			if err != nil || suffixLen <= 0 {
 				c.Header("Content-Range", fmt.Sprintf("bytes */%d", totalSize))
@@ -115,7 +141,7 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 			}
 			start = s
 
-			if parts[1] == "" { // Open range: 500-
+			if parts[1] == "" {
 				end = totalSize - 1
 			} else {
 				e, err := strconv.ParseInt(parts[1], 10, 64)
@@ -131,10 +157,9 @@ func (h *mediaHandler) GetPublicMedia(c *gin.Context) {
 			}
 		}
 
-		// Fetch byte range
-		rangeObj, err := h.uc.GetPublicMedia(c.Request.Context(), mediaID, start, end)
+		rangeObj, err := fetcher(c.Request.Context(), start, end)
 		if err != nil {
-			if errors.Is(err, domain.ErrReviewMediaNotFound) {
+			if errors.Is(err, notFoundErr) || errors.Is(err, storage.ErrObjectNotFound) {
 				c.Status(http.StatusNotFound)
 				return
 			}
