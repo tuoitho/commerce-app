@@ -147,3 +147,13 @@ Subagent:
     Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need
     information that wasn't provided. Never silently produce work you're unsure about.
 ```
+
+**Placeholders:**
+- `[BRIEF_FILE]`, `[REPORT_FILE]` — REQUIRED: the values printed by
+  `bash scripts/task-brief PLAN_FILE N`, verbatim
+- `[REQUIREMENTS_FILE]`, `[DESIGN_FILE]`, `[TASKS_FILE]` — the governing
+  feature artifacts
+- `N`, `[task name]` — the task ID and title from the brief
+- `[Scene-setting: ...]` — one line on where the task fits, plus stable
+  interfaces and decisions from earlier tasks that the brief cannot know
+- `[directory]` — the implementation worktree

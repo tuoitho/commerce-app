@@ -222,6 +222,8 @@ Subagent:
 **Placeholders:**
 - `[BRIEF_FILE]` — REQUIRED: the task brief file (`bash scripts/task-brief PLAN N`
   prints the path; same file the implementer worked from)
+- `[REQUIREMENTS_FILE]`, `[DESIGN_FILE]`, `[TASKS_FILE]` — the governing
+  feature artifacts
 - `[GLOBAL_CONSTRAINTS]` — the binding requirements copied verbatim from
   the plan's Global Constraints section or the spec: exact values, formats,
   and stated relationships between components (not process rules — those

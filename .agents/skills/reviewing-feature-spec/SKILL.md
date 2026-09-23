@@ -181,6 +181,7 @@ Check:
 
     Do not require a parallel capability or new API when an existing supported
     capability already satisfies the dependency.
+
 Do not flag wording preferences, formatting, or optional enhancements.
 
 An implementation or schema domain that is broader than approved product
@@ -248,6 +249,18 @@ specification repair, passes the normal Finding Gate, and materially prevents
 correct implementation. Unrelated observations and optional improvements are
 non-blocking and do not extend the repair loop.
 
+Do not repeat broad dependency discovery during Re-review Mode.
+
+Reinspect only:
+
+- dependencies involved in previous blocking findings;
+- dependencies directly touched by the repaired artifact sections; and
+- contradictions introduced into directly linked requirements, design
+  decisions, or tasks.
+
+A dependency unrelated to the repair cannot become a new blocking finding in
+Re-review Mode.
+
 Use this output in Re-review Mode:
 
 ```markdown
@@ -282,15 +295,3 @@ Use this output in Re-review Mode:
 
 Use `Approved` only when there are no blocking issues. If there are no
 findings, state that explicitly. Do not edit files.
-
-Do not repeat broad dependency discovery during Re-review Mode.
-
-Reinspect only:
-
-- dependencies involved in previous blocking findings;
-- dependencies directly touched by the repaired artifact sections; and
-- contradictions introduced into directly linked requirements, design
-  decisions, or tasks.
-
-A dependency unrelated to the repair cannot become a new blocking finding in
-Re-review Mode.
