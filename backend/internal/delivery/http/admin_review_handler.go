@@ -26,15 +26,22 @@ func (h *AdminReviewHandler) ListReviews(c *gin.Context) {
 	ratingFilter, _ := strconv.Atoi(c.Query("rating"))
 	hasReplyFilter := c.Query("has_reply")
 
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
 	result, err := h.reviewUC.GetAdminReviews(ctx, int16(ratingFilter), hasReplyFilter, page, limit)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 
-	if limit <= 0 {
-		limit = 10
-	}
 	totalPages := (result.Total + int64(limit) - 1) / int64(limit)
 	if totalPages == 0 {
 		totalPages = 1

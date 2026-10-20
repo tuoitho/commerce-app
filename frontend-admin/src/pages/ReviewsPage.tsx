@@ -19,6 +19,7 @@ export const ReviewsPage: React.FC = () => {
   const [replyDialogOpen, setReplyDialogOpen] = useState(false)
   const [selectedReview, setSelectedReview] = useState<AdminReview | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [replyError, setReplyError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -55,6 +56,7 @@ export const ReviewsPage: React.FC = () => {
   const openReplyDialog = (review: AdminReview) => {
     setSelectedReview(review)
     setReplyText(review.adminReply || '')
+    setReplyError(null)
     setReplyDialogOpen(true)
   }
 
@@ -67,13 +69,16 @@ export const ReviewsPage: React.FC = () => {
     if (!selectedReview) return
     const text = replyText.trim()
     if (!text) {
+      setReplyError('Nội dung phản hồi không được để trống')
       alert('Nội dung phản hồi không được để trống')
       return
     }
     if (text.length > 1000) {
+      setReplyError('Nội dung phản hồi không được quá 1000 ký tự')
       alert('Nội dung phản hồi không được quá 1000 ký tự')
       return
     }
+    setReplyError(null)
 
     setIsSubmitting(true)
     try {
@@ -193,23 +198,25 @@ export const ReviewsPage: React.FC = () => {
                     <p className="text-sm line-clamp-2">{review.comment || <span className="text-muted-foreground italic">Không có nhận xét</span>}</p>
                     <p className="text-xs text-muted-foreground mt-1">{new Date(review.createdAt).toLocaleString('vi-VN')}</p>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {review.adminReply ? (
-                      <Badge className="bg-emerald-500 hover:bg-emerald-600">Đã phản hồi</Badge>
+                      <Badge className="bg-emerald-500 hover:bg-emerald-600 whitespace-nowrap">Đã phản hồi</Badge>
                     ) : (
-                      <Badge className="text-amber-600 border-amber-200 bg-amber-50">Chưa phản hồi</Badge>
+                      <Badge className="text-amber-600 border-amber-200 bg-amber-50 whitespace-nowrap">Chưa phản hồi</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => openReplyDialog(review)}>
-                      {review.adminReply ? <Edit className="w-4 h-4 mr-1" /> : <MessageSquare className="w-4 h-4 mr-1" />}
-                      {review.adminReply ? 'Sửa' : 'Phản hồi'}
-                    </Button>
-                    {review.adminReply && (
-                      <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(review)}>
-                        <Trash2 className="w-4 h-4" />
+                  <TableCell className="text-right whitespace-nowrap">
+                    <div className="inline-flex items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openReplyDialog(review)}>
+                        {review.adminReply ? <Edit className="w-4 h-4 mr-1" /> : <MessageSquare className="w-4 h-4 mr-1" />}
+                        {review.adminReply ? 'Sửa' : 'Phản hồi'}
                       </Button>
-                    )}
+                      {review.adminReply && (
+                        <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(review)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -257,13 +264,25 @@ export const ReviewsPage: React.FC = () => {
               <label className="text-sm font-medium">Nội dung phản hồi (Tối đa 1000 ký tự)</label>
               <Textarea
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(e) => {
+                  setReplyText(e.target.value)
+                  if (replyError) setReplyError(null)
+                }}
                 placeholder="Nhập câu trả lời của cửa hàng..."
                 className="h-32 resize-none"
                 maxLength={1000}
               />
-              <div className="text-right text-xs text-muted-foreground">
-                {replyText.length}/1000
+              <div className="flex items-center justify-between">
+                {replyError ? (
+                  <p role="alert" className="text-xs font-medium text-rose-600">
+                    {replyError}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                <div className="text-right text-xs text-muted-foreground">
+                  {replyText.length}/1000
+                </div>
               </div>
             </div>
           </div>

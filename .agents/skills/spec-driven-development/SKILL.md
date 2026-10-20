@@ -12,13 +12,18 @@ code.
 ## Input And Location
 
 Accept a kebab-case feature name or derive one from the user's description.
-Store exactly three canonical artifacts:
+Store exactly three canonical planning artifacts:
 
 ```text
 .dream/specs/<feature>/requirements.md
 .dream/specs/<feature>/design.md
 .dream/specs/<feature>/tasks.md
 ```
+
+(During later implementation of UI-affecting features, the E2E verification leaf
+task additionally writes runtime evidence to `.dream/specs/<feature>/imgs/` and
+`.dream/specs/<feature>/report.md`; those are execution evidence artifacts, not
+created during this planning workflow.)
 
 If a feature directory already exists, read it and continue from the first
 missing phase. Continue past an existing requirements or design gate only when

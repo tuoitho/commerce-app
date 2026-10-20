@@ -138,9 +138,15 @@ it is blocked by capability; the replacement reads the brief and report
 files. Record the replacement in the ledger.
 
 In either implementer mode, stop and report `BLOCKED` or `NEEDS_CONTEXT` on a
-missing decision, a contradictory plan, or a missing dependency. If
-implementation reveals a material specification gap, or that an approved
-contract is wrong or incomplete, stop and run `managing-contract-changes`.
+missing decision, a contradictory plan, or a missing dependency. When executing
+a final E2E verification leaf task (`verifier` role), if the real browser run
+exposes an integration bug in earlier tasks that is still within the approved
+specification, fix the root cause (`systematic-debugging`), re-run the affected
+unit/integration tests and the E2E suite, and refresh
+`.dream/specs/<feature>/imgs/` and `.dream/specs/<feature>/report.md`. If
+implementation or E2E verification reveals a material specification gap, or
+that an approved contract is wrong or incomplete, stop and run
+`managing-contract-changes`.
 After the CCR is applied, re-enumerate incomplete leaf tasks in dependency
 order and continue; reopened tasks are ordinary incomplete tasks, and their
 `Reopened` line tells the implementer what must change.

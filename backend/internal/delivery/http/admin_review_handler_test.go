@@ -156,6 +156,8 @@ func TestAdminReviewHandler_ListReviews(t *testing.T) {
 	assert.Equal(t, "rev-1", resp.Data[0].ID)
 	assert.Equal(t, &replyContent, resp.Data[0].AdminReply)
 	assert.Equal(t, 1, resp.Meta.Pagination.Total)
+	assert.Equal(t, 2, resp.Meta.Pagination.Page)
+	assert.Equal(t, 10, resp.Meta.Pagination.Limit)
 }
 
 func TestAdminReviewHandler_UpdateReply(t *testing.T) {
@@ -215,6 +217,30 @@ func TestAdminReviewHandler_UpdateReply(t *testing.T) {
 		assert.Equal(t, "Cập nhật phản hồi thành công", resp.Message)
 		require.NotNil(t, resp.Data.AdminReply)
 		assert.Equal(t, "Cảm ơn bạn nhiều nhé!", *resp.Data.AdminReply)
+	})
+
+	t.Run("Second admin can edit reply created by first admin (Req 2.6)", func(t *testing.T) {
+		secondAdminToken, err := manager.GenerateAccessToken("admin-2", domain.RoleAdmin, 15*time.Minute)
+		require.NoError(t, err)
+
+		body := `{"reply": "Phản hồi được cập nhật bởi admin thứ hai"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/reviews/rev-1/reply", bytes.NewReader([]byte(body)))
+		req.Header.Set("Authorization", "Bearer "+secondAdminToken)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Success bool          `json:"success"`
+			Message string        `json:"message"`
+			Data    domain.Review `json:"data"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+		require.NotNil(t, resp.Data.AdminReply)
+		assert.Equal(t, "Phản hồi được cập nhật bởi admin thứ hai", *resp.Data.AdminReply)
 	})
 }
 

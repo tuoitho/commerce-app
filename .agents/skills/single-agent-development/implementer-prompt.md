@@ -44,10 +44,17 @@ Subagent:
 
     1. Implement exactly what the task specifies.
     2. For behavior changes, load and follow `test-driven-development`.
-    3. Verify the implementation works: run the focused test while iterating
+    3. For E2E verification tasks (`verifier` role), load and follow
+       `e2e-testing`, save screenshots to `.dream/specs/<feature>/imgs/`, and
+       write `.dream/specs/<feature>/report.md`. If E2E exposes an integration
+       bug in earlier tasks within the approved spec, fix the root cause
+       (`systematic-debugging`), re-run affected unit/integration tests and the
+       E2E suite, and refresh `imgs/` and `report.md`; if an approved contract
+       is wrong or incomplete, stop and report `BLOCKED`.
+    4. Verify the implementation works: run the focused test while iterating
        and the broader affected suite once before reporting.
-    4. Self-review (see below) and fix what you find.
-    5. Write the report and reply with the short status.
+    5. Self-review (see below) and fix what you find.
+    6. Write the report and reply with the short status.
 
     Work from: [directory]
 

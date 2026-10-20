@@ -104,6 +104,17 @@ Cross-boundary integration or E2E verification may be a separate leaf task when
 it validates several already-completed behaviors and has a bounded verification
 objective.
 
+For any feature that adds or modifies UI in `frontend/` or `frontend-admin/`,
+include a final E2E verification leaf task (`verifier` contract role) that loads
+`e2e-testing`, executes the real user flow in a browser (performing real login
+when the flow requires authentication), saves step-by-step screenshots to
+`.dream/specs/<feature>/imgs/`, and generates `.dream/specs/<feature>/report.md`
+referencing those images. If that E2E run exposes an integration bug in
+earlier tasks within the approved spec, the E2E task fixes the root cause,
+re-runs affected unit/integration tests and the E2E suite, and refreshes
+`imgs/` and `report.md`; if it exposes a broken or incomplete approved
+contract, stop and invoke `managing-contract-changes`.
+
 ## Complexity Check
 
 Before accepting a leaf task, verify:

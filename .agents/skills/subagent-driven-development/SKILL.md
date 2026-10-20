@@ -54,12 +54,17 @@ approved specification governs it. Current repository state remains
 authoritative for implementation details that the specification does not fix.
 
 Do not send unrelated change history or the entire feature specification when a
-scoped artifact reference is sufficient. If implementation uncovers a material
-specification gap or contradiction, or that an approved contract is wrong or
-incomplete, stop the task and run `managing-contract-changes` before resuming
-delegation. After the CCR is applied, re-enumerate incomplete leaf tasks in
-dependency order; reopened tasks are ordinary incomplete tasks, and their
-`Reopened` line tells the implementer what must change.
+scoped artifact reference is sufficient. When a final E2E verification leaf
+task (`verifier` role) exposes an integration bug in earlier tasks within the
+approved specification, the implementer fixes the root cause, re-runs the
+affected unit/integration tests and the E2E suite, and refreshes
+`.dream/specs/<feature>/imgs/` and `.dream/specs/<feature>/report.md`. If
+implementation or E2E verification uncovers a material specification gap or
+contradiction, or that an approved contract is wrong or incomplete, stop the
+task and run `managing-contract-changes` before resuming delegation. After the
+CCR is applied, re-enumerate incomplete leaf tasks in dependency order;
+reopened tasks are ordinary incomplete tasks, and their `Reopened` line tells
+the implementer what must change.
 
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.

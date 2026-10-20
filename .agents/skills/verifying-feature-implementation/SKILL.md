@@ -17,6 +17,8 @@ Read:
 - `design.md`
 - `tasks.md`
 - `changes/CCR-*.md`, when present
+- `.dream/specs/<feature>/report.md` and `.dream/specs/<feature>/imgs/*`, when
+  the feature includes UI / E2E verification
 - the cumulative working-tree review package containing committed, staged,
   unstaged, and untracked implementation changes
 - relevant production code and tests
@@ -29,7 +31,10 @@ Read:
 2. Confirm every task is complete and its stated outcome exists. A task that
    is unchecked or still carries a `Reopened` line is incomplete, and every
    CCR must be `APPLIED` or `REJECTED`. Verify implementation against the
-   current revision of each design contract, not an earlier one.
+   current revision of each design contract, not an earlier one. For UI-affecting
+   features, confirm `.dream/specs/<feature>/report.md` exists and every
+   referenced screenshot under `.dream/specs/<feature>/imgs/` is present and
+   non-empty.
 3. Confirm the implementation follows material design decisions, interfaces,
    ownership boundaries, error semantics, and migration strategy.
 4. Run focused verification first, then the broader affected checks. Record
