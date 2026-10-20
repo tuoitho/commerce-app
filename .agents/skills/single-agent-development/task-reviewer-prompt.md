@@ -121,6 +121,12 @@ Subagent:
 
     **Tests:**
     - Do the new and changed tests verify real behavior, not mocks?
+    - For E2E `verifier` tasks using **Contract-Verified Mock E2E (`page.route`)**,
+      do the route handlers consume backend-verified golden snapshots from
+      `.dream/specs/<feature>/contract-snapshots.json`, validate inbound request
+      auth/method/body, enforce 1:1 structural key/type parity with the snapshot,
+      and mutate in-memory state across `POST`/`PUT`/`PATCH`/`DELETE`? Report
+      any hand-invented envelope or mock/contract drift as Important.
     - Are the task's edge cases covered?
 
     **Structure:**

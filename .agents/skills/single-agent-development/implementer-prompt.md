@@ -45,8 +45,12 @@ Subagent:
     1. Implement exactly what the task specifies.
     2. For behavior changes, load and follow `test-driven-development`.
     3. For E2E verification tasks (`verifier` role), load and follow
-       `e2e-testing`, save screenshots to `.dream/specs/<feature>/imgs/`, and
-       write `.dream/specs/<feature>/report.md`. If E2E exposes an integration
+       `e2e-testing` using the E2E execution mode locked in `[DESIGN_FILE]` /
+       `[TASKS_FILE]` (default: `Mode 2: Contract-Verified Mock E2E` with 1:1
+       Backend Contract lock; or `Mode 1: Full-Stack Live Backend E2E` when
+       explicitly specified), save screenshots to
+       `.dream/specs/<feature>/imgs/`, and write
+       `.dream/specs/<feature>/report.md`. If E2E exposes an integration
        bug in earlier tasks within the approved spec, fix the root cause
        (`systematic-debugging`), re-run affected unit/integration tests and the
        E2E suite, and refresh `imgs/` and `report.md`; if an approved contract

@@ -79,10 +79,12 @@ Check:
 2. Design covers every requirement without inventing scope and defines all
    material boundaries, interfaces, data, error, and migration decisions.
 3. Tasks cover every requirement and acceptance criterion with deterministic
-   verification. For features that add or modify UI in `frontend/` or
-   `frontend-admin/`, `design.md` and `tasks.md` must include a final E2E
-   verification leaf task (`verifier` role) that executes real browser flows and
-   produces `.dream/specs/<feature>/imgs/` and `.dream/specs/<feature>/report.md`.
+   verification. For features that add or modify user-facing UI, `design.md` and
+   `tasks.md` must include a final E2E verification leaf task (`verifier` role)
+   that explicitly declares its E2E execution mode (defaulting to
+   `Mode 2: Contract-Verified Mock E2E`, or `Mode 1: Full-Stack Live Backend E2E`
+   when specified in `design.md`), executes real browser flows, and produces
+   `.dream/specs/<feature>/imgs/` and `.dream/specs/<feature>/report.md`.
 4. Task dependencies correctly distinguish shared-contract dependencies from
    implementation dependencies.
 

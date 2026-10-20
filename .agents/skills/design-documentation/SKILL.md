@@ -163,12 +163,14 @@ contract already satisfies the requirement.
 - Describe required testing evidence and risk coverage without duplicating
   complete test implementations unless an exact fixture or case is itself
   contractual.
-- For features that add or modify user-facing UI in `frontend/` or
-  `frontend-admin/`, `Testing Strategy` must require end-to-end Playwright
-  verification (`e2e-testing`) against the running stack (including real login
-  when the workflow is authenticated), capturing screenshot evidence under
-  `.dream/specs/<feature>/imgs/` and a summary report at
-  `.dream/specs/<feature>/report.md`.
+- For features that add or modify user-facing UI, `Testing Strategy` must
+  require end-to-end Playwright verification (`e2e-testing`) and explicitly
+  state the E2E execution mode: defaulting to
+  **`Mode 2: Contract-Verified Mock E2E (1:1 Backend Contract Lock)`** unless
+  the user explicitly requests **`Mode 1: Full-Stack Live Backend E2E`**.
+  Because the user approves `design.md`, the E2E mode is locked at spec approval
+  time, and must capture screenshot evidence under `.dream/specs/<feature>/imgs/`
+  and a summary report at `.dream/specs/<feature>/report.md`.
 - Map every requirement ID to design elements and deterministic verification.
 - Do not leave placeholders or unresolved material decisions.
 - Trace every material supporting dependency from user workflow to its canonical

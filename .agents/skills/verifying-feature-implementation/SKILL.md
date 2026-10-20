@@ -34,7 +34,12 @@ Read:
    current revision of each design contract, not an earlier one. For UI-affecting
    features, confirm `.dream/specs/<feature>/report.md` exists and every
    referenced screenshot under `.dream/specs/<feature>/imgs/` is present and
-   non-empty.
+   non-empty. When the E2E suite uses **Contract-Verified Mock E2E (`page.route`)**,
+   confirm `.dream/specs/<feature>/contract-snapshots.json` exists and is
+   verified by the backend HTTP handler/controller test suite, and confirm the
+   Playwright E2E suite loads those golden snapshots to enforce 1:1 response
+   shape parity, inbound request auth/method/body validation, and stateful
+   in-memory mutations.
 3. Confirm the implementation follows material design decisions, interfaces,
    ownership boundaries, error semantics, and migration strategy.
 4. Run focused verification first, then the broader affected checks. Record
