@@ -63,8 +63,9 @@ Delete this plan's workspace; preserve the implementation worktree
    home to every artifact of this plan: ledger, briefs, reports, review
    packages. Another plan's directory is never yours to read or write.
 3. Check `<workspace>/progress.md`. If its first line names your plan file,
-   tasks with a `Task <N>: complete` line are DONE — never redo them; resume at
-   the first task without one. A task whose last line is a fix round is
+   a task's latest status line governs: `Task <N>: complete` is DONE — never
+   redo it; `Task <N>: reopened (CCR-<NNN>)` makes it incomplete again. Resume
+   at the first incomplete task. A task whose last line is a fix round is
    mid-loop: resume at the next round. If that next round's before-package
    already exists, the round was interrupted: reuse that package, finish the
    fix, and continue the round. Otherwise create the ledger:
@@ -135,8 +136,11 @@ files. Record the replacement in the ledger.
 
 In either implementer mode, stop and report `BLOCKED` or `NEEDS_CONTEXT` on a
 missing decision, a contradictory plan, or a missing dependency. If
-implementation reveals a material specification gap, stop and update and
-re-approve the governing artifact before continuing.
+implementation reveals a material specification gap, or that an approved
+contract is wrong or incomplete, stop and run `managing-contract-changes`.
+After the CCR is applied, re-enumerate incomplete leaf tasks in dependency
+order and continue; reopened tasks are ordinary incomplete tasks, and their
+`Reopened` line tells the implementer what must change.
 
 ## Task Gate
 
@@ -207,8 +211,8 @@ On a clean review append `Task <N>: complete (review clean)`, or
 
 ## Completing A Task
 
-After the ledger line, mark the task `- [x]` in `tasks.md`; mark a parent only
-when its last child completes. The primary agent owns the ledger and
+After the ledger line, mark the task `- [x]` in `tasks.md` and remove its
+`Reopened` line if present; mark a parent only when its last child completes. The primary agent owns the ledger and
 `tasks.md` in every mode. Mark the todo complete and continue to the next leaf
 task.
 

@@ -55,8 +55,11 @@ authoritative for implementation details that the specification does not fix.
 
 Do not send unrelated change history or the entire feature specification when a
 scoped artifact reference is sufficient. If implementation uncovers a material
-specification gap or contradiction, stop the task and update and approve the
-governing artifact before resuming delegation.
+specification gap or contradiction, or that an approved contract is wrong or
+incomplete, stop the task and run `managing-contract-changes` before resuming
+delegation. After the CCR is applied, re-enumerate incomplete leaf tasks in
+dependency order; reopened tasks are ordinary incomplete tasks, and their
+`Reopened` line tells the implementer what must change.
 
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.
@@ -212,8 +215,10 @@ a ledger file, not only in todos.
   every artifact for THIS plan: ledger, briefs, reports, review packages.
   Another plan's directory is never yours to read or write.
 - Check for this plan's ledger at `<workspace>/progress.md`. If its first
-  line names your plan file, tasks with a `Task <N>: complete` line are DONE
-  — do not re-dispatch them; resume at the first task without one. A task
+  line names your plan file, a task's latest status line governs:
+  `Task <N>: complete` is DONE — do not re-dispatch it;
+  `Task <N>: reopened (CCR-<NNN>)` makes it incomplete again. Resume at the
+  first incomplete task. A task
   whose last line is a fix round is mid-loop: resume the loop at the next
   round. A ledger whose first line names a different plan file — or a stray
   ledger at the old flat path `.dream/sdd/progress.md` — is another
@@ -490,8 +495,8 @@ message as your other bookkeeping:
 - `Task <N>: complete (<K> parked)` after a
   tripped breaker
 
-Then mark the completed task from `- [ ]` to `- [x]` in canonical `tasks.md`
-and mark the todo complete. Do not mark an item complete without corresponding
+Then mark the completed task from `- [ ]` to `- [x]` in canonical `tasks.md`,
+remove its `Reopened` line if present, and mark the todo complete. Do not mark an item complete without corresponding
 implementation and verification evidence. Never complete a parent checkbox
 while any child checkbox remains incomplete; mark it automatically when its
 last child passes review. Continue to the next leaf task. Do not proceed while

@@ -16,6 +16,7 @@ Read:
 - `requirements.md`
 - `design.md`
 - `tasks.md`
+- `changes/CCR-*.md`, when present
 - the cumulative working-tree review package containing committed, staged,
   unstaged, and untracked implementation changes
 - relevant production code and tests
@@ -25,7 +26,10 @@ Read:
 
 1. Map every requirement ID and acceptance criterion to implementation and test
    evidence with exact file references.
-2. Confirm every task is complete and its stated outcome exists.
+2. Confirm every task is complete and its stated outcome exists. A task that
+   is unchecked or still carries a `Reopened` line is incomplete, and every
+   CCR must be `APPLIED` or `REJECTED`. Verify implementation against the
+   current revision of each design contract, not an earlier one.
 3. Confirm the implementation follows material design decisions, interfaces,
    ownership boundaries, error semantics, and migration strategy.
 4. Run focused verification first, then the broader affected checks. Record

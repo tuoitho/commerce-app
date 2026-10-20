@@ -32,6 +32,7 @@ executable units dispatched to coding agents.
   - **Produces:** `GET /items/{id}` with the approved detail contract.
   - **Scope:** query/mapping, boundary handling, and focused tests.
   - **Consumes:** approved data and payload contracts from design.
+  - **Contracts:** API-ITEMS@1 (provider); DB-ITEMS@1 (consumer)
   - **Acceptance:** valid requests return the complete projection; missing targets return the approved not-found contract; values and metadata are preserved.
   - **Verification:** focused automated tests proving the behavior.
   - _Requirements: 3.8, 7.1, 8.6_
@@ -39,6 +40,23 @@ executable units dispatched to coding agents.
 
 Parent epic checkboxes represent aggregate progress only. Do not dispatch,
 implement, or review an epic separately from its leaf tasks.
+
+`Contracts` lists every design contract the task touches as
+`<ID>@<rev> (<role>)`, or `none`:
+
+- `provider` — implements the producing side: endpoint, handler, migration,
+  event emitter, shared type or configuration definition;
+- `consumer` — calls, reads, renders, or otherwise depends on the contract;
+- `verifier` — integration or E2E work whose objective is proving the
+  contract across boundaries.
+
+This field lets `managing-contract-changes` compute which completed tasks a
+contract revision invalidates, so list every contract the task's code
+provides, consumes, or verifies.
+
+A task reopened by a contract change carries
+`- **Reopened:** CCR-<NNN> — <required change>` until the executing workflow
+completes it again.
 
 ## Leaf Task Right-Sizing
 
@@ -266,7 +284,10 @@ First self-check:
 11. absence of implementation tasks that must invent missing shared contracts,
     ownership, semantics, or compatibility behavior;
 12. absence of duplicate implementation work when an existing approved
-    capability is sufficient.
+    capability is sufficient;
+13. every `Contracts` entry names a contract ID and current revision defined
+    in `design.md`, and every design contract has at least one provider task
+    or an existing provider outside the feature.
 
 ## Completion
 After the self-check passes, return the completed `tasks.md` to the coordinating

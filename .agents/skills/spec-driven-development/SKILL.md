@@ -98,7 +98,8 @@ reconciling them.
     specification revision and run one new independent review cycle.
     Automated reviewer fixes do not reset the three-round budget.
 11. Stop when the user approves `tasks.md`. Report the artifact paths and that
-    implementation is a separate workflow.
+    implementation is a separate workflow. Later changes to the approved
+    specification go through `managing-contract-changes`.
 
 ## Approval State
 

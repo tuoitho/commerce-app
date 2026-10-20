@@ -102,6 +102,20 @@ definition.
 Do not introduce a shared contract where no cross-boundary agreement between
 independently implemented work units is needed.
 
+Give each material contract a stable ID and revision as its own heading:
+
+```markdown
+#### Contract API-CHAT-CUSTOMER (rev 1)
+```
+
+Use uppercase kebab-case IDs prefixed by kind: `API-`, `WS-`, `EVENT-`,
+`DB-`, `TYPE-`, `CONFIG-`. Contracts include HTTP and WebSocket interfaces,
+events, persisted schema read or written by more than one task, and shared
+types or configuration keys relied on across tasks or packages. Every contract
+starts at `rev 1`. Tasks reference contracts by `<ID>@<rev>`, so after
+`tasks.md` is approved a contract changes only through
+`managing-contract-changes`, which increments its revision.
+
 ## Feature Dependencies
 
 For every material downstream impact or supporting dependency identified by the

@@ -13,7 +13,7 @@
 
 - Local fixes and explicit behavior changes confined to one bounded context may proceed directly with focused tests. Any API/schema/event, compatibility, persistence/security boundary, cross-package, or materially ambiguous behavior change requires an approved dream specification first.
 - Canonical governed artifacts are `.dream/specs/<feature>/requirements.md`, `design.md`, and `tasks.md`; approve each stage and independently review the complete set before implementation. `tasks.md` is the implementation plan.
-- If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. Verify completed governed work against requirement IDs and acceptance criteria.
+- If implementation contradicts an approved artifact, update and re-approve that artifact before continuing. After `tasks.md` is approved, change approved requirements, design contracts (API, events, schema, shared types, configuration keys), or tasks through a Contract Change Request with the `managing-contract-changes` skill; it records `.dream/specs/<feature>/changes/CCR-<NNN>-<slug>.md` and reopens exactly the tasks the change affects. Verify completed governed work against requirement IDs and acceptance criteria.
 - Use the `question` tool for blocking product/architecture choices and approval gates that repository evidence cannot resolve.
 - Whenever database schema, tables, columns, constraints, or queries are modified:
   - Add numbered migration files in `backend/db/migrations/` (`.up.sql` and `.down.sql`).

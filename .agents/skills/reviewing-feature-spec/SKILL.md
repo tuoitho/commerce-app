@@ -279,6 +279,42 @@ Use this output in Re-review Mode:
 **Status:** Approved | Issues Remain
 ```
 
+## Change Review Mode
+
+When the caller supplies a CCR from `managing-contract-changes`, the artifact
+paths, and the artifact diff, review only that change. Do not repeat the broad
+specification review.
+
+Check:
+
+1. The CCR, `design.md` contract headings, and `tasks.md` references agree on
+   every changed contract's new revision.
+2. Each compatibility class is correct for existing consumers. A change that
+   requires any existing consumer to change is not `additive`.
+3. The impact table follows the reopen rules: every task referencing a changed
+   contract appears, and each action matches its role and compatibility class.
+4. Every direct code consumer of a changed contract is covered by a reopened
+   or new task. Establish consumers with bounded repository evidence, as in
+   the Independent Dependency Check.
+5. Changed requirements, design sections, and tasks are consistent with each
+   other and with untouched sections that directly depend on the changed
+   contracts.
+6. Schema changes add a new migration instead of editing an applied one.
+
+Apply the normal Finding Gate. Later repair rounds use Re-review Mode.
+
+```markdown
+## Contract Change Review: CCR-<NNN>
+
+**Status:** Approved | Issues Found
+
+### Blocking Issues
+- [artifact:section]: Issue and why it blocks correct implementation.
+
+### Advisory Notes
+- [artifact:section]: Non-blocking risk or clarification.
+```
+
 ## Output
 
 ```markdown
