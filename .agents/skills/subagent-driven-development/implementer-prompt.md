@@ -150,7 +150,7 @@ Subagent:
 
 **Placeholders:**
 - `[BRIEF_FILE]`, `[REPORT_FILE]` — REQUIRED: the values printed by
-  `bash scripts/task-brief PLAN_FILE N`, verbatim
+  `node scripts/task-brief.mjs PLAN_FILE N`, verbatim
 - `[REQUIREMENTS_FILE]`, `[DESIGN_FILE]`, `[TASKS_FILE]` — the governing
   feature artifacts
 - `N`, `[task name]` — the task ID and title from the brief

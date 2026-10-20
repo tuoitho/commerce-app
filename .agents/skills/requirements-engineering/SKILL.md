@@ -132,7 +132,8 @@ Before requesting approval:
    implementation could technically supply it.
 7. Identify any remaining material ambiguity explicitly.
 
-Use the `question` tool to ask exactly:
+Use the platform's structured user-question tool (e.g., `question` or
+`ask_question`) to ask exactly:
 
 "Do the requirements look good? If so, we can move on to the design."
 

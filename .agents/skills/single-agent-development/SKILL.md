@@ -58,7 +58,8 @@ Delete this plan's workspace; preserve the implementation worktree
 
 1. Load `using-git-worktrees` and work in an isolated worktree. Never start on
    `main` or `master` without the user's explicit consent.
-2. Run `bash scripts/sad-workspace PLAN_FILE`. It prints this plan's
+2. Run this skill's `node scripts/sad-workspace.mjs PLAN_FILE` (resolving
+   `scripts/` relative to this skill's directory). It prints this plan's
    git-ignored directory (`<repo-root>/.dream/sad/<parent>-<plan-basename>/`),
    home to every artifact of this plan: ledger, briefs, reports, review
    packages. Another plan's directory is never yours to read or write.
@@ -86,18 +87,20 @@ Implementer: <agent/session id, persistent mode only>
 5. Scan the plan once for tasks that contradict each other or the Global
    Constraints, and for anything the plan mandates that the review rubric
    treats as a defect (a test that asserts nothing, verbatim duplication of a
-   logic block). Present all findings to the user as one batched `question`,
-   each beside the plan text that mandates it. A clean scan proceeds silently.
+   logic block). Present all findings to the user as one batched prompt via the
+   platform's structured user-question tool (e.g., `question` or
+   `ask_question`), each beside the plan text that mandates it. A clean scan
+   proceeds silently.
 6. Enumerate incomplete leaf tasks in dependency order. One todo per leaf
    task; exactly one in progress.
 
 ## Implementing A Task
 
 Before each task and each fix, capture an immutable before-package:
-`bash scripts/review-package PLAN_FILE BASE_SHA HEAD <workspace>/task-<N>-r<R>-before.diff`
+`node scripts/review-package.mjs PLAN_FILE BASE_SHA HEAD <workspace>/task-<N>-r<R>-before.diff`
 (R=0 for the initial implementation). Never reuse a package path.
 
-Run `bash scripts/task-brief PLAN_FILE N`. It prints absolute `BRIEF_FILE=`
+Run `node scripts/task-brief.mjs PLAN_FILE N`. It prints absolute `BRIEF_FILE=`
 and `REPORT_FILE=` values; use them verbatim.
 
 **`implementer=main`:** implement directly in the current session and follow
@@ -145,7 +148,7 @@ order and continue; reopened tasks are ordinary incomplete tasks, and their
 ## Task Gate
 
 Capture the after-package with
-`bash scripts/review-package PLAN_FILE BASE_SHA HEAD <workspace>/task-<N>-r<R>-after.diff`.
+`node scripts/review-package.mjs PLAN_FILE BASE_SHA HEAD <workspace>/task-<N>-r<R>-after.diff`.
 
 ### `review=final-only`
 
@@ -220,7 +223,7 @@ task.
 
 After every task is complete:
 
-1. Run `bash scripts/review-package PLAN_FILE BASE_SHA HEAD <workspace>/final-before.diff`.
+1. Run `node scripts/review-package.mjs PLAN_FILE BASE_SHA HEAD <workspace>/final-before.diff`.
 2. Dispatch a fresh reviewer on the most capable available model using
    `requesting-code-review` with the `review-agent` skill. Provide the
    requirements, design, tasks, the package path, the reports, and the

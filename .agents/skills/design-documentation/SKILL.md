@@ -195,7 +195,8 @@ Review the design for:
 
 Present material architecture decisions and research findings.
 
-Use the `question` tool to ask exactly:
+Use the platform's structured user-question tool (e.g., `question` or
+`ask_question`) to ask exactly:
 
 "Does the design look good? If so, we can move on to the implementation plan."
 

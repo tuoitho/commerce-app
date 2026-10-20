@@ -210,7 +210,8 @@ sequences — the single most expensive failure observed. Track progress in
 a ledger file, not only in todos.
 
 - Each plan owns a workspace: at skill start, run this skill's
-  ` scripts/sdd-workspace PLAN_FILE` — it prints the plan's git-ignored
+  `node scripts/sdd-workspace.mjs PLAN_FILE` (resolving `scripts/` relative to
+  this skill's directory) — it prints the plan's git-ignored
   directory (`<repo-root>/.dream/sdd/<parent>-<plan-basename>/`), home to
   every artifact for THIS plan: ledger, briefs, reports, review packages.
   Another plan's directory is never yours to read or write.
@@ -301,11 +302,11 @@ packages compare that base with the current working tree, including untracked
 files, so implementation does not require per-task commits.
 
 - **Before snapshot:** immediately before dispatching each task or fix, run
-  ` scripts/review-package PLAN_FILE BASE HEAD <unique-before-path>`. The
+  `node scripts/review-package.mjs PLAN_FILE BASE HEAD <unique-before-path>`. The
   path must include the task ID and review round. Never reuse or overwrite it.
 
 - **Task artifacts:** before dispatching an implementer, run this skill's
-  `scripts/task-brief PLAN_FILE N`. It extracts the task's full text and prints
+  `node scripts/task-brief.mjs PLAN_FILE N`. It extracts the task's full text and prints
   absolute `BRIEF_FILE=...` and `REPORT_FILE=...` values. Copy both printed
   values verbatim into the dispatch; never construct, shorten, or relocate the
   report path. Compose the dispatch so the
@@ -339,7 +340,7 @@ Template: [implementer-prompt.md](implementer-prompt.md)
 Implementer subagents report one of four statuses. Handle each appropriately:
 
 **DONE:** Generate the immutable `after` package with
-` scripts/review-package PLAN_FILE BASE HEAD <unique-after-path>`. Dispatch
+`node scripts/review-package.mjs PLAN_FILE BASE HEAD <unique-after-path>`. Dispatch
 the task reviewer with the matching `before` and `after` paths.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
@@ -367,7 +368,7 @@ required. Implementer self-review never replaces the task review; both are
 needed.
 
 - Hand the reviewer the cumulative `before` and `after` package files generated
-  with ` scripts/review-package PLAN_FILE BASE HEAD OUTFILE`. Comparing the
+  with `node scripts/review-package.mjs PLAN_FILE BASE HEAD OUTFILE`. Comparing the
   snapshots isolates the current task and catches unreported changed files.
   Never dispatch a task reviewer without both files.
 - **Reviewer inputs:** the task reviewer gets four paths — the same brief file,
@@ -506,7 +507,7 @@ parked-with-ruling at the cap.
 ## Final Review
 
 The final whole-branch review gets a package too: run
-` scripts/review-package PLAN_FILE MERGE_BASE HEAD OUTFILE` (MERGE_BASE = the commit the
+`node scripts/review-package.mjs PLAN_FILE MERGE_BASE HEAD OUTFILE` (MERGE_BASE = the commit the
 branch started from, e.g. `git merge-base main HEAD`) and include the
 printed path in the final review dispatch, so the final reviewer reads
 one file instead of re-deriving the branch diff with git commands. Dispatch

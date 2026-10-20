@@ -58,9 +58,10 @@ repository whenever possible.
 Ask one logical decision at a time. Prefer a recommended option with concise
 alternatives and consequences.
 
-When work cannot continue without the answer, invoke OpenCode's `question`
-tool so the session is explicitly waiting. A non-blocking conversational
-question may remain ordinary prose.
+When work cannot continue without the answer, invoke the platform's structured
+user-question tool (e.g., `question` or `ask_question`) so the session is
+explicitly waiting. A non-blocking conversational question may remain ordinary
+prose.
 
 ## Explore alternatives
 
@@ -118,6 +119,6 @@ implementation.
 
 - brainstorming despite a sufficient active feature specification
 - asking questions whose answers are discoverable from the repository
-- using prose for a blocking question instead of the `question` tool
+- using prose for a blocking question instead of the platform's structured user-question tool (e.g., `question` or `ask_question`)
 - implementing before material decisions are recorded
 - implementing before requirements and design approvals

@@ -54,8 +54,9 @@ reconciling them.
    decision and obtain explicit approval. After `brainstorming` hands back approved decisions,
    update `requirements.md` to match. If no such ambiguity remains, refine
    requirements through targeted feedback only.
-4. Present the requirements through the `question` tool and request explicit
-   user approval. Stop and wait.
+4. Present the requirements through the platform's structured user-question
+   tool (e.g., `question` or `ask_question`) and request explicit user approval.
+   Stop and wait.
 5. After approval, load `design-documentation` and create or revise `design.md`.
 
    During design, inspect the concrete repository architecture and contracts
@@ -66,8 +67,9 @@ reconciling them.
    requirement, return to requirements engineering and obtain approval again.
    Purely technical resolution of an already approved behavior remains a design
    decision.
-6. Present material design decisions through the `question` tool and request
-   explicit user approval. Stop and wait.
+6. Present material design decisions through the platform's structured
+   user-question tool (e.g., `question` or `ask_question`) and request explicit
+   user approval. Stop and wait.
 7. After approval, load `task-breakdown` and create or revise `tasks.md`.
 8. Dispatch one fresh reviewer subagent. Tell it to load
    `reviewing-feature-spec`, pass all three artifact paths, and perform the
@@ -93,7 +95,8 @@ reconciling them.
    remaining findings, conflicting artifact text, and repair history to the
    user for adjudication.
 10. After independent review is approved, present `tasks.md` through the
-    `question` tool and request explicit user approval. If user feedback
+    platform's structured user-question tool (e.g., `question` or
+    `ask_question`) and request explicit user approval. If user feedback
     materially changes approved scope or behavior, treat it as a new
     specification revision and run one new independent review cycle.
     Automated reviewer fixes do not reset the three-round budget.
@@ -116,8 +119,8 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
 - Do not skip tasks approval or combine two artifact phases in one interaction.
 - Do not implement code in the same response that creates or completes the
   specification.
-- Do not proceed through a material user decision without using the `question`
-  tool.
+- Do not proceed through a material user decision without using the platform's
+  structured user-question tool (e.g., `question` or `ask_question`).
 - When independently implemented work crosses a shared boundary, require the
   design to stabilize every material shared contract before tasks treat those
   work units as independently executable.

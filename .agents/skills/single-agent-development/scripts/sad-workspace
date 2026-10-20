@@ -20,6 +20,18 @@
 # Usage: sad-workspace PLAN_FILE
 set -euo pipefail
 
+to_host_path() {
+  path=$1
+  if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null \
+    && command -v wslpath >/dev/null 2>&1; then
+    wslpath -w "$path"
+  elif command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$path"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
 if [ $# -ne 1 ]; then
   echo "usage: sad-workspace PLAN_FILE" >&2
   exit 2
@@ -34,9 +46,13 @@ slug="${parent}-${name}"
 [ -n "$slug" ] && [ "$slug" != "." ] && [ "$slug" != ".." ] \
   || { echo "cannot derive a workspace name from: $plan" >&2; exit 2; }
 
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel 2>/dev/null || git.exe rev-parse --show-toplevel 2>/dev/null | tr -d '\r')
+if command -v wslpath >/dev/null 2>&1 && printf '%s' "$root" | grep -q '^[A-Za-z]:'; then
+  root=$(wslpath -u "$root")
+fi
 base="$root/.dream/sad"
 dir="$base/$slug"
 mkdir -p "$dir"
 printf '*\n' > "$base/.gitignore"
-cd "$dir" && pwd
+resolved=$(cd "$dir" && pwd)
+to_host_path "$resolved"

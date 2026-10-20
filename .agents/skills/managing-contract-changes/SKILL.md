@@ -71,7 +71,8 @@ between two classes, choose the stricter one.
    `Status: PROPOSED`. `<NNN>` is the next three-digit number in that
    directory.
 5. **Request approval.** Present the change, each contract's compatibility
-   class, and the impact table through the `question` tool. Stop and wait. On
+   class, and the impact table through the platform's structured user-question
+   tool (e.g., `question` or `ask_question`). Stop and wait. On
    rejection, set `Status: REJECTED`, revert any backfill that is not needed,
    and stop.
 6. **Apply** the approved CCR to the artifacts (see Applying).

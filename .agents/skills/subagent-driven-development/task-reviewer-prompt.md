@@ -220,7 +220,7 @@ Subagent:
 ```
 
 **Placeholders:**
-- `[BRIEF_FILE]` — REQUIRED: the task brief file (`bash scripts/task-brief PLAN N`
+- `[BRIEF_FILE]` — REQUIRED: the task brief file (`node scripts/task-brief.mjs PLAN N`
   prints the path; same file the implementer worked from)
 - `[REQUIREMENTS_FILE]`, `[DESIGN_FILE]`, `[TASKS_FILE]` — the governing
   feature artifacts

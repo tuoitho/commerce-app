@@ -1,174 +1,232 @@
 ---
 name: e2e-testing
-description: Playwright E2E testing patterns, Page Object Model, configuration, CI/CD integration, artifact management, and flaky test strategies. Use when writing Playwright tests, structuring page objects, or fixing flaky E2E runs in CI.
-metadata:
-  origin: ECC
+description: Playwright E2E testing patterns, Page Object Model, configuration, .dream requirement/contract traceability, and flaky test strategies for frontend (:15173) and frontend-admin (:15174). Use when writing Playwright tests, structuring page objects, or verifying cross-boundary contracts.
 ---
 
 # E2E Testing Patterns
 
-Comprehensive Playwright patterns for building stable, fast, and maintainable E2E test suites.
+Playwright patterns for building stable, fast, and maintainable E2E test suites across `frontend/` (storefront) and `frontend-admin/` (admin portal), integrated with `.dream` specification governance.
+
+## `.dream` Governance & Traceability
+
+When a `.dream/specs/<feature>/` specification governs the work, E2E tests act as cross-boundary verification (`verifier` role):
+
+1. **Contract Role (`verifier`):** Leaf tasks in `tasks.md` that implement or update E2E suites declare the contracts they prove under `Contracts`, e.g.:
+   ```markdown
+   - **Contracts:** API-CART@1 (verifier); API-ORDERS@1 (verifier)
+   - _Requirements: 2.1, 2.3, 4.2_
+   ```
+2. **Requirement Traceability:** Reference the covered requirement IDs (`_Requirements: X.Y_`) in the spec file header or `test.describe` / `test` titles so `verifying-feature-implementation` can map every acceptance criterion to deterministic test evidence.
+3. **API Envelope Verification:** Verify `/api/v1` responses and UI reactions against the repository's Full Status Envelope:
+   - **Success (`200`, `201`):** `{"success": true, "message": string, "data": <T>, "error": null, "meta": {"timestamp": string, "pagination"?: PaginationMeta}}`.
+   - **No Content (`204`):** `POST /api/v1/auth/logout` returns HTTP 204 with no body.
+   - **Validation Error (`400`):** `error.code` (e.g. `"validation_error"`, `"invalid_filter"`) and `error.fields` mapped to form field error messages.
+   - **Business Logic Error (`401`, `404`, `409`):** `error.code` (e.g. `"out_of_stock"`, `"stock_limit"`, `"email_in_use"`, `"cart_item_unavailable"`) with user-facing Vietnamese messages rendered in alerts or `sonner` toasts.
+
+## Repository Architecture & Ports
+
+| Package | Directory | Dev Server Port | Preview Port | Backend Proxy Target |
+|---|---|---|---|---|
+| Storefront | `frontend/` | `http://localhost:15173` | `http://127.0.0.1:4173` | `http://localhost:${HTTP_PORT:-18080}` (`/api`, `/media`) |
+| Admin Portal | `frontend-admin/` | `http://localhost:15174` | `http://127.0.0.1:4174` | `http://localhost:${HTTP_PORT:-18080}` (`/api`) |
+| Backend API | `backend/` | `http://localhost:18080` | — | Base path `/api/v1` |
+
+Run E2E commands from the respective package directory (`frontend/` or `frontend-admin/`). Notice that Vitest (`npm test`) excludes `e2e/**` in `vite.config.ts`, whereas Playwright (`npm run test:e2e` / `npx playwright test`) executes specs inside `./e2e`.
 
 ## Test File Organization
 
-```
-tests/
+```text
+frontend/ (or frontend-admin/)
 ├── e2e/
 │   ├── auth/
 │   │   ├── login.spec.ts
-│   │   ├── logout.spec.ts
-│   │   └── register.spec.ts
-│   ├── features/
+│   │   └── logout.spec.ts
+│   ├── catalog/
 │   │   ├── browse.spec.ts
-│   │   ├── search.spec.ts
-│   │   └── create.spec.ts
-│   └── api/
-│       └── endpoints.spec.ts
-├── fixtures/
-│   ├── auth.ts
-│   └── data.ts
-└── playwright.config.ts
+│   │   └── product-detail.spec.ts
+│   ├── cart/
+│   │   └── cart-checkout.spec.ts
+│   ├── fixtures/
+│   │   ├── auth.ts
+│   │   └── catalog-data.ts
+│   └── pages/
+│       ├── CatalogPage.ts
+│       └── CartPage.ts
+├── playwright.config.ts
+└── vite.config.ts
 ```
 
 ## Page Object Model (POM)
 
 ```typescript
-import { Page, Locator } from '@playwright/test'
+import { Page, Locator, expect } from '@playwright/test'
 
-export class ItemsPage {
+export class CatalogPage {
   readonly page: Page
   readonly searchInput: Locator
-  readonly itemCards: Locator
-  readonly createButton: Locator
+  readonly productCards: Locator
+  readonly emptyState: Locator
 
   constructor(page: Page) {
     this.page = page
     this.searchInput = page.locator('[data-testid="search-input"]')
-    this.itemCards = page.locator('[data-testid="item-card"]')
-    this.createButton = page.locator('[data-testid="create-btn"]')
+    this.productCards = page.locator('[data-testid="product-card"]')
+    this.emptyState = page.locator('[data-testid="empty-catalog"]')
   }
 
   async goto() {
-    await this.page.goto('/items')
-    await this.page.waitForLoadState('networkidle')
+    await this.page.goto('/')
   }
 
   async search(query: string) {
+    const responsePromise = this.page.waitForResponse(
+      resp => resp.url().includes('/api/v1/products') && resp.request().method() === 'GET'
+    )
     await this.searchInput.fill(query)
-    await this.page.waitForResponse(resp => resp.url().includes('/api/search'))
-    await this.page.waitForLoadState('networkidle')
+    await responsePromise
   }
 
-  async getItemCount() {
-    return await this.itemCards.count()
+  async getProductCount() {
+    return await this.productCards.count()
+  }
+
+  async expectLoaded() {
+    await expect(this.productCards.first()).toBeVisible()
   }
 }
 ```
 
-## Test Structure
+## Test Structure with Requirement & Contract Mapping
 
 ```typescript
+// Contracts: API-CATALOG@1 (verifier)
+// _Requirements: 1.1, 1.2_
 import { test, expect } from '@playwright/test'
-import { ItemsPage } from '../../pages/ItemsPage'
+import { CatalogPage } from '../pages/CatalogPage'
 
-test.describe('Item Search', () => {
-  let itemsPage: ItemsPage
+test.describe('Catalog Search [Req 1.1, 1.2]', () => {
+  let catalogPage: CatalogPage
 
   test.beforeEach(async ({ page }) => {
-    itemsPage = new ItemsPage(page)
-    await itemsPage.goto()
+    catalogPage = new CatalogPage(page)
+    await catalogPage.goto()
   })
 
-  test('should search by keyword', async ({ page }) => {
-    await itemsPage.search('test')
+  test('1.1: filters products by keyword via /api/v1/products', async () => {
+    await catalogPage.search('áo')
 
-    const count = await itemsPage.getItemCount()
+    const count = await catalogPage.getProductCount()
     expect(count).toBeGreaterThan(0)
-
-    await expect(itemsPage.itemCards.first()).toContainText(/test/i)
-    await page.screenshot({ path: 'artifacts/search-results.png' })
+    await expect(catalogPage.productCards.first()).toContainText(/áo/i)
   })
 
-  test('should handle no results', async ({ page }) => {
-    await itemsPage.search('xyznonexistent123')
+  test('1.2: renders empty state when no products match filter', async () => {
+    await catalogPage.search('xyznonexistent123')
 
-    await expect(page.locator('[data-testid="no-results"]')).toBeVisible()
-    expect(await itemsPage.getItemCount()).toBe(0)
+    await expect(catalogPage.emptyState).toBeVisible()
+    expect(await catalogPage.getProductCount()).toBe(0)
   })
 })
 ```
 
 ## Playwright Configuration
 
+### Storefront (`frontend/playwright.config.ts`)
+
+For deterministic UI/layout verification against the production bundle (`vite preview` on `:4173`) or full-stack integration against the Vite dev server (`:15173`):
+
 ```typescript
 import { defineConfig, devices } from '@playwright/test'
 
+const baseURL = process.env.BASE_URL || 'http://localhost:15173'
+
 export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: true,
+  testDir: './e2e',
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['junit', { outputFile: 'playwright-results.xml' }],
-    ['json', { outputFile: 'playwright-results.json' }]
-  ],
+  reporter: process.env.CI ? 'dot' : 'list',
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    trace: 'on-first-retry',
+    baseURL,
+    browserName: 'chromium',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
-  ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 120_000,
   },
+  projects: [
+    { name: 'chromium-320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 720 } } },
+    { name: 'chromium-767', use: { ...devices['Desktop Chrome'], viewport: { width: 767, height: 900 } } },
+    { name: 'chromium-1440', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+  ],
+})
+```
+
+> For `frontend-admin/`, set `baseURL` and `webServer.url` to `http://localhost:15174`. Never leave dev servers running unbounded in the foreground outside Playwright's managed `webServer` lifecycle.
+
+## Verifying `/api/v1` Status Envelope & Business Errors
+
+When testing cart, checkout, or admin mutations, assert both the HTTP `/api/v1` status envelope and the Vietnamese business error feedback:
+
+```typescript
+// Contracts: API-CART@1 (verifier)
+// _Requirements: 3.2, 3.4_
+import { test, expect } from '@playwright/test'
+
+test.describe('Cart Stock Limit [Req 3.2, 3.4]', () => {
+  test('3.4: displays Vietnamese business error when adding beyond available stock', async ({ page }) => {
+    await page.goto('/products/sample-slug')
+
+    const addResponsePromise = page.waitForResponse(
+      resp => resp.url().includes('/api/v1/cart/items') && resp.request().method() === 'POST'
+    )
+
+    await page.locator('[data-testid="quantity-input"]').fill('999')
+    await page.locator('[data-testid="add-to-cart-btn"]').click()
+
+    const response = await addResponsePromise
+    expect(response.status()).toBe(409)
+
+    const body = await response.json()
+    expect(body.success).toBe(false)
+    expect(body.error.code).toBe('stock_limit')
+
+    // User-facing Vietnamese business message must be shown via toast/alert
+    await expect(page.getByText(body.error.message)).toBeVisible()
+  })
+
+  test('validation error (400) binds error.fields to form inputs', async ({ page }) => {
+    await page.goto('/login')
+    await page.locator('[data-testid="login-submit"]').click()
+
+    await expect(page.locator('[data-testid="email-error"]')).toBeVisible()
+  })
 })
 ```
 
 ## Flaky Test Patterns
 
-### Quarantine
-
-```typescript
-test('flaky: complex search', async ({ page }) => {
-  test.fixme(true, 'Flaky - Issue #123')
-  // test code...
-})
-
-test('conditional skip', async ({ page }) => {
-  test.skip(process.env.CI, 'Flaky in CI - Issue #123')
-  // test code...
-})
-```
-
 ### Identify Flakiness
 
 ```bash
-npx playwright test tests/search.spec.ts --repeat-each=10
-npx playwright test tests/search.spec.ts --retries=3
+npx playwright test e2e/catalog/browse.spec.ts --repeat-each=5
 ```
 
 ### Common Causes & Fixes
 
 **Race conditions:**
 ```typescript
-// Bad: assumes element is ready
-await page.click('[data-testid="button"]')
+// Bad: assumes element is ready immediately
+await page.click('[data-testid="add-to-cart-btn"]')
 
 // Good: auto-wait locator
-await page.locator('[data-testid="button"]').click()
+await page.locator('[data-testid="add-to-cart-btn"]').click()
 ```
 
 **Network timing:**
@@ -176,152 +234,26 @@ await page.locator('[data-testid="button"]').click()
 // Bad: arbitrary timeout
 await page.waitForTimeout(5000)
 
-// Good: wait for specific condition
-await page.waitForResponse(resp => resp.url().includes('/api/data'))
+// Good: wait for the specific /api/v1 endpoint response
+await page.waitForResponse(resp => resp.url().includes('/api/v1/cart'))
 ```
 
-**Animation timing:**
+**Animation / transition timing:**
 ```typescript
-// Bad: click during animation
-await page.click('[data-testid="menu-item"]')
-
-// Good: wait for stability
-await page.locator('[data-testid="menu-item"]').waitFor({ state: 'visible' })
-await page.waitForLoadState('networkidle')
-await page.locator('[data-testid="menu-item"]').click()
+// Good: wait for visibility before interacting
+const drawer = page.locator('[data-testid="cart-drawer"]')
+await expect(drawer).toBeVisible()
+await drawer.locator('[data-testid="checkout-btn"]').click()
 ```
 
-## Artifact Management
+## Artifact & Evidence Reporting
 
-### Screenshots
-
-```typescript
-await page.screenshot({ path: 'artifacts/after-login.png' })
-await page.screenshot({ path: 'artifacts/full-page.png', fullPage: true })
-await page.locator('[data-testid="chart"]').screenshot({ path: 'artifacts/chart.png' })
-```
-
-### Traces
-
-```typescript
-await browser.startTracing(page, {
-  path: 'artifacts/trace.json',
-  screenshots: true,
-  snapshots: true,
-})
-// ... test actions ...
-await browser.stopTracing()
-```
-
-### Video
-
-```typescript
-// In playwright.config.ts
-use: {
-  video: 'retain-on-failure',
-  videosPath: 'artifacts/videos/'
-}
-```
-
-## CI/CD Integration
-
-```yaml
-# .github/workflows/e2e.yml
-name: E2E Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npx playwright test
-        env:
-          BASE_URL: ${{ vars.STAGING_URL }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
-```
-
-## Test Report Template
+When reporting E2E execution for `.dream` tasks or `verifying-feature-implementation`, include exact commands, requirement coverage, and outcomes:
 
 ```markdown
-# E2E Test Report
-
-**Date:** YYYY-MM-DD HH:MM
-**Duration:** Xm Ys
-**Status:** PASSING / FAILING
-
-## Summary
-- Total: X | Passed: Y (Z%) | Failed: A | Flaky: B | Skipped: C
-
-## Failed Tests
-
-### test-name
-**File:** `tests/e2e/feature.spec.ts:45`
-**Error:** Expected element to be visible
-**Screenshot:** artifacts/failed.png
-**Recommended Fix:** [description]
-
-## Artifacts
-- HTML Report: playwright-report/index.html
-- Screenshots: artifacts/*.png
-- Videos: artifacts/videos/*.webm
-- Traces: artifacts/*.zip
+### E2E Verification Evidence
+- **Command:** `npx playwright test e2e/cart/cart-checkout.spec.ts` (from `frontend/`)
+- **Contracts Verified:** `API-CART@1 (verifier)`
+- **Requirements Covered:** `3.2`, `3.4` — Pass (6/6 tests across viewports)
 ```
 
-## Wallet / Web3 Testing
-
-```typescript
-test('wallet connection', async ({ page, context }) => {
-  // Mock wallet provider
-  await context.addInitScript(() => {
-    window.ethereum = {
-      isMetaMask: true,
-      request: async ({ method }) => {
-        if (method === 'eth_requestAccounts')
-          return ['0x1234567890123456789012345678901234567890']
-        if (method === 'eth_chainId') return '0x1'
-      }
-    }
-  })
-
-  await page.goto('/')
-  await page.locator('[data-testid="connect-wallet"]').click()
-  await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x1234')
-})
-```
-
-## Financial / Critical Flow Testing
-
-```typescript
-test('trade execution', async ({ page }) => {
-  // Skip on production — real money
-  test.skip(process.env.NODE_ENV === 'production', 'Skip on production')
-
-  await page.goto('/markets/test-market')
-  await page.locator('[data-testid="position-yes"]').click()
-  await page.locator('[data-testid="trade-amount"]').fill('1.0')
-
-  // Verify preview
-  const preview = page.locator('[data-testid="trade-preview"]')
-  await expect(preview).toContainText('1.0')
-
-  // Confirm and wait for blockchain
-  await page.locator('[data-testid="confirm-trade"]').click()
-  await page.waitForResponse(
-    resp => resp.url().includes('/api/trade') && resp.status() === 200,
-    { timeout: 30000 }
-  )
-
-  await expect(page.locator('[data-testid="trade-success"]')).toBeVisible()
-})
-```
