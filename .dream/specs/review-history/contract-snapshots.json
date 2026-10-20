@@ -1,0 +1,270 @@
+{
+  "feature": "review-history",
+  "snapshots": {
+    "get_user_reviews_200": {
+      "contractId": "API-USER-REVIEWS@1",
+      "endpoint": "GET /api/v1/reviews/me",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "reviews": [
+            {
+              "adminRepliedAt": "2026-10-18T14:15:00Z",
+              "adminReply": "Cảm ơn quý khách đã tin tưởng lựa chọn AuraPhone! Chúc bạn có trải nghiệm tuyệt vời cùng iPhone 15 Pro Max.",
+              "canEdit": true,
+              "comment": "Máy chính hãng VNA đóng gói rất kỹ, màn hình 120Hz siêu mượt và camera zoom 5x cực kỳ sắc nét.",
+              "createdAt": "2026-10-18T09:00:00Z",
+              "editCount": 0,
+              "edited": false,
+              "id": "rev-101",
+              "media": [
+                {
+                  "createdAt": "2026-10-18T09:00:00Z",
+                  "id": "media-101",
+                  "mimeType": "image/jpeg",
+                  "position": 0,
+                  "type": "image",
+                  "url": "/media/reviews/media-101"
+                },
+                {
+                  "createdAt": "2026-10-18T09:00:00Z",
+                  "id": "media-102",
+                  "mimeType": "video/mp4",
+                  "position": 0,
+                  "type": "video",
+                  "url": "/media/reviews/media-102"
+                }
+              ],
+              "order": {
+                "createdAt": "2026-10-16T09:00:00Z",
+                "id": "22222222-2222-2222-2222-222222222222"
+              },
+              "orderItemId": "33333333-3333-3333-3333-333333333333",
+              "product": {
+                "brandName": "Apple",
+                "id": "prod-101",
+                "imageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format\u0026fit=crop\u0026w=300\u0026q=80",
+                "model": "A3106",
+                "name": "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
+                "options": [
+                  {
+                    "groupLabel": "Màu sắc",
+                    "valueLabel": "Titan Tự Nhiên"
+                  },
+                  {
+                    "groupLabel": "Dung lượng",
+                    "valueLabel": "256GB"
+                  }
+                ]
+              },
+              "rating": 5,
+              "updatedAt": "2026-10-18T09:00:00Z"
+            },
+            {
+              "canEdit": false,
+              "comment": "Thiết kế vuông vức nam tính, bút S-Pen tiện lợi cho công việc ghi chú nhanh.",
+              "createdAt": "2026-10-12T08:00:00Z",
+              "editCount": 1,
+              "edited": true,
+              "id": "rev-102",
+              "media": [
+                {
+                  "createdAt": "2026-10-12T08:00:00Z",
+                  "id": "media-201",
+                  "mimeType": "image/jpeg",
+                  "position": 0,
+                  "type": "image",
+                  "url": "/media/reviews/media-201"
+                }
+              ],
+              "order": {
+                "createdAt": "2026-10-09T08:00:00Z",
+                "id": "55555555-5555-5555-5555-555555555555"
+              },
+              "orderItemId": "44444444-4444-4444-4444-444444444444",
+              "product": {
+                "brandName": "Samsung",
+                "id": "prod-102",
+                "imageUrl": "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format\u0026fit=crop\u0026w=300\u0026q=80",
+                "model": "SM-S928B",
+                "name": "Samsung Galaxy S24 Ultra 5G 512GB",
+                "options": [
+                  {
+                    "groupLabel": "Màu sắc",
+                    "valueLabel": "Xám Titan"
+                  },
+                  {
+                    "groupLabel": "Dung lượng",
+                    "valueLabel": "512GB"
+                  }
+                ]
+              },
+              "rating": 4,
+              "updatedAt": "2026-10-14T16:45:00Z"
+            }
+          ]
+        },
+        "error": null,
+        "message": "Lấy lịch sử đánh giá thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 10,
+            "page": 1,
+            "total": 2,
+            "totalPages": 1
+          },
+          "timestamp": "2026-10-20T15:44:43.5456398Z"
+        },
+        "success": true
+      }
+    },
+    "get_user_reviews_empty_200": {
+      "contractId": "API-USER-REVIEWS@1",
+      "endpoint": "GET /api/v1/reviews/me",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "reviews": []
+        },
+        "error": null,
+        "message": "Lấy lịch sử đánh giá thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 10,
+            "page": 1,
+            "total": 0,
+            "totalPages": 0
+          },
+          "timestamp": "2026-10-20T15:44:43.5473066Z"
+        },
+        "success": true
+      }
+    },
+    "get_user_reviews_validation_400": {
+      "contractId": "API-USER-REVIEWS@1",
+      "endpoint": "GET /api/v1/reviews/me",
+      "status": 400,
+      "requestBody": {
+        "rating": 9
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "rating": "Số sao lọc không hợp lệ, phải là số nguyên từ 0 đến 5"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-10-20T15:44:43.5445256Z"
+        },
+        "success": false
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-USER-REVIEWS@1",
+      "endpoint": "GET /api/v1/reviews/me",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-10-20T15:44:43.5428948Z"
+        },
+        "success": false
+      }
+    },
+    "update_review_200": {
+      "contractId": "API-ORDER-ITEM-REVIEW@1",
+      "endpoint": "PUT /api/v1/orders/:id/items/:itemId/review",
+      "status": 200,
+      "requestBody": {
+        "comment": "Sau 2 tuần sử dụng pin vẫn rất ổn định, đáng tiền.",
+        "rating": 4
+      },
+      "responseBody": {
+        "data": {
+          "canEdit": false,
+          "comment": "Sau 2 tuần sử dụng pin vẫn rất ổn định, đáng tiền.",
+          "createdAt": "2026-10-18T09:00:00Z",
+          "editCount": 1,
+          "edited": true,
+          "id": "rev-101",
+          "media": [
+            {
+              "createdAt": "2026-10-18T09:00:00Z",
+              "id": "media-101",
+              "mimeType": "image/jpeg",
+              "position": 0,
+              "type": "image",
+              "url": "/media/reviews/media-101"
+            }
+          ],
+          "orderItemId": "33333333-3333-3333-3333-333333333333",
+          "rating": 4,
+          "updatedAt": "2026-10-20T10:30:00Z"
+        },
+        "error": null,
+        "message": "Cập nhật đánh giá thành công",
+        "meta": {
+          "timestamp": "2026-10-20T15:44:43.5357228Z"
+        },
+        "success": true
+      }
+    },
+    "update_review_conflict_409": {
+      "contractId": "API-ORDER-ITEM-REVIEW@1",
+      "endpoint": "PUT /api/v1/orders/:id/items/:itemId/review",
+      "status": 409,
+      "requestBody": {
+        "rating": 3
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "review_edit_limit_reached",
+          "message": "Đánh giá chỉ được chỉnh sửa một lần"
+        },
+        "message": "Đánh giá chỉ được chỉnh sửa một lần",
+        "meta": {
+          "timestamp": "2026-10-20T15:44:43.5396588Z"
+        },
+        "success": false
+      }
+    },
+    "update_review_validation_400": {
+      "contractId": "API-ORDER-ITEM-REVIEW@1",
+      "endpoint": "PUT /api/v1/orders/:id/items/:itemId/review",
+      "status": 400,
+      "requestBody": {
+        "comment": "Điểm số vượt quá phạm vi",
+        "rating": 6
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "rating": "Số sao đánh giá phải từ 1 đến 5"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-10-20T15:44:43.5379301Z"
+        },
+        "success": false
+      }
+    }
+  }
+}

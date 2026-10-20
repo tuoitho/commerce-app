@@ -46,7 +46,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
-// Status styling & configuration mapping
 interface StatusInfo {
   label: string
   badgeClass: string
@@ -60,32 +59,32 @@ const returnStatusMap: Record<
 > = {
   pending_approval: {
     label: 'Chờ xét duyệt',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
     icon: Clock,
   },
   approved: {
     label: 'Đã duyệt trả hàng',
-    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-900 border-zinc-200',
     icon: CheckCircle2,
   },
   received: {
     label: 'Shop đã nhận hàng',
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-900 border-zinc-200',
     icon: Package,
   },
   refunded: {
     label: 'Đã hoàn tiền',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
     icon: CheckCircle2,
   },
   rejected: {
     label: 'Từ chối trả hàng',
-    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200',
     icon: XCircle,
   },
   cancelled: {
     label: 'Đã hủy yêu cầu',
-    badgeClass: 'bg-slate-100 text-slate-800 border-slate-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-800 border-zinc-200',
     icon: RotateCcw,
   },
 }
@@ -100,61 +99,60 @@ const returnReasonLabels: Record<string, string> = {
 const statusMap: Record<OrderStatus, StatusInfo> = {
   pending_confirmation: {
     label: 'Chờ xác nhận',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
     icon: Clock,
     description: 'Đơn hàng đang chờ xác nhận. Bạn có thể tự hủy đơn trong vòng 30 phút kể từ khi đặt.',
   },
   confirmed: {
     label: 'Đã xác nhận',
-    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-900 border-zinc-200',
     icon: CheckCircle2,
     description: 'Đơn hàng đã được xác nhận. Bạn vẫn có thể hủy đơn ngay trước khi cửa hàng chuẩn bị hàng.',
   },
   preparing: {
     label: 'Đang chuẩn bị hàng',
-    badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-900 border-zinc-200',
     icon: Package,
     description: 'Cửa hàng đang chuẩn bị sản phẩm. Bạn có thể gửi yêu cầu hủy để người bán xét duyệt.',
   },
   cancel_requested: {
     label: 'Chờ duyệt hủy',
-    badgeClass: 'bg-orange-50 text-orange-800 border-orange-200/80',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
     icon: AlertTriangle,
     description: 'Đang chờ người bán xác nhận hủy. Bạn có thể hoàn tác yêu cầu hủy nếu muốn tiếp tục nhận hàng.',
   },
   shipped: {
     label: 'Đang giao hàng',
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200/80',
+    badgeClass: 'bg-zinc-900 text-white border-zinc-900',
     icon: Truck,
     description: 'Đơn hàng đã được giao cho đơn vị vận chuyển và đang trên đường tới bạn.',
   },
   delivered: {
     label: 'Đã giao hàng',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
     icon: CheckCircle2,
     description: 'Đơn hàng đã được giao thành công.',
   },
   cancelled: {
     label: 'Đã hủy',
-    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200',
     icon: XCircle,
     description: 'Đơn hàng đã bị hủy.',
   },
   partially_returned: {
     label: 'Trả hàng một phần',
-    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-800 border-zinc-200',
     icon: RotateCcw,
     description: 'Đơn hàng đã được hoàn tiền một phần các sản phẩm đã trả.',
   },
   returned: {
     label: 'Trả hàng',
-    badgeClass: 'bg-slate-100 text-slate-800 border-slate-200/80',
+    badgeClass: 'bg-zinc-100 text-zinc-800 border-zinc-200',
     icon: RotateCcw,
     description: 'Đơn hàng đã được hoàn trả.',
   },
 }
 
-// Countdown timer component for pending_confirmation
 function CountdownTimer({ cancellableUntil }: { cancellableUntil: string }) {
   const [timeLeft, setTimeLeft] = useState<number>(() => {
     const target = new Date(cancellableUntil).getTime()
@@ -178,8 +176,8 @@ function CountdownTimer({ cancellableUntil }: { cancellableUntil: string }) {
   const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100/70 px-3 py-1.5 text-xs font-semibold text-amber-900 border border-amber-200">
-      <Clock className="h-3.5 w-3.5 text-amber-700 animate-pulse" />
+    <div className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 border border-amber-200">
+      <Clock className="h-3.5 w-3.5 text-amber-700" />
       <span>Thời gian hủy tự động:</span>
       <span className="font-mono font-bold text-amber-950 tabular-nums">{formatted}</span>
     </div>
@@ -197,14 +195,12 @@ export function OrderDetailPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isNotFound, setIsNotFound] = useState(false)
 
-  // Dialog state for actions
   const [dialogType, setDialogType] = useState<'cancel' | 'request_cancel' | 'undo_cancel' | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
   const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
   const [isCancelReturnDialogOpen, setIsCancelReturnDialogOpen] = useState(false)
   const [isSubmittingReturnCancel, setIsSubmittingReturnCancel] = useState(false)
 
-  // Review dialog state
   const [reviewDialogState, setReviewDialogState] = useState<{
     isOpen: boolean
     item: OrderItem | null
@@ -235,14 +231,12 @@ export function OrderDetailPage() {
     })
   }
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate(`/login?redirect=/orders/${id || ''}`)
     }
   }, [authLoading, isAuthenticated, navigate, id])
 
-  // Fetch order data
   const fetchOrderDetail = useCallback(async () => {
     if (!id || !isAuthenticated) return
     try {
@@ -270,7 +264,6 @@ export function OrderDetailPage() {
     }
   }, [isAuthenticated, id, fetchOrderDetail])
 
-  // Handle Cancel / Request Cancel action
   const handleConfirmCancelOrRequest = async () => {
     if (!order) return
     try {
@@ -297,7 +290,6 @@ export function OrderDetailPage() {
     }
   }
 
-  // Handle Undo Cancel Request action
   const handleConfirmUndoCancel = async () => {
     if (!order) return
     try {
@@ -317,7 +309,6 @@ export function OrderDetailPage() {
     }
   }
 
-  // Handle Cancel Return Request action
   const handleConfirmCancelReturn = async () => {
     if (!order || !order.latestReturnRequest) return
     try {
@@ -337,7 +328,6 @@ export function OrderDetailPage() {
     }
   }
 
-  // Handle Open Chat with Order context
   const handleOpenChatWithOrder = () => {
     if (!order) return
     const card = orderToAttachedOrderCard(order)
@@ -351,11 +341,10 @@ export function OrderDetailPage() {
     )
   }
 
-  // Loading skeleton
   if (authLoading || (isLoading && !order && !isNotFound && !errorMessage)) {
     return (
-      <div className="min-h-screen bg-slate-50/60 pb-24">
-        <div className="border-b border-slate-200 bg-white py-8">
+      <div className="min-h-screen bg-[#f7f7f5] pb-24">
+        <div className="border-b border-zinc-200 bg-white py-8">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-4">
             <Skeleton className="h-6 w-32 rounded-lg" />
             <Skeleton className="h-10 w-72 rounded-xl" />
@@ -364,12 +353,12 @@ export function OrderDetailPage() {
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 space-y-6">
-              <Skeleton className="h-40 w-full rounded-3xl" />
-              <Skeleton className="h-64 w-full rounded-3xl" />
-              <Skeleton className="h-32 w-full rounded-3xl" />
+              <Skeleton className="h-40 w-full rounded-2xl" />
+              <Skeleton className="h-64 w-full rounded-2xl" />
+              <Skeleton className="h-32 w-full rounded-2xl" />
             </div>
             <div className="lg:col-span-4 space-y-6">
-              <Skeleton className="h-72 w-full rounded-3xl" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
             </div>
           </div>
         </div>
@@ -377,19 +366,18 @@ export function OrderDetailPage() {
     )
   }
 
-  // 404 Not Found State
   if (isNotFound) {
     return (
-      <div className="min-h-screen bg-slate-50/60 pb-24">
+      <div className="min-h-screen bg-[#f7f7f5] pb-24">
         <div className="mx-auto max-w-2xl px-4 py-20 text-center space-y-6">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-rose-50 text-rose-500 mx-auto border border-rose-100 shadow-xs">
-            <Ban className="h-10 w-10" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 mx-auto border border-rose-200">
+            <Ban className="h-8 w-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
+            <h1 className="text-2xl font-extrabold text-zinc-950 sm:text-3xl">
               Không tìm thấy đơn hàng
             </h1>
-            <p className="text-sm sm:text-base text-slate-600 max-w-md mx-auto">
+            <p className="text-sm sm:text-base text-zinc-600 max-w-md mx-auto">
               Đơn hàng không tồn tại hoặc bạn không có quyền truy cập vào thông tin đơn hàng này.
             </p>
           </div>
@@ -411,17 +399,16 @@ export function OrderDetailPage() {
     )
   }
 
-  // Generic Error State
   if (errorMessage || !order) {
     return (
-      <div className="min-h-screen bg-slate-50/60 pb-24">
+      <div className="min-h-screen bg-[#f7f7f5] pb-24">
         <div className="mx-auto max-w-2xl px-4 py-20 text-center space-y-6">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-50 text-amber-600 mx-auto border border-amber-100">
-            <AlertTriangle className="h-10 w-10" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 mx-auto border border-amber-200">
+            <AlertTriangle className="h-8 w-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-slate-900">Không thể tải đơn hàng</h1>
-            <p className="text-sm text-slate-600">{errorMessage || 'Có lỗi xảy ra khi tải dữ liệu.'}</p>
+            <h1 className="text-2xl font-extrabold text-zinc-950">Không thể tải đơn hàng</h1>
+            <p className="text-sm text-zinc-600">{errorMessage || 'Có lỗi xảy ra khi tải dữ liệu.'}</p>
           </div>
           <Button
             variant="primary"
@@ -438,56 +425,55 @@ export function OrderDetailPage() {
 
   const currentStatusInfo = statusMap[order.status] || {
     label: order.status,
-    badgeClass: 'bg-slate-100 text-slate-800 border-slate-200',
+    badgeClass: 'bg-zinc-100 text-zinc-800 border-zinc-200',
     icon: Package,
     description: '',
   }
   const StatusIcon = currentStatusInfo.icon
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-24">
+    <div className="min-h-screen bg-[#f7f7f5] pb-24">
       {/* Header Bar */}
-      <div className="border-b border-slate-200 bg-white py-8">
+      <div className="border-b border-zinc-200 bg-white py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3">
               <Link
                 to="/orders"
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition mt-0.5 sm:mt-0"
+                className="p-2 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 rounded-xl transition mt-0.5 sm:mt-0"
                 title="Quay lại danh sách đơn hàng"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
                     Chi tiết đơn hàng
                   </h1>
                   <Badge
                     variant="outline"
-                    className={`font-bold text-xs px-2.5 py-1 ${currentStatusInfo.badgeClass}`}
+                    className={`font-semibold text-xs px-2.5 py-1 ${currentStatusInfo.badgeClass}`}
                   >
                     <StatusIcon className="h-3.5 w-3.5 mr-1 inline" />
                     {currentStatusInfo.label}
                   </Badge>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1 font-mono">
-                  Mã đơn: <span className="text-slate-800 font-semibold">{order.id}</span> • Ngày đặt:{' '}
-                  <span className="text-slate-800 font-sans">{formatDateTime(order.createdAt)}</span>
+                <p className="text-xs sm:text-sm text-zinc-500 mt-1 font-mono">
+                  Mã đơn: <span className="text-zinc-900 font-semibold">{order.id}</span> • Ngày đặt:{' '}
+                  <span className="text-zinc-900 font-sans">{formatDateTime(order.createdAt)}</span>
                 </p>
               </div>
             </div>
 
-            {/* Quick Actions in Header */}
             <div className="flex items-center gap-2 self-start sm:self-center">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleOpenChatWithOrder}
-                className="rounded-xl text-xs gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-semibold"
+                className="rounded-xl text-xs gap-1.5 text-emerald-800 border-emerald-200 hover:bg-emerald-50 font-semibold"
                 data-testid="order-inquiry-header-btn"
               >
-                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
                 <span>Hỏi đáp về đơn hàng</span>
               </Button>
               <Link to="/orders">
@@ -503,25 +489,24 @@ export function OrderDetailPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Status Notice Banner */}
-        <div className="mb-8 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm">
+        <div className="mb-8 rounded-2xl border border-zinc-200 bg-white p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5">
               <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${currentStatusInfo.badgeClass}`}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${currentStatusInfo.badgeClass}`}
               >
-                <StatusIcon className="h-6 w-6" />
+                <StatusIcon className="h-5 w-5" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="text-base font-bold text-zinc-950 flex items-center gap-2">
                   <span>Trạng thái: {currentStatusInfo.label}</span>
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">
                   {currentStatusInfo.description}
                 </p>
               </div>
             </div>
 
-            {/* Countdown timer for pending_confirmation */}
             {order.status === 'pending_confirmation' && order.cancellableUntil && (
               <div className="sm:self-center shrink-0">
                 <CountdownTimer cancellableUntil={order.cancellableUntil} />
@@ -531,29 +516,28 @@ export function OrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Details, Products & Shipping */}
+          {/* Left Column */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Return Request Banner / Card if exists */}
             {order.latestReturnRequest && (
-              <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-indigo-100 pb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                      <RotateCcw className="h-5 w-5" />
+              <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                      <RotateCcw className="h-4 w-4" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-slate-900">
+                      <h2 className="text-lg font-bold text-zinc-950">
                         Thông tin trả hàng & hoàn tiền
                       </h2>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-zinc-500">
                         Cập nhật ngày {formatDateTime(order.latestReturnRequest.updatedAt)}
                       </p>
                     </div>
                   </div>
                   <Badge
                     variant="outline"
-                    className={`font-bold text-xs px-2.5 py-1 ${
-                      returnStatusMap[order.latestReturnRequest.status]?.badgeClass || 'bg-slate-100'
+                    className={`font-semibold text-xs px-2.5 py-1 ${
+                      returnStatusMap[order.latestReturnRequest.status]?.badgeClass || 'bg-zinc-100'
                     }`}
                   >
                     {returnStatusMap[order.latestReturnRequest.status]?.label ||
@@ -563,15 +547,15 @@ export function OrderDetailPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <span className="text-slate-500">Lý do trả hàng:</span>
-                    <p className="font-semibold text-slate-800 mt-0.5">
+                    <span className="text-zinc-500">Lý do trả hàng:</span>
+                    <p className="font-semibold text-zinc-900 mt-0.5">
                       {returnReasonLabels[order.latestReturnRequest.reasonCode] ||
                         order.latestReturnRequest.reasonCode}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Tiền hoàn:</span>
-                    <p className="font-bold text-indigo-700 text-sm mt-0.5">
+                    <span className="text-zinc-500">Tiền hoàn:</span>
+                    <p className="font-mono font-bold text-zinc-950 text-sm mt-0.5">
                       {order.latestReturnRequest.refundAmountVnd
                         ? formatVND(order.latestReturnRequest.refundAmountVnd)
                         : formatVND(order.latestReturnRequest.expectedRefundVnd) + ' (dự kiến)'}
@@ -579,8 +563,8 @@ export function OrderDetailPage() {
                   </div>
                   {order.latestReturnRequest.description && (
                     <div className="sm:col-span-2">
-                      <span className="text-slate-500">Ghi chú của bạn:</span>
-                      <p className="text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-0.5">
+                      <span className="text-zinc-500">Ghi chú của bạn:</span>
+                      <p className="text-zinc-700 bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 mt-0.5">
                         {order.latestReturnRequest.description}
                       </p>
                     </div>
@@ -611,49 +595,49 @@ export function OrderDetailPage() {
             )}
 
             {/* 1. Recipient & Shipping Information */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <MapPin className="h-5 w-5" />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+              <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                  <MapPin className="h-4 w-4" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Thông tin nhận hàng</h2>
-                  <p className="text-xs text-slate-500">
+                  <h2 className="text-lg font-bold text-zinc-950">Thông tin nhận hàng</h2>
+                  <p className="text-xs text-zinc-500">
                     Địa chỉ và người nhận hàng được ghi nhận tại thời điểm đặt đơn
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm text-slate-700">
+              <div className="space-y-2 text-sm text-zinc-700">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-bold text-slate-900 text-base">{order.recipientName}</span>
-                  <span className="font-mono text-slate-500">({order.phone})</span>
+                  <span className="font-bold text-zinc-950 text-base">{order.recipientName}</span>
+                  <span className="font-mono text-zinc-500">({order.phone})</span>
                 </div>
-                <p className="text-slate-600 leading-relaxed">
+                <p className="text-zinc-600 leading-relaxed">
                   {order.detailAddress}, {order.wardName}, {order.provinceName}
                 </p>
               </div>
             </div>
 
             {/* 2. Order Items List */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                    <Truck className="h-5 w-5" />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
+                    <Truck className="h-4 w-4" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">
+                    <h2 className="text-lg font-bold text-zinc-950">
                       Danh sách sản phẩm ({order.items.length})
                     </h2>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-zinc-500">
                       Sản phẩm được lưu theo ảnh chụp tại thời điểm đặt hàng
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-zinc-100">
                 {order.items.map((item) => {
                   const isReturnedItem = order.latestReturnRequest?.items?.some(
                     (ri) => ri.orderItemId === item.id
@@ -664,8 +648,7 @@ export function OrderDetailPage() {
                       className="py-4 first:pt-1 last:pb-1 flex items-center justify-between gap-4"
                     >
                       <div className="flex items-center gap-4 flex-1">
-                        {/* Image */}
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 p-1.5 overflow-hidden">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#f7f7f5] border border-zinc-100 p-1.5 overflow-hidden">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
@@ -673,40 +656,38 @@ export function OrderDetailPage() {
                               className="max-h-full max-w-full object-contain"
                             />
                           ) : (
-                            <Smartphone className="h-6 w-6 text-slate-300" />
+                            <Smartphone className="h-6 w-6 text-zinc-300" />
                           )}
                         </div>
 
-                        {/* Info */}
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-semibold text-slate-400 uppercase">
+                            <span className="font-mono text-[11px] font-semibold text-zinc-500 uppercase">
                               {item.brandName}
                             </span>
                             {item.model && (
-                              <span className="text-[10px] text-slate-400 font-mono">
+                              <span className="text-[10px] text-zinc-400 font-mono">
                                 ({item.model})
                               </span>
                             )}
                             {isReturnedItem && (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] text-indigo-700 border-indigo-200 bg-indigo-50 font-medium"
+                                className="text-[10px] text-zinc-800 border-zinc-200 bg-zinc-100 font-medium"
                               >
                                 Đã yêu cầu trả
                               </Badge>
                             )}
                           </div>
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                          <h3 className="font-bold text-zinc-950 text-sm sm:text-base leading-tight">
                             <Link
                               to={`/products/${item.productId}`}
-                              className="hover:text-emerald-600 transition"
+                              className="hover:text-emerald-700 transition"
                             >
                               {item.productName}
                             </Link>
                           </h3>
 
-                          {/* Options */}
                           {item.options && item.options.length > 0 && (
                             <div className="flex flex-wrap gap-1 pt-0.5">
                               {item.options.map((opt, idx) => (
@@ -722,7 +703,6 @@ export function OrderDetailPage() {
                             </div>
                           )}
 
-                          {/* Review status and actions */}
                           <div className="flex items-center gap-2 pt-1.5 flex-wrap">
                             {item.reviewStatus === 'eligible' && (
                               <Button
@@ -735,9 +715,9 @@ export function OrderDetailPage() {
                                     existingReview: null,
                                   })
                                 }
-                                className="text-xs h-7 rounded-lg border-amber-300 bg-amber-50/60 text-amber-900 hover:bg-amber-100 font-semibold gap-1"
+                                className="text-xs h-7 rounded-lg border-zinc-300 bg-zinc-50 text-zinc-900 hover:bg-zinc-100 font-semibold gap-1"
                               >
-                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                                 <span>Đánh giá</span>
                               </Button>
                             )}
@@ -745,9 +725,9 @@ export function OrderDetailPage() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge
                                   variant="outline"
-                                  className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 py-0.5 font-medium"
+                                  className="text-[11px] bg-emerald-50 text-emerald-800 border-emerald-200 gap-1 py-0.5 font-medium"
                                 >
-                                  <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                                   <span>Đã đánh giá ({item.review?.rating}★)</span>
                                 </Badge>
                                 {item.review?.canEdit && (
@@ -761,7 +741,7 @@ export function OrderDetailPage() {
                                         existingReview: item.review,
                                       })
                                     }
-                                    className="text-xs h-6 px-2 text-slate-600 hover:text-slate-900 font-medium"
+                                    className="text-xs h-6 px-2 text-zinc-600 hover:text-zinc-950 font-medium"
                                   >
                                     Sửa đánh giá
                                   </Button>
@@ -771,7 +751,7 @@ export function OrderDetailPage() {
                             {item.reviewStatus === 'refunded' && (
                               <Badge
                                 variant="outline"
-                                className="text-[11px] bg-slate-100 text-slate-600 border-slate-200 font-medium"
+                                className="text-[11px] bg-zinc-100 text-zinc-600 border-zinc-200 font-medium"
                               >
                                 Đã hoàn tiền
                               </Badge>
@@ -780,12 +760,11 @@ export function OrderDetailPage() {
                         </div>
                       </div>
 
-                      {/* Price and Quantity */}
                       <div className="text-right shrink-0">
-                        <div className="font-bold text-slate-900 text-sm sm:text-base tabular-nums">
+                        <div className="font-mono font-bold text-zinc-950 text-sm sm:text-base tabular-nums">
                           {formatVND(item.lineTotalVnd)}
                         </div>
-                        <div className="text-xs text-slate-500 tabular-nums mt-0.5">
+                        <div className="font-mono text-xs text-zinc-500 tabular-nums mt-0.5">
                           {formatVND(item.unitPriceVnd)} x {item.quantity}
                         </div>
                       </div>
@@ -796,124 +775,118 @@ export function OrderDetailPage() {
             </div>
 
             {/* 3. Payment Method */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                  <CreditCard className="h-5 w-5" />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+              <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
+                  <CreditCard className="h-4 w-4" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Phương thức thanh toán</h2>
-                  <p className="text-xs text-slate-500">Hình thức thanh toán áp dụng cho đơn hàng</p>
+                  <h2 className="text-lg font-bold text-zinc-950">Phương thức thanh toán</h2>
+                  <p className="text-xs text-zinc-500">Hình thức thanh toán áp dụng cho đơn hàng</p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+              <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-200 bg-zinc-50">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-sm">
+                    <span className="font-bold text-zinc-950 text-sm">
                       Thanh toán khi nhận hàng (COD)
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-[10px] text-purple-700 border-purple-200 bg-purple-50"
+                      className="text-[10px] text-zinc-700 border-zinc-200 bg-white"
                     >
                       Tiền mặt
                     </Badge>
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-zinc-500">
                     Thanh toán trực tiếp cho nhân viên giao hàng khi nhận được bưu kiện.
                   </p>
                 </div>
-                <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+                <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0" />
               </div>
             </div>
           </div>
 
           {/* Right Column: Financial Summary & Actions */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Financial Summary Card */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-6">
-              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-6">
+              <h3 className="text-lg font-bold text-zinc-950 border-b border-zinc-100 pb-3">
                 Tổng kết đơn hàng
               </h3>
 
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-zinc-600">
                   <span>Tạm tính ({order.items.length} món):</span>
-                  <span className="font-semibold text-slate-900 tabular-nums">
+                  <span className="font-mono font-semibold text-zinc-950 tabular-nums">
                     {formatVND(order.subtotalVnd)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-zinc-600">
                   <span>Phí vận chuyển:</span>
-                  <span className="font-semibold text-emerald-600">
+                  <span className="font-semibold text-emerald-700">
                     {!order.shippingFeeVnd || order.shippingFeeVnd === '0'
                       ? 'Miễn phí'
                       : formatVND(order.shippingFeeVnd)}
                   </span>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex justify-between items-baseline">
-                  <span className="font-bold text-slate-900 text-base">Tổng thanh toán:</span>
-                  <span className="font-extrabold text-xl sm:text-2xl text-emerald-700 tabular-nums">
+                <div className="pt-4 border-t border-zinc-100 flex justify-between items-baseline">
+                  <span className="font-bold text-zinc-950 text-base">Tổng thanh toán:</span>
+                  <span className="font-mono font-bold text-xl sm:text-2xl text-zinc-950 tabular-nums">
                     {formatVND(order.totalVnd)}
                   </span>
                 </div>
               </div>
 
-              {/* Status Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 space-y-3">
-                {/* 1. Pending Confirmation: Hủy đơn */}
+              <div className="pt-4 border-t border-zinc-100 space-y-3">
                 {order.status === 'pending_confirmation' && (
                   <Button
                     variant="destructive"
                     size="lg"
                     onClick={() => setDialogType('cancel')}
-                    className="w-full rounded-2xl font-bold gap-2"
+                    className="w-full rounded-xl font-semibold gap-2"
                   >
                     <Ban className="h-4 w-4" />
                     <span>Hủy đơn</span>
                   </Button>
                 )}
 
-                {/* 2. Confirmed: Hủy đơn */}
                 {order.status === 'confirmed' && (
                   <Button
                     variant="destructive"
                     size="lg"
                     onClick={() => setDialogType('cancel')}
-                    className="w-full rounded-2xl font-bold gap-2"
+                    className="w-full rounded-xl font-semibold gap-2"
                   >
                     <Ban className="h-4 w-4" />
                     <span>Hủy đơn</span>
                   </Button>
                 )}
 
-                {/* 3. Preparing: Yêu cầu hủy */}
                 {order.status === 'preparing' && (
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={() => setDialogType('request_cancel')}
-                    className="w-full rounded-2xl font-bold text-amber-700 border-amber-300 hover:bg-amber-50 gap-2"
+                    className="w-full rounded-xl font-semibold text-amber-800 border-amber-300 hover:bg-amber-50 gap-2"
                   >
                     <AlertTriangle className="h-4 w-4" />
                     <span>Yêu cầu hủy</span>
                   </Button>
                 )}
 
-                {/* 4. Cancel Requested: Hoàn tác yêu cầu hủy */}
                 {order.status === 'cancel_requested' && (
                   <div className="space-y-2">
-                    <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200 text-center font-medium">
+                    <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200 text-center font-medium">
                       Đang chờ người bán xác nhận hủy
                     </div>
                     <Button
                       variant="primary"
                       size="lg"
                       onClick={() => setDialogType('undo_cancel')}
-                      className="w-full rounded-2xl font-bold gap-2"
+                      className="w-full rounded-xl font-semibold gap-2"
                     >
                       <RotateCcw className="h-4 w-4" />
                       <span>Hoàn tác yêu cầu hủy</span>
@@ -921,64 +894,60 @@ export function OrderDetailPage() {
                   </div>
                 )}
 
-                {/* Return Action button when eligible */}
                 {order.returnEligibility?.eligible && (
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={() => setIsReturnDialogOpen(true)}
-                    className="w-full rounded-2xl font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 gap-2"
+                    className="w-full rounded-xl font-semibold text-zinc-900 border-zinc-300 hover:bg-zinc-50 gap-2"
                   >
                     <RotateCcw className="h-4 w-4" />
                     <span>Yêu cầu trả hàng</span>
                   </Button>
                 )}
 
-                {/* Notice when delivered but return expired */}
                 {order.status === 'delivered' &&
                   order.returnEligibility &&
                   !order.returnEligibility.eligible &&
                   !order.latestReturnRequest && (
-                    <div className="text-center py-2 text-xs text-slate-400">
+                    <div className="text-center py-2 text-xs text-zinc-400">
                       Đã hết thời hạn 7 ngày để yêu cầu trả hàng
                     </div>
                   )}
 
-                {/* 5. Terminal / In-transit statuses: No cancel button */}
                 {['shipped', 'cancelled', 'returned', 'partially_returned'].includes(
                   order.status
                 ) && (
-                  <div className="text-center py-2 text-xs text-slate-400">
+                  <div className="text-center py-2 text-xs text-zinc-400">
                     Đơn hàng ở trạng thái không thể hủy
                   </div>
                 )}
 
-                {/* 6. Order Inquiry Button */}
                 <Button
                   variant="outline"
                   size="lg"
                   onClick={handleOpenChatWithOrder}
-                  className="w-full rounded-2xl font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-2"
+                  className="w-full rounded-xl font-semibold text-emerald-800 border-emerald-200 hover:bg-emerald-50 gap-2"
                   data-testid="order-inquiry-card-btn"
                 >
-                  <MessageCircle className="h-4 w-4 text-emerald-600" />
+                  <MessageCircle className="h-4 w-4 text-emerald-700" />
                   <span>Hỏi đáp về đơn hàng</span>
                 </Button>
               </div>
             </div>
 
             {/* Timeline / Additional details */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-3 text-xs text-slate-500">
-              <h4 className="font-bold text-slate-800 text-sm">Lịch sử thời gian</h4>
-              <div className="space-y-2 divide-y divide-slate-100">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-3 text-xs text-zinc-500">
+              <h4 className="font-bold text-zinc-950 text-sm">Lịch sử thời gian</h4>
+              <div className="space-y-2 divide-y divide-zinc-100">
                 <div className="flex justify-between pt-1">
                   <span>Thời gian tạo:</span>
-                  <span className="font-mono text-slate-700">{formatDateTime(order.createdAt)}</span>
+                  <span className="font-mono text-zinc-800">{formatDateTime(order.createdAt)}</span>
                 </div>
                 {order.confirmedAt && (
                   <div className="flex justify-between pt-2">
                     <span>Thời gian xác nhận:</span>
-                    <span className="font-mono text-slate-700">
+                    <span className="font-mono text-zinc-800">
                       {formatDateTime(order.confirmedAt)}
                     </span>
                   </div>
@@ -986,7 +955,7 @@ export function OrderDetailPage() {
                 {order.deliveredAt && (
                   <div className="flex justify-between pt-2">
                     <span>Thời gian giao hàng:</span>
-                    <span className="font-mono text-emerald-600">
+                    <span className="font-mono text-emerald-700">
                       {formatDateTime(order.deliveredAt)}
                     </span>
                   </div>
@@ -1005,7 +974,6 @@ export function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Return Request Dialog */}
       {order && (
         <ReturnRequestDialog
           order={order}
@@ -1015,20 +983,19 @@ export function OrderDetailPage() {
         />
       )}
 
-      {/* Cancel Return Request Confirmation Dialog */}
       <Dialog
         open={isCancelReturnDialogOpen}
         onOpenChange={(open) => !open && setIsCancelReturnDialogOpen(false)}
       >
-        <DialogContent className="sm:max-w-md rounded-3xl p-6">
+        <DialogContent className="sm:max-w-md rounded-2xl p-6">
           <DialogHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-700 border border-amber-200 mb-2">
               <RotateCcw className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-zinc-950">
               Hủy yêu cầu trả hàng
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
+            <DialogDescription className="text-sm text-zinc-600">
               Bạn có chắc chắn muốn rút lại yêu cầu trả hàng này không? Sau khi hủy, bạn vẫn có thể gửi lại yêu cầu nếu còn trong thời hạn 7 ngày.
             </DialogDescription>
           </DialogHeader>
@@ -1055,20 +1022,19 @@ export function OrderDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Order Dialog */}
       <Dialog
         open={dialogType === 'cancel'}
         onOpenChange={(open) => !open && setDialogType(null)}
       >
-        <DialogContent className="sm:max-w-md rounded-3xl p-6">
+        <DialogContent className="sm:max-w-md rounded-2xl p-6">
           <DialogHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200 mb-2">
               <Ban className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-zinc-950">
               Xác nhận hủy đơn hàng
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
+            <DialogDescription className="text-sm text-zinc-600">
               Bạn có chắc chắn muốn hủy đơn hàng này không? Sau khi hủy, đơn hàng sẽ chuyển sang trạng
               thái đã hủy và số lượng tồn kho sẽ được khôi phục.
             </DialogDescription>
@@ -1096,20 +1062,19 @@ export function OrderDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Request Cancel Dialog */}
       <Dialog
         open={dialogType === 'request_cancel'}
         onOpenChange={(open) => !open && setDialogType(null)}
       >
-        <DialogContent className="sm:max-w-md rounded-3xl p-6">
+        <DialogContent className="sm:max-w-md rounded-2xl p-6">
           <DialogHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-700 border border-amber-200 mb-2">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-zinc-950">
               Gửi yêu cầu hủy đơn hàng
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
+            <DialogDescription className="text-sm text-zinc-600">
               Đơn hàng đang được người bán chuẩn bị. Bạn có muốn gửi yêu cầu hủy để người bán duyệt không?
             </DialogDescription>
           </DialogHeader>
@@ -1136,20 +1101,19 @@ export function OrderDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Undo Cancel Request Dialog */}
       <Dialog
         open={dialogType === 'undo_cancel'}
         onOpenChange={(open) => !open && setDialogType(null)}
       >
-        <DialogContent className="sm:max-w-md rounded-3xl p-6">
+        <DialogContent className="sm:max-w-md rounded-2xl p-6">
           <DialogHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
               <RotateCcw className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-zinc-950">
               Hoàn tác yêu cầu hủy đơn
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
+            <DialogDescription className="text-sm text-zinc-600">
               Bạn có muốn rút lại yêu cầu hủy đơn và tiếp tục để cửa hàng chuẩn bị hàng cho bạn không?
             </DialogDescription>
           </DialogHeader>
@@ -1176,7 +1140,6 @@ export function OrderDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Review Form Dialog */}
       {order && reviewDialogState.item && (
         <ReviewFormDialog
           isOpen={reviewDialogState.isOpen}

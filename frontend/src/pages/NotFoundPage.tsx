@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button'
 
 export function NotFoundPage() {
   return (
-    <div className="min-h-[75vh] flex flex-col items-center justify-center px-4 text-center">
-      <span className="text-7xl font-extrabold tracking-tight text-slate-200">404</span>
-      <h1 className="text-2xl font-bold text-slate-900 mt-2">Trang không tồn tại</h1>
-      <p className="text-sm text-slate-500 mt-2 max-w-sm leading-relaxed">
+    <div className="min-h-[75vh] flex flex-col items-center justify-center px-4 text-center bg-[#f7f7f5]">
+      <span className="font-mono text-7xl font-bold tracking-tight text-zinc-200">404</span>
+      <h1 className="text-2xl font-bold text-zinc-950 mt-2">Trang không tồn tại</h1>
+      <p className="text-sm text-zinc-500 mt-2 max-w-sm leading-relaxed">
         Địa chỉ bạn truy cập không tồn tại hoặc đã được chuyển sang đường dẫn khác.
       </p>
       <div className="flex gap-3 mt-8">

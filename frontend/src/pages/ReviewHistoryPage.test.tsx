@@ -160,11 +160,64 @@ describe('ReviewHistoryPage', () => {
     expect(screen.getByText('5/5 sao')).toBeInTheDocument()
     expect(screen.getByText('4/5 sao')).toBeInTheDocument()
 
-    // Check edited badge
+    // Check edited badge and updatedAt timestamp (Req 1.3)
     expect(screen.getByText('Đã chỉnh sửa')).toBeInTheDocument()
+    expect(screen.getByTestId('review-updated-at')).toHaveTextContent(/Cập nhật:/i)
+
+    // Check product image and name links (Req 1.4)
+    const imageLinks = screen.getAllByTestId('review-product-image-link')
+    expect(imageLinks[0]).toHaveAttribute('href', '/products/prod-iphone')
+    expect(imageLinks[1]).toHaveAttribute('href', '/products/prod-s24')
 
     // Check action buttons: canEdit item has button, edited item doesn't
     expect(screen.getByRole('button', { name: /Sửa đánh giá/i })).toBeInTheDocument()
+  })
+
+  it('renders fallback placeholder when review image or video fails to load without disrupting review content (Req 4.3)', async () => {
+    vi.spyOn(reviewsApi, 'getUserReviews').mockResolvedValue({
+      data: { reviews: [mockReviews[0]] },
+      message: 'Lấy lịch sử đánh giá thành công',
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+    })
+
+    const { container } = render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/reviews']}>
+          <ReviewHistoryPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('iPhone 15 Pro Max')).toBeInTheDocument()
+    })
+
+    const reviewImg = screen.getByAltText('Ảnh đánh giá')
+    fireEvent.error(reviewImg)
+
+    const videoEl = container.querySelector('video')
+    expect(videoEl).not.toBeNull()
+    if (videoEl) {
+      fireEvent.error(videoEl)
+    }
+
+    await waitFor(() => {
+      const fallbacks = screen.getAllByTestId('review-media-fallback')
+      expect(fallbacks).toHaveLength(2)
+    })
+
+    // Other review content remains intact
+    expect(screen.getByText(/Máy dùng rất mượt/)).toBeInTheDocument()
   })
 
   it('filters reviews by star rating when clicking filter tab', async () => {

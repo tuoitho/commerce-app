@@ -48,17 +48,27 @@ reconciling them.
    requirements.
 2. Load `requirements-engineering` and create an initial `requirements.md`
    directly from the user's rough idea and the bounded dependency discovery
-   context without sequential questions first.
+   context without sequential questions first. Label unverified material
+   assumptions, contradictions, and decisions discovered during drafting so
+   they are not silently treated as approved product behavior.
 
    Existing repository behavior may establish compatibility constraints or
    reveal capabilities required by the requested workflow, but must not silently
    define new product behavior.
-3. If the first requirements draft still leaves material behavior, scope,
-   dependency behavior, architecture, or compatibility unclear, or if design
-   trade-offs remain, load the `brainstorming` skill to clarify each material
-   decision and obtain explicit approval. After `brainstorming` hands back approved decisions,
-   update `requirements.md` to match. If no such ambiguity remains, refine
-   requirements through targeted feedback only.
+3. Treat ambiguity review as a hard gate before requesting requirements
+   approval. Load `brainstorming` when the request or draft has any material
+   ambiguity, contradiction, or likely-invalid premise about behavior, scope,
+   dependencies, architecture, compatibility, data ownership, security, or
+   supported workflow. A repository finding that conflicts with the request is
+   a likely-invalid premise and must be surfaced; do not silently preserve it
+   or replace it with inferred behavior.
+
+   `brainstorming` must clarify each material decision and obtain explicit
+   approval. After it hands back approved decisions, update
+   `requirements.md` to match. Do not request requirements approval while a
+   material assumption, contradiction, or design trade-off remains unresolved.
+   If no such ambiguity remains, refine requirements through targeted feedback
+   only.
 4. Present the requirements through the platform's structured user-question
    tool (e.g., `question` or `ask_question`) and request explicit user approval.
    Stop and wait.
@@ -121,6 +131,9 @@ review commentary, or workflow history to `requirements.md`, `design.md`, or
 
 - Requirements define what; design defines how; tasks define execution order.
 - Do not skip requirements or design approval for governed changes.
+- Do not convert an ambiguous, contradictory, or likely-invalid request into a
+  requirement by inference. Resolve it through `brainstorming` before asking
+  for requirements approval.
 - Do not skip tasks approval or combine two artifact phases in one interaction.
 - Do not implement code in the same response that creates or completes the
   specification.

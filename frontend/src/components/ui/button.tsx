@@ -3,23 +3,23 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] cursor-pointer select-none',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] cursor-pointer select-none',
   {
     variants: {
       variant: {
         default:
-          'bg-slate-900 text-white shadow-sm hover:bg-slate-800 hover:shadow active:bg-slate-950',
+          'bg-zinc-950 text-white shadow-2xs hover:bg-zinc-800 active:bg-zinc-950',
         primary:
-          'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/30 active:bg-emerald-800',
+          'bg-emerald-700 text-white shadow-2xs hover:bg-emerald-800 active:bg-emerald-900',
         secondary:
-          'bg-slate-100 text-slate-900 hover:bg-slate-200/80 active:bg-slate-300',
+          'bg-zinc-100 text-zinc-900 hover:bg-zinc-200/80 active:bg-zinc-300',
         outline:
-          'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100',
+          'border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 hover:border-zinc-400 active:bg-zinc-100',
         ghost:
-          'text-slate-700 hover:bg-slate-100/80 active:bg-slate-200',
+          'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 active:bg-zinc-200',
         destructive:
-          'bg-rose-500 text-white shadow-sm hover:bg-rose-600 active:bg-rose-700',
-        link: 'text-emerald-600 underline-offset-4 hover:underline p-0 h-auto',
+          'bg-rose-600 text-white shadow-2xs hover:bg-rose-700 active:bg-rose-800',
+        link: 'text-emerald-700 underline-offset-4 hover:underline p-0 h-auto',
       },
       size: {
         default: 'h-10 px-4 py-2',

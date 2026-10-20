@@ -52,6 +52,8 @@ Ordinary `page.route()` mocks are brittle if the test author invents arbitrary J
 4. **Rule 4 — Stateful In-Memory Transitions Across Multi-Step Flows:**
    - Seed the mutable in-memory state store per test from `snapshots['..._200'].body.data`. When the UI triggers a `POST`/`PUT`/`PATCH`/`DELETE` mutation, update the in-memory state (including `omitempty` deletions like `delete target.adminReply`) so that subsequent `GET` requests, React Query invalidations, filter changes, or `page.reload()` calls return the updated state identically to the database.
 
+> **WebSocket Note (`page.routeWebSocket`):** Standard `page.route()` intercepts HTTP/HTTPS only. When testing real-time WebSocket flows in Mode 2, use Playwright's `page.routeWebSocket()` / `context.routeWebSocket()` to intercept `ws://` / `wss://` connections, validate inbound client messages (`ws.onMessage`) and send server-push frames (`ws.send`) using the exact JSON message shapes recorded in `.dream/specs/<feature>/contract-snapshots.json` via `assertMatchesContractShape`.
+
 ### Self-Contained Contract-Verified Mock E2E Pattern (Level 2 Code Template)
 
 Complete, ready-to-use reference files are bundled inside this skill's `examples/` directory (so copying `.agents/skills/` to any repository carries them automatically):

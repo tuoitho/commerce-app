@@ -192,13 +192,13 @@ digraph process {
     "Triage final findings; admitted blockers?" -> "Broad feature verification" [label="no"];
     "ONE final fix wave and scoped re-review" -> "Broad feature verification";
     "Broad feature verification" -> "Initial verification status";
-    "Initial verification status" -> "Delete this plan's workspace" [label="Verified"];
+    "Initial verification status" -> "Keep this plan's workspace" [label="Verified"];
     "Initial verification status" -> "STOP: report BLOCKED to human partner" [label="Blocked"];
     "Initial verification status" -> "ONE verification repair wave, scoped review, scoped re-verification" [label="Needs Fix"];
     "ONE verification repair wave, scoped review, scoped re-verification" -> "Re-verification status";
-    "Re-verification status" -> "Delete this plan's workspace" [label="Verified"];
+    "Re-verification status" -> "Keep this plan's workspace" [label="Verified"];
     "Re-verification status" -> "Return residual Needs Fix or Blocked to human partner" [label="Needs Fix or Blocked"];
-    "Delete this plan's workspace" -> "Report verified worktree";
+    "Keep this plan's workspace" -> "Report verified worktree";
 }
 ```
 
@@ -585,7 +585,7 @@ detects residual defects; it is not an unbounded implementation engine.
 ## Finish
 
 When the final whole-branch review gate passes and feature verification status
-is `Verified`, delete this plan's scratch workspace. Preserve the
+is `Verified`, keep this plan's scratch workspace. Preserve the
 implementation worktree and report that the full plan is complete with
 uncommitted changes.
 
@@ -671,7 +671,7 @@ Final reviewer: All requirements met. Deferred minors triaged: none block merge.
 [Dispatch verifier with requirements.md, design.md, tasks.md, working-tree package, and fresh checks]
 Verifier: Verified. Every acceptance criterion has implementation and test evidence.
 
-[Delete this plan's workspace — the record now lives in git]
+[Keep this plan's workspace — progress.md and task reports remain available]
 
 Done! Full plan verified; implementation worktree preserved for user review.
 ```

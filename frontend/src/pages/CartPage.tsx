@@ -37,7 +37,6 @@ export function CartPage() {
 
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/login?redirect=/cart')
@@ -64,7 +63,6 @@ export function CartPage() {
   const items = cart?.items || []
   const hasItems = items.length > 0
 
-  // Calculate if all selectable items are selected
   const availableItems = items.filter((item) => item.availability === 'available')
   const allSelected =
     availableItems.length > 0 && availableItems.every((item) => item.selected)
@@ -119,16 +117,16 @@ export function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-24">
+    <div className="min-h-screen bg-[#f7f7f5] pb-24">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white py-8">
+      <div className="border-b border-zinc-200 bg-white py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
                 Giỏ Hàng Của Bạn
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-zinc-500 mt-1">
                 {hasItems
                   ? `Đang có ${cart?.totalUnits || 0} sản phẩm trong giỏ`
                   : 'Chưa có sản phẩm nào trong giỏ hàng'}
@@ -146,7 +144,7 @@ export function CartPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {!hasItems ? (
           <EmptyState
-            icon={<ShoppingCart className="h-8 w-8 text-slate-400" />}
+            icon={<ShoppingCart className="h-7 w-7 text-zinc-500" />}
             title="Giỏ hàng đang trống"
             description="Bạn chưa thêm sản phẩm nào vào giỏ. Hãy bắt đầu chọn những thiết bị yêu thích ngay hôm nay!"
             actionLabel="Khám phá điện thoại"
@@ -157,7 +155,7 @@ export function CartPage() {
             {/* Left: Cart Items List */}
             <div className="lg:col-span-8 space-y-4">
               {/* Select All Bar */}
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-4">
                 <div className="flex items-center gap-3 select-none">
                   <Checkbox
                     id="select-all"
@@ -166,7 +164,7 @@ export function CartPage() {
                   />
                   <label
                     htmlFor="select-all"
-                    className="text-sm font-bold text-slate-900 cursor-pointer"
+                    className="text-sm font-bold text-zinc-950 cursor-pointer"
                   >
                     Chọn tất cả ({availableItems.length} sản phẩm có thể mua)
                   </label>
@@ -187,8 +185,8 @@ export function CartPage() {
                       key={item.id}
                       className={`relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border p-4 sm:p-5 transition-all ${
                         !isAvailable
-                          ? 'border-amber-200/80 bg-amber-50/20'
-                          : 'border-slate-200/90 bg-white shadow-sm hover:border-slate-300'
+                          ? 'border-amber-200 bg-amber-50/20'
+                          : 'border-zinc-200 bg-white hover:border-zinc-400'
                       }`}
                     >
                       {/* Checkbox & Product Info */}
@@ -201,7 +199,7 @@ export function CartPage() {
                         />
 
                         {/* Thumbnail */}
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 p-2 overflow-hidden">
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#f7f7f5] border border-zinc-100 p-2 overflow-hidden">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
@@ -209,32 +207,31 @@ export function CartPage() {
                               className="max-h-full max-w-full object-contain"
                             />
                           ) : (
-                            <Smartphone className="h-8 w-8 text-slate-300" />
+                            <Smartphone className="h-7 w-7 text-zinc-300" />
                           )}
                         </div>
 
                         {/* Text */}
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-400 uppercase">
+                            <span className="font-mono text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
                               {item.brandName}
                             </span>
                             {item.model && (
-                              <span className="text-[11px] text-slate-400 font-mono">
+                              <span className="text-[11px] text-zinc-400 font-mono">
                                 ({item.model})
                               </span>
                             )}
                           </div>
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                          <h3 className="font-bold text-zinc-950 text-sm sm:text-base leading-tight">
                             <Link
                               to={`/products/${item.productId}`}
-                              className="hover:text-emerald-600 transition"
+                              className="hover:text-emerald-700 transition"
                             >
                               {item.productName}
                             </Link>
                           </h3>
 
-                          {/* Options pills */}
                           {item.options && item.options.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 pt-1">
                               {item.options.map((opt, idx) => (
@@ -249,7 +246,6 @@ export function CartPage() {
                             </div>
                           )}
 
-                          {/* Status warning badges */}
                           {isOutOfStock && (
                             <div className="flex items-center gap-1 text-xs text-rose-600 font-semibold pt-1">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -257,13 +253,13 @@ export function CartPage() {
                             </div>
                           )}
                           {isInsufficient && (
-                            <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold pt-1">
+                            <div className="flex items-center gap-1 text-xs text-amber-700 font-semibold pt-1">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                               <span>Vượt quá tồn kho (Hiện còn: {item.stockQuantity})</span>
                             </div>
                           )}
                           {isUnavailable && (
-                            <div className="flex items-center gap-1 text-xs text-slate-500 font-semibold pt-1">
+                            <div className="flex items-center gap-1 text-xs text-zinc-500 font-semibold pt-1">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                               <span>Phiên bản này hiện không còn kinh doanh</span>
                             </div>
@@ -272,32 +268,31 @@ export function CartPage() {
                       </div>
 
                       {/* Price, Stepper & Delete */}
-                      <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100">
                         <div className="text-left sm:text-right">
-                          <div className="font-bold text-slate-900 text-base tabular-nums">
+                          <div className="font-mono font-bold text-zinc-950 text-base tabular-nums">
                             {item.lineTotalVnd ? formatVND(item.lineTotalVnd) : 'Không khả dụng'}
                           </div>
                           {item.unitPriceVnd && (
-                            <div className="text-[11px] text-slate-400 tabular-nums">
+                            <div className="font-mono text-[11px] text-zinc-400 tabular-nums">
                               {formatVND(item.unitPriceVnd)} / chiếc
                             </div>
                           )}
                         </div>
 
                         <div className="flex items-center gap-3">
-                          {/* Stepper */}
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-white p-0.5 shadow-sm">
+                          <div className="flex items-center border border-zinc-200 rounded-xl bg-white p-0.5">
                             <button
                               type="button"
                               disabled={isUpdating || item.quantity <= 1 || isUnavailable || isOutOfStock}
                               onClick={() =>
                                 handleQuantityChange(item.id, item.quantity - 1, item.stockQuantity)
                               }
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                             >
                               <Minus className="h-3.5 w-3.5" />
                             </button>
-                            <span className="w-8 text-center text-xs font-bold tabular-nums">
+                            <span className="w-8 text-center font-mono text-xs font-bold tabular-nums">
                               {item.quantity}
                             </span>
                             <button
@@ -310,18 +305,17 @@ export function CartPage() {
                               onClick={() =>
                                 handleQuantityChange(item.id, item.quantity + 1, item.stockQuantity)
                               }
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
                           </div>
 
-                          {/* Delete */}
                           <button
                             type="button"
                             disabled={isUpdating}
                             onClick={() => handleRemove(item.id, item.productName)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                             title="Xóa khỏi giỏ"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -336,64 +330,63 @@ export function CartPage() {
 
             {/* Right: Order Summary Sidebar */}
             <div className="lg:col-span-4 space-y-4">
-              <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-6">
-                <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
+              <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-6">
+                <h3 className="text-lg font-bold text-zinc-950 border-b border-zinc-100 pb-3">
                   Tóm tắt đơn hàng
                 </h3>
 
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-zinc-600">
                     <span>Tổng số lượng:</span>
-                    <span className="font-semibold text-slate-900">{cart?.totalUnits || 0} sản phẩm</span>
+                    <span className="font-mono font-semibold text-zinc-950">
+                      {cart?.totalUnits || 0} sản phẩm
+                    </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-zinc-600">
                     <span>Số dòng được chọn:</span>
-                    <span className="font-semibold text-emerald-700">
+                    <span className="font-mono font-semibold text-emerald-700">
                       {cart?.selectedLineCount || 0} sản phẩm
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-zinc-600">
                     <span>Phí vận chuyển:</span>
-                    <span className="font-semibold text-emerald-600">
+                    <span className="font-semibold text-emerald-700">
                       {!cart?.shippingFeeVnd || cart.shippingFeeVnd === '0'
                         ? 'Miễn phí'
                         : formatVND(cart.shippingFeeVnd)}
                     </span>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex justify-between items-baseline">
-                    <span className="font-bold text-slate-900 text-base">Tổng thanh toán:</span>
-                    <span className="font-extrabold text-xl sm:text-2xl text-emerald-700 tabular-nums">
+                  <div className="pt-4 border-t border-zinc-100 flex justify-between items-baseline">
+                    <span className="font-bold text-zinc-950 text-base">Tổng thanh toán:</span>
+                    <span className="font-mono font-bold text-xl sm:text-2xl text-zinc-950 tabular-nums">
                       {formatVND(cart?.selectedTotalVnd || 0)}
                     </span>
                   </div>
                 </div>
 
-                {/* Checkout CTA */}
                 <Button
                   variant="primary"
                   size="lg"
                   disabled={!cart?.selectedLineCount || cart.selectedLineCount === 0}
                   onClick={() => navigate('/checkout')}
-                  className="w-full h-13 rounded-2xl font-bold text-base shadow-lg shadow-emerald-600/20 gap-2"
+                  className="w-full h-12 rounded-xl font-semibold text-sm bg-emerald-700 hover:bg-emerald-800 gap-2"
                 >
                   <span>Tiến hành mua hàng</span>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
 
-                {/* Scope Note */}
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs leading-relaxed">
-                  <Info className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-500 text-xs leading-relaxed">
+                  <Info className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
                   <span>
                     Chỉ những sản phẩm hợp lệ được chọn mới được tính vào tổng thanh toán.
                   </span>
                 </div>
               </div>
 
-              {/* Guarantees */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-600 space-y-2">
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-600 space-y-2">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <ShieldCheck className="h-4 w-4 text-emerald-700" />
                   <span>Bảo mật thanh toán & thông tin khách hàng</span>
                 </div>
               </div>

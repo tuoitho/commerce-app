@@ -51,7 +51,7 @@ For each incomplete leaf task in dependency order:
   review=final-only: complete as self-verified
 Final code review -> at most ONE final fix wave + scoped re-review
 Feature verification -> at most ONE repair wave + scoped re-verification
-Delete this plan's workspace; preserve the implementation worktree
+Keep this plan's workspace; preserve the implementation worktree
 ```
 
 ## Setup
@@ -267,7 +267,7 @@ repository verification context. This is the only broad feature verification.
 
 ## Finish
 
-On `Verified`, delete this plan's workspace directory, preserve the
+On `Verified`, keep this plan's workspace directory, preserve the
 implementation worktree, and report completion with the verified evidence. Do
 not commit, merge, push, create a PR, or remove the worktree unless the user
 explicitly asks; then use `finishing-a-development-branch`.

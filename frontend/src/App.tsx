@@ -21,7 +21,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function AppContent() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 selection:bg-emerald-600 selection:text-white">
+    <div className="flex min-h-screen flex-col bg-[#f7f7f5] font-sans text-zinc-950 selection:bg-emerald-700 selection:text-white">
       <Header />
       <main className="flex-1">
         <Routes>

@@ -108,35 +108,35 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white shadow-xs border-b border-slate-200">
-      {/* Top Utility Bar */}
-      <div className="bg-slate-100 border-b border-slate-200/80 text-[12px] text-slate-600 hidden md:block">
+    <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-zinc-200/90">
+      {/* Top Architectural Telemetry Bar */}
+      <div className="bg-zinc-950 border-b border-zinc-800/80 text-[11px] text-zinc-400 hidden md:block">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-8">
           <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1 text-slate-700">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Hệ thống điện thoại chính hãng 100% VNA</span>
+            <span className="flex items-center gap-1.5 text-zinc-200 font-medium">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Hệ thống phân phối thiết bị di động chính hãng VNA</span>
             </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex items-center gap-1 text-slate-600">
-              <MapPin className="h-3.5 w-3.5 text-slate-500" />
+            <span className="text-zinc-700">|</span>
+            <span className="flex items-center gap-1.5 text-zinc-400">
+              <MapPin className="h-3.5 w-3.5 text-zinc-500" />
               <span>Hà Nội • TP. HCM • Đà Nẵng</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-6">
             <a
               href="tel:18006868"
-              className="flex items-center gap-1 text-slate-700 hover:text-emerald-600 font-semibold transition-colors"
+              className="flex items-center gap-1.5 text-zinc-200 hover:text-emerald-400 font-mono font-medium transition-colors"
             >
-              <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Hotline: 1800 6868 (Miễn phí)</span>
+              <PhoneCall className="h-3.5 w-3.5 text-emerald-400" />
+              <span>1800 6868</span>
             </a>
             <Link
               to="/products"
-              className="flex items-center gap-1 hover:text-emerald-600 transition-colors"
+              className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors"
             >
-              <FileText className="h-3.5 w-3.5 text-slate-500" />
+              <FileText className="h-3.5 w-3.5 text-zinc-500" />
               <span>Tra cứu bảo hành</span>
             </Link>
           </div>
@@ -149,17 +149,17 @@ export function Header() {
           {/* Brand Logo */}
           <Link
             to="/"
-            className="flex items-center gap-3 font-bold text-2xl text-slate-900 shrink-0"
+            className="flex items-center gap-3 font-bold text-2xl text-zinc-950 shrink-0 group"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
-              <Smartphone className="h-6 w-6 stroke-[2.2]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white border border-zinc-800 transition-colors group-hover:bg-emerald-700 group-hover:border-emerald-700">
+              <Smartphone className="h-5 w-5 stroke-[2]" />
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold tracking-tight text-slate-900 text-2xl leading-none">
+              <span className="font-extrabold tracking-tight text-zinc-950 text-xl sm:text-2xl leading-none">
                 AuraPhone
               </span>
-              <span className="text-[10px] font-semibold text-emerald-700 tracking-normal mt-0.5">
-                Điện thoại chính hãng
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-1">
+                Flagship Studio
               </span>
             </div>
           </Link>
@@ -167,28 +167,28 @@ export function Header() {
           {/* Central Search Box */}
           <form
             onSubmit={handleHeaderSearchSubmit}
-            className="hidden md:flex flex-1 max-w-lg relative mx-2"
+            className="hidden md:flex flex-1 max-w-md relative mx-2"
           >
             <input
               type="text"
-              placeholder="Bạn muốn tìm điện thoại gì? (vd: Tìm theo tên, hãng...)"
+              placeholder="Tìm thiết bị, dòng máy, thương hiệu..."
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-24 text-sm font-medium rounded-xl bg-slate-50 border border-slate-300 focus:bg-white focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100 outline-none transition-all placeholder:text-slate-400"
+              className="w-full h-10 pl-9 pr-24 text-xs sm:text-sm font-medium rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-950 focus:bg-white focus:border-zinc-900 outline-none transition-all placeholder:text-zinc-400"
             />
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             {headerSearch && (
               <button
                 type="button"
                 onClick={() => setHeaderSearch('')}
-                className="absolute right-20 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-20 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
             <button
               type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors"
+              className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-950 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
             >
               Tìm kiếm
             </button>
@@ -200,8 +200,8 @@ export function Header() {
               to="/"
               className={`px-3 py-2 rounded-lg transition-colors ${
                 location.pathname === '/' && !location.search
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
               }`}
             >
               Trang chủ
@@ -211,8 +211,8 @@ export function Header() {
               to="/products"
               className={`px-3 py-2 rounded-lg transition-colors ${
                 location.pathname === '/products' && !location.search.includes('category_id')
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
               }`}
             >
               Sản phẩm
@@ -225,8 +225,8 @@ export function Header() {
                 onClick={() => setCategoryDropdownOpen((prev) => !prev)}
                 className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                   categoryDropdownOpen || location.search.includes('category_id')
-                    ? 'text-emerald-700 bg-emerald-50 font-bold'
-                    : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                    ? 'text-zinc-950 bg-zinc-100 font-bold'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
                 }`}
                 aria-expanded={categoryDropdownOpen}
                 aria-haspopup="true"
@@ -234,14 +234,14 @@ export function Header() {
                 <span>Danh mục</span>
                 <ChevronDown
                   className={`h-4 w-4 transition-transform duration-200 ${
-                    categoryDropdownOpen ? 'rotate-180 text-emerald-600' : 'text-slate-400'
+                    categoryDropdownOpen ? 'rotate-180 text-zinc-950' : 'text-zinc-400'
                   }`}
                 />
               </button>
 
               {categoryDropdownOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in duration-150">
-                  <div className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                <div className="absolute left-0 mt-2 w-60 rounded-2xl bg-white border border-zinc-200 shadow-xl py-2 z-50 animate-in fade-in duration-150">
+                  <div className="px-4 py-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-400 border-b border-zinc-100">
                     Chọn theo danh mục
                   </div>
                   <div className="py-1 max-h-64 overflow-y-auto">
@@ -251,25 +251,25 @@ export function Header() {
                           key={cat.id}
                           to={`/products?category_id=${cat.id}`}
                           onClick={() => setCategoryDropdownOpen(false)}
-                          className={`flex items-center justify-between px-3.5 py-2 text-sm transition-colors ${
+                          className={`flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
                             location.search.includes(cat.id)
-                              ? 'text-emerald-700 bg-emerald-50 font-bold'
-                              : 'text-slate-700 hover:bg-slate-50 hover:text-emerald-600'
+                              ? 'text-emerald-800 bg-emerald-50/70 font-bold'
+                              : 'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950'
                           }`}
                         >
                           <span>{cat.name}</span>
-                          <Smartphone className="h-3.5 w-3.5 text-slate-400" />
+                          <Smartphone className="h-3.5 w-3.5 text-zinc-400" />
                         </Link>
                       ))
                     ) : (
-                      <div className="px-3.5 py-2 text-xs text-slate-400">Đang tải danh mục...</div>
+                      <div className="px-4 py-2.5 text-xs text-zinc-400">Đang tải danh mục...</div>
                     )}
                   </div>
-                  <div className="pt-1 border-t border-slate-100 px-2">
+                  <div className="pt-1 border-t border-zinc-100 px-2">
                     <Link
                       to="/products"
                       onClick={() => setCategoryDropdownOpen(false)}
-                      className="block text-center py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className="block text-center py-2 text-xs font-bold text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors"
                     >
                       Tất cả sản phẩm &rarr;
                     </Link>
@@ -282,8 +282,8 @@ export function Header() {
               to="/products?in_stock=true"
               className={`px-3 py-2 rounded-lg transition-colors ${
                 location.search.includes('in_stock=true')
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
               }`}
             >
               Hàng có sẵn
@@ -295,8 +295,8 @@ export function Header() {
                   to="/favorites"
                   className={`px-3 py-2 rounded-lg transition-colors ${
                     location.pathname.startsWith('/favorites')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
                   }`}
                 >
                   Sản phẩm yêu thích
@@ -305,18 +305,19 @@ export function Header() {
                   to="/orders"
                   className={`px-3 py-2 rounded-lg transition-colors ${
                     location.pathname.startsWith('/orders')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
                   }`}
                 >
                   Lịch sử mua hàng
                 </Link>
                 <Link
                   to="/reviews"
+                  data-testid="header-reviews-link"
                   className={`px-3 py-2 rounded-lg transition-colors ${
                     location.pathname.startsWith('/reviews')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-700 hover:text-emerald-600 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
                   }`}
                 >
                   Lịch sử đánh giá
@@ -326,18 +327,18 @@ export function Header() {
           </nav>
 
           {/* Right Functional Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {/* Cart Button */}
             <Link
               to="/cart"
               onClick={handleCartClick}
-              className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 hover:border-emerald-600 hover:text-emerald-600 transition-colors shadow-2xs"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-900 transition-colors"
               aria-label="Giỏ hàng"
               title="Giỏ hàng"
             >
-              <ShoppingCart className="h-5 w-5 text-slate-700 hover:text-emerald-600 transition-colors" />
+              <ShoppingCart className="h-4 w-4 text-zinc-800" />
               {badgeCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-extrabold text-white shadow-xs">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-emerald-700 px-1 text-[10px] font-mono font-bold text-white shadow-2xs">
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>
               )}
@@ -347,18 +348,18 @@ export function Header() {
             {/* Auth / Account */}
             <div className="hidden sm:flex items-center">
               {isLoading && !user ? (
-                <Skeleton data-testid="auth-loading-skeleton" className="h-11 w-28 rounded-xl" />
+                <Skeleton data-testid="auth-loading-skeleton" className="h-10 w-28 rounded-xl" />
               ) : isAuthenticated && user ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 max-w-[170px] truncate">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs uppercase shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-semibold text-zinc-900 max-w-[170px] truncate">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-950 text-white font-mono font-bold text-xs uppercase shrink-0">
                       {user.email.charAt(0)}
                     </div>
                     <span className="truncate">{user.email}</span>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                    className="p-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                     title="Đăng xuất"
                   >
                     <LogOut className="h-4 w-4" />
@@ -369,9 +370,9 @@ export function Header() {
                   <Button
                     variant="default"
                     size="sm"
-                    className="h-11 px-4 rounded-xl font-bold text-xs bg-slate-900 hover:bg-emerald-600 text-white transition-colors"
+                    className="h-10 px-4 rounded-xl font-semibold text-xs bg-zinc-950 hover:bg-emerald-700 text-white transition-colors"
                   >
-                    <UserIcon className="h-4 w-4 mr-1.5" />
+                    <UserIcon className="h-3.5 w-3.5 mr-1.5" />
                     <span>Đăng nhập</span>
                   </Button>
                 </Link>
@@ -381,10 +382,11 @@ export function Header() {
             {/* Mobile Menu Toggle Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              data-testid="mobile-menu-toggle"
+              className="xl:hidden flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50"
               aria-label="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
@@ -392,7 +394,7 @@ export function Header() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-4 shadow-xl">
+        <div className="xl:hidden border-t border-zinc-200 bg-white px-4 pt-3 pb-6 space-y-4 shadow-xl">
           {/* Mobile Search */}
           <form onSubmit={handleHeaderSearchSubmit} className="relative">
             <input
@@ -400,12 +402,12 @@ export function Header() {
               placeholder="Tìm kiếm điện thoại, thương hiệu..."
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-20 text-sm font-medium rounded-xl bg-slate-100 border border-slate-200 outline-none"
+              className="w-full h-10 pl-9 pr-20 text-sm font-medium rounded-xl bg-zinc-50 border border-zinc-200 outline-none"
             />
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <button
               type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-zinc-950 text-white text-xs font-semibold rounded-lg"
             >
               Tìm
             </button>
@@ -418,8 +420,8 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
               className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
                 location.pathname === '/' && !location.search
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-800 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-700 hover:bg-zinc-50'
               }`}
             >
               Trang chủ
@@ -429,8 +431,8 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
               className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
                 location.pathname === '/products' && !location.search.includes('category_id')
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-800 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-700 hover:bg-zinc-50'
               }`}
             >
               Tất cả sản phẩm
@@ -440,8 +442,8 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
               className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
                 location.search.includes('in_stock=true')
-                  ? 'text-emerald-700 bg-emerald-50 font-bold'
-                  : 'text-slate-800 hover:bg-slate-50'
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-700 hover:bg-zinc-50'
               }`}
             >
               Hàng có sẵn giao ngay
@@ -454,11 +456,11 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
                     location.pathname.startsWith('/favorites')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-800 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <Heart className="h-4 w-4 text-emerald-600" />
+                  <Heart className="h-4 w-4 text-zinc-600" />
                   <span>Sản phẩm yêu thích</span>
                 </Link>
                 <Link
@@ -466,23 +468,24 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
                     location.pathname.startsWith('/orders')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-800 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <Package className="h-4 w-4 text-emerald-600" />
+                  <Package className="h-4 w-4 text-zinc-600" />
                   <span>Lịch sử mua hàng</span>
                 </Link>
                 <Link
                   to="/reviews"
+                  data-testid="mobile-reviews-link"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
                     location.pathname.startsWith('/reviews')
-                      ? 'text-emerald-700 bg-emerald-50 font-bold'
-                      : 'text-slate-800 hover:bg-slate-50'
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <Star className="h-4 w-4 text-emerald-600" />
+                  <Star className="h-4 w-4 text-zinc-600" />
                   <span>Lịch sử đánh giá</span>
                 </Link>
               </>
@@ -490,8 +493,8 @@ export function Header() {
 
             {/* Dynamic Categories in Mobile Drawer */}
             {categories.length > 0 && (
-              <div className="pt-2 border-t border-slate-100">
-                <div className="px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <div className="pt-2 border-t border-zinc-100">
+                <div className="px-3.5 py-1 text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-400">
                   Danh mục nổi bật
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-1.5">
@@ -500,14 +503,14 @@ export function Header() {
                       key={cat.id}
                       to={`/products?category_id=${cat.id}`}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-between py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors ${
+                      className={`flex items-center justify-between py-2.5 px-3 rounded-xl text-xs font-semibold border transition-colors ${
                         location.search.includes(cat.id)
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                          ? 'bg-zinc-950 text-white border-zinc-950'
+                          : 'bg-zinc-50 text-zinc-800 border-zinc-200 hover:border-zinc-400'
                       }`}
                     >
                       <span className="truncate">{cat.name}</span>
-                      <Smartphone className="h-3.5 w-3.5 text-slate-400 shrink-0 ml-1" />
+                      <Smartphone className="h-3.5 w-3.5 text-zinc-400 shrink-0 ml-1" />
                     </Link>
                   ))}
                 </div>
@@ -516,18 +519,18 @@ export function Header() {
           </nav>
 
           {/* Mobile Auth */}
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-zinc-100">
             {isLoading && !user ? (
-              <Skeleton data-testid="mobile-auth-loading-skeleton" className="h-11 w-full rounded-xl" />
+              <Skeleton data-testid="mobile-auth-loading-skeleton" className="h-10 w-full rounded-xl" />
             ) : isAuthenticated && user ? (
               <div className="space-y-3">
-                <div className="px-3.5 py-2.5 rounded-xl bg-slate-50 text-xs font-medium text-slate-700">
-                  Tài khoản: <span className="font-bold text-slate-900">{user.email}</span>
+                <div className="px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-medium text-zinc-600">
+                  Tài khoản: <span className="font-bold text-zinc-950">{user.email}</span>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-center text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl font-bold"
+                  className="w-full justify-center text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl font-semibold"
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -540,7 +543,7 @@ export function Header() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="block"
               >
-                <Button variant="default" className="w-full h-11 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button variant="default" className="w-full h-10 rounded-xl font-semibold bg-zinc-950 hover:bg-emerald-700 text-white">
                   Đăng nhập / Đăng ký
                 </Button>
               </Link>

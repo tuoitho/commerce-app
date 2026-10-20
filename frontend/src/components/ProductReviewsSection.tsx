@@ -165,7 +165,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
             <Star
               key={idx}
               className={`${sizeClass} ${
-                isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200 fill-slate-100'
+                isFilled ? 'fill-amber-400 text-amber-400' : 'text-zinc-200 fill-zinc-100'
               }`}
             />
           )
@@ -182,16 +182,16 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
     <section
       id="product-reviews"
       aria-label="Đánh giá từ khách hàng"
-      className="rounded-3xl border border-slate-200/90 bg-white/90 backdrop-blur-md p-6 sm:p-8 shadow-sm space-y-8"
+      className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 space-y-8"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-5">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
-            <MessageSquare className="w-6 h-6 text-emerald-600" />
+          <h2 className="text-xl sm:text-2xl font-extrabold text-zinc-950 flex items-center gap-2.5">
+            <MessageSquare className="w-5 h-5 text-emerald-700" />
             <span>Đánh giá từ khách hàng đã mua</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
             Đánh giá thực tế từ người dùng đã mua hàng thành công tại AuraPhone
           </p>
         </div>
@@ -199,7 +199,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
 
       {/* Error state */}
       {error && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{error}</span>
@@ -208,7 +208,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
             variant="outline"
             size="sm"
             onClick={() => fetchReviews(page)}
-            className="text-xs gap-1 border-destructive/30 hover:bg-destructive/10 self-end sm:self-auto"
+            className="text-xs gap-1 border-rose-300 hover:bg-rose-100 self-end sm:self-auto"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Thử lại</span>
@@ -219,7 +219,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
       {/* Loading state */}
       {isSectionLoading && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 rounded-2xl bg-slate-50/80 border border-slate-200/80">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 rounded-2xl bg-zinc-50 border border-zinc-200">
             <div className="md:col-span-4 space-y-3 flex flex-col items-center justify-center">
               <Skeleton className="h-12 w-24 rounded-xl" />
               <Skeleton className="h-4 w-32 rounded-md" />
@@ -242,27 +242,25 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
       {!isSectionLoading && !error && (
         <div className="space-y-8">
           {/* Summary & Rating Distribution Box */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-50/90 to-emerald-50/30 border border-slate-200/80">
-            {/* Left: Overall Score */}
-            <div className="md:col-span-4 flex flex-col items-center justify-center text-center sm:border-r sm:border-slate-200/80 sm:pr-6 space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 sm:p-8 rounded-2xl bg-zinc-50 border border-zinc-200">
+            <div className="md:col-span-4 flex flex-col items-center justify-center text-center sm:border-r sm:border-zinc-200 sm:pr-6 space-y-2">
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl sm:text-5xl font-black text-slate-900 tabular-nums">
+                <span className="font-mono text-4xl sm:text-5xl font-bold text-zinc-950 tabular-nums">
                   {totalReviewsCount > 0 ? summary?.averageRating : '0.0'}
                 </span>
-                <span className="text-slate-400 font-bold text-lg sm:text-xl">/ 5</span>
+                <span className="font-mono text-zinc-400 font-semibold text-lg sm:text-xl">/ 5</span>
               </div>
               <div>{renderStars(Math.round(avgRatingNum), 5, 'w-5 h-5')}</div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-zinc-500 font-medium">
                 Dựa trên{' '}
-                <strong className="text-slate-800 font-bold">
+                <strong className="font-mono text-zinc-900 font-bold">
                   {totalReviewsCount}
                 </strong>{' '}
                 lượt đánh giá
               </p>
             </div>
 
-            {/* Right: Star breakdown progress bars */}
-            <div className="md:col-span-8 space-y-2 flex flex-col justify-center">
+            <div className="md:col-span-8 space-y-2.5 flex flex-col justify-center">
               {[5, 4, 3, 2, 1].map((starLevel) => {
                 const count = summary?.ratingCounts?.[String(starLevel)] || 0
                 const percent =
@@ -272,16 +270,16 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
 
                 return (
                   <div key={starLevel} className="flex items-center gap-3 text-xs">
-                    <span className="w-12 text-slate-600 font-semibold text-right shrink-0">
+                    <span className="w-12 font-mono text-zinc-600 font-semibold text-right shrink-0">
                       {starLevel} sao
                     </span>
-                    <div className="flex-1 h-2.5 rounded-full bg-slate-200/70 overflow-hidden">
+                    <div className="flex-1 h-2 rounded-full bg-zinc-200 overflow-hidden">
                       <div
-                        className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                        className="h-full bg-zinc-950 rounded-full transition-all duration-500"
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    <span className="w-10 text-slate-400 font-mono text-right tabular-nums">
+                    <span className="w-10 text-zinc-500 font-mono text-right tabular-nums">
                       {count}
                     </span>
                   </div>
@@ -292,20 +290,19 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
 
           {/* Empty state when 0 reviews */}
           {totalReviewsCount === 0 || reviews.length === 0 ? (
-            <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-200 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                <MessageSquare className="w-6 h-6" />
+            <div className="text-center py-12 px-4 rounded-2xl border border-zinc-200 bg-zinc-50/50 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-zinc-200 text-zinc-500 flex items-center justify-center mx-auto">
+                <MessageSquare className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-800">
+              <h3 className="text-base font-bold text-zinc-950">
                 Chưa có đánh giá nào cho sản phẩm này
               </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
                 Hãy là người đầu tiên sở hữu và chia sẻ cảm nhận thực tế về chất lượng sản phẩm sau khi mua hàng.
               </p>
             </div>
           ) : (
-            /* Reviews List */
-            <div className="space-y-4 divide-y divide-slate-100">
+            <div className="space-y-4 divide-y divide-zinc-200">
               {reviews.map((rev) => {
                 const reviewerEmail = rev.reviewer?.maskedEmail || 'Khách hàng AuraPhone'
                 const isRevPending = isTargetPending(rev.id)
@@ -315,39 +312,36 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                 const revUnhelpfulCount = rev.helpfulness?.unhelpfulCount ?? 0
 
                 return (
-                  <div key={rev.id} className="pt-5 first:pt-0 space-y-3">
-                    {/* Review Header: User & Verified Badge */}
+                  <div key={rev.id} className="pt-6 first:pt-0 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white font-mono font-bold flex items-center justify-center text-xs">
                           {reviewerEmail.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-slate-900">
+                            <span className="text-sm font-bold text-zinc-950">
                               {reviewerEmail}
                             </span>
                             <Badge
                               variant="outline"
-                              className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold gap-1 py-0.5"
+                              className="text-[10px] bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold gap-1 py-0.5"
                             >
-                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
                               <span>Đã mua tại AuraPhone</span>
                             </Badge>
                           </div>
-                          <span className="text-[11px] text-slate-400">
+                          <span className="font-mono text-[11px] text-zinc-400">
                             {formatDateTime(rev.createdAt)}
                           </span>
                         </div>
                       </div>
 
-                      {/* Stars */}
                       <div>{renderStars(rev.rating, 5, 'w-4 h-4')}</div>
                     </div>
 
-                    {/* Purchase Snapshot */}
                     {(rev.purchase?.model || (rev.purchase?.options && rev.purchase.options.length > 0)) && (
-                      <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2 flex-wrap">
+                      <div className="text-xs text-zinc-600 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200/80 flex items-center gap-2 flex-wrap">
                         {rev.purchase.model && (
                           <span>
                             Phân loại: <strong>{rev.purchase.model}</strong>
@@ -361,20 +355,18 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                       </div>
                     )}
 
-                    {/* Comment */}
                     {rev.comment && (
-                      <p className="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                      <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed whitespace-pre-line">
                         {rev.comment}
                       </p>
                     )}
 
-                    {/* Media Attachments */}
                     {rev.media && rev.media.length > 0 && (
                       <div className="flex flex-wrap gap-2.5 pt-1">
                         {rev.media.map((m: ReviewMedia) => (
                           <div
                             key={m.id}
-                            className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900"
+                            className="relative rounded-xl overflow-hidden border border-zinc-200 bg-zinc-950"
                           >
                             {m.type === 'video' ? (
                               <div className="w-48 sm:w-56 aspect-video bg-black flex items-center justify-center">
@@ -389,14 +381,13 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setExpandedImage(m.url)}
-                                className="w-20 h-20 sm:w-24 sm:h-24 block overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="w-20 h-20 sm:w-24 sm:h-24 block overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-700"
                               >
                                 <img
                                   src={m.url}
                                   alt="Ảnh đánh giá của khách hàng"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
-                                    // Hide broken media gracefully
                                     ;(e.target as HTMLElement).style.display = 'none'
                                   }}
                                 />
@@ -407,7 +398,6 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                       </div>
                     )}
 
-                    {/* Review Helpfulness Voting Controls */}
                     <div className="flex flex-wrap items-center gap-2 pt-2">
                       <button
                         type="button"
@@ -417,17 +407,17 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                         onClick={() => handleVote('review', rev.id, 'helpful', rev.helpfulness)}
                         className={cn(
                           'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2',
                           'disabled:opacity-50 disabled:cursor-not-allowed',
                           isRevHelpful
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400/50 shadow-2xs'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                            : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300'
                         )}
                       >
                         <ThumbsUp
                           className={cn(
                             'w-4 h-4 transition-all shrink-0',
-                            isRevHelpful ? 'fill-emerald-600 text-emerald-600 scale-105' : 'text-slate-500 fill-none'
+                            isRevHelpful ? 'fill-emerald-700 text-emerald-700 scale-105' : 'text-zinc-500 fill-none'
                           )}
                         />
                         <span>{`Hữu ích (${revHelpfulCount})`}</span>
@@ -441,47 +431,45 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                         onClick={() => handleVote('review', rev.id, 'unhelpful', rev.helpfulness)}
                         className={cn(
                           'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2',
                           'disabled:opacity-50 disabled:cursor-not-allowed',
                           isRevUnhelpful
-                            ? 'bg-slate-100 border-slate-300 text-slate-900 font-bold ring-1 ring-slate-400/50 shadow-2xs'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                            ? 'bg-zinc-100 border-zinc-300 text-zinc-950 font-bold'
+                            : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300'
                         )}
                       >
                         <ThumbsDown
                           className={cn(
                             'w-4 h-4 transition-all shrink-0',
-                            isRevUnhelpful ? 'fill-slate-700 text-slate-700 scale-105' : 'text-slate-500 fill-none'
+                            isRevUnhelpful ? 'fill-zinc-800 text-zinc-800 scale-105' : 'text-zinc-500 fill-none'
                           )}
                         />
                         <span>{`Không hữu ích (${revUnhelpfulCount})`}</span>
                       </button>
                     </div>
 
-                    {/* Admin Reply */}
                     {rev.adminReply && (
-                      <div className="mt-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 p-4 space-y-3">
+                      <div className="mt-3 rounded-xl bg-zinc-50 border border-zinc-200 p-4 space-y-3">
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="secondary"
-                            className="bg-blue-50 text-blue-700 border-blue-200 font-semibold gap-1 text-[11px] py-0.5 px-2"
+                            className="bg-zinc-950 text-white border-zinc-900 font-semibold gap-1 text-[11px] py-0.5 px-2.5"
                           >
-                            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Phản hồi từ người bán</span>
                           </Badge>
                           {rev.adminRepliedAt && (
-                            <span className="text-[11px] text-slate-400">
+                            <span className="font-mono text-[11px] text-zinc-400">
                               {formatDateTime(rev.adminRepliedAt)}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                        <p className="text-xs sm:text-sm text-zinc-700 leading-relaxed whitespace-pre-line">
                           {rev.adminReply}
                         </p>
 
-                        {/* Admin Reply Helpfulness Controls */}
                         {rev.adminReplyId && rev.adminReplyHelpfulness && (
-                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60">
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-200/80">
                             <button
                               type="button"
                               aria-label={`Hữu ích (${rev.adminReplyHelpfulness.helpfulCount})`}
@@ -497,19 +485,19 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                               }
                               className={cn(
                                 'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2',
                                 'disabled:opacity-50 disabled:cursor-not-allowed',
                                 rev.adminReplyHelpfulness.viewerVote === 'helpful'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400/50 shadow-2xs'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                                  : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300'
                               )}
                             >
                               <ThumbsUp
                                 className={cn(
                                   'w-4 h-4 transition-all shrink-0',
                                   rev.adminReplyHelpfulness.viewerVote === 'helpful'
-                                    ? 'fill-emerald-600 text-emerald-600 scale-105'
-                                    : 'text-slate-500 fill-none'
+                                    ? 'fill-emerald-700 text-emerald-700 scale-105'
+                                    : 'text-zinc-500 fill-none'
                                 )}
                               />
                               <span>{`Hữu ích (${rev.adminReplyHelpfulness.helpfulCount})`}</span>
@@ -530,19 +518,19 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                               }
                               className={cn(
                                 'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all inline-flex items-center gap-2 select-none cursor-pointer',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2',
                                 'disabled:opacity-50 disabled:cursor-not-allowed',
                                 rev.adminReplyHelpfulness.viewerVote === 'unhelpful'
-                                  ? 'bg-slate-100 border-slate-300 text-slate-900 font-bold ring-1 ring-slate-400/50 shadow-2xs'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                                  ? 'bg-zinc-100 border-zinc-300 text-zinc-950 font-bold'
+                                  : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300'
                               )}
                             >
                               <ThumbsDown
                                 className={cn(
                                   'w-4 h-4 transition-all shrink-0',
                                   rev.adminReplyHelpfulness.viewerVote === 'unhelpful'
-                                    ? 'fill-slate-700 text-slate-700 scale-105'
-                                    : 'text-slate-500 fill-none'
+                                    ? 'fill-zinc-800 text-zinc-800 scale-105'
+                                    : 'text-zinc-500 fill-none'
                                 )}
                               />
                               <span>{`Không hữu ích (${rev.adminReplyHelpfulness.unhelpfulCount})`}</span>
@@ -557,11 +545,10 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
             </div>
           )}
 
-          {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs">
-              <span className="text-slate-500 font-medium">
-                Trang <strong className="text-slate-800">{page}</strong> / {totalPages}
+            <div className="flex items-center justify-between border-t border-zinc-200 pt-4 text-xs">
+              <span className="text-zinc-500 font-medium">
+                Trang <strong className="font-mono text-zinc-900">{page}</strong> / {totalPages}
               </span>
               <div className="flex items-center gap-1.5">
                 <Button
@@ -604,7 +591,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
               type="button"
               aria-label="Đóng ảnh"
               onClick={() => setExpandedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-slate-300 focus:outline-none p-1"
+              className="absolute -top-10 right-0 text-white hover:text-zinc-300 focus:outline-none p-1"
             >
               <X className="w-6 h-6" />
             </button>
@@ -620,5 +607,3 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
     </section>
   )
 }
-
-

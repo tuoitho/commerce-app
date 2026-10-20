@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -289,10 +290,13 @@ func TestCreateReview_HTTPHandler(t *testing.T) {
 
 func TestUpdateReview_HTTPHandler(t *testing.T) {
 	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
-	userID := uuid.NewString()
-	orderID := uuid.NewString()
-	itemID := uuid.NewString()
-	reviewID := uuid.NewString()
+	userID := "11111111-1111-1111-1111-111111111111"
+	orderID := "22222222-2222-2222-2222-222222222222"
+	itemID := "33333333-3333-3333-3333-333333333333"
+	reviewID := "rev-101"
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "review-history", "contract-snapshots.json")
+	createdAt := time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC)
+	updatedAt := time.Date(2026, 10, 20, 10, 30, 0, 0, time.UTC)
 
 	token, err := jwtMgr.GenerateAccessToken(userID, domain.RoleCustomer, 2*time.Hour)
 	require.NoError(t, err)
@@ -306,11 +310,20 @@ func TestUpdateReview_HTTPHandler(t *testing.T) {
 					OrderItemID: input.OrderItemID,
 					Rating:      input.Rating,
 					Comment:     input.Comment,
-					Media:       []domain.ReviewMedia{},
-					CanEdit:     false,
-					Edited:      true,
-					CreatedAt:   time.Now().UTC().Add(-1 * time.Hour),
-					UpdatedAt:   time.Now().UTC(),
+					EditCount:   1,
+					Media: []domain.ReviewMedia{
+						{
+							ID:        "media-101",
+							Type:      domain.ReviewMediaTypeImage,
+							MimeType:  "image/jpeg",
+							URL:       "/media/reviews/media-101",
+							CreatedAt: createdAt,
+						},
+					},
+					CanEdit:   false,
+					Edited:    true,
+					CreatedAt: createdAt,
+					UpdatedAt: updatedAt,
 				}, nil, nil
 			},
 		}
@@ -320,7 +333,7 @@ func TestUpdateReview_HTTPHandler(t *testing.T) {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		_ = writer.WriteField("rating", "4")
-		_ = writer.WriteField("comment", "Cập nhật đánh giá")
+		_ = writer.WriteField("comment", "Sau 2 tuần sử dụng pin vẫn rất ổn định, đáng tiền.")
 		_ = writer.Close()
 
 		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/orders/%s/items/%s/review", orderID, itemID), body)
@@ -336,6 +349,61 @@ func TestUpdateReview_HTTPHandler(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, resp.Success)
 		assert.Equal(t, "Cập nhật đánh giá thành công", resp.Message)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"update_review_200",
+			"API-ORDER-ITEM-REVIEW@1",
+			"PUT /api/v1/orders/:id/items/:itemId/review",
+			map[string]any{
+				"rating":  4,
+				"comment": "Sau 2 tuần sử dụng pin vẫn rất ổn định, đáng tiền.",
+			},
+			w,
+		)
+	})
+
+	t.Run("400 Validation Error on invalid rating", func(t *testing.T) {
+		store := reviewmedia.NewFakeStore()
+		repo := &mockReviewRepoForHTTP{}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		_ = writer.WriteField("rating", "6")
+		_ = writer.WriteField("comment", "Điểm số vượt quá phạm vi")
+		_ = writer.Close()
+
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/orders/%s/items/%s/review", orderID, itemID), body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp ResponseEnvelope
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.False(t, resp.Success)
+		assert.Equal(t, "validation_error", resp.Error.Code)
+		assert.Contains(t, resp.Error.Fields, "rating")
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"update_review_validation_400",
+			"API-ORDER-ITEM-REVIEW@1",
+			"PUT /api/v1/orders/:id/items/:itemId/review",
+			map[string]any{
+				"rating":  6,
+				"comment": "Điểm số vượt quá phạm vi",
+			},
+			w,
+		)
 	})
 
 	t.Run("409 Review Edit Limit Reached", func(t *testing.T) {
@@ -365,6 +433,19 @@ func TestUpdateReview_HTTPHandler(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "review_edit_limit_reached", resp.Error.Code)
 		assert.Equal(t, "Đánh giá chỉ được chỉnh sửa một lần", resp.Message)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"update_review_conflict_409",
+			"API-ORDER-ITEM-REVIEW@1",
+			"PUT /api/v1/orders/:id/items/:itemId/review",
+			map[string]any{
+				"rating": 3,
+			},
+			w,
+		)
 	})
 }
 
@@ -747,8 +828,9 @@ func TestGetMedia_HTTPHandler(t *testing.T) {
 
 func TestGetUserReviews_HTTPHandler(t *testing.T) {
 	jwtMgr := jwt.NewManager("test-secret-key-32bytes-long-min!!", "test-issuer")
-	userID := uuid.NewString()
+	userID := "11111111-1111-1111-1111-111111111111"
 	token, _ := jwtMgr.GenerateAccessToken(userID, "customer", 15*time.Minute)
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "review-history", "contract-snapshots.json")
 
 	store := reviewmedia.NewFakeStore()
 
@@ -761,6 +843,17 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"unauthenticated_401",
+			"API-USER-REVIEWS@1",
+			"GET /api/v1/reviews/me",
+			nil,
+			w,
+		)
 	})
 
 	t.Run("400 Bad Request on invalid rating query param", func(t *testing.T) {
@@ -773,11 +866,32 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"get_user_reviews_validation_400",
+			"API-USER-REVIEWS@1",
+			"GET /api/v1/reviews/me",
+			map[string]any{
+				"rating": 9,
+			},
+			w,
+		)
 	})
 
 	t.Run("200 OK returns Full Status Envelope with user reviews and pagination", func(t *testing.T) {
 		var capturedRating int16
 		var capturedPage, capturedLimit int
+		img1 := "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=300&q=80"
+		img2 := "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=300&q=80"
+		adminReplyText := "Cảm ơn quý khách đã tin tưởng lựa chọn AuraPhone! Chúc bạn có trải nghiệm tuyệt vời cùng iPhone 15 Pro Max."
+		createdAt1 := time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC)
+		repliedAt1 := time.Date(2026, 10, 18, 14, 15, 0, 0, time.UTC)
+		createdAt2 := time.Date(2026, 10, 12, 8, 0, 0, 0, time.UTC)
+		updatedAt2 := time.Date(2026, 10, 14, 16, 45, 0, 0, time.UTC)
+
 		repo := &mockReviewRepoForHTTP{
 			getUserReviewsFn: func(ctx context.Context, uID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
 				capturedRating = ratingFilter
@@ -786,23 +900,86 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 				return &domain.UserReviewsResult{
 					Reviews: []domain.UserReview{
 						{
-							ID:          "rev-1",
-							OrderItemID: "item-1",
-							Rating:      5,
-							Comment:     "Tuyệt vời",
-							CanEdit:     true,
-							Edited:      false,
+							ID:             "rev-101",
+							OrderItemID:    "33333333-3333-3333-3333-333333333333",
+							Rating:         5,
+							Comment:        "Máy chính hãng VNA đóng gói rất kỹ, màn hình 120Hz siêu mượt và camera zoom 5x cực kỳ sắc nét.",
+							AdminReply:     &adminReplyText,
+							AdminRepliedAt: &repliedAt1,
+							Media: []domain.ReviewMedia{
+								{
+									ID:        "media-101",
+									Type:      domain.ReviewMediaTypeImage,
+									MimeType:  "image/jpeg",
+									URL:       "/media/reviews/media-101",
+									CreatedAt: createdAt1,
+								},
+								{
+									ID:        "media-102",
+									Type:      domain.ReviewMediaTypeVideo,
+									MimeType:  "video/mp4",
+									URL:       "/media/reviews/media-102",
+									CreatedAt: createdAt1,
+								},
+							},
+							CanEdit:   true,
+							Edited:    false,
+							EditCount: 0,
+							CreatedAt: createdAt1,
+							UpdatedAt: createdAt1,
 							Product: domain.UserReviewProduct{
-								ID:        "prod-1",
-								Name:      "iPhone 15 Pro",
+								ID:        "prod-101",
+								Name:      "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
 								BrandName: "Apple",
+								Model:     "A3106",
+								ImageURL:  img1,
+								Options: []domain.CartOption{
+									{GroupLabel: "Màu sắc", ValueLabel: "Titan Tự Nhiên"},
+									{GroupLabel: "Dung lượng", ValueLabel: "256GB"},
+								},
 							},
 							Order: domain.UserReviewOrder{
-								ID: "ord-1",
+								ID:        "22222222-2222-2222-2222-222222222222",
+								CreatedAt: createdAt1.Add(-48 * time.Hour),
+							},
+						},
+						{
+							ID:          "rev-102",
+							OrderItemID: "44444444-4444-4444-4444-444444444444",
+							Rating:      4,
+							Comment:     "Thiết kế vuông vức nam tính, bút S-Pen tiện lợi cho công việc ghi chú nhanh.",
+							Media: []domain.ReviewMedia{
+								{
+									ID:        "media-201",
+									Type:      domain.ReviewMediaTypeImage,
+									MimeType:  "image/jpeg",
+									URL:       "/media/reviews/media-201",
+									CreatedAt: createdAt2,
+								},
+							},
+							CanEdit:   false,
+							Edited:    true,
+							EditCount: 1,
+							CreatedAt: createdAt2,
+							UpdatedAt: updatedAt2,
+							Product: domain.UserReviewProduct{
+								ID:        "prod-102",
+								Name:      "Samsung Galaxy S24 Ultra 5G 512GB",
+								BrandName: "Samsung",
+								Model:     "SM-S928B",
+								ImageURL:  img2,
+								Options: []domain.CartOption{
+									{GroupLabel: "Màu sắc", ValueLabel: "Xám Titan"},
+									{GroupLabel: "Dung lượng", ValueLabel: "512GB"},
+								},
+							},
+							Order: domain.UserReviewOrder{
+								ID:        "55555555-5555-5555-5555-555555555555",
+								CreatedAt: createdAt2.Add(-72 * time.Hour),
 							},
 						},
 					},
-					Total: 1,
+					Total: 2,
 				}, nil
 			},
 		}
@@ -832,10 +1009,51 @@ func TestGetUserReviews_HTTPHandler(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, resp.Success)
 		assert.Equal(t, "Lấy lịch sử đánh giá thành công", resp.Message)
-		require.Len(t, resp.Data.Reviews, 1)
-		assert.Equal(t, "rev-1", resp.Data.Reviews[0].ID)
-		assert.Equal(t, 1, resp.Meta.Pagination.Total)
+		require.Len(t, resp.Data.Reviews, 2)
+		assert.Equal(t, "rev-101", resp.Data.Reviews[0].ID)
+		assert.Equal(t, 2, resp.Meta.Pagination.Total)
 		assert.Equal(t, 1, resp.Meta.Pagination.Page)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"get_user_reviews_200",
+			"API-USER-REVIEWS@1",
+			"GET /api/v1/reviews/me",
+			nil,
+			w,
+		)
+	})
+
+	t.Run("200 OK returns empty list when user has no matching reviews", func(t *testing.T) {
+		repo := &mockReviewRepoForHTTP{
+			getUserReviewsFn: func(ctx context.Context, uID string, ratingFilter int16, page, limit int) (*domain.UserReviewsResult, error) {
+				return &domain.UserReviewsResult{
+					Reviews: []domain.UserReview{},
+					Total:   0,
+				}, nil
+			},
+		}
+		r := setupReviewTestRouter(repo, store, jwtMgr)
+
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/reviews/me?page=1&limit=10", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		assertOrRecordContractSnapshot(
+			t,
+			snapshotPath,
+			"review-history",
+			"get_user_reviews_empty_200",
+			"API-USER-REVIEWS@1",
+			"GET /api/v1/reviews/me",
+			nil,
+			w,
+		)
 	})
 }
 

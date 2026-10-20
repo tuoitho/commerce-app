@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.BASE_URL || 'http://localhost:15173'
+const isFullStackMode = process.env.E2E_MODE === '1'
 
 export default defineConfig({
   testDir: './e2e',
@@ -18,31 +19,39 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   webServer: [
-    {
-      command: 'go run ./cmd/server',
-      cwd: '../backend',
-      url: 'http://localhost:18080/api/v1/categories',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-      env: {
-        ...process.env,
-        ADMIN_BOOTSTRAP_EMAIL: process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@example.com',
-        ADMIN_BOOTSTRAP_PASSWORD: process.env.ADMIN_BOOTSTRAP_PASSWORD || 'Admin123456@',
-      },
-    },
+    ...(isFullStackMode
+      ? [
+          {
+            command: 'go run ./cmd/server',
+            cwd: '../backend',
+            url: 'http://localhost:18080/api/v1/categories',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+            env: {
+              ...process.env,
+              ADMIN_BOOTSTRAP_EMAIL: process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@example.com',
+              ADMIN_BOOTSTRAP_PASSWORD: process.env.ADMIN_BOOTSTRAP_PASSWORD || 'Admin123456@',
+            },
+          },
+        ]
+      : []),
     {
       command: 'npm run dev',
       url: 'http://localhost:15173',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
-    {
-      command: 'npm run dev',
-      cwd: '../frontend-admin',
-      url: 'http://localhost:15174',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
+    ...(isFullStackMode
+      ? [
+          {
+            command: 'npm run dev',
+            cwd: '../frontend-admin',
+            url: 'http://localhost:15174',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+          },
+        ]
+      : []),
   ],
   projects: [
     {

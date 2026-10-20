@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Smartphone, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react'
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ApiError } from '@/api/types'
@@ -50,23 +50,28 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-slate-50/60">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-[#f7f7f5]">
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <Link to="/" className="inline-flex items-center gap-2 font-bold text-2xl text-slate-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
-              <Smartphone className="h-5 w-5 text-emerald-400" />
+          <Link to="/" className="inline-flex items-center gap-3 font-bold text-2xl text-zinc-950">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white">
+              <span className="font-display text-sm font-extrabold tracking-tighter text-emerald-400">
+                AP
+              </span>
             </div>
-            <span>AuraPhone</span>
+            <span className="font-display tracking-tight">AuraPhone</span>
           </Link>
-          <p className="text-xs text-slate-500">Đăng nhập tài khoản để quản lý giỏ hàng</p>
+          <p className="text-xs text-zinc-500">Đăng nhập tài khoản để quản lý giỏ hàng</p>
         </div>
 
-        <Card className="rounded-3xl border-slate-200/90 shadow-xl">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-bold text-center">Đăng Nhập</CardTitle>
-            <CardDescription className="text-center text-xs">
+        <Card className="rounded-2xl border-zinc-200 shadow-xs">
+          <CardHeader className="space-y-1.5 pb-4">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 text-center">
+              MEMBER ACCESS
+            </p>
+            <CardTitle className="text-xl font-bold text-center text-zinc-950">Đăng Nhập</CardTitle>
+            <CardDescription className="text-center text-xs text-zinc-500">
               Nhập email và mật khẩu của bạn để tiếp tục
             </CardDescription>
           </CardHeader>
@@ -81,9 +86,9 @@ export function LoginPage() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Email</label>
+                <label className="text-xs font-bold text-zinc-700">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                   <Input
                     type="email"
                     placeholder="name@example.com"
@@ -96,9 +101,9 @@ export function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Mật khẩu</label>
+                <label className="text-xs font-bold text-zinc-700">Mật khẩu</label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                   <Input
                     type="password"
                     placeholder="••••••••"
@@ -115,7 +120,7 @@ export function LoginPage() {
                 variant="primary"
                 size="lg"
                 isLoading={isLoading}
-                className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20 gap-2 mt-2"
+                className="w-full h-12 rounded-xl font-bold text-sm gap-2 mt-2"
               >
                 <span>Đăng nhập</span>
                 <ArrowRight className="h-4 w-4" />
@@ -123,12 +128,12 @@ export function LoginPage() {
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col items-center justify-center border-t border-slate-100 pt-4 text-xs text-slate-500">
+          <CardFooter className="flex flex-col items-center justify-center border-t border-zinc-100 pt-4 text-xs text-zinc-500">
             <div>
               Chưa có tài khoản?{' '}
               <Link
                 to={`/register${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`}
-                className="font-bold text-emerald-600 hover:underline"
+                className="font-bold text-emerald-700 hover:underline"
               >
                 Đăng ký ngay
               </Link>

@@ -9,8 +9,6 @@ import {
   AlertCircle,
   Smartphone,
   ChevronRight,
-  Zap,
-  Gift,
   CreditCard,
   Layers,
   Cpu,
@@ -18,7 +16,6 @@ import {
   BatteryCharging,
   Wifi,
   Sparkles,
-  Award,
   Share2,
   CheckCircle2,
   PhoneCall,
@@ -41,7 +38,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { FavoriteToggleButton } from '@/components/FavoriteToggleButton'
 import { ProductReviewsSection } from '@/components/ProductReviewsSection'
 
-// Currency formatter
 function formatVND(value: string | number): string {
   const num = typeof value === 'string' ? Number(value) : value
   if (isNaN(num)) return '0 ₫'
@@ -51,7 +47,6 @@ function formatVND(value: string | number): string {
   }).format(num)
 }
 
-// Color palette mapping for swatches
 function getColorCode(label: string): string {
   const l = label.toLowerCase()
   if (l.includes('đen') || l.includes('black') || l.includes('space black') || l.includes('midnight')) return '#18181b'
@@ -63,10 +58,9 @@ function getColorCode(label: string): string {
   if (l.includes('tím') || l.includes('purple') || l.includes('violet')) return '#8b5cf6'
   if (l.includes('hồng') || l.includes('pink') || l.includes('rose')) return '#f43f5e'
   if (l.includes('cam') || l.includes('orange')) return '#f97316'
-  return '#94a3b8'
+  return '#71717a'
 }
 
-// Intelligent smartphone technical specifications provider
 function getPhoneTechSpecs(name: string = '', model: string = '') {
   const isIPhone = name.toLowerCase().includes('iphone') || model.toLowerCase().includes('a3')
   const isXiaomi = name.toLowerCase().includes('xiaomi') || name.toLowerCase().includes('redmi')
@@ -74,7 +68,7 @@ function getPhoneTechSpecs(name: string = '', model: string = '') {
   if (isIPhone) {
     return [
       { icon: Smartphone, label: 'Màn hình', value: '6.3" Super Retina XDR OLED 120Hz ProMotion' },
-      { icon: Cpu, label: 'Vi xử lý', value: 'Apple A18 Pro (3nm thế hệ 2) siêu mạnh mẽ' },
+      { icon: Cpu, label: 'Vi xử lý', value: 'Apple A18 Pro (3nm thế hệ 2) hiệu năng cao' },
       { icon: Camera, label: 'Camera sau', value: 'Bộ 3 camera 48MP Fusion + 48MP Ultra Wide + 12MP Tele 5x' },
       { icon: BatteryCharging, label: 'Pin & Sạc', value: 'Thời lượng pin lên đến 27h, Sạc nhanh MagSafe 25W' },
       { icon: Layers, label: 'Chất liệu khung', value: 'Titanium cấp 5 hàng không vũ trụ siêu nhẹ & bền' },
@@ -114,14 +108,12 @@ export function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Selected Option values mapping: { [groupId]: valueId }
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({})
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [activeTab, setActiveTab] = useState<'specs' | 'highlights' | 'warranty'>('specs')
   const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary | null>(null)
 
-  // Load product data
   useEffect(() => {
     if (!id) return
     setIsLoading(true)
@@ -130,7 +122,6 @@ export function ProductDetailPage() {
       .getProduct(id)
       .then((data) => {
         setProduct(data)
-        // Auto-select first available options if options exist
         if (data && data.optionGroups && data.optionGroups.length > 0) {
           const initial: Record<string, string> = {}
           data.optionGroups.forEach((g) => {
@@ -148,7 +139,6 @@ export function ProductDetailPage() {
       .finally(() => setIsLoading(false))
   }, [id])
 
-  // Find active variant matching current selections
   const selectedVariant = useMemo<ProductVariant | null>(() => {
     if (!product || !product.variants || product.variants.length === 0) return null
     if (!product.optionGroups || product.optionGroups.length === 0) {
@@ -164,13 +154,11 @@ export function ProductDetailPage() {
     )
   }, [product, selectedOptions])
 
-  // Check if all option groups have a selection
   const allGroupsSelected = useMemo(() => {
     if (!product || !product.optionGroups || product.optionGroups.length === 0) return true
     return product.optionGroups.every((g) => Boolean(selectedOptions[g.id]))
   }, [product, selectedOptions])
 
-  // Price calculations
   const displayedPrice = useMemo(() => {
     if (selectedVariant && selectedVariant.priceVnd) {
       return formatVND(selectedVariant.priceVnd)
@@ -196,7 +184,6 @@ export function ProductDetailPage() {
     return Math.round(numericPrice / 12)
   }, [numericPrice])
 
-  // Availability calculation
   const isAvailable = useMemo(() => {
     if (!product) return false
     if (product.optionGroups?.length > 0) {
@@ -206,13 +193,11 @@ export function ProductDetailPage() {
     return product.stockQuantity > 0
   }, [product, allGroupsSelected, selectedVariant])
 
-  // Option selection handler
   const handleSelectOption = (groupId: string, valueId: string) => {
     setSelectedOptions((prev) => {
       const next = { ...prev, [groupId]: valueId }
       if (!product?.variants) return next
 
-      // Auto-reconcile conflicting secondary options
       for (const [gId, vId] of Object.entries(next)) {
         if (gId === groupId) continue
         const isCompatible = product.variants.some(
@@ -228,7 +213,6 @@ export function ProductDetailPage() {
     })
   }
 
-  // Check if option is selectable with current selections
   const isValueSelectable = (groupId: string, valueId: string) => {
     if (!product?.variants) return true
     const testSelection = { ...selectedOptions, [groupId]: valueId }
@@ -239,7 +223,6 @@ export function ProductDetailPage() {
     })
   }
 
-  // Add to cart handler
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
       navigate(`/login?redirect=/products/${id}`)
@@ -282,44 +265,42 @@ export function ProductDetailPage() {
     }
   }
 
-  // Loading skeleton state
   if (isLoading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 space-y-8 animate-fade-in">
         <Skeleton className="h-6 w-56 rounded-xl" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-6 space-y-4">
-            <Skeleton className="h-[460px] w-full rounded-3xl" />
+            <Skeleton className="h-[460px] w-full rounded-2xl" />
             <div className="flex gap-3">
-              <Skeleton className="h-20 w-20 rounded-2xl" />
-              <Skeleton className="h-20 w-20 rounded-2xl" />
-              <Skeleton className="h-20 w-20 rounded-2xl" />
+              <Skeleton className="h-20 w-20 rounded-xl" />
+              <Skeleton className="h-20 w-20 rounded-xl" />
+              <Skeleton className="h-20 w-20 rounded-xl" />
             </div>
           </div>
           <div className="lg:col-span-6 space-y-6">
-            <Skeleton className="h-10 w-4/5 rounded-2xl" />
-            <Skeleton className="h-28 w-full rounded-3xl" />
-            <Skeleton className="h-32 w-full rounded-3xl" />
-            <Skeleton className="h-14 w-full rounded-2xl" />
+            <Skeleton className="h-10 w-4/5 rounded-xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
+            <Skeleton className="h-14 w-full rounded-xl" />
           </div>
         </div>
       </div>
     )
   }
 
-  // Error / Not found state
   if (error || !product) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center animate-fade-in">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-50 text-rose-600 mx-auto mb-4 border border-rose-200/80 shadow-xs">
-          <AlertCircle className="h-8 w-8" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 mx-auto mb-4 border border-rose-200">
+          <AlertCircle className="h-7 w-7" />
         </div>
-        <h2 className="text-2xl font-black text-slate-900">Không tìm thấy sản phẩm</h2>
-        <p className="text-sm text-slate-500 mt-2 mb-6 leading-relaxed">
+        <h2 className="text-2xl font-extrabold text-zinc-950">Không tìm thấy sản phẩm</h2>
+        <p className="text-sm text-zinc-500 mt-2 mb-6 leading-relaxed">
           {error || 'Sản phẩm này có thể đã ngừng kinh doanh hoặc đường dẫn không chính xác.'}
         </p>
         <Link to="/products">
-          <Button variant="default" className="gap-2 rounded-2xl font-bold bg-slate-900 hover:bg-emerald-600">
+          <Button variant="default" className="gap-2 rounded-xl font-semibold bg-zinc-950 hover:bg-emerald-700">
             <ArrowLeft className="h-4 w-4" /> Quay lại danh mục điện thoại
           </Button>
         </Link>
@@ -331,32 +312,32 @@ export function ProductDetailPage() {
   const techSpecs = getPhoneTechSpecs(product.name, product.model)
 
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen bg-[#f7f7f5] pb-28">
       {/* Breadcrumb Navigation Bar */}
-      <div className="border-b border-slate-200/80 bg-white/70 backdrop-blur-md py-3.5 shadow-2xs">
+      <div className="border-b border-zinc-200 bg-white py-3.5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4">
-            <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500 overflow-x-auto whitespace-nowrap">
-              <Link to="/" className="hover:text-emerald-600 transition-colors">
+            <nav className="flex items-center gap-2 text-xs font-medium text-zinc-500 overflow-x-auto whitespace-nowrap">
+              <Link to="/" className="hover:text-zinc-950 transition-colors">
                 Trang chủ
               </Link>
-              <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <Link to="/products" className="hover:text-emerald-600 transition-colors">
+              <ChevronRight className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <Link to="/products" className="hover:text-zinc-950 transition-colors">
                 Điện thoại
               </Link>
               {product.category && (
                 <>
-                  <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <ChevronRight className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <Link
                     to={`/products?category_id=${product.category.id}`}
-                    className="hover:text-emerald-600 transition-colors"
+                    className="hover:text-zinc-950 transition-colors"
                   >
                     {product.category.name}
                   </Link>
                 </>
               )}
-              <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span className="text-slate-900 font-bold truncate max-w-[180px] sm:max-w-xs">
+              <ChevronRight className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span className="text-zinc-950 font-semibold truncate max-w-[180px] sm:max-w-xs">
                 {product.name}
               </span>
             </nav>
@@ -368,7 +349,7 @@ export function ProductDetailPage() {
               />
               <button
                 onClick={handleShare}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:text-emerald-600 hover:border-emerald-300 transition shadow-2xs shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:border-zinc-900 hover:text-zinc-950 transition shrink-0 cursor-pointer"
                 title="Chia sẻ sản phẩm"
               >
                 <Share2 className="h-3.5 w-3.5" />
@@ -381,64 +362,63 @@ export function ProductDetailPage() {
 
       {/* Main Flagship Product Presentation */}
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8 space-y-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-14 items-start">
-          {/* Left Column: Flagship Studio Showcase & Gallery */}
-          <div className="lg:col-span-6 space-y-5">
-            {/* Primary Studio Frame */}
-            <div className="relative flex h-[400px] sm:h-[490px] w-full items-center justify-center overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/80 p-8 shadow-sm group">
-              {/* Radial backdrop highlight */}
-              <div className="absolute inset-0 bg-radial from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-12 items-start">
+          {/* Left Column: Architectural Gallery Pedestal */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+              {/* Top Status Bar (Separated from image per anti-slop rule 9.F) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-zinc-100">
+                <div className="flex items-center gap-2">
+                  {isAvailable ? (
+                    <Badge variant="success" className="font-semibold text-xs py-0.5 px-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 mr-1.5" />
+                      Còn hàng
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="font-semibold text-xs py-0.5 px-2.5">
+                      Hết hàng
+                    </Badge>
+                  )}
+                  <span className="inline-flex items-center gap-1 rounded-md bg-zinc-950 text-white font-mono text-[10px] uppercase tracking-wider px-2.5 py-1">
+                    <ShieldCheck className="h-3 w-3 text-emerald-400" />
+                    VNA Nguyên Seal
+                  </span>
+                </div>
 
-              {images.length > 0 ? (
-                <img
-                  src={images[selectedImageIndex] || images[0]}
-                  alt={`${product.brand || ''} ${product.name}`.trim()}
-                  className="relative z-10 max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <img
-                  src="/iphone-16-pro.jpg"
-                  alt={`${product.brand || ''} ${product.name}`.trim()}
-                  className="relative z-10 max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
-                />
-              )}
-
-              {/* Status Badges Header */}
-              <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2">
-                {isAvailable ? (
-                  <Badge variant="success" className="shadow-xs font-bold text-xs py-1 px-3">
-                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                    Còn hàng
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive" className="shadow-xs font-bold text-xs py-1 px-3">
-                    Hết hàng
-                  </Badge>
-                )}
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white text-[10px] font-extrabold px-3 py-1 shadow-xs border border-slate-700">
-                  <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                  VNA Nguyên Seal
+                <span className="hidden sm:inline-flex items-center gap-1.5 font-mono text-[11px] text-zinc-500">
+                  Bảo hành 12 tháng chính hãng
                 </span>
               </div>
 
-              {/* Exclusive 100% Genuine Badge */}
-              <div className="absolute bottom-4 right-4 z-20 hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/90 text-xs font-extrabold text-slate-800 shadow-xs">
-                <Award className="h-4 w-4 text-emerald-600" />
-                <span>Bảo hành chính hãng 12 tháng</span>
+              {/* Unobstructed Studio Frame */}
+              <div className="relative flex h-[360px] sm:h-[430px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#f7f7f5] p-6 group">
+                {images.length > 0 ? (
+                  <img
+                    src={images[selectedImageIndex] || images[0]}
+                    alt={`${product.brand || ''} ${product.name}`.trim()}
+                    className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <img
+                    src="/iphone-16-pro.jpg"
+                    alt={`${product.brand || ''} ${product.name}`.trim()}
+                    className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
+                  />
+                )}
               </div>
             </div>
 
             {/* Thumbnail Carousel */}
             {images.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="flex gap-3 overflow-x-auto pb-1">
                 {images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImageIndex(idx)}
-                    className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border p-2 bg-white transition-all ${
+                    className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border p-2 bg-white transition-all cursor-pointer ${
                       selectedImageIndex === idx
-                        ? 'border-emerald-600 ring-2 ring-emerald-600/25 shadow-sm'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-zinc-950 ring-1 ring-zinc-950'
+                        : 'border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
                     <img
@@ -451,76 +431,82 @@ export function ProductDetailPage() {
               </div>
             )}
 
-            {/* Trust Assurance Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-800">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+            {/* Architectural Assurance Ledger */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+              <div className="flex items-center gap-2 p-3.5 text-xs font-semibold text-zinc-800">
+                <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span>100% Chính hãng</span>
               </div>
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-800">
-                <RotateCcw className="h-4 w-4 text-emerald-600 shrink-0" />
+              <div className="flex items-center gap-2 p-3.5 text-xs font-semibold text-zinc-800">
+                <RotateCcw className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span>1 Đổi 1 30 ngày</span>
               </div>
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-800">
-                <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
+              <div className="flex items-center gap-2 p-3.5 text-xs font-semibold text-zinc-800">
+                <Truck className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span>Giao nhanh 2h</span>
               </div>
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs text-xs font-bold text-slate-800">
-                <PhoneCall className="h-4 w-4 text-emerald-600 shrink-0" />
+              <div className="flex items-center gap-2 p-3.5 text-xs font-semibold text-zinc-800">
+                <PhoneCall className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span>Hỗ trợ 24/7</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Product Configuration, Pricing & Purchase Matrix */}
+          {/* Right Column: Configuration & Purchase Matrix */}
           <div className="lg:col-span-6 space-y-6">
-            {/* Title & Brand Header */}
             <div>
-              <div className="flex items-center gap-2.5 mb-2">
+              <div className="flex items-center gap-2.5 mb-2.5">
                 {product.brand && (
-                  <Badge variant="brand" className="font-extrabold text-xs px-3 py-1">
+                  <Badge variant="outline" className="font-mono uppercase tracking-wider text-[11px] px-2.5 py-0.5">
                     {product.brand}
                   </Badge>
                 )}
                 {product.model && (
-                  <span className="text-xs font-mono font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
+                  <span className="text-xs font-mono font-medium text-zinc-500 bg-zinc-100 border border-zinc-200/80 px-2.5 py-0.5 rounded-md">
                     Model: {product.model}
                   </span>
                 )}
-                <div className="flex items-center gap-1 text-xs text-amber-500 font-bold ml-auto">
+                <div className="flex items-center gap-1 text-xs text-zinc-900 font-semibold ml-auto">
                   {reviewSummary && reviewSummary.totalReviews > 0 ? (
                     <>
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <span>{reviewSummary.averageRating}</span>
-                      <span className="text-slate-400 font-normal">
+                      <span className="font-mono">{reviewSummary.averageRating}</span>
+                      <span className="text-zinc-500 font-normal">
                         ({reviewSummary.totalReviews} đánh giá)
                       </span>
                     </>
                   ) : (
-                    <span className="text-slate-400 font-normal text-xs">
+                    <span className="text-zinc-400 font-normal text-xs">
                       Chưa có đánh giá
                     </span>
                   )}
                 </div>
               </div>
 
-              <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-zinc-950 tracking-tight leading-tight">
                 {product.name}
               </h1>
             </div>
 
-            {/* Authentic E-Commerce Price Card */}
-            <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
-              <div className="flex flex-wrap items-baseline gap-3">
-                <span className="text-3xl sm:text-4xl font-extrabold text-rose-600 tracking-tight tabular-nums">
-                  {displayedPrice}
-                </span>
+            {/* Editorial Price Ledger Card */}
+            <div className="p-5 rounded-2xl bg-white border border-zinc-200 space-y-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 block mb-0.5">
+                    GIÁ NIÊM YẾT CHÍNH HÃNG
+                  </span>
+                  <span className="font-mono text-3xl sm:text-4xl font-bold text-zinc-950 tracking-tight tabular-nums">
+                    {displayedPrice}
+                  </span>
+                </div>
                 {selectedVariant && (
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ml-auto ${
-                    selectedVariant.stockQuantity > 0 && selectedVariant.active !== false
-                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-                      : 'text-rose-700 bg-rose-50 border border-rose-200'
-                  }`}>
+                  <span
+                    className={`font-mono text-xs font-semibold px-2.5 py-1 rounded-md ${
+                      selectedVariant.stockQuantity > 0 && selectedVariant.active !== false
+                        ? 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+                        : 'text-rose-700 bg-rose-50 border border-rose-200'
+                    }`}
+                  >
                     {selectedVariant.stockQuantity > 0 && selectedVariant.active !== false
                       ? `Còn ${selectedVariant.stockQuantity} máy sẵn hàng`
                       : 'Hết hàng'}
@@ -529,14 +515,16 @@ export function ProductDetailPage() {
               </div>
 
               {monthlyInstallment > 0 && (
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 pt-2 border-t border-slate-100">
-                  <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span>Trả góp 0% lãi suất chỉ từ <strong className="text-slate-900 font-bold">{formatVND(monthlyInstallment)}</strong>/tháng</span>
+                <div className="flex items-center justify-between text-xs text-zinc-600 pt-2.5 border-t border-zinc-100">
+                  <span>Chương trình trả góp 0% lãi suất kỳ hạn 12 tháng</span>
+                  <strong className="font-mono text-zinc-950 font-bold">
+                    {formatVND(monthlyInstallment)}/tháng
+                  </strong>
                 </div>
               )}
             </div>
 
-            {/* Dynamic Option Groups (Màu sắc, Dung lượng, etc.) */}
+            {/* Dynamic Option Groups */}
             {product.optionGroups && product.optionGroups.length > 0 && (
               <div className="space-y-4 pt-1">
                 {product.optionGroups.map((group) => {
@@ -547,17 +535,17 @@ export function ProductDetailPage() {
                     <div key={group.id} className="space-y-2">
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-800">
+                          <span className="font-bold text-zinc-900">
                             {`${group.label}:`}
                           </span>
                           {selectedVal && (
-                            <span className="font-medium text-slate-500">
+                            <span className="font-medium text-zinc-500">
                               (Đang chọn: {selectedVal.label})
                             </span>
                           )}
                         </div>
                         {!selectedOptions[group.id] && (
-                          <span className="text-xs text-amber-600 font-bold">
+                          <span className="text-xs text-amber-700 font-semibold">
                             Chưa chọn
                           </span>
                         )}
@@ -574,17 +562,17 @@ export function ProductDetailPage() {
                               type="button"
                               disabled={!isSelectable}
                               onClick={() => handleSelectOption(group.id, val.id)}
-                              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all select-none ${
+                              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all select-none cursor-pointer ${
                                 isSelected
-                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600 shadow-2xs font-bold'
+                                  ? 'border-zinc-950 bg-zinc-950 text-white font-bold'
                                   : isSelectable
-                                  ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                                  : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed line-through opacity-50'
+                                  ? 'border-zinc-200 bg-white text-zinc-800 hover:border-zinc-400'
+                                  : 'border-zinc-100 bg-zinc-50 text-zinc-300 cursor-not-allowed line-through opacity-50'
                               }`}
                             >
                               {isColorGroup && (
                                 <span
-                                  className="h-3.5 w-3.5 rounded-full border border-black/20 shrink-0 shadow-2xs"
+                                  className="h-3.5 w-3.5 rounded-full border border-zinc-400 shrink-0"
                                   style={{ backgroundColor: getColorCode(val.label) }}
                                 />
                               )}
@@ -599,28 +587,30 @@ export function ProductDetailPage() {
               </div>
             )}
 
-            {/* Exclusive Promotions Box */}
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider">
-                <Gift className="h-4 w-4 text-emerald-400" />
-                <span>Khuyến Mại Đặc Biệt AuraPhone</span>
+            {/* Architectural Privilege Ledger */}
+            <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-zinc-950 text-white">
+                <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-emerald-400">
+                  ĐẶC QUYỀN ĐI KÈM TẠI AURAPHONE
+                </span>
+                <span className="font-mono text-[10px] text-zinc-400">VNA VIP CARE</span>
               </div>
-              <div className="p-4 space-y-2.5 text-xs text-slate-700 font-medium">
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white mt-0.5">1</span>
+              <div className="p-4 space-y-2.5 text-xs text-zinc-700 divide-y divide-zinc-100">
+                <div className="flex items-start gap-3 pb-2">
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 shrink-0">01</span>
                   <span>Tặng gói bảo hành VIP 12 tháng 1 đổi 1 lỗi phần cứng từ nhà sản xuất.</span>
                 </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white mt-0.5">2</span>
-                  <span>Giảm ngay 500.000₫ khi thanh toán quét mã VNPay/MoMo/Thẻ tín dụng.</span>
+                <div className="flex items-start gap-3 py-2">
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 shrink-0">02</span>
+                  <span>Giảm trực tiếp 500.000₫ khi thanh toán qua cổng VNPay, MoMo hoặc thẻ tín dụng.</span>
                 </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white mt-0.5">3</span>
-                  <span>Giảm 30% khi mua kèm củ sạc nhanh chính hãng 30W/65W & ốp lưng.</span>
+                <div className="flex items-start gap-3 py-2">
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 shrink-0">03</span>
+                  <span>Ưu đãi 30% khi trang bị kèm củ sạc nhanh chính hãng và bao da bảo vệ.</span>
                 </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white mt-0.5">4</span>
-                  <span>Trợ giá thu cũ đổi mới lên đến 2.000.000₫ (Định giá nhanh tại cửa hàng).</span>
+                <div className="flex items-start gap-3 pt-2">
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 shrink-0">04</span>
+                  <span>Trợ giá thu cũ đổi mới lên đến 2.000.000₫ thẩm định nhanh trong 15 phút.</span>
                 </div>
               </div>
             </div>
@@ -634,9 +624,9 @@ export function ProductDetailPage() {
                   onClick={handleAddToCart}
                   isLoading={isAddingToCart}
                   disabled={!isAvailable || isAddingToCart}
-                  className="h-13 rounded-xl font-bold text-sm sm:text-base bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 gap-2"
+                  className="h-12 rounded-xl font-semibold text-sm bg-emerald-700 hover:bg-emerald-800 text-white gap-2"
                 >
-                  <ShoppingCart className="h-5 w-5" />
+                  <ShoppingCart className="h-4 w-4" />
                   <span>
                     {!allGroupsSelected
                       ? 'Vui lòng chọn phân loại'
@@ -651,9 +641,9 @@ export function ProductDetailPage() {
                   size="lg"
                   onClick={handleAddToCart}
                   disabled={!isAvailable || isAddingToCart}
-                  className="h-13 rounded-xl font-bold text-sm border border-slate-300 bg-white text-slate-800 hover:border-slate-900 hover:bg-slate-50 transition gap-2"
+                  className="h-12 rounded-xl font-semibold text-sm border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-900 transition gap-2"
                 >
-                  <CreditCard className="h-5 w-5 text-slate-600" />
+                  <CreditCard className="h-4 w-4 text-zinc-700" />
                   <span>Trả góp 0% qua thẻ</span>
                 </Button>
               </div>
@@ -663,17 +653,17 @@ export function ProductDetailPage() {
                   productId={product.id}
                   productName={product.name}
                   showText
-                  className="flex-1 h-12 rounded-xl text-xs sm:text-sm font-bold border-slate-200 bg-white hover:bg-slate-50 shadow-2xs"
+                  className="flex-1 h-11 rounded-xl text-xs sm:text-sm font-semibold border-zinc-200 bg-white hover:bg-zinc-50"
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-500 pt-1 px-1">
+              <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 px-1">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                  <Clock className="h-3.5 w-3.5 text-emerald-700" />
                   Giao nhanh trong 2 giờ
                 </span>
-                <span className="flex items-center gap-1.5 font-semibold text-slate-700">
-                  Hotline tư vấn: <strong className="text-emerald-700">1800 6868</strong> (Miễn phí)
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700">
+                  Hotline tư vấn: <strong className="font-mono text-zinc-950">1800 6868</strong>
                 </span>
               </div>
             </div>
@@ -681,15 +671,14 @@ export function ProductDetailPage() {
         </div>
 
         {/* Detailed Tabs: Specs, Highlights & Warranty Policies */}
-        <section className="rounded-3xl border border-slate-200/90 bg-white/90 backdrop-blur-md p-6 sm:p-8 shadow-sm space-y-6">
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-4 overflow-x-auto">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 space-y-6">
+          <div className="flex items-center gap-2 border-b border-zinc-200 pb-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('specs')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'specs'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-zinc-950 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
               <Smartphone className="h-4 w-4" />
@@ -697,10 +686,10 @@ export function ProductDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab('highlights')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'highlights'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-zinc-950 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
               <Sparkles className="h-4 w-4" />
@@ -708,10 +697,10 @@ export function ProductDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab('warranty')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'warranty'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-zinc-950 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
               <ShieldCheck className="h-4 w-4" />
@@ -719,7 +708,6 @@ export function ProductDetailPage() {
             </button>
           </div>
 
-          {/* Tab Content: Specs */}
           {activeTab === 'specs' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
               {techSpecs.map((spec, i) => {
@@ -727,16 +715,16 @@ export function ProductDetailPage() {
                 return (
                   <div
                     key={i}
-                    className="flex items-start gap-3.5 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80"
+                    className="flex items-start gap-3.5 p-4 rounded-xl bg-zinc-50 border border-zinc-200/80"
                   >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-xs shrink-0 mt-0.5 border border-slate-200/60">
-                      <Icon className="h-4.5 w-4.5" />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-zinc-900 shrink-0 mt-0.5 border border-zinc-200">
+                      <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">
+                      <span className="font-mono text-[10px] font-semibold text-zinc-400 block uppercase tracking-widest">
                         {spec.label}
                       </span>
-                      <span className="text-xs sm:text-sm font-semibold text-slate-800">
+                      <span className="text-xs sm:text-sm font-semibold text-zinc-900 mt-0.5 block">
                         {spec.value}
                       </span>
                     </div>
@@ -746,52 +734,59 @@ export function ProductDetailPage() {
             </div>
           )}
 
-          {/* Tab Content: Highlights / Description */}
           {activeTab === 'highlights' && (
-            <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed animate-fade-in">
+            <div className="space-y-4 text-xs sm:text-sm text-zinc-700 leading-relaxed animate-fade-in">
               {product.description ? (
-                <div className="whitespace-pre-line p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80">
+                <div className="whitespace-pre-line p-5 rounded-xl bg-zinc-50 border border-zinc-200">
                   {product.description}
                 </div>
               ) : (
-                <p className="text-slate-400">Đang cập nhật thông tin mô tả chi tiết sản phẩm.</p>
+                <p className="text-zinc-400">Đang cập nhật thông tin mô tả chi tiết sản phẩm.</p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-1.5">
-                  <h4 className="font-extrabold text-emerald-900 text-sm">Thiết Kế Đỉnh Cao</h4>
-                  <p className="text-xs text-slate-600">Vật liệu Titanium cao cấp với độ bền vượt trội và cảm giác cầm nắm đầm tay.</p>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span className="font-mono text-[10px] text-emerald-700 font-bold">01 / CRAFTSMANSHIP</span>
+                  <h4 className="font-bold text-zinc-950 text-sm">Thiết Kế Đỉnh Cao</h4>
+                  <p className="text-xs text-zinc-600">
+                    Vật liệu hoàn thiện cao cấp với độ bền vượt trội và cảm giác cầm nắm chuẩn xác.
+                  </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-1.5">
-                  <h4 className="font-extrabold text-emerald-900 text-sm">Camera Pro Chuyên Nghiệp</h4>
-                  <p className="text-xs text-slate-600">Chụp ảnh đêm xuất sắc và quay video cinematic chuẩn phòng thu.</p>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span className="font-mono text-[10px] text-emerald-700 font-bold">02 / OPTICS</span>
+                  <h4 className="font-bold text-zinc-950 text-sm">Camera Chuyên Nghiệp</h4>
+                  <p className="text-xs text-zinc-600">
+                    Hệ thống cảm biến quang học thế hệ mới thu sáng vượt trội và quay phim chuẩn điện ảnh.
+                  </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-1.5">
-                  <h4 className="font-extrabold text-emerald-900 text-sm">Hiệu Năng Vô Địch</h4>
-                  <p className="text-xs text-slate-600">Xử lý mượt mà mọi tác vụ đồ họa 3D nặng và tối ưu tiết kiệm pin vượt trội.</p>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-1.5">
+                  <span className="font-mono text-[10px] text-emerald-700 font-bold">03 / SILICON</span>
+                  <h4 className="font-bold text-zinc-950 text-sm">Hiệu Năng Đầu Bảng</h4>
+                  <p className="text-xs text-zinc-600">
+                    Vi xử lý tiến trình 3nm xử lý mượt mà tác vụ đồ họa nặng và tối ưu năng lượng.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Tab Content: Warranty */}
           {activeTab === 'warranty' && (
             <div className="space-y-4 animate-fade-in">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
-                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-2">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <div className="p-5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+                  <h4 className="font-bold text-zinc-950 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
                     Bảo hành phần cứng 12 tháng
                   </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed">
+                  <p className="text-xs text-zinc-600 leading-relaxed">
                     Bảo hành toàn diện tại tất cả trung tâm bảo hành ủy quyền chính hãng trên toàn quốc.
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-2">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                    <RotateCcw className="h-4 w-4 text-emerald-600" />
+                <div className="p-5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
+                  <h4 className="font-bold text-zinc-950 flex items-center gap-2">
+                    <RotateCcw className="h-4 w-4 text-emerald-700" />
                     Đổi mới trong 30 ngày đầu
                   </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed">
+                  <p className="text-xs text-zinc-600 leading-relaxed">
                     Nếu phát sinh bất kỳ lỗi phần cứng nào từ nhà sản xuất, khách hàng được đổi ngay máy mới 100%.
                   </p>
                 </div>
@@ -808,11 +803,11 @@ export function ProductDetailPage() {
       </div>
 
       {/* Floating Mobile Sticky Purchase Bar */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-2xl animate-fade-in">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-zinc-200 p-3 shadow-2xl animate-fade-in">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] text-slate-400 block font-bold uppercase">Giá thanh toán</span>
-            <span className="text-lg font-black text-rose-600 tabular-nums">
+            <span className="font-mono text-[10px] text-zinc-400 block uppercase">Giá thanh toán</span>
+            <span className="font-mono text-lg font-bold text-zinc-950 tabular-nums">
               {displayedPrice}
             </span>
           </div>
@@ -828,7 +823,7 @@ export function ProductDetailPage() {
               onClick={handleAddToCart}
               isLoading={isAddingToCart}
               disabled={!isAvailable || isAddingToCart}
-              className="px-5 h-11 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 gap-1.5"
+              className="px-5 h-11 rounded-xl font-semibold text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
             >
               <ShoppingCart className="h-4 w-4" />
               <span>Thêm giỏ hàng</span>

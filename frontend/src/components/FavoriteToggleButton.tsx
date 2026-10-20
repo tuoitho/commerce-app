@@ -87,12 +87,12 @@ export function FavoriteToggleButton({
       onClick={handleClick}
       className={cn(
         'inline-flex items-center justify-center transition-all select-none cursor-pointer',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         showText
-          ? 'gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-          : 'p-2 rounded-full bg-white/90 hover:bg-white text-slate-600 hover:text-rose-600 border border-slate-200/80 shadow-2xs backdrop-blur-xs',
-        isFavorited && showText && 'border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100/60',
+          ? 'gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 text-zinc-800'
+          : 'p-2 rounded-xl bg-white/95 hover:bg-white text-zinc-600 hover:text-rose-600 border border-zinc-200/90 shadow-2xs',
+        isFavorited && showText && 'border-rose-200 bg-rose-50/70 text-rose-700 hover:bg-rose-100/60',
         className
       )}
     >
@@ -102,7 +102,7 @@ export function FavoriteToggleButton({
           'transition-all shrink-0',
           isFavorited
             ? 'fill-rose-500 text-rose-500 scale-105'
-            : 'text-slate-500 fill-none group-hover:text-rose-500 hover:scale-110'
+            : 'text-zinc-500 fill-none group-hover:text-rose-500 hover:scale-110'
         )}
       />
       {showText && (
