@@ -516,6 +516,8 @@ Run these from `frontend/`:
 * Lint: `npm run lint` (Oxlint, not ESLint).
 * Typecheck and production build: `npm run build` (`tsc -b && vite build`).
 * `npm run build` does not run lint or tests.
+* Run one Playwright suite: `npx playwright test e2e/<name>.spec.ts`. Playwright starts both Vite dev servers itself.
+* Mocked-backend Playwright specs declare every `/api/v1` route through `mountContractRoutes` in `e2e/fixtures/contract.ts`; do not call `page.route` or `context.route` on an API path in a spec. `e2e/contract-fixture.spec.ts` tests that helper.
 
 ## Verification
 

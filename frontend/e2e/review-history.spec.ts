@@ -3,8 +3,9 @@ import * as path from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import {
   loadContractSnapshots,
-  fulfillFromContractSnapshot,
+  mountContractRoutes,
   assertMatchesContractShape,
+  type ContractRoute,
 } from './fixtures/contract'
 import { ReviewHistoryPage } from './pages/ReviewHistoryPage'
 
@@ -77,175 +78,95 @@ async function assertVisualQualityInvariants(page: Page): Promise<void> {
   expect(brokenImages, `Broken visible images found: ${brokenImages.join(', ')}`).toEqual([])
 }
 
-async function setupCommonRoutes(page: Page, options: { authenticated?: boolean } = {}): Promise<void> {
-  const isAuthenticated = options.authenticated ?? true
+const MOCK_USER = {
+  id: '11111111-1111-1111-1111-111111111111',
+  email: 'khachhang@auraphone.vn',
+  role: 'customer',
+  createdAt: '2026-10-01T00:00:00Z',
+}
 
-  if (isAuthenticated) {
-    await page.addInitScript(() => {
-      localStorage.setItem('accessToken', 'mock-jwt-customer-token')
-      localStorage.setItem(
-        'authUser',
-        JSON.stringify({
-          id: '11111111-1111-1111-1111-111111111111',
-          email: 'khachhang@auraphone.vn',
-          role: 'customer',
-          createdAt: '2026-10-01T00:00:00Z',
-        })
-      )
-    })
-  } else {
-    await page.addInitScript(() => {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('authUser')
-    })
+function envelope(message: string, data: unknown, pagination?: Record<string, unknown>) {
+  return {
+    success: true,
+    message,
+    data,
+    error: null,
+    meta: { timestamp: '2026-10-20T10:00:00Z', ...(pagination ? { pagination } : {}) },
   }
+}
 
-  await page.route('**/api/v1/auth/me', async (route) => {
-    const authHeader = route.request().headers()['authorization'] || ''
-    if (!isAuthenticated || !authHeader.startsWith('Bearer ')) {
-      await fulfillFromContractSnapshot(route, snapshots, 'unauthenticated_401')
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy thông tin người dùng thành công',
-        data: {
-          id: '11111111-1111-1111-1111-111111111111',
-          email: 'khachhang@auraphone.vn',
-          role: 'customer',
-          createdAt: '2026-10-01T00:00:00Z',
-        },
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
+function singlePage(total: number, limit: number) {
+  return { total, page: 1, limit, totalPages: total > 0 ? 1 : 0, hasNext: false, hasPrev: false }
+}
 
-  await page.route('**/api/v1/categories', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy danh mục thành công',
-        data: [
-          { id: 'cat-apple', name: 'Apple iPhone', description: 'Điện thoại iPhone chính hãng' },
-          { id: 'cat-samsung', name: 'Samsung Galaxy', description: 'Điện thoại Samsung chính hãng' },
-        ],
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
-
-  await page.route('**/api/v1/products?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy danh sách sản phẩm thành công',
-        data: [],
-        error: null,
-        meta: {
-          timestamp: '2026-10-20T10:00:00Z',
-          pagination: {
-            total: 0,
-            page: 1,
-            limit: 12,
-            totalPages: 0,
-            hasNext: false,
-            hasPrev: false,
-          },
-        },
-      }),
-    })
-  })
-
-  await page.route('**/api/v1/cart', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy giỏ hàng thành công',
-        data: {
-          id: 'cart-1',
-          items: [],
-          totalUnits: 2,
-          selectedTotal: '0',
-        },
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
-
-  await page.route('**/api/v1/categories*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy danh mục thành công',
-        data: [
+// Background calls from the shared storefront layout, outside this feature's contracts.
+function layoutRoutes(isAuthenticated: boolean): ContractRoute[] {
+  const unauthenticated = snapshots.snapshots.unauthenticated_401
+  return [
+    {
+      method: 'GET',
+      path: '/api/v1/auth/me',
+      stub: ({ request }) =>
+        isAuthenticated && /^Bearer .+/.test(request.headers()['authorization'] ?? '')
+          ? { status: 200, body: envelope('Lấy thông tin người dùng thành công', MOCK_USER) }
+          : { status: unauthenticated.status, body: unauthenticated.responseBody },
+    },
+    {
+      method: 'GET',
+      path: '/api/v1/categories',
+      stub: {
+        status: 200,
+        body: envelope('Lấy danh mục thành công', [
           {
             id: 'cat-apple',
             name: 'Apple iPhone',
             slug: 'apple-iphone',
             description: 'Điện thoại iPhone chính hãng',
           },
-        ],
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
+        ]),
+      },
+    },
+    {
+      method: 'GET',
+      path: '/api/v1/cart',
+      stub: {
+        status: 200,
+        body: envelope('Lấy giỏ hàng thành công', {
+          id: 'cart-1',
+          items: [],
+          totalUnits: 2,
+          selectedTotal: '0',
+        }),
+      },
+    },
+    {
+      method: 'GET',
+      path: '/api/v1/favorites',
+      stub: {
+        status: 200,
+        body: envelope('Lấy danh sách yêu thích thành công', [], singlePage(0, 10)),
+      },
+    },
+    {
+      method: 'GET',
+      path: /^\/api\/v1\/chat\//,
+      stub: { status: 200, body: envelope('OK', null) },
+    },
+    {
+      method: 'GET',
+      path: '/api/v1/notifications',
+      stub: {
+        status: 200,
+        body: envelope('Lấy danh sách thông báo thành công', { items: [], unreadCount: 0 }),
+      },
+    },
+  ]
+}
 
-  await page.route('**/api/v1/favorites*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy danh sách yêu thích thành công',
-        data: [],
-        error: null,
-        meta: {
-          timestamp: '2026-10-20T10:00:00Z',
-          pagination: {
-            total: 0,
-            page: 1,
-            limit: 10,
-            totalPages: 0,
-            hasNext: false,
-            hasPrev: false,
-          },
-        },
-      }),
-    })
-  })
-
-  await page.route('**/api/v1/chat/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'OK',
-        data: null,
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
-
-  await page.routeWebSocket('**/api/v1/chat/ws*', () => {
-    // Intercept chat WebSocket in Mode 2 so Vite does not proxy to offline backend
-  })
+// Static assets outside /api/v1, which the route-mounting helper does not cover.
+async function setupAssetRoutes(page: Page): Promise<void> {
+  // Intercept chat WebSocket in Mode 2 so Vite does not proxy to offline backend
+  await page.routeWebSocket('**/api/v1/chat/ws*', () => {})
 
   await page.route('https://images.unsplash.com/**', async (route) => {
     await route.fulfill({
@@ -280,182 +201,161 @@ function createInitialReviewsState(): MockUserReview[] {
   return raw.data.reviews
 }
 
-async function setupStatefulReviewRoutes(
-  page: Page,
-  options: {
-    initialReviews?: MockUserReview[]
-    totalOverride?: number
-    delayMs?: number
-    forceInvalidMultipartRatingOnce?: boolean
-  } = {}
-): Promise<{
+interface ReviewRouteOptions {
+  initialReviews?: MockUserReview[]
+  totalOverride?: number
+  delayMs?: number
+  forceInvalidMultipartRatingOnce?: boolean
+}
+
+interface ReviewRouteState {
   reviewsState: MockUserReview[]
   requestedReviewQueries: string[]
   capturedPutRequests: Array<{ contentType: string; rating: number; comment: string }>
-}> {
-  const reviewsState = options.initialReviews ?? createInitialReviewsState()
-  const requestedReviewQueries: string[] = []
-  const capturedPutRequests: Array<{ contentType: string; rating: number; comment: string }> = []
+}
+
+function reviewRoutes(options: ReviewRouteOptions, state: ReviewRouteState): ContractRoute[] {
+  const { reviewsState, requestedReviewQueries, capturedPutRequests } = state
   let forceInvalidOnce = options.forceInvalidMultipartRatingOnce ?? false
 
-  await page.route('**/api/v1/reviews/me*', async (route) => {
-    if (options.delayMs) {
-      await new Promise((r) => setTimeout(r, options.delayMs))
-    }
+  return [
+    {
+      method: 'GET',
+      path: '/api/v1/reviews/me',
+      auth: 'bearer',
+      handle: async ({ url }) => {
+        if (options.delayMs) {
+          await new Promise((r) => setTimeout(r, options.delayMs))
+        }
 
-    // Rule 2: Inbound Auth Boundary Check
-    const authHeader = route.request().headers()['authorization'] || ''
-    if (!authHeader.startsWith('Bearer ')) {
-      await fulfillFromContractSnapshot(route, snapshots, 'unauthenticated_401')
-      return
-    }
+        requestedReviewQueries.push(url.search)
+        const ratingParam = url.searchParams.get('rating')
+        const pageNum = Number(url.searchParams.get('page') || '1')
+        const limitNum = Number(url.searchParams.get('limit') || '10')
 
-    const reqUrl = new URL(route.request().url())
-    requestedReviewQueries.push(reqUrl.search)
-    const ratingParam = reqUrl.searchParams.get('rating')
-    const pageNum = Number(reqUrl.searchParams.get('page') || '1')
-    const limitNum = Number(reqUrl.searchParams.get('limit') || '10')
+        // Inbound query validation of the backend handler: rating must be 0..5
+        if (ratingParam !== null) {
+          const ratingVal = Number(ratingParam)
+          if (!Number.isInteger(ratingVal) || ratingVal < 0 || ratingVal > 5) {
+            return { snapshot: 'get_user_reviews_validation_400' }
+          }
+        }
 
-    // Rule 2: Inbound Query Validation (rating must be 0..5)
-    if (ratingParam !== null) {
-      const ratingVal = Number(ratingParam)
-      if (!Number.isInteger(ratingVal) || ratingVal < 0 || ratingVal > 5) {
-        await fulfillFromContractSnapshot(route, snapshots, 'get_user_reviews_validation_400')
-        return
-      }
-    }
+        const activeRating = ratingParam ? Number(ratingParam) : 0
+        const filtered =
+          activeRating > 0 ? reviewsState.filter((r) => r.rating === activeRating) : reviewsState
 
-    const activeRating = ratingParam ? Number(ratingParam) : 0
-    const filtered =
-      activeRating > 0 ? reviewsState.filter((r) => r.rating === activeRating) : reviewsState
+        if (filtered.length === 0) {
+          return { snapshot: 'get_user_reviews_empty_200' }
+        }
 
-    if (filtered.length === 0) {
-      await fulfillFromContractSnapshot(route, snapshots, 'get_user_reviews_empty_200')
-      return
-    }
+        const total =
+          options.totalOverride && activeRating === 0 ? options.totalOverride : filtered.length
+        const totalPages = Math.max(1, Math.ceil(total / limitNum))
+        const body = structuredClone(snapshots.snapshots.get_user_reviews_200.responseBody) as {
+          data: { reviews: MockUserReview[] }
+          meta: { pagination: Record<string, unknown> }
+        }
+        body.data.reviews = structuredClone(filtered)
+        body.meta.pagination = {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages,
+          hasNext: pageNum < totalPages,
+          hasPrev: pageNum > 1,
+        }
 
-    const total = options.totalOverride && activeRating === 0 ? options.totalOverride : filtered.length
-    const totalPages = Math.max(1, Math.ceil(total / limitNum))
-    const body = structuredClone(snapshots.snapshots.get_user_reviews_200.responseBody) as {
-      data: { reviews: MockUserReview[] }
-      meta: { pagination: Record<string, unknown> }
-    }
-    body.data.reviews = structuredClone(filtered)
-    body.meta.pagination = {
-      total,
-      page: pageNum,
-      limit: limitNum,
-      totalPages,
-      hasNext: pageNum < totalPages,
-      hasPrev: pageNum > 1,
-    }
+        return {
+          snapshot: 'get_user_reviews_200',
+          body: body as unknown as Record<string, unknown>,
+        }
+      },
+    },
+    {
+      method: 'PUT',
+      path: /^\/api\/v1\/orders\/[^/]+\/items\/[^/]+\/review$/,
+      auth: 'bearer',
+      handle: ({ request, url }) => {
+        const urlParts = url.pathname.split('/')
+        const itemId = urlParts[urlParts.indexOf('items') + 1]
+        const contentType = request.headers()['content-type'] || ''
+        const postData = request.postData() || ''
 
-    await fulfillFromContractSnapshot(
-      route,
-      snapshots,
-      'get_user_reviews_200',
-      body as unknown as Record<string, unknown>
-    )
-  })
+        expect(contentType).toContain('multipart/form-data')
+        const rawRating = parseMultipartField(postData, 'rating')
+        const rawComment = parseMultipartField(postData, 'comment') ?? ''
+        const parsedRating = forceInvalidOnce ? 6 : Number(rawRating)
+        forceInvalidOnce = false
 
-  await page.route('**/api/v1/orders/*/items/*/review', async (route) => {
-    const method = route.request().method()
+        // Inbound multipart validation of the backend handler
+        if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+          return { snapshot: 'update_review_validation_400' }
+        }
 
-    // Req 3.5: DELETE route does not exist
-    if (method === 'DELETE') {
-      await route.fulfill({
+        const target = reviewsState.find((r) => r.orderItemId === itemId)
+        if (!target || target.editCount >= 1 || !target.canEdit) {
+          return { snapshot: 'update_review_conflict_409' }
+        }
+
+        // The body is multipart, so the helper's JSON request check does not apply; compare the parsed fields instead.
+        const requestPayload = { rating: parsedRating, comment: rawComment }
+        assertMatchesContractShape(
+          requestPayload,
+          snapshots.snapshots.update_review_200.requestBody,
+          'snapshot(update_review_200).requestBody'
+        )
+        capturedPutRequests.push({ contentType, rating: parsedRating, comment: rawComment })
+
+        target.rating = parsedRating
+        target.comment = rawComment
+        target.editCount = 1
+        target.canEdit = false
+        target.edited = true
+        target.updatedAt = '2026-10-20T10:30:00Z'
+
+        const updateBody = structuredClone(snapshots.snapshots.update_review_200.responseBody) as {
+          data: Record<string, unknown>
+        }
+        updateBody.data.id = target.id
+        updateBody.data.orderItemId = target.orderItemId
+        updateBody.data.rating = target.rating
+        updateBody.data.comment = target.comment
+        updateBody.data.editCount = target.editCount
+        updateBody.data.canEdit = target.canEdit
+        updateBody.data.edited = target.edited
+        updateBody.data.updatedAt = target.updatedAt
+
+        return {
+          snapshot: 'update_review_200',
+          body: updateBody as unknown as Record<string, unknown>,
+        }
+      },
+    },
+    // Req 3.5: the review DELETE route does not exist, so the router answers 404.
+    {
+      method: 'DELETE',
+      path: /^\/api\/v1\/orders\/[^/]+\/items\/[^/]+\/review$/,
+      stub: {
         status: 404,
-        contentType: 'application/json',
-        body: JSON.stringify({
+        body: {
           success: false,
           message: 'Không tìm thấy đường dẫn',
           data: null,
           error: { code: 'not_found', message: 'Không tìm thấy đường dẫn' },
           meta: { timestamp: '2026-10-20T10:00:00Z' },
-        }),
-      })
-      return
-    }
-
-    // Rule 2: Inbound Auth Check
-    const authHeader = route.request().headers()['authorization'] || ''
-    if (!authHeader.startsWith('Bearer ')) {
-      await fulfillFromContractSnapshot(route, snapshots, 'unauthenticated_401')
-      return
-    }
-
-    expect(method).toBe('PUT')
-    const urlParts = new URL(route.request().url()).pathname.split('/')
-    const itemId = urlParts[urlParts.indexOf('items') + 1]
-    const contentType = route.request().headers()['content-type'] || ''
-    const postData = route.request().postData() || ''
-
-    expect(contentType).toContain('multipart/form-data')
-    const rawRating = parseMultipartField(postData, 'rating')
-    const rawComment = parseMultipartField(postData, 'comment') ?? ''
-    const parsedRating = forceInvalidOnce ? 6 : Number(rawRating)
-    forceInvalidOnce = false
-
-    // Rule 2: Inbound Multipart Validation
-    if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
-      await fulfillFromContractSnapshot(route, snapshots, 'update_review_validation_400')
-      return
-    }
-
-    const target = reviewsState.find((r) => r.orderItemId === itemId)
-    if (!target || target.editCount >= 1 || !target.canEdit) {
-      await fulfillFromContractSnapshot(route, snapshots, 'update_review_conflict_409')
-      return
-    }
-
-    // Rule 3: Outbound Request Contract Shape Validation
-    const requestPayload = { rating: parsedRating, comment: rawComment }
-    assertMatchesContractShape(
-      requestPayload,
-      snapshots.snapshots.update_review_200.requestBody,
-      'snapshot(update_review_200).requestBody'
-    )
-    capturedPutRequests.push({ contentType, rating: parsedRating, comment: rawComment })
-
-    // Rule 4: Mutate Stateful In-Memory Store
-    target.rating = parsedRating
-    target.comment = rawComment
-    target.editCount = 1
-    target.canEdit = false
-    target.edited = true
-    target.updatedAt = '2026-10-20T10:30:00Z'
-
-    const updateBody = structuredClone(snapshots.snapshots.update_review_200.responseBody) as {
-      data: Record<string, unknown>
-    }
-    updateBody.data.id = target.id
-    updateBody.data.orderItemId = target.orderItemId
-    updateBody.data.rating = target.rating
-    updateBody.data.comment = target.comment
-    updateBody.data.editCount = target.editCount
-    updateBody.data.canEdit = target.canEdit
-    updateBody.data.edited = target.edited
-    updateBody.data.updatedAt = target.updatedAt
-
-    await fulfillFromContractSnapshot(
-      route,
-      snapshots,
-      'update_review_200',
-      updateBody as unknown as Record<string, unknown>
-    )
-  })
-
-  // Cross-page routes for /products, /products/:productId, /products/:productId/reviews and /orders/:orderId (Req 1.4, 1.5, 5.2)
-  await page.route('**/api/v1/products**', async (route) => {
-    const reqUrl = new URL(route.request().url())
-    if (reqUrl.pathname === '/api/v1/products') {
-      await route.fulfill({
+        },
+      },
+    },
+    // Cross-page routes for /products, /products/:productId, /products/:productId/reviews and /orders/:orderId (Req 1.4, 1.5, 5.2)
+    {
+      method: 'GET',
+      path: '/api/v1/products',
+      stub: () => ({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          message: 'Lấy danh sách sản phẩm thành công',
-          data: reviewsState.map((r) => ({
+        body: envelope(
+          'Lấy danh sách sản phẩm thành công',
+          reviewsState.map((r) => ({
             id: r.product.id,
             categoryId: 'cat-apple',
             categoryName: 'Apple iPhone',
@@ -467,179 +367,178 @@ async function setupStatefulReviewRoutes(
             maxPrice: '29990000',
             inStock: true,
           })),
-          error: null,
-          meta: {
-            timestamp: '2026-10-20T10:00:00Z',
-            pagination: {
-              total: reviewsState.length,
-              page: 1,
-              limit: 12,
-              totalPages: 1,
-              hasNext: false,
-              hasPrev: false,
-            },
-          },
-        }),
-      })
-      return
-    }
-    if (reqUrl.pathname.endsWith('/reviews')) {
-      const productId = reqUrl.pathname.split('/')[4]
-      const prodReviews = reviewsState.filter((r) => r.product.id === productId)
-      const avg =
-        prodReviews.length > 0
-          ? (prodReviews.reduce((acc, r) => acc + r.rating, 0) / prodReviews.length).toFixed(1)
-          : '0.0'
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          message: 'Lấy danh sách đánh giá thành công',
-          data: {
-            summary: {
-              totalReviews: prodReviews.length,
-              averageRating: avg,
-              ratingCounts: {
-                '1': prodReviews.filter((r) => r.rating === 1).length,
-                '2': prodReviews.filter((r) => r.rating === 2).length,
-                '3': prodReviews.filter((r) => r.rating === 3).length,
-                '4': prodReviews.filter((r) => r.rating === 4).length,
-                '5': prodReviews.filter((r) => r.rating === 5).length,
-              },
-            },
-            reviews: prodReviews.map((r) => ({
-              id: r.id,
-              rating: r.rating,
-              comment: r.comment,
-              edited: r.edited,
-              createdAt: r.createdAt,
-              updatedAt: r.updatedAt,
-              reviewer: { maskedEmail: 'k***@auraphone.vn' },
-              purchase: { model: r.product.model, options: r.product.options },
-              media: r.media,
-              helpfulness: { helpfulCount: 3, unhelpfulCount: 0, viewerVote: null },
-              adminReply: r.adminReply,
-              adminRepliedAt: r.adminRepliedAt,
-            })),
-          },
-          error: null,
-          meta: {
-            timestamp: '2026-10-20T10:00:00Z',
-            pagination: {
-              total: prodReviews.length,
-              page: 1,
-              limit: 10,
-              totalPages: 1,
-              hasNext: false,
-              hasPrev: false,
-            },
-          },
-        }),
-      })
-      return
-    }
-
-    const productId = reqUrl.pathname.split('/').pop() || 'prod-101'
-    const matched = reviewsState.find((r) => r.product.id === productId) ?? reviewsState[0]
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy chi tiết sản phẩm thành công',
-        data: {
-          id: matched.product.id,
-          categoryId: 'cat-apple',
-          categoryName: 'Apple iPhone',
-          brandName: matched.product.brandName,
-          name: matched.product.name,
-          slug: matched.product.id,
-          description: 'Điện thoại chính hãng VNA',
-          images: [{ id: 'img-1', url: matched.product.imageUrl, isPrimary: true }],
-          optionGroups: [],
-          variants: [
-            {
-              id: 'var-1',
-              model: matched.product.model,
-              price: '29990000',
-              stockQuantity: 10,
-              isDefault: true,
-              options: [],
-            },
-          ],
-        },
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
+          { ...singlePage(reviewsState.length, 12), totalPages: 1 }
+        ),
       }),
-    })
-  })
-
-  await page.route('**/api/v1/orders/*', async (route) => {
-    const reqUrl = new URL(route.request().url())
-    if (reqUrl.pathname.includes('/items/')) {
-      await route.fallback()
-      return
-    }
-    const orderId = reqUrl.pathname.split('/').pop() || '22222222-2222-2222-2222-222222222222'
-    const matched = reviewsState.find((r) => r.order.id === orderId) ?? reviewsState[0]
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        message: 'Lấy chi tiết đơn hàng thành công',
-        data: {
-          id: matched.order.id,
-          userId: '11111111-1111-1111-1111-111111111111',
-          status: 'delivered',
-          recipientName: 'Nguyễn Văn A',
-          phone: '0901234567',
-          provinceName: 'TP. Hồ Chí Minh',
-          wardName: 'Phường Bến Nghé',
-          detailAddress: '123 Nguyễn Huệ',
-          paymentMethod: 'cod',
-          subtotalVnd: '29990000',
-          shippingFeeVnd: '0',
-          totalVnd: '29990000',
-          createdAt: matched.order.createdAt,
-          updatedAt: matched.updatedAt,
-          items: [
+    },
+    {
+      method: 'GET',
+      path: /^\/api\/v1\/products\/[^/]+\/reviews$/,
+      stub: ({ url }) => {
+        const productId = url.pathname.split('/')[4]
+        const prodReviews = reviewsState.filter((r) => r.product.id === productId)
+        const avg =
+          prodReviews.length > 0
+            ? (prodReviews.reduce((acc, r) => acc + r.rating, 0) / prodReviews.length).toFixed(1)
+            : '0.0'
+        return {
+          status: 200,
+          body: envelope(
+            'Lấy danh sách đánh giá thành công',
             {
-              id: matched.orderItemId,
-              variantId: 'var-1',
-              productId: matched.product.id,
-              brandName: matched.product.brandName,
-              productName: matched.product.name,
-              model: matched.product.model,
-              imageUrl: matched.product.imageUrl,
-              options: matched.product.options,
-              unitPriceVnd: '29990000',
-              quantity: 1,
-              lineTotalVnd: '29990000',
-              reviewStatus: 'reviewed',
-              review: {
-                id: matched.id,
-                orderItemId: matched.orderItemId,
-                rating: matched.rating,
-                comment: matched.comment,
-                editCount: matched.editCount,
-                canEdit: matched.canEdit,
-                edited: matched.edited,
-                media: matched.media,
-                createdAt: matched.createdAt,
-                updatedAt: matched.updatedAt,
+              summary: {
+                totalReviews: prodReviews.length,
+                averageRating: avg,
+                ratingCounts: {
+                  '1': prodReviews.filter((r) => r.rating === 1).length,
+                  '2': prodReviews.filter((r) => r.rating === 2).length,
+                  '3': prodReviews.filter((r) => r.rating === 3).length,
+                  '4': prodReviews.filter((r) => r.rating === 4).length,
+                  '5': prodReviews.filter((r) => r.rating === 5).length,
+                },
               },
+              reviews: prodReviews.map((r) => ({
+                id: r.id,
+                rating: r.rating,
+                comment: r.comment,
+                edited: r.edited,
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+                reviewer: { maskedEmail: 'k***@auraphone.vn' },
+                purchase: { model: r.product.model, options: r.product.options },
+                media: r.media,
+                helpfulness: { helpfulCount: 3, unhelpfulCount: 0, viewerVote: null },
+                adminReply: r.adminReply,
+                adminRepliedAt: r.adminRepliedAt,
+              })),
             },
-          ],
-        },
-        error: null,
-        meta: { timestamp: '2026-10-20T10:00:00Z' },
-      }),
-    })
-  })
+            { ...singlePage(prodReviews.length, 10), totalPages: 1 }
+          ),
+        }
+      },
+    },
+    {
+      method: 'GET',
+      path: /^\/api\/v1\/products\/[^/]+$/,
+      stub: ({ url }) => {
+        const productId = url.pathname.split('/').pop() || 'prod-101'
+        const matched = reviewsState.find((r) => r.product.id === productId) ?? reviewsState[0]
+        return {
+          status: 200,
+          body: envelope('Lấy chi tiết sản phẩm thành công', {
+            id: matched.product.id,
+            categoryId: 'cat-apple',
+            categoryName: 'Apple iPhone',
+            brandName: matched.product.brandName,
+            name: matched.product.name,
+            slug: matched.product.id,
+            description: 'Điện thoại chính hãng VNA',
+            images: [{ id: 'img-1', url: matched.product.imageUrl, isPrimary: true }],
+            optionGroups: [],
+            variants: [
+              {
+                id: 'var-1',
+                model: matched.product.model,
+                price: '29990000',
+                stockQuantity: 10,
+                isDefault: true,
+                options: [],
+              },
+            ],
+          }),
+        }
+      },
+    },
+    {
+      method: 'GET',
+      path: /^\/api\/v1\/orders\/[^/]+$/,
+      stub: ({ url }) => {
+        const orderId = url.pathname.split('/').pop() || '22222222-2222-2222-2222-222222222222'
+        const matched = reviewsState.find((r) => r.order.id === orderId) ?? reviewsState[0]
+        return {
+          status: 200,
+          body: envelope('Lấy chi tiết đơn hàng thành công', {
+            id: matched.order.id,
+            userId: MOCK_USER.id,
+            status: 'delivered',
+            recipientName: 'Nguyễn Văn A',
+            phone: '0901234567',
+            provinceName: 'TP. Hồ Chí Minh',
+            wardName: 'Phường Bến Nghé',
+            detailAddress: '123 Nguyễn Huệ',
+            paymentMethod: 'cod',
+            subtotalVnd: '29990000',
+            shippingFeeVnd: '0',
+            totalVnd: '29990000',
+            createdAt: matched.order.createdAt,
+            updatedAt: matched.updatedAt,
+            items: [
+              {
+                id: matched.orderItemId,
+                variantId: 'var-1',
+                productId: matched.product.id,
+                brandName: matched.product.brandName,
+                productName: matched.product.name,
+                model: matched.product.model,
+                imageUrl: matched.product.imageUrl,
+                options: matched.product.options,
+                unitPriceVnd: '29990000',
+                quantity: 1,
+                lineTotalVnd: '29990000',
+                reviewStatus: 'reviewed',
+                review: {
+                  id: matched.id,
+                  orderItemId: matched.orderItemId,
+                  rating: matched.rating,
+                  comment: matched.comment,
+                  editCount: matched.editCount,
+                  canEdit: matched.canEdit,
+                  edited: matched.edited,
+                  media: matched.media,
+                  createdAt: matched.createdAt,
+                  updatedAt: matched.updatedAt,
+                },
+              },
+            ],
+          }),
+        }
+      },
+    },
+  ]
+}
 
-  return { reviewsState, requestedReviewQueries, capturedPutRequests }
+async function setupReviewHistoryRoutes(
+  page: Page,
+  options: ReviewRouteOptions & { authenticated?: boolean } = {}
+): Promise<ReviewRouteState> {
+  const isAuthenticated = options.authenticated ?? true
+
+  await page.addInitScript(
+    ({ authenticated, user }) => {
+      if (authenticated) {
+        localStorage.setItem('accessToken', 'mock-jwt-customer-token')
+        localStorage.setItem('authUser', JSON.stringify(user))
+      } else {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('authUser')
+      }
+    },
+    { authenticated: isAuthenticated, user: MOCK_USER }
+  )
+
+  const state: ReviewRouteState = {
+    reviewsState: options.initialReviews ?? createInitialReviewsState(),
+    requestedReviewQueries: [],
+    capturedPutRequests: [],
+  }
+
+  await setupAssetRoutes(page)
+  await mountContractRoutes(page, snapshots, [
+    ...layoutRoutes(isAuthenticated),
+    ...reviewRoutes(options, state),
+  ])
+
+  return state
 }
 
 test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () => {
@@ -658,8 +557,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
       consoleErrors.push(err.message)
     })
 
-    await setupCommonRoutes(page, { authenticated: true })
-    const { requestedReviewQueries } = await setupStatefulReviewRoutes(page, { delayMs: 250 })
+    const { requestedReviewQueries } = await setupReviewHistoryRoutes(page, { delayMs: 250 })
 
     const reviewPage = new ReviewHistoryPage(page)
 
@@ -761,8 +659,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
   test('Req 1.1 & Rule 2: Unauthenticated access redirects to /login?redirect=/reviews, hides Header link, and API rejects missing Bearer token with 401', async ({
     page,
   }) => {
-    await setupCommonRoutes(page, { authenticated: false })
-    await setupStatefulReviewRoutes(page)
+    await setupReviewHistoryRoutes(page, { authenticated: false })
 
     const reviewPage = new ReviewHistoryPage(page)
     await reviewPage.goto()
@@ -786,8 +683,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
       if (msg.type() === 'error') consoleErrors.push(msg.text())
     })
 
-    await setupCommonRoutes(page, { authenticated: true })
-    await setupStatefulReviewRoutes(page, { initialReviews: [] })
+    await setupReviewHistoryRoutes(page, { initialReviews: [] })
 
     const reviewPage = new ReviewHistoryPage(page)
     await reviewPage.goto()
@@ -817,8 +713,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
       }
     })
 
-    await setupCommonRoutes(page, { authenticated: true })
-    const { requestedReviewQueries } = await setupStatefulReviewRoutes(page, { totalOverride: 12 })
+    const { requestedReviewQueries } = await setupReviewHistoryRoutes(page, { totalOverride: 12 })
 
     const reviewPage = new ReviewHistoryPage(page)
     await reviewPage.goto()
@@ -880,8 +775,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
       unexpectedErrors.push(err.message)
     })
 
-    await setupCommonRoutes(page, { authenticated: true })
-    const { capturedPutRequests } = await setupStatefulReviewRoutes(page, {
+    const { capturedPutRequests } = await setupReviewHistoryRoutes(page, {
       forceInvalidMultipartRatingOnce: true,
     })
 
@@ -991,9 +885,8 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
   test('Req 3.4 & Rule 4: Displays 409 review_edit_limit_reached error message in modal when concurrent edit limit is reached', async ({
     page,
   }) => {
-    await setupCommonRoutes(page, { authenticated: true })
     const initial = createInitialReviewsState()
-    const { reviewsState } = await setupStatefulReviewRoutes(page, { initialReviews: initial })
+    const { reviewsState } = await setupReviewHistoryRoutes(page, { initialReviews: initial })
 
     const reviewPage = new ReviewHistoryPage(page)
     await reviewPage.goto()
@@ -1018,7 +911,6 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
   test('Req 4.1–4.3 & 6.4: Media thumbnails, Lightbox preview open/close via Escape and button, and broken media fallback placeholders', async ({
     page,
   }) => {
-    await setupCommonRoutes(page, { authenticated: true })
     const customReviews = createInitialReviewsState()
     customReviews[1].media = [
       {
@@ -1038,7 +930,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
         url: '/media/reviews/broken-video',
       },
     ]
-    await setupStatefulReviewRoutes(page, { initialReviews: customReviews })
+    await setupReviewHistoryRoutes(page, { initialReviews: customReviews })
 
     const reviewPage = new ReviewHistoryPage(page)
     await reviewPage.goto()
@@ -1085,8 +977,7 @@ test.describe('Review History E2E — Mode 2 (Contract-Verified Mock E2E)', () =
       if (msg.type() === 'error') consoleErrors.push(msg.text())
     })
 
-    await setupCommonRoutes(page, { authenticated: true })
-    await setupStatefulReviewRoutes(page)
+    await setupReviewHistoryRoutes(page)
 
     await page.setViewportSize({ width: 375, height: 812 })
     const reviewPage = new ReviewHistoryPage(page)

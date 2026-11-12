@@ -17,6 +17,7 @@ Run these from `backend/`:
 - Run all tests: `make test` (`go test ./...`). Existing tests use fake repositories and do not require PostgreSQL.
 - Run one package: `go test ./internal/usecase/catalog`.
 - Run one test: `go test ./internal/delivery/http -run '^TestCatalog_ListProductsWithoutAuth$'`.
+- Handler tests record and verify response contracts in `.dream/specs/<feature>/contract-snapshots.json` through `assertOrRecordContractSnapshot` in `internal/delivery/http/contract_snapshot_test.go`. Set `UPDATE_CONTRACT_SNAPSHOTS=1` only to re-record a contract that changed on purpose.
 - Static analysis: `make vet` (`go vet ./...`).
 - Regenerate sqlc output: `make gen`; `sqlc` must be on `PATH`.
 - After changing Wire providers or injector declarations, regenerate `cmd/server/wire_gen.go` with the backend Wire generation target and inspect the generated diff. Do not edit generated Wire code manually.

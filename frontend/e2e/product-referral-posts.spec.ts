@@ -12,7 +12,21 @@ import {
 import { StorefrontPostsPage } from './pages/StorefrontPostsPage'
 import { AdminPostsPage } from './pages/AdminPostsPage'
 
-const snapshots = loadContractSnapshots('product-referral-posts')
+const snapshots = loadContractSnapshots('product-referral-posts', {
+  // Fields TYPE-POST-DOMAIN declares `| null`.
+  nullable: [
+    'viewerReaction',
+    'parentId',
+    'replyToUserId',
+    'replyToUserName',
+    'actorId',
+    'actorName',
+    'actorRole',
+    'postId',
+    'commentId',
+    'reactionType',
+  ],
+})
 const imgsDir = fs.existsSync(path.resolve(process.cwd(), '.dream'))
   ? path.resolve(process.cwd(), '.dream', 'specs', 'product-referral-posts', 'imgs')
   : path.resolve(process.cwd(), '..', '.dream', 'specs', 'product-referral-posts', 'imgs')
@@ -845,7 +859,8 @@ test.describe('Product Referral Posts E2E Verification (Mode 2: Contract-Verifie
       assertMatchesContractShape(
         frameObj,
         snapshots.snapshots.ws_notification_new.responseBody,
-        'ws_notification_new'
+        'ws_notification_new',
+        snapshots.nullable
       )
 
       const frame = JSON.stringify(frameObj)
