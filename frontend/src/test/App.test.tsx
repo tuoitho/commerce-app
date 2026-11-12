@@ -60,6 +60,37 @@ vi.mock('@/api/cart', () => ({
   },
 }))
 
+vi.mock('@/api/posts', () => ({
+  postsApi: {
+    listPosts: vi.fn().mockResolvedValue({
+      data: [],
+      meta: {
+        pagination: { page: 1, limit: 10, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+        timestamp: '2026-10-21T00:00:00Z',
+      },
+      message: 'OK',
+    }),
+    getPostById: vi.fn().mockResolvedValue({
+      id: 'post-test-1',
+      authorId: 'admin-1',
+      authorName: 'Quản trị viên',
+      authorRole: 'admin',
+      content: 'Bài viết chi tiết cho route test',
+      media: [],
+      referredProducts: [],
+      reactions: {
+        totalCount: 0,
+        counts: { like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
+        viewerReaction: null,
+      },
+      commentCount: 0,
+      createdAt: '2026-10-21T00:00:00Z',
+      updatedAt: '2026-10-21T00:00:00Z',
+      comments: [],
+    }),
+  },
+}))
+
 describe('App navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -161,6 +192,50 @@ describe('App navigation', () => {
     })
 
     tokenStore.clearToken()
+  })
+
+  it('renders posts feed page at /posts', async () => {
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/posts']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    const { waitFor } = await import('@testing-library/react')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /bảng tin & đánh giá flagship/i, level: 1 })
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('renders post detail page at /posts/:id', async () => {
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/posts/post-test-1']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    const { waitFor } = await import('@testing-library/react')
+    await waitFor(() => {
+      expect(screen.getByText('Bài viết chi tiết cho route test')).toBeInTheDocument()
+    })
   })
 })
 

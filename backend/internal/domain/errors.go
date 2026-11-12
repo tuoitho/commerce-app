@@ -46,6 +46,10 @@ var (
 	ErrChatAttachmentNotFound  = errors.New("chat attachment not found")
 	ErrChatMediaForbidden      = errors.New("chat media forbidden")
 	ErrConversationNotFound    = errors.New("conversation not found")
+	ErrPostNotFound            = errors.New("post not found")
+	ErrPostCommentNotFound     = errors.New("post comment not found")
+	ErrPostMediaNotFound       = errors.New("post media not found")
+	ErrNotificationNotFound    = errors.New("notification not found")
 )
 
 type ValidationError struct {

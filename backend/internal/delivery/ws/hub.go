@@ -31,6 +31,7 @@ type Hub struct {
 }
 
 var _ domain.ChatEventBroadcaster = (*Hub)(nil)
+var _ domain.NotificationBroadcaster = (*Hub)(nil)
 
 // NewHub initializes and returns a new Hub.
 func NewHub(repo domain.ChatRepository, logger *slog.Logger) *Hub {
@@ -254,6 +255,43 @@ func (h *Hub) BroadcastPresence(ctx context.Context, userID string, role domain.
 	targets := make([]*Client, 0, len(h.clients))
 	for c := range h.clients {
 		targets = append(targets, c)
+	}
+	h.mu.RUnlock()
+
+	for _, c := range targets {
+		c.SendMessage(data)
+	}
+
+	return nil
+}
+
+// BroadcastNotification pushes a notification item to a specific recipient via WebSocket.
+func (h *Hub) BroadcastNotification(ctx context.Context, recipientID string, notification *domain.NotificationItem) error {
+	if notification == nil || strings.TrimSpace(recipientID) == "" {
+		return nil
+	}
+
+	event := Event{
+		Type:    "notification:new",
+		Payload: notification,
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal notification event: %w", err)
+	}
+
+	h.mu.RLock()
+	if h.closed {
+		h.mu.RUnlock()
+		return nil
+	}
+
+	var targets []*Client
+	if clients, ok := h.userClients[recipientID]; ok {
+		targets = make([]*Client, 0, len(clients))
+		for c := range clients {
+			targets = append(targets, c)
+		}
 	}
 	h.mu.RUnlock()
 

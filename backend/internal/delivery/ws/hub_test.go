@@ -452,3 +452,114 @@ func TestHub_CloseCleanShutdown(t *testing.T) {
 		t.Fatalf("broadcast after close returned error: %v", err)
 	}
 }
+
+func TestHub_BroadcastNotification(t *testing.T) {
+	hub := NewHub(nil, nil)
+
+	recipientID := "user-recipient-uuid"
+	otherUserID := "user-other-uuid"
+
+	c1 := createTestClient(hub, recipientID, domain.ChatSenderCustomer)
+	c2 := createTestClient(hub, recipientID, domain.ChatSenderCustomer) // Second tab for same user
+	cOther := createTestClient(hub, otherUserID, domain.ChatSenderCustomer)
+
+	hub.Register(c1)
+	hub.Register(c2)
+	hub.Register(cOther)
+
+	// Drain presence events triggered during registration
+	for _, c := range []*Client{c1, c2, cOther} {
+		for len(c.send) > 0 {
+			<-c.send
+		}
+	}
+
+	notifID := "notif-uuid-123"
+	actorID := "actor-uuid-456"
+	actorName := "Khách hàng A"
+	actorRole := "customer"
+	postID := "post-uuid-789"
+	groupKey := domain.NotificationGroupKeyPostReaction(postID)
+	rx := domain.ReactionTypeLove
+	now := time.Now().UTC()
+
+	item := &domain.NotificationItem{
+		ID:               notifID,
+		RecipientID:      recipientID,
+		ActorID:          &actorID,
+		ActorName:        &actorName,
+		ActorRole:        &actorRole,
+		GroupKey:         groupKey,
+		ActorCount:       2,
+		Category:         domain.NotificationCategoryPost,
+		NotificationType: domain.NotificationTypePostReaction,
+		PostID:           &postID,
+		ReactionType:     &rx,
+		Excerpt:          "Nội dung bài viết...",
+		Metadata: map[string]interface{}{
+			"recentActors": []domain.NotificationActorSummary{
+				{ID: actorID, Name: actorName, Role: actorRole},
+				{ID: "actor-uuid-111", Name: "Khách hàng B", Role: "customer"},
+			},
+		},
+		IsRead:    false,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := hub.BroadcastNotification(context.Background(), recipientID, item)
+	if err != nil {
+		t.Fatalf("expected no error from BroadcastNotification, got %v", err)
+	}
+
+	// Verify both connections of recipient received the frame
+	for idx, client := range []*Client{c1, c2} {
+		select {
+		case msg := <-client.send:
+			var event struct {
+				Type    string                   `json:"type"`
+				Payload *domain.NotificationItem `json:"payload"`
+			}
+			if err := json.Unmarshal(msg, &event); err != nil {
+				t.Fatalf("client %d failed to unmarshal event: %v", idx, err)
+			}
+			if event.Type != "notification:new" {
+				t.Errorf("client %d expected event type 'notification:new', got '%s'", idx, event.Type)
+			}
+			if event.Payload == nil || event.Payload.ID != notifID {
+				t.Errorf("client %d expected notification id '%s', got '%v'", idx, notifID, event.Payload)
+			}
+			if event.Payload.RecipientID != recipientID {
+				t.Errorf("client %d expected recipient '%s', got '%s'", idx, recipientID, event.Payload.RecipientID)
+			}
+			if event.Payload.GroupKey != groupKey {
+				t.Errorf("client %d expected groupKey '%s', got '%s'", idx, groupKey, event.Payload.GroupKey)
+			}
+			if event.Payload.ActorCount != 2 {
+				t.Errorf("client %d expected actorCount 2, got %d", idx, event.Payload.ActorCount)
+			}
+			if _, ok := event.Payload.Metadata["recentActors"]; !ok {
+				t.Errorf("client %d expected metadata.recentActors to be present", idx)
+			}
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("client %d timed out waiting for notification frame", idx)
+		}
+	}
+
+	// Verify other user received nothing
+	select {
+	case msg := <-cOther.send:
+		t.Fatalf("other user unexpectedly received message: %s", string(msg))
+	default:
+		// expected
+	}
+
+	// Nil notification or empty recipient returns nil without panic
+	if err := hub.BroadcastNotification(context.Background(), "", item); err != nil {
+		t.Errorf("expected nil error for empty recipient, got %v", err)
+	}
+	if err := hub.BroadcastNotification(context.Background(), recipientID, nil); err != nil {
+		t.Errorf("expected nil error for nil item, got %v", err)
+	}
+}
+

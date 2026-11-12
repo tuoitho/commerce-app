@@ -78,6 +78,24 @@ type Conversation struct {
 	UpdatedAt          time.Time
 }
 
+type Notification struct {
+	ID               string
+	RecipientID      string
+	ActorID          pgtype.UUID
+	Category         string
+	NotificationType string
+	PostID           pgtype.UUID
+	CommentID        pgtype.UUID
+	ReactionType     pgtype.Text
+	Excerpt          string
+	Metadata         []byte
+	IsRead           bool
+	CreatedAt        time.Time
+	GroupKey         string
+	ActorCount       int32
+	UpdatedAt        time.Time
+}
+
 type Order struct {
 	ID             string
 	UserID         string
@@ -111,6 +129,62 @@ type OrderItem struct {
 	UnitPriceVnd pgtype.Numeric
 	Quantity     int64
 	LineTotalVnd pgtype.Numeric
+}
+
+type Post struct {
+	ID        string
+	AuthorID  string
+	Content   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type PostComment struct {
+	ID            string
+	PostID        string
+	AuthorID      string
+	ParentID      pgtype.UUID
+	ReplyToUserID pgtype.UUID
+	Content       string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type PostCommentReaction struct {
+	ID           string
+	CommentID    string
+	UserID       string
+	ReactionType string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type PostMedium struct {
+	ID         string
+	PostID     pgtype.UUID
+	UploaderID string
+	ObjectKey  string
+	FileType   string
+	FileName   string
+	FileSize   int64
+	MimeType   string
+	Position   int32
+	CreatedAt  time.Time
+}
+
+type PostReaction struct {
+	ID           string
+	PostID       string
+	UserID       string
+	ReactionType string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type PostReferredProduct struct {
+	PostID    string
+	ProductID string
+	Position  int32
 }
 
 type Product struct {

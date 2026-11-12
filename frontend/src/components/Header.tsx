@@ -24,6 +24,7 @@ import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { Button } from './ui/button'
 import { Skeleton } from './ui/skeleton'
+import { NotificationBell } from './notifications/NotificationBell'
 
 export function Header() {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
@@ -289,6 +290,18 @@ export function Header() {
               Hàng có sẵn
             </Link>
 
+            <Link
+              to="/posts"
+              data-testid="header-posts-link"
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                location.pathname.startsWith('/posts')
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
+              }`}
+            >
+              Bài viết
+            </Link>
+
             {isAuthenticated && (
               <>
                 <Link
@@ -328,6 +341,9 @@ export function Header() {
 
           {/* Right Functional Actions */}
           <div className="flex items-center gap-2.5">
+            {/* Notification Bell (when authenticated) */}
+            {isAuthenticated && <NotificationBell />}
+
             {/* Cart Button */}
             <Link
               to="/cart"
@@ -447,6 +463,18 @@ export function Header() {
               }`}
             >
               Hàng có sẵn giao ngay
+            </Link>
+            <Link
+              to="/posts"
+              data-testid="mobile-posts-link"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl ${
+                location.pathname.startsWith('/posts')
+                  ? 'text-zinc-950 bg-zinc-100 font-bold'
+                  : 'text-zinc-700 hover:bg-zinc-50'
+              }`}
+            >
+              Bài viết
             </Link>
 
             {isAuthenticated && (

@@ -207,6 +207,88 @@ describe('useAdminChatSocket', () => {
     expect(onMessagesRead).toHaveBeenCalledWith(readPayload)
   })
 
+  it('handles notification:new event and calls onNotification callback', async () => {
+    const onNotification = vi.fn()
+    renderHook(() =>
+      useAdminChatSocket({
+        token: 'admin-token-123',
+        enabled: true,
+        onNotification,
+      })
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    const ws = MockWebSocket.instances[0]
+    const mockNotif = {
+      id: 'notif-1',
+      recipientId: 'admin-1',
+      actorId: 'user-1',
+      actorName: 'Khách hàng A',
+      actorRole: 'customer' as const,
+      category: 'post',
+      notificationType: 'post_reaction' as const,
+      postId: 'post-1',
+      commentId: null,
+      reactionType: 'love' as const,
+      excerpt: 'Đánh giá chi tiết...',
+      metadata: {},
+      isRead: false,
+      createdAt: '2026-10-21T10:00:00.000Z',
+    }
+
+    act(() => {
+      ws.receive({
+        type: 'notification:new',
+        payload: mockNotif,
+      })
+    })
+
+    expect(onNotification).toHaveBeenCalledWith(mockNotif)
+  })
+
+  it('triggers onReconnect callback when reconnecting after unexpected disconnect', async () => {
+    const onReconnect = vi.fn()
+    const { result } = renderHook(() =>
+      useAdminChatSocket({
+        token: 'admin-token-123',
+        enabled: true,
+        onReconnect,
+      })
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+    expect(result.current.isConnected).toBe(true)
+
+    // Initial connection should NOT trigger onReconnect
+    expect(onReconnect).not.toHaveBeenCalled()
+
+    // Unexpected disconnect
+    act(() => {
+      MockWebSocket.instances[0].close(1006, 'Abnormal closure')
+    })
+    expect(result.current.isConnected).toBe(false)
+
+    // Advance 1s to trigger reconnect
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    expect(MockWebSocket.instances.length).toBe(2)
+
+    // Advance 10ms for MockWebSocket to open
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    expect(result.current.isConnected).toBe(true)
+    expect(onReconnect).toHaveBeenCalledTimes(1)
+  })
+
   it('auto-reconnects with exponential backoff on unexpected disconnect', async () => {
     const { result } = renderHook(() =>
       useAdminChatSocket({ token: 'admin-token-123', enabled: true })

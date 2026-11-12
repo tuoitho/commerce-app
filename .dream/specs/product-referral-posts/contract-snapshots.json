@@ -1,0 +1,782 @@
+{
+  "feature": "product-referral-posts",
+  "snapshots": {
+    "admin_post_not_found_404": {
+      "contractId": "API-POSTS-ADMIN@1",
+      "endpoint": "PUT /api/v1/admin/posts/:id",
+      "status": 404,
+      "requestBody": {
+        "content": "Nội dung...",
+        "mediaIds": null,
+        "referredProductIds": [
+          "77777777-7777-7777-7777-777777777777"
+        ]
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "post_not_found",
+          "message": "Bài viết không tồn tại hoặc đã bị xóa"
+        },
+        "message": "Bài viết không tồn tại hoặc đã bị xóa",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2550579Z"
+        },
+        "success": false
+      }
+    },
+    "admin_post_validation_400": {
+      "contractId": "API-POSTS-ADMIN@1",
+      "endpoint": "POST /api/v1/admin/posts",
+      "status": 400,
+      "requestBody": {
+        "content": ""
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "content": "Nội dung bài viết phải từ 1 đến 5.000 ký tự"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2525295Z"
+        },
+        "success": false
+      }
+    },
+    "comment_not_found_404": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "POST /api/v1/posts/:id/comments",
+      "status": 404,
+      "requestBody": {
+        "content": "Phản hồi bình luận...",
+        "parentCommentId": "2ff32002-69ff-4545-92dc-77ce41132521"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "comment_not_found",
+          "message": "Bình luận không tồn tại hoặc đã bị xóa"
+        },
+        "message": "Bình luận không tồn tại hoặc đã bị xóa",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2696833Z"
+        },
+        "success": false
+      }
+    },
+    "comment_validation_400": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "POST /api/v1/posts/:id/comments",
+      "status": 400,
+      "requestBody": {
+        "content": "",
+        "parentCommentId": null
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "content": "Nội dung bình luận phải từ 1 đến 1.000 ký tự"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2650328Z"
+        },
+        "success": false
+      }
+    },
+    "create_comment_201": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "POST /api/v1/posts/:id/comments",
+      "status": 201,
+      "requestBody": {
+        "content": "Sản phẩm rất đẹp và sang trọng!",
+        "parentCommentId": null
+      },
+      "responseBody": {
+        "data": {
+          "authorId": "22222222-2222-2222-2222-222222222222",
+          "authorName": "Nguyễn Văn A",
+          "authorRole": "customer",
+          "content": "Sản phẩm rất đẹp và sang trọng!",
+          "createdAt": "2026-10-20T10:00:00Z",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "parentId": null,
+          "postId": "33333333-3333-3333-3333-333333333333",
+          "reactions": {
+            "counts": {
+              "angry": 0,
+              "haha": 0,
+              "like": 0,
+              "love": 0,
+              "sad": 0,
+              "wow": 0
+            },
+            "totalCount": 0,
+            "viewerReaction": null
+          },
+          "replyToUserId": null,
+          "replyToUserName": null,
+          "updatedAt": "2026-10-20T10:00:00Z"
+        },
+        "error": null,
+        "message": "Bình luận thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2650328Z"
+        },
+        "success": true
+      }
+    },
+    "create_post_201": {
+      "contractId": "API-POSTS-ADMIN@1",
+      "endpoint": "POST /api/v1/admin/posts",
+      "status": 201,
+      "requestBody": {
+        "content": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max mới về hàng tại shop...",
+        "mediaIds": [
+          "55555555-5555-5555-5555-555555555555"
+        ],
+        "referredProductIds": [
+          "77777777-7777-7777-7777-777777777777"
+        ]
+      },
+      "responseBody": {
+        "data": {
+          "authorId": "11111111-1111-1111-1111-111111111111",
+          "authorName": "Quản trị viên",
+          "authorRole": "admin",
+          "commentCount": 1,
+          "comments": [
+            {
+              "authorId": "22222222-2222-2222-2222-222222222222",
+              "authorName": "Nguyễn Văn A",
+              "authorRole": "customer",
+              "content": "Sản phẩm rất đẹp và sang trọng!",
+              "createdAt": "2026-10-20T10:00:00Z",
+              "id": "44444444-4444-4444-4444-444444444444",
+              "parentId": null,
+              "postId": "33333333-3333-3333-3333-333333333333",
+              "reactions": {
+                "counts": {
+                  "angry": 0,
+                  "haha": 0,
+                  "like": 0,
+                  "love": 0,
+                  "sad": 0,
+                  "wow": 0
+                },
+                "totalCount": 0,
+                "viewerReaction": null
+              },
+              "replies": [],
+              "replyToUserId": null,
+              "replyToUserName": null,
+              "updatedAt": "2026-10-20T10:00:00Z"
+            }
+          ],
+          "content": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max mới về hàng tại shop...",
+          "createdAt": "2026-10-20T10:00:00Z",
+          "id": "33333333-3333-3333-3333-333333333333",
+          "media": [
+            {
+              "fileName": "iphone15-banner.jpg",
+              "fileSize": 102400,
+              "fileType": "image",
+              "fileUrl": "/api/v1/posts/media/55555555-5555-5555-5555-555555555555",
+              "id": "55555555-5555-5555-5555-555555555555",
+              "mimeType": "image/jpeg",
+              "position": 0
+            }
+          ],
+          "reactions": {
+            "counts": {
+              "angry": 0,
+              "haha": 0,
+              "like": 0,
+              "love": 1,
+              "sad": 0,
+              "wow": 0
+            },
+            "totalCount": 1,
+            "viewerReaction": "love"
+          },
+          "referredProducts": [
+            {
+              "active": true,
+              "brand": "Apple",
+              "currency": "VND",
+              "id": "77777777-7777-7777-7777-777777777777",
+              "imageUrl": "https://example.com/products/iphone15.jpg",
+              "inStock": true,
+              "name": "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
+              "price": "29990000"
+            }
+          ],
+          "updatedAt": "2026-10-20T10:00:00Z"
+        },
+        "error": null,
+        "message": "Tạo bài viết thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2459908Z"
+        },
+        "success": true
+      }
+    },
+    "delete_comment_200": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "DELETE /api/v1/posts/:id/comments/:commentId",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "commentCount": 0,
+          "deletedCommentId": "44444444-4444-4444-4444-444444444444"
+        },
+        "error": null,
+        "message": "Xóa bình luận thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2703872Z"
+        },
+        "success": true
+      }
+    },
+    "delete_post_200": {
+      "contractId": "API-POSTS-ADMIN@1",
+      "endpoint": "DELETE /api/v1/admin/posts/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "id": "33333333-3333-3333-3333-333333333333"
+        },
+        "error": null,
+        "message": "Xóa bài viết thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2513758Z"
+        },
+        "success": true
+      }
+    },
+    "get_post_detail_200": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "GET /api/v1/posts/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "authorId": "11111111-1111-1111-1111-111111111111",
+          "authorName": "Quản trị viên",
+          "authorRole": "admin",
+          "commentCount": 1,
+          "comments": [
+            {
+              "authorId": "22222222-2222-2222-2222-222222222222",
+              "authorName": "Nguyễn Văn A",
+              "authorRole": "customer",
+              "content": "Sản phẩm rất đẹp và sang trọng!",
+              "createdAt": "2026-10-20T10:00:00Z",
+              "id": "44444444-4444-4444-4444-444444444444",
+              "parentId": null,
+              "postId": "33333333-3333-3333-3333-333333333333",
+              "reactions": {
+                "counts": {
+                  "angry": 0,
+                  "haha": 0,
+                  "like": 0,
+                  "love": 0,
+                  "sad": 0,
+                  "wow": 0
+                },
+                "totalCount": 0,
+                "viewerReaction": null
+              },
+              "replies": [],
+              "replyToUserId": null,
+              "replyToUserName": null,
+              "updatedAt": "2026-10-20T10:00:00Z"
+            }
+          ],
+          "content": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max mới về hàng tại shop...",
+          "createdAt": "2026-10-20T10:00:00Z",
+          "id": "33333333-3333-3333-3333-333333333333",
+          "media": [
+            {
+              "fileName": "iphone15-banner.jpg",
+              "fileSize": 102400,
+              "fileType": "image",
+              "fileUrl": "/api/v1/posts/media/55555555-5555-5555-5555-555555555555",
+              "id": "55555555-5555-5555-5555-555555555555",
+              "mimeType": "image/jpeg",
+              "position": 0
+            }
+          ],
+          "reactions": {
+            "counts": {
+              "angry": 0,
+              "haha": 0,
+              "like": 0,
+              "love": 1,
+              "sad": 0,
+              "wow": 0
+            },
+            "totalCount": 1,
+            "viewerReaction": "love"
+          },
+          "referredProducts": [
+            {
+              "active": true,
+              "brand": "Apple",
+              "currency": "VND",
+              "id": "77777777-7777-7777-7777-777777777777",
+              "imageUrl": "https://example.com/products/iphone15.jpg",
+              "inStock": true,
+              "name": "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
+              "price": "29990000"
+            }
+          ],
+          "updatedAt": "2026-10-20T10:00:00Z"
+        },
+        "error": null,
+        "message": "Lấy chi tiết bài viết thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2575941Z"
+        },
+        "success": true
+      }
+    },
+    "list_notifications_200": {
+      "contractId": "API-NOTIFICATIONS@2",
+      "endpoint": "GET /api/v1/notifications?limit=20\u0026offset=0",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "items": [
+            {
+              "actorCount": 1,
+              "actorId": "22222222-2222-2222-2222-222222222222",
+              "actorName": "Nguyễn Văn A",
+              "actorRole": "customer",
+              "category": "post",
+              "commentId": null,
+              "createdAt": "2026-10-20T10:00:00Z",
+              "excerpt": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max...",
+              "groupKey": "post_reaction:33333333-3333-3333-3333-333333333333",
+              "id": "66666666-6666-6666-6666-666666666666",
+              "isRead": false,
+              "metadata": {
+                "recentActors": [
+                  {
+                    "id": "22222222-2222-2222-2222-222222222222",
+                    "name": "Nguyễn Văn A",
+                    "role": "customer"
+                  }
+                ]
+              },
+              "notificationType": "post_reaction",
+              "postId": "33333333-3333-3333-3333-333333333333",
+              "reactionType": "love",
+              "recipientId": "11111111-1111-1111-1111-111111111111",
+              "updatedAt": "2026-10-20T10:00:00Z"
+            }
+          ],
+          "unreadCount": 1
+        },
+        "error": null,
+        "message": "Lấy danh sách thông báo thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2752177Z"
+        },
+        "success": true
+      }
+    },
+    "list_posts_200": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "GET /api/v1/posts?page=1\u0026limit=10",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "authorId": "11111111-1111-1111-1111-111111111111",
+            "authorName": "Quản trị viên",
+            "authorRole": "admin",
+            "commentCount": 1,
+            "content": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max mới về hàng tại shop...",
+            "createdAt": "2026-10-20T10:00:00Z",
+            "id": "33333333-3333-3333-3333-333333333333",
+            "media": [
+              {
+                "fileName": "iphone15-banner.jpg",
+                "fileSize": 102400,
+                "fileType": "image",
+                "fileUrl": "/api/v1/posts/media/55555555-5555-5555-5555-555555555555",
+                "id": "55555555-5555-5555-5555-555555555555",
+                "mimeType": "image/jpeg",
+                "position": 0
+              }
+            ],
+            "reactions": {
+              "counts": {
+                "angry": 0,
+                "haha": 0,
+                "like": 0,
+                "love": 1,
+                "sad": 0,
+                "wow": 0
+              },
+              "totalCount": 1,
+              "viewerReaction": "love"
+            },
+            "referredProducts": [
+              {
+                "active": true,
+                "brand": "Apple",
+                "currency": "VND",
+                "id": "77777777-7777-7777-7777-777777777777",
+                "imageUrl": "https://example.com/products/iphone15.jpg",
+                "inStock": true,
+                "name": "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
+                "price": "29990000"
+              }
+            ],
+            "updatedAt": "2026-10-20T10:00:00Z"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách bài viết thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 10,
+            "page": 1,
+            "total": 1,
+            "totalPages": 1
+          },
+          "timestamp": "2026-10-21T08:42:56.2575941Z"
+        },
+        "success": true
+      }
+    },
+    "mark_all_notifications_read_200": {
+      "contractId": "API-NOTIFICATIONS@2",
+      "endpoint": "POST /api/v1/notifications/read-all",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "unreadCount": 0
+        },
+        "error": null,
+        "message": "Đánh dấu tất cả đã đọc thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2792598Z"
+        },
+        "success": true
+      }
+    },
+    "mark_notification_read_200": {
+      "contractId": "API-NOTIFICATIONS@2",
+      "endpoint": "POST /api/v1/notifications/:id/read",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "id": "66666666-6666-6666-6666-666666666666",
+          "isRead": true,
+          "unreadCount": 0
+        },
+        "error": null,
+        "message": "Đánh dấu đã đọc thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2752177Z"
+        },
+        "success": true
+      }
+    },
+    "notification_not_found_404": {
+      "contractId": "API-NOTIFICATIONS@2",
+      "endpoint": "POST /api/v1/notifications/:id/read",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "notification_not_found",
+          "message": "Không tìm thấy thông báo"
+        },
+        "message": "Không tìm thấy thông báo",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2792598Z"
+        },
+        "success": false
+      }
+    },
+    "post_media_not_found_404": {
+      "contractId": "API-POST-MEDIA@1",
+      "endpoint": "GET /api/v1/posts/media/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "post_media_not_found",
+          "message": "Không tìm thấy tệp đính kèm"
+        },
+        "message": "Không tìm thấy tệp đính kèm",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2439612Z"
+        },
+        "success": false
+      }
+    },
+    "post_not_found_404": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "GET /api/v1/posts/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "post_not_found",
+          "message": "Bài viết không tồn tại hoặc đã bị xóa"
+        },
+        "message": "Bài viết không tồn tại hoặc đã bị xóa",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2575941Z"
+        },
+        "success": false
+      }
+    },
+    "post_reaction_validation_400": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "PUT /api/v1/posts/:id/reactions",
+      "status": 400,
+      "requestBody": {
+        "reaction": "invalid_reaction"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "reaction": "Loại cảm xúc không hợp lệ"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2650328Z"
+        },
+        "success": false
+      }
+    },
+    "set_comment_reaction_200": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "PUT /api/v1/post-comments/:commentId/reactions",
+      "status": 200,
+      "requestBody": {
+        "reaction": "love"
+      },
+      "responseBody": {
+        "data": {
+          "counts": {
+            "angry": 0,
+            "haha": 0,
+            "like": 0,
+            "love": 1,
+            "sad": 0,
+            "wow": 0
+          },
+          "totalCount": 1,
+          "viewerReaction": "love"
+        },
+        "error": null,
+        "message": "Cập nhật cảm xúc bình luận thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2735863Z"
+        },
+        "success": true
+      }
+    },
+    "set_post_reaction_200": {
+      "contractId": "API-POSTS-PUBLIC@2",
+      "endpoint": "PUT /api/v1/posts/:id/reactions",
+      "status": 200,
+      "requestBody": {
+        "reaction": "love"
+      },
+      "responseBody": {
+        "data": {
+          "counts": {
+            "angry": 0,
+            "haha": 0,
+            "like": 0,
+            "love": 1,
+            "sad": 0,
+            "wow": 0
+          },
+          "totalCount": 1,
+          "viewerReaction": "love"
+        },
+        "error": null,
+        "message": "Cập nhật cảm xúc thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2628711Z"
+        },
+        "success": true
+      }
+    },
+    "update_post_200": {
+      "contractId": "API-POSTS-ADMIN@1",
+      "endpoint": "PUT /api/v1/admin/posts/:id",
+      "status": 200,
+      "requestBody": {
+        "content": "Cập nhật nội dung bài viết...",
+        "mediaIds": [
+          "55555555-5555-5555-5555-555555555555"
+        ],
+        "referredProductIds": [
+          "77777777-7777-7777-7777-777777777777"
+        ]
+      },
+      "responseBody": {
+        "data": {
+          "authorId": "11111111-1111-1111-1111-111111111111",
+          "authorName": "Quản trị viên",
+          "authorRole": "admin",
+          "commentCount": 1,
+          "comments": [
+            {
+              "authorId": "22222222-2222-2222-2222-222222222222",
+              "authorName": "Nguyễn Văn A",
+              "authorRole": "customer",
+              "content": "Sản phẩm rất đẹp và sang trọng!",
+              "createdAt": "2026-10-20T10:00:00Z",
+              "id": "44444444-4444-4444-4444-444444444444",
+              "parentId": null,
+              "postId": "33333333-3333-3333-3333-333333333333",
+              "reactions": {
+                "counts": {
+                  "angry": 0,
+                  "haha": 0,
+                  "like": 0,
+                  "love": 0,
+                  "sad": 0,
+                  "wow": 0
+                },
+                "totalCount": 0,
+                "viewerReaction": null
+              },
+              "replies": [],
+              "replyToUserId": null,
+              "replyToUserName": null,
+              "updatedAt": "2026-10-20T10:00:00Z"
+            }
+          ],
+          "content": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max mới về hàng tại shop...",
+          "createdAt": "2026-10-20T10:00:00Z",
+          "id": "33333333-3333-3333-3333-333333333333",
+          "media": [
+            {
+              "fileName": "iphone15-banner.jpg",
+              "fileSize": 102400,
+              "fileType": "image",
+              "fileUrl": "/api/v1/posts/media/55555555-5555-5555-5555-555555555555",
+              "id": "55555555-5555-5555-5555-555555555555",
+              "mimeType": "image/jpeg",
+              "position": 0
+            }
+          ],
+          "reactions": {
+            "counts": {
+              "angry": 0,
+              "haha": 0,
+              "like": 0,
+              "love": 1,
+              "sad": 0,
+              "wow": 0
+            },
+            "totalCount": 1,
+            "viewerReaction": "love"
+          },
+          "referredProducts": [
+            {
+              "active": true,
+              "brand": "Apple",
+              "currency": "VND",
+              "id": "77777777-7777-7777-7777-777777777777",
+              "imageUrl": "https://example.com/products/iphone15.jpg",
+              "inStock": true,
+              "name": "iPhone 15 Pro Max 256GB Titan Tự Nhiên",
+              "price": "29990000"
+            }
+          ],
+          "updatedAt": "2026-10-20T10:00:00Z"
+        },
+        "error": null,
+        "message": "Cập nhật bài viết thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2493635Z"
+        },
+        "success": true
+      }
+    },
+    "upload_media_201": {
+      "contractId": "API-POST-MEDIA@1",
+      "endpoint": "POST /api/v1/admin/posts/media",
+      "status": 201,
+      "responseBody": {
+        "data": {
+          "fileName": "iphone15-banner.jpg",
+          "fileSize": 102400,
+          "fileType": "image",
+          "fileUrl": "/api/v1/posts/media/55555555-5555-5555-5555-555555555555",
+          "id": "55555555-5555-5555-5555-555555555555",
+          "mimeType": "image/jpeg",
+          "position": 0
+        },
+        "error": null,
+        "message": "Tải tệp lên thành công",
+        "meta": {
+          "timestamp": "2026-10-21T08:42:56.2432984Z"
+        },
+        "success": true
+      }
+    },
+    "ws_notification_new": {
+      "contractId": "WS-NOTIFICATIONS@2",
+      "endpoint": "WS /api/v1/chat/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "actorCount": 1,
+          "actorId": "22222222-2222-2222-2222-222222222222",
+          "actorName": "Nguyễn Văn A",
+          "actorRole": "customer",
+          "category": "post",
+          "commentId": null,
+          "createdAt": "2026-10-20T10:00:00Z",
+          "excerpt": "Đánh giá chi tiết siêu phẩm iPhone 15 Pro Max...",
+          "groupKey": "post_reaction:33333333-3333-3333-3333-333333333333",
+          "id": "66666666-6666-6666-6666-666666666666",
+          "isRead": false,
+          "metadata": {
+            "recentActors": [
+              {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "name": "Nguyễn Văn A",
+                "role": "customer"
+              }
+            ]
+          },
+          "notificationType": "post_reaction",
+          "postId": "33333333-3333-3333-3333-333333333333",
+          "reactionType": "love",
+          "recipientId": "11111111-1111-1111-1111-111111111111",
+          "updatedAt": "2026-10-20T10:00:00Z"
+        },
+        "type": "notification:new"
+      }
+    }
+  }
+}

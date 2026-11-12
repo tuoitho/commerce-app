@@ -306,4 +306,81 @@ describe('Header Component', () => {
       expect(screen.queryByText('Đăng nhập / Đăng ký')).not.toBeInTheDocument()
     })
   })
+
+  it('renders "Bài viết" link in desktop navigation and mobile drawer for all users', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const desktopPostsLink = screen.getByTestId('header-posts-link')
+    expect(desktopPostsLink).toBeInTheDocument()
+    expect(desktopPostsLink).toHaveAttribute('href', '/posts')
+
+    // Open mobile menu
+    const menuButton = screen.getByRole('button', { name: /toggle menu/i })
+    fireEvent.click(menuButton)
+
+    await waitFor(() => {
+      const mobilePostsLink = screen.getByTestId('mobile-posts-link')
+      expect(mobilePostsLink).toBeInTheDocument()
+      expect(mobilePostsLink).toHaveAttribute('href', '/posts')
+    })
+  })
+
+  it('renders NotificationBell when authenticated and does not when unauthenticated', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    const { rerender } = render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(screen.queryByTestId('notification-bell-button')).not.toBeInTheDocument()
+
+    // Now authenticated
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 'u-1', email: 'test@example.com' } as any,
+      accessToken: 'token',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    rerender(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(screen.getByTestId('notification-bell-button')).toBeInTheDocument()
+  })
 })

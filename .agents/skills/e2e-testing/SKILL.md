@@ -32,13 +32,13 @@ Playwright E2E suites in this repository support two execution modes. Both modes
 | **Governance & Selection** | **Default mode** locked in `design.md` (`Testing Strategy`) and `tasks.md` unless the user explicitly requests Mode 1 at spec approval | Selected only when explicitly specified in the user-approved `design.md` / `tasks.md` or requested by the user |
 | **Frontend Runtime** | Real Chromium + Vite (`:15173` / `:15174`) — no Go/PostgreSQL process required | Real Chromium + Vite (`:15173` / `:15174`) |
 | **API Layer (`/api/v1`)** | Intercepted at browser network layer (`context.route` / `page.route`) with strict 1:1 Backend Contract verification | Proxied to real Go backend (`:18080`) + PostgreSQL |
-| **Contract Fidelity** | Enforced by **4 Mandatory 1:1 Contract Parity Rules** + Backend `go test` cross-check | Enforced directly by live Go handlers |
+| **Contract Fidelity** | Enforced by **5 Mandatory 1:1 Contract Parity Rules** + Backend `go test` cross-check | Enforced directly by live Go handlers |
 
 > **Governance Rule:** The E2E execution mode is locked upfront in `design.md` and `tasks.md` when the user approves the specification, defaulting to **Mode 2 (Contract-Verified Mock E2E)**. During implementation, the agent MUST execute the exact mode approved in `tasks.md` and never switch modes autonomously.
 
-### The 4 Mandatory Rules for Mode 2 (Contract-Verified Mock E2E — Level 2 Golden Snapshot Lock)
+### The 5 Mandatory Rules for Mode 2 (Contract-Verified Mock E2E — Level 2 Golden Snapshot Lock)
 
-Ordinary `page.route()` mocks are brittle if the test author invents arbitrary JSON shapes or ignores request payloads. To make **Mode 2 (Contract-Verified Mock E2E)** 100% contractually identical to the backend without running a database or live backend server, every Mode 2 E2E suite MUST enforce all four rules (requiring zero pre-existing helper files in the repository):
+Ordinary `page.route()` mocks are brittle if the test author invents arbitrary JSON shapes or ignores request payloads. To make **Mode 2 (Contract-Verified Mock E2E)** 100% contractually identical to the backend without running a database or live backend server, every Mode 2 E2E suite MUST enforce all five rules (requiring zero pre-existing helper files in the repository):
 
 1. **Rule 1 — Machine-Verified Golden Contract Snapshot Lock (`.dream/specs/<feature>/contract-snapshots.json`):**
    - **Backend Producer (Handler/Controller Unit Tests):** In the backend HTTP handler/controller tests (e.g., Go `httptest.NewRecorder()`, Node `supertest`, Python `TestClient`), execute the real router, middleware, handler, and JSON serializer in-memory (no live DB or server required) and write/assert the normalized HTTP status and JSON response envelopes (`200`, `201`, `400`, `401`, `403`, `404`, `409`) into `.dream/specs/<feature>/contract-snapshots.json`.
@@ -51,6 +51,9 @@ Ordinary `page.route()` mocks are brittle if the test author invents arbitrary J
    - Fulfill all `/api/v1` JSON responses (except `204 No Content`) through an inline or local `fulfillFromContractSnapshot` helper that validates the Full Status Envelope structure (`{ success, message, data, error, meta: { timestamp, pagination? } }`), checks recursive key/type match against the backend snapshot, and asserts that forbidden internal/PII fields (e.g., `adminId`, `adminEmail` on public endpoints) are absent.
 4. **Rule 4 — Stateful In-Memory Transitions Across Multi-Step Flows:**
    - Seed the mutable in-memory state store per test from `snapshots['..._200'].body.data`. When the UI triggers a `POST`/`PUT`/`PATCH`/`DELETE` mutation, update the in-memory state (including `omitempty` deletions like `delete target.adminReply`) so that subsequent `GET` requests, React Query invalidations, filter changes, or `page.reload()` calls return the updated state identically to the database.
+5. **Rule 5 — Catch-All Unmocked `/api/v1/**` Trap & Secondary Route Coverage:**
+   - Register a base catch-all route handler (`page.route('**/api/v1/**', ...)`) first (since Playwright evaluates routes in reverse registration order) that records and fails the test whenever any `/api/v1/` request reaches the network unmocked instead of silently falling through to Vite's proxy (`ECONNREFUSED` / `500`).
+   - When a test navigates to cross-feature pages (e.g., `/products/:id`, header layout with auth/cart/favorites/notifications), explicitly mock all secondary background endpoints triggered by that page so no unexpected error banners or failed sub-panels appear in screenshots.
 
 > **WebSocket Note (`page.routeWebSocket`):** Standard `page.route()` intercepts HTTP/HTTPS only. When testing real-time WebSocket flows in Mode 2, use Playwright's `page.routeWebSocket()` / `context.routeWebSocket()` to intercept `ws://` / `wss://` connections, validate inbound client messages (`ws.onMessage`) and send server-push frames (`ws.send`) using the exact JSON message shapes recorded in `.dream/specs/<feature>/contract-snapshots.json` via `assertMatchesContractShape`.
 

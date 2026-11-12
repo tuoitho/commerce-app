@@ -126,6 +126,9 @@ Subagent:
       auth/method/body, enforce 1:1 structural key/type parity with the snapshot,
       and mutate in-memory state across `POST`/`PUT`/`PATCH`/`DELETE`? Report
       any hand-invented envelope or mock/contract drift as Important.
+    - For E2E `verifier` tasks that generate `.dream/specs/<feature>/imgs/*.png`,
+      inspect the generated screenshot files (via `read_file`) to verify that the
+      captured UI state matches the scenario under test.
     - Are the task's edge cases covered?
 
     **Structure:**

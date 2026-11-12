@@ -7,6 +7,14 @@ import {
   type WSEventPresence,
   type WSEvent,
 } from '@/api/chat'
+import type { NotificationItem } from '@/api/posts'
+
+export interface WSEventNotificationNew {
+  type: 'notification:new'
+  payload: NotificationItem
+}
+
+export type AnyAdminWSEvent = WSEvent | WSEventNotificationNew
 
 export interface UseAdminChatSocketOptions {
   token?: string | null
@@ -14,6 +22,8 @@ export interface UseAdminChatSocketOptions {
   onNewMessage?: (msg: AdminChatMessage) => void
   onMessagesRead?: (payload: WSEventMessagesRead['payload']) => void
   onPresenceChange?: (payload: WSEventPresence['payload']) => void
+  onNotification?: (notification: NotificationItem) => void
+  onReconnect?: () => void
   onAuthError?: () => void
 }
 
@@ -62,6 +72,8 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
     onNewMessage,
     onMessagesRead,
     onPresenceChange,
+    onNotification,
+    onReconnect,
     onAuthError,
   } = options
 
@@ -84,6 +96,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const isReconnectingRef = useRef(false)
   const manualCloseRef = useRef(false)
   const isAuthErrorRef = useRef(false)
   const prevTokenRef = useRef<string | null>(effectiveToken)
@@ -102,6 +115,8 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
     onNewMessage,
     onMessagesRead,
     onPresenceChange,
+    onNotification,
+    onReconnect,
     onAuthError,
   })
 
@@ -110,6 +125,8 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
       onNewMessage,
       onMessagesRead,
       onPresenceChange,
+      onNotification,
+      onReconnect,
       onAuthError,
     }
   })
@@ -167,6 +184,11 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
         setIsConnected(true)
         reconnectAttemptsRef.current = 0
 
+        if (isReconnectingRef.current) {
+          isReconnectingRef.current = false
+          callbacksRef.current.onReconnect?.()
+        }
+
         pingTimerRef.current = setInterval(() => {
           if (
             typeof WebSocket !== 'undefined' &&
@@ -183,7 +205,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
 
       ws.onmessage = (event) => {
         try {
-          const data: WSEvent = JSON.parse(event.data)
+          const data: AnyAdminWSEvent = JSON.parse(event.data)
           switch (data.type) {
             case 'chat:new_message':
               callbacksRef.current.onNewMessage?.(data.payload)
@@ -195,6 +217,10 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
 
             case 'chat:presence':
               callbacksRef.current.onPresenceChange?.(data.payload)
+              break
+
+            case 'notification:new':
+              callbacksRef.current.onNotification?.(data.payload)
               break
 
             case 'pong':
@@ -225,6 +251,7 @@ export function useAdminChatSocket(options: UseAdminChatSocketOptions = {}): Use
           return
         }
 
+        isReconnectingRef.current = true
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
         reconnectAttemptsRef.current += 1
         reconnectTimerRef.current = setTimeout(() => {

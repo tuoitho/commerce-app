@@ -33,8 +33,9 @@ Read:
    CCR must be `APPLIED` or `REJECTED`. Verify implementation against the
    current revision of each design contract, not an earlier one. For UI-affecting
    features, confirm `.dream/specs/<feature>/report.md` exists and every
-   referenced screenshot under `.dream/specs/<feature>/imgs/` is present and
-   non-empty. When the E2E suite uses **Contract-Verified Mock E2E (`page.route`)**,
+   referenced screenshot under `.dream/specs/<feature>/imgs/` is present,
+   non-empty, and inspected (via `read_file`) to confirm the captured UI
+   matches the verified scenario. When the E2E suite uses **Contract-Verified Mock E2E (`page.route`)**,
    confirm `.dream/specs/<feature>/contract-snapshots.json` exists and is
    verified by the backend HTTP handler/controller test suite, and confirm the
    Playwright E2E suite loads those golden snapshots to enforce 1:1 response

@@ -7,6 +7,14 @@ import {
   type WSEventPresence,
   type WSEvent,
 } from '@/api/chat'
+import type { NotificationItem } from '@/api/posts'
+
+export interface WSEventNotificationNew {
+  type: 'notification:new'
+  payload: NotificationItem
+}
+
+export type AnyWSEvent = WSEvent | WSEventNotificationNew
 
 export interface UseChatSocketOptions {
   token?: string | null
@@ -16,6 +24,8 @@ export interface UseChatSocketOptions {
   onNewMessage?: (msg: ChatMessage) => void
   onMessagesRead?: (payload: WSEventMessagesRead['payload']) => void
   onPresenceChange?: (payload: WSEventPresence['payload']) => void
+  onNotification?: (notification: NotificationItem) => void
+  onReconnect?: () => void
   onAuthError?: () => void
 }
 
@@ -72,6 +82,8 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
     onNewMessage,
     onMessagesRead,
     onPresenceChange,
+    onNotification,
+    onReconnect,
     onAuthError,
   } = options
 
@@ -98,6 +110,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const isReconnectingRef = useRef(false)
   const manualCloseRef = useRef(false)
   const isAuthErrorRef = useRef(false)
   const prevTokenRef = useRef<string | null>(effectiveToken)
@@ -119,6 +132,8 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
     onNewMessage,
     onMessagesRead,
     onPresenceChange,
+    onNotification,
+    onReconnect,
     onAuthError,
   })
 
@@ -127,6 +142,8 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
       onNewMessage,
       onMessagesRead,
       onPresenceChange,
+      onNotification,
+      onReconnect,
       onAuthError,
     }
   })
@@ -198,6 +215,11 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
         setIsConnected(true)
         reconnectAttemptsRef.current = 0
 
+        if (isReconnectingRef.current) {
+          isReconnectingRef.current = false
+          callbacksRef.current.onReconnect?.()
+        }
+
         // Start heartbeat ping every 30 seconds
         pingTimerRef.current = setInterval(() => {
           if (
@@ -215,7 +237,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
 
       ws.onmessage = (event) => {
         try {
-          const data: WSEvent = JSON.parse(event.data)
+          const data: AnyWSEvent = JSON.parse(event.data)
           switch (data.type) {
             case 'chat:new_message':
               callbacksRef.current.onNewMessage?.(data.payload)
@@ -231,6 +253,10 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
                 setIsSupportOnline(data.payload.isOnline)
                 setSupportLastActiveAt(data.payload.lastActiveAt)
               }
+              break
+
+            case 'notification:new':
+              callbacksRef.current.onNotification?.(data.payload)
               break
 
             case 'pong':
@@ -265,6 +291,7 @@ export function useChatSocket(options: UseChatSocketOptions = {}): UseChatSocket
         }
 
         // Unexpected disconnect: auto-reconnect with exponential backoff
+        isReconnectingRef.current = true
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
         reconnectAttemptsRef.current += 1
         reconnectTimerRef.current = setTimeout(() => {

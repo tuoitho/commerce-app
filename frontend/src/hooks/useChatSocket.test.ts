@@ -380,4 +380,81 @@ describe('useChatSocket', () => {
 
     expect(ws.readyState).toBe(MockWebSocket.CLOSED)
   })
+
+  it('handles notification:new event and calls onNotification callback (Req 8.2)', async () => {
+    const onNotification = vi.fn()
+    renderHook(() =>
+      useChatSocket({
+        token: 'test-token-123',
+        enabled: true,
+        onNotification,
+      })
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    const ws = MockWebSocket.instances[0]
+    const notificationPayload = {
+      id: 'notif-1',
+      recipientId: 'user-1',
+      actorId: 'admin-1',
+      actorName: 'Quản trị viên',
+      actorRole: 'admin',
+      category: 'post',
+      notificationType: 'post_reaction',
+      postId: 'post-1',
+      commentId: null,
+      reactionType: 'love',
+      excerpt: 'Bài viết hay',
+      metadata: {},
+      isRead: false,
+      createdAt: '2026-10-21T10:00:00Z',
+    }
+
+    act(() => {
+      ws.receive({
+        type: 'notification:new',
+        payload: notificationPayload,
+      })
+    })
+
+    expect(onNotification).toHaveBeenCalledWith(notificationPayload)
+  })
+
+  it('triggers onReconnect callback when reconnecting after unexpected disconnect (Req 6.7)', async () => {
+    const onReconnect = vi.fn()
+    renderHook(() =>
+      useChatSocket({
+        token: 'test-token-123',
+        enabled: true,
+        onReconnect,
+      })
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+    expect(MockWebSocket.instances.length).toBe(1)
+    expect(onReconnect).not.toHaveBeenCalled()
+
+    // Unexpected disconnect
+    act(() => {
+      MockWebSocket.instances[0].close(1006, 'Connection lost')
+    })
+
+    // Advance timer to trigger reconnect
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(MockWebSocket.instances.length).toBe(2)
+
+    // Trigger onopen for second instance
+    await act(async () => {
+      vi.advanceTimersByTime(10)
+    })
+
+    expect(onReconnect).toHaveBeenCalledTimes(1)
+  })
 })

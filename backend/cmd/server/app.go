@@ -23,6 +23,7 @@ import (
 	chatuc "commerce-backend/internal/usecase/chat"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
+	postuc "commerce-backend/internal/usecase/post"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
 	"commerce-backend/internal/delivery/ws"
@@ -37,6 +38,7 @@ type App struct {
 	Server     *http.Server
 	AuthUC     *authuc.UseCase
 	OrderUC    *orderuc.UseCase
+	PostUC     *postuc.UseCase
 	MediaStore *reviewmedia.Store
 	ChatMedia  *chatmedia.Store
 	WSHub      *ws.Hub
@@ -234,6 +236,19 @@ func provideChatUseCase(repo *repository.ChatRepository, mediaStore *chatmedia.S
 	return chatuc.New(repo, mediaStore, chatuc.WithBroadcaster(hub))
 }
 
+func providePostRepository(pool *pgxpool.Pool) *repository.PostRepository {
+	return repository.NewPostRepository(pool)
+}
+
+func providePostUseCase(
+	repo *repository.PostRepository,
+	catalogRepo *repository.CatalogRepository,
+	mediaStore *chatmedia.Store,
+	hub *ws.Hub,
+) *postuc.UseCase {
+	return postuc.New(repo, catalogRepo, mediaStore, postuc.WithBroadcaster(hub))
+}
+
 func provideGinRouter(
 	cfg *config.Config,
 	log *slog.Logger,
@@ -247,6 +262,7 @@ func provideGinRouter(
 	reviewUC *reviewuc.ReviewUseCase,
 	favoriteUC *favoriteuc.UseCase,
 	chatUC *chatuc.UseCase,
+	postUC *postuc.UseCase,
 	wsHub *ws.Hub,
 	jwtMgr *jwt.Manager,
 ) *gin.Engine {
@@ -266,6 +282,7 @@ func provideGinRouter(
 		Review:       reviewUC,
 		Favorite:     favoriteUC,
 		Chat:         chatUC,
+		Post:         postUC,
 		WSHub:        wsHub,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
@@ -289,6 +306,7 @@ func provideApp(
 	srv *http.Server,
 	authUC *authuc.UseCase,
 	orderUC *orderuc.UseCase,
+	postUC *postuc.UseCase,
 	mediaStore *reviewmedia.Store,
 	chatMedia *chatmedia.Store,
 	wsHub *ws.Hub,
@@ -300,6 +318,7 @@ func provideApp(
 		Server:     srv,
 		AuthUC:     authUC,
 		OrderUC:    orderUC,
+		PostUC:     postUC,
 		MediaStore: mediaStore,
 		ChatMedia:  chatMedia,
 		WSHub:      wsHub,

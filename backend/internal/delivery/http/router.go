@@ -31,6 +31,7 @@ type Dependencies struct {
 	Review       *reviewuc.ReviewUseCase
 	Favorite     *favoriteuc.UseCase
 	Chat         domain.ChatUseCase
+	Post         domain.PostUseCase
 	WSHub        *ws.Hub
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
@@ -48,6 +49,37 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 
 	authHandler := newAuthHandler(deps.UseCase, deps.RefreshTTL, deps.CookieSecure)
 	guard := newGuard(deps.JWT)
+
+	if deps.Post != nil {
+		postMediaHandler := newPostMediaHandler(deps.Post)
+		api.GET("/posts/media/:id", postMediaHandler.getMedia)
+		api.HEAD("/posts/media/:id", postMediaHandler.getMedia)
+
+		postHandler := newPostHandler(deps.Post)
+		posts := api.Group("/posts")
+		{
+			posts.GET("", guard.OptionalAuth, postHandler.listPosts)
+			posts.GET("/:id", guard.OptionalAuth, postHandler.getPostByID)
+			posts.PUT("/:id/reactions", guard.AuthRequired, postHandler.setPostReaction)
+			posts.POST("/:id/comments", guard.AuthRequired, postHandler.createComment)
+			posts.DELETE("/:id/comments/:commentId", guard.AuthRequired, postHandler.deleteComment)
+		}
+
+		postComments := api.Group("/post-comments")
+		postComments.Use(guard.AuthRequired)
+		{
+			postComments.PUT("/:commentId/reactions", postHandler.setCommentReaction)
+		}
+
+		notificationHandler := newNotificationHandler(deps.Post)
+		notifications := api.Group("/notifications")
+		notifications.Use(guard.AuthRequired)
+		{
+			notifications.GET("", notificationHandler.listNotifications)
+			notifications.POST("/:id/read", notificationHandler.markRead)
+			notifications.POST("/read-all", notificationHandler.markAllRead)
+		}
+	}
 
 	auth := api.Group("/auth")
 	{
@@ -215,6 +247,17 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 				adminChat.GET("/conversations/:id/messages", chatAdminHandler.listMessages)
 				adminChat.POST("/conversations/:id/messages", chatAdminHandler.sendMessage)
 				adminChat.POST("/conversations/:id/read", chatAdminHandler.markRead)
+			}
+		}
+		if deps.Post != nil {
+			postMediaHandler := newPostMediaHandler(deps.Post)
+			postAdminHandler := newPostAdminHandler(deps.Post)
+			adminPosts := admin.Group("/posts")
+			{
+				adminPosts.POST("/media", postMediaHandler.uploadMedia)
+				adminPosts.POST("", postAdminHandler.createPost)
+				adminPosts.PUT("/:id", postAdminHandler.updatePost)
+				adminPosts.DELETE("/:id", postAdminHandler.deletePost)
 			}
 		}
 	}

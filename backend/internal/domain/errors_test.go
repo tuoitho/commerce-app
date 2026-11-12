@@ -54,6 +54,10 @@ func TestSentinelErrors_Defined(t *testing.T) {
 		{"ErrReviewEditLimitReached", ErrReviewEditLimitReached},
 		{"ErrReviewMediaNotFound", ErrReviewMediaNotFound},
 		{"ErrConversationNotFound", ErrConversationNotFound},
+		{"ErrPostNotFound", ErrPostNotFound},
+		{"ErrPostCommentNotFound", ErrPostCommentNotFound},
+		{"ErrPostMediaNotFound", ErrPostMediaNotFound},
+		{"ErrNotificationNotFound", ErrNotificationNotFound},
 	}
 
 	for _, s := range sentinels {

@@ -41,17 +41,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
-    ...(isFullStackMode
-      ? [
-          {
-            command: 'npm run dev',
-            cwd: '../frontend-admin',
-            url: 'http://localhost:15174',
-            reuseExistingServer: !process.env.CI,
-            timeout: 120_000,
-          },
-        ]
-      : []),
+    {
+      command: 'npm run dev',
+      cwd: '../frontend-admin',
+      url: 'http://localhost:15174',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
   ],
   projects: [
     {

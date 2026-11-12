@@ -67,6 +67,8 @@ between two classes, choose the stricter one.
    code consumers of the changed contract that no task in this feature covers,
    including code owned by other features; each one needs a new leaf task.
    Follow `discovering-feature-dependencies` boundaries: direct consumers only.
+   Then list the execution evidence the change makes stale (see Evidence
+   Refresh).
 4. **Draft the CCR** at `changes/CCR-<NNN>-<slug>.md` using the format below,
    `Status: PROPOSED`. `<NNN>` is the next three-digit number in that
    directory.
@@ -121,6 +123,9 @@ references no contract.
   and `_Requirements_` when the CCR changes them. Uncheck a parent epic whose
   child is reopened. Append new leaf tasks with the next free number under the
   most relevant epic, with a complete task entry and `Contracts` field.
+- **Evidence:** leave `contract-snapshots.json`, `imgs/`, and `report.md`
+  untouched; tests regenerate them. Copy each Evidence Refresh row into the
+  `Reopened` line of its owner task so the implementer sees it.
 - **Active execution ledger:** if `.dream/sad/<feature>-tasks/progress.md` or
   `.dream/sdd/<feature>-tasks/progress.md` exists, append
   `Task <N>: reopened (CCR-<NNN>)` for each reopened task.
@@ -128,6 +133,31 @@ references no contract.
 Keep workflow history out of `requirements.md` and `design.md`; the CCR is the
 change record. The `Reopened` marker is execution state; the executing
 workflow removes it when the task is complete again.
+
+## Evidence Refresh
+
+Execution evidence under `.dream/specs/<feature>/` records the old contract
+until tests regenerate it. List every stale item in the CCR's Evidence
+Refresh table:
+
+- **Contract snapshots:** every `contract-snapshots.json` key whose
+  `contractId` names a changed contract (`<ID>@<old rev>`) → `re-record`,
+  owned by that contract's provider task. A new endpoint or status code →
+  `add`; a removed one → `remove`.
+- **Screenshots:** every `imgs/*.png` that shows changed behavior →
+  `regenerate`; behavior with no screenshot yet → `add`; removed behavior →
+  `delete`. Owned by the verifier task.
+- **Report:** the `report.md` sections covering changed requirements →
+  `regenerate`, owned by the verifier task.
+
+When the feature has no `contract-snapshots.json` or no UI, write `none` with
+the reason instead of rows.
+
+`UPDATE_CONTRACT_SNAPSHOTS=1` re-records every key the test run executes,
+which would hide drift on unchanged contracts. The provider's `Reopened` line
+therefore states: re-record only the listed keys at `<ID>@<new rev>`, with
+the test run filtered to their tests (e.g., `go test -run`), and confirm the
+`contract-snapshots.json` diff touches no other key.
 
 ## CCR Format
 
@@ -156,7 +186,15 @@ Trigger: <user request | Task <N> implementation | review finding>
 | 2.1 | provider | API-CHAT@2 | reopen |
 | 3.2 | consumer | API-CHAT@2 | reopen |
 | 3.1 | consumer | API-CHAT@2 | bump to @3 |
+| 6.1 | verifier | API-CHAT@2 | reopen |
 | 5.1 (new) | consumer | API-CHAT@3 | new task: admin inbox reads renamed field |
+
+## Evidence Refresh
+| Evidence | Item | Owner Task | Action |
+|---|---|---|---|
+| snapshot | `send_message_201` (API-CHAT@2 → @3) | 2.1 | re-record |
+| screenshot | `imgs/04-admin-inbox-order-link.png` | 6.1 | regenerate |
+| report | `report.md` — requirement 3.2 section | 6.1 | regenerate |
 
 ## Migration And Release Notes
 <New migration, data backfill, or coordinated frontend/backend release; or none.>
@@ -168,5 +206,7 @@ Trigger: <user request | Task <N> implementation | review finding>
 - Never reopen tasks by intuition; every reopened task traces to a changed
   contract, requirement, or task outcome in the impact table.
 - Never leave a direct code consumer of a changed contract without a task.
+- Never leave a snapshot key that references a changed contract out of the
+  Evidence Refresh table.
 - Do not bundle unrelated changes into one CCR; one coherent change per CCR.
 - Do not implement code in the same response that applies the CCR.

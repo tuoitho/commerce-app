@@ -104,6 +104,14 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 403, "forbidden", "Bạn không có quyền truy cập tệp đính kèm này", nil)
 	case errors.Is(err, domain.ErrConversationNotFound):
 		respondError(c, 404, "conversation_not_found", "Không tìm thấy cuộc hội thoại", nil)
+	case errors.Is(err, domain.ErrPostNotFound):
+		respondError(c, 404, "post_not_found", "Bài viết không tồn tại hoặc đã bị xóa", nil)
+	case errors.Is(err, domain.ErrPostCommentNotFound):
+		respondError(c, 404, "comment_not_found", "Bình luận không tồn tại hoặc đã bị xóa", nil)
+	case errors.Is(err, domain.ErrPostMediaNotFound):
+		respondError(c, 404, "post_media_not_found", "Không tìm thấy tệp đính kèm", nil)
+	case errors.Is(err, domain.ErrNotificationNotFound):
+		respondError(c, 404, "notification_not_found", "Không tìm thấy thông báo", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {
