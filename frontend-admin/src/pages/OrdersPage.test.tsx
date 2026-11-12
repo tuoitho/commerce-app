@@ -448,4 +448,44 @@ describe('OrdersPage', () => {
       expect(screen.getByRole('heading', { name: 'Quản lý đơn hàng' })).toBeInTheDocument()
     })
   })
+
+  it('displays "Trả hàng một phần" option and filters by partially_returned from URL', async () => {
+    vi.mocked(ordersApi.getAdminOrders).mockResolvedValue({
+      data: [mockOrders[0]],
+      meta: {
+        timestamp: '2026-08-18T12:00:00Z',
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 1,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+      message: '',
+    })
+
+    renderWithClient(
+      <>
+        <OrdersPage />
+        <LocationProbe />
+      </>,
+      ['/orders?status=partially_returned']
+    )
+
+    await waitFor(() => {
+      expect(ordersApi.getAdminOrders).toHaveBeenCalledWith({
+        status: 'partially_returned',
+        page: 1,
+        limit: 20,
+      })
+    })
+
+    const select = screen.getByLabelText('Lọc theo trạng thái') as HTMLSelectElement
+    expect(select.value).toBe('partially_returned')
+    const option = screen.getByRole('option', { name: 'Trả hàng một phần' })
+    expect(option).toBeInTheDocument()
+    expect(option).toHaveValue('partially_returned')
+  })
 })

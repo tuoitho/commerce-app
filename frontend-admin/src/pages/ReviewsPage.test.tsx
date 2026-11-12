@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { ReviewsPage } from './ReviewsPage'
 import * as reviewsApi from '../api/reviews'
 import type { AdminReview } from '../api/reviews'
@@ -9,6 +10,29 @@ vi.mock('../api/reviews', () => ({
   updateAdminReply: vi.fn(),
   deleteAdminReply: vi.fn(),
 }))
+
+function LocationProbe() {
+  const location = useLocation()
+  return <output data-testid="location">{location.pathname}{location.search}</output>
+}
+
+function renderReviewsPage(initialEntries = ['/reviews']) {
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <Routes>
+        <Route
+          path="/reviews"
+          element={
+            <>
+              <ReviewsPage />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  )
+}
 
 const mockReviewsList: AdminReview[] = [
   {
@@ -69,7 +93,7 @@ describe('ReviewsPage', () => {
       message: 'OK',
     })
 
-    render(<ReviewsPage />)
+    renderReviewsPage()
 
     await waitFor(() => {
       expect(screen.getByText('iPhone 15 Pro Max')).toBeInTheDocument()
@@ -93,7 +117,7 @@ describe('ReviewsPage', () => {
       message: 'OK',
     })
 
-    render(<ReviewsPage />)
+    renderReviewsPage()
 
     await waitFor(() => {
       expect(screen.getByText('iPhone 15 Pro Max')).toBeInTheDocument()
@@ -130,7 +154,7 @@ describe('ReviewsPage', () => {
       message: 'OK',
     })
 
-    render(<ReviewsPage />)
+    renderReviewsPage()
 
     await waitFor(() => {
       expect(screen.getByText('Phản hồi')).toBeInTheDocument()
@@ -168,7 +192,7 @@ describe('ReviewsPage', () => {
       message: 'OK',
     })
 
-    render(<ReviewsPage />)
+    renderReviewsPage()
 
     await waitFor(() => {
       expect(screen.getByText('Sửa')).toBeInTheDocument()
@@ -190,6 +214,103 @@ describe('ReviewsPage', () => {
     await waitFor(() => {
       expect(deleteSpy).toHaveBeenCalledWith('rev-1')
       expect(window.alert).toHaveBeenCalledWith('Xóa phản hồi thành công')
+    })
+  })
+
+  it('initializes has_reply filter from URL ?has_reply=no and fetches matching reviews', async () => {
+    const apiSpy = vi.spyOn(reviewsApi, 'getAdminReviews').mockResolvedValue({
+      data: [mockReviewsList[1]],
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: 'OK',
+    })
+
+    renderReviewsPage(['/reviews?has_reply=no'])
+
+    await waitFor(() => {
+      expect(apiSpy).toHaveBeenCalledWith(expect.objectContaining({ has_reply: 'no', page: 1 }))
+    })
+
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[]
+    expect(selects[1].value).toBe('no')
+  })
+
+  it('initializes has_reply filter from URL ?has_reply=yes and fetches matching reviews', async () => {
+    const apiSpy = vi.spyOn(reviewsApi, 'getAdminReviews').mockResolvedValue({
+      data: [mockReviewsList[0]],
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: 'OK',
+    })
+
+    renderReviewsPage(['/reviews?has_reply=yes'])
+
+    await waitFor(() => {
+      expect(apiSpy).toHaveBeenCalledWith(expect.objectContaining({ has_reply: 'yes', page: 1 }))
+    })
+
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[]
+    expect(selects[1].value).toBe('yes')
+  })
+
+  it('falls back to all reviews when ?has_reply= is invalid', async () => {
+    const apiSpy = vi.spyOn(reviewsApi, 'getAdminReviews').mockResolvedValue({
+      data: mockReviewsList,
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: { page: 1, limit: 10, total: 2, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: 'OK',
+    })
+
+    renderReviewsPage(['/reviews?has_reply=invalid_value'])
+
+    await waitFor(() => {
+      expect(apiSpy).toHaveBeenCalledWith(expect.objectContaining({ has_reply: '', page: 1 }))
+    })
+
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[]
+    expect(selects[1].value).toBe('')
+  })
+
+  it('updates URL search params when changing reply filter and removes param for all', async () => {
+    vi.spyOn(reviewsApi, 'getAdminReviews').mockResolvedValue({
+      data: mockReviewsList,
+      meta: {
+        timestamp: '2026-08-28T00:00:00Z',
+        pagination: { page: 1, limit: 10, total: 2, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: 'OK',
+    })
+
+    renderReviewsPage(['/reviews'])
+
+    await waitFor(() => {
+      expect(screen.getByText('iPhone 15 Pro Max')).toBeInTheDocument()
+    })
+
+    const selects = screen.getAllByRole('combobox')
+
+    // Change to 'no'
+    fireEvent.change(selects[1], { target: { value: 'no' } })
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/reviews?has_reply=no')
+    })
+
+    // Change to 'yes'
+    fireEvent.change(selects[1], { target: { value: 'yes' } })
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/reviews?has_reply=yes')
+    })
+
+    // Change to 'all' ('') -> removes has_reply param
+    fireEvent.change(selects[1], { target: { value: '' } })
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/reviews')
     })
   })
 })

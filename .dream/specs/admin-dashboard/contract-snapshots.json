@@ -1,0 +1,265 @@
+{
+  "feature": "admin-dashboard",
+  "snapshots": {
+    "forbidden_403": {
+      "contractId": "API-ADMIN-DASHBOARD@1",
+      "endpoint": "GET /api/v1/admin/dashboard",
+      "status": 403,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "forbidden",
+          "message": "Bạn không có quyền thực hiện thao tác này"
+        },
+        "message": "Bạn không có quyền thực hiện thao tác này",
+        "meta": {
+          "timestamp": "2026-11-12T14:41:21.8577664Z"
+        },
+        "success": false
+      }
+    },
+    "get_dashboard_default_200": {
+      "contractId": "API-ADMIN-DASHBOARD@1",
+      "endpoint": "GET /api/v1/admin/dashboard",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "dailyRevenue": [
+            {
+              "date": "2026-11-06",
+              "deliveredVnd": "0",
+              "netVnd": "0",
+              "refundedVnd": "0"
+            },
+            {
+              "date": "2026-11-07",
+              "deliveredVnd": "0",
+              "netVnd": "0",
+              "refundedVnd": "0"
+            },
+            {
+              "date": "2026-11-08",
+              "deliveredVnd": "50000000",
+              "netVnd": "50000000",
+              "refundedVnd": "0"
+            },
+            {
+              "date": "2026-11-09",
+              "deliveredVnd": "0",
+              "netVnd": "0",
+              "refundedVnd": "0"
+            },
+            {
+              "date": "2026-11-10",
+              "deliveredVnd": "0",
+              "netVnd": "-25990000",
+              "refundedVnd": "25990000"
+            },
+            {
+              "date": "2026-11-11",
+              "deliveredVnd": "0",
+              "netVnd": "0",
+              "refundedVnd": "0"
+            },
+            {
+              "date": "2026-11-12",
+              "deliveredVnd": "75990000",
+              "netVnd": "75990000",
+              "refundedVnd": "0"
+            }
+          ],
+          "generatedAt": "2026-11-12T03:15:42Z",
+          "lowStock": {
+            "items": [
+              {
+                "options": [
+                  {
+                    "groupLabel": "Dung lượng",
+                    "valueLabel": "256GB"
+                  }
+                ],
+                "productId": "11111111-1111-1111-1111-111111111111",
+                "productName": "iPhone 16 Pro",
+                "stockQuantity": 0,
+                "variantId": "22222222-2222-2222-2222-222222222222"
+              }
+            ],
+            "threshold": 5,
+            "total": 14
+          },
+          "orders": {
+            "byStatus": {
+              "cancel_requested": 1,
+              "cancelled": 6,
+              "confirmed": 1,
+              "delivered": 40,
+              "partially_returned": 1,
+              "pending_confirmation": 3,
+              "preparing": 2,
+              "returned": 2,
+              "shipped": 4
+            },
+            "cancelledInRange": 1,
+            "newInRange": 12
+          },
+          "pendingWork": {
+            "cancelRequestedOrders": 1,
+            "pendingApprovalReturns": 2,
+            "pendingConfirmationOrders": 3,
+            "receivedReturns": 1,
+            "unreadConversations": 4,
+            "unrepliedReviews": 7
+          },
+          "range": "7d",
+          "rangeStart": "2026-11-05T17:00:00Z",
+          "revenue": {
+            "averageOrderVnd": "25198000",
+            "deliveredOrders": 5,
+            "deliveredVnd": "125990000",
+            "netVnd": "100000000",
+            "refundedVnd": "25990000"
+          },
+          "topProducts": [
+            {
+              "active": true,
+              "brand": "Apple",
+              "imageUrl": "https://example.com/image.jpg",
+              "name": "iPhone 16 Pro",
+              "productId": "11111111-1111-1111-1111-111111111111",
+              "quantitySold": 9,
+              "revenueVnd": "233910000"
+            }
+          ]
+        },
+        "error": null,
+        "message": "Dashboard retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T14:41:21.8792455Z"
+        },
+        "success": true
+      }
+    },
+    "get_dashboard_today_200": {
+      "contractId": "API-ADMIN-DASHBOARD@1",
+      "endpoint": "GET /api/v1/admin/dashboard?range=today",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "dailyRevenue": [
+            {
+              "date": "2026-11-12",
+              "deliveredVnd": "75990000",
+              "netVnd": "75990000",
+              "refundedVnd": "0"
+            }
+          ],
+          "generatedAt": "2026-11-12T03:15:42Z",
+          "lowStock": {
+            "items": [
+              {
+                "options": [
+                  {
+                    "groupLabel": "Dung lượng",
+                    "valueLabel": "256GB"
+                  }
+                ],
+                "productId": "11111111-1111-1111-1111-111111111111",
+                "productName": "iPhone 16 Pro",
+                "stockQuantity": 0,
+                "variantId": "22222222-2222-2222-2222-222222222222"
+              }
+            ],
+            "threshold": 5,
+            "total": 14
+          },
+          "orders": {
+            "byStatus": {
+              "cancel_requested": 1,
+              "cancelled": 6,
+              "confirmed": 1,
+              "delivered": 40,
+              "partially_returned": 1,
+              "pending_confirmation": 3,
+              "preparing": 2,
+              "returned": 2,
+              "shipped": 4
+            },
+            "cancelledInRange": 1,
+            "newInRange": 12
+          },
+          "pendingWork": {
+            "cancelRequestedOrders": 1,
+            "pendingApprovalReturns": 2,
+            "pendingConfirmationOrders": 3,
+            "receivedReturns": 1,
+            "unreadConversations": 4,
+            "unrepliedReviews": 7
+          },
+          "range": "today",
+          "rangeStart": "2026-11-11T17:00:00Z",
+          "revenue": {
+            "averageOrderVnd": "25330000",
+            "deliveredOrders": 3,
+            "deliveredVnd": "75990000",
+            "netVnd": "75990000",
+            "refundedVnd": "0"
+          },
+          "topProducts": [
+            {
+              "active": true,
+              "brand": "Apple",
+              "imageUrl": "https://example.com/image.jpg",
+              "name": "iPhone 16 Pro",
+              "productId": "11111111-1111-1111-1111-111111111111",
+              "quantitySold": 9,
+              "revenueVnd": "233910000"
+            }
+          ]
+        },
+        "error": null,
+        "message": "Dashboard retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T14:41:21.8886151Z"
+        },
+        "success": true
+      }
+    },
+    "invalid_filter_400": {
+      "contractId": "API-ADMIN-DASHBOARD@1",
+      "endpoint": "GET /api/v1/admin/dashboard?range=1y",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_filter",
+          "fields": {
+            "range": "Kỳ báo cáo không hợp lệ"
+          },
+          "message": "Tiêu chí lọc sản phẩm không hợp lệ"
+        },
+        "message": "Tiêu chí lọc sản phẩm không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-12T14:41:21.8680078Z"
+        },
+        "success": false
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-ADMIN-DASHBOARD@1",
+      "endpoint": "GET /api/v1/admin/dashboard",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-12T14:41:21.8554168Z"
+        },
+        "success": false
+      }
+    }
+  }
+}

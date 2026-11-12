@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getAdminReviews, updateAdminReply, deleteAdminReply } from '../api/reviews'
 import type { AdminReview, GetAdminReviewsParams } from '../api/reviews'
 import { Button } from '@/components/ui/button'
@@ -9,11 +10,23 @@ import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Star, MessageSquare, Trash2, Edit } from 'lucide-react'
 
+function parseHasReply(val: string | null): '' | 'yes' | 'no' {
+  return val === 'yes' || val === 'no' ? val : ''
+}
+
 export const ReviewsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialHasReply = parseHasReply(searchParams.get('has_reply'))
+
   const [reviews, setReviews] = useState<AdminReview[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [params, setParams] = useState<GetAdminReviewsParams>({ page: 1, limit: 10, rating: 0, has_reply: '' })
+  const [params, setParams] = useState<GetAdminReviewsParams>(() => ({
+    page: 1,
+    limit: 10,
+    rating: 0,
+    has_reply: initialHasReply,
+  }))
   const [isLoading, setIsLoading] = useState(false)
 
   const [replyDialogOpen, setReplyDialogOpen] = useState(false)
@@ -23,6 +36,16 @@ export const ReviewsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  useEffect(() => {
+    const valid = parseHasReply(searchParams.get('has_reply'))
+    setParams(prev => {
+      if (prev.has_reply !== valid) {
+        return { ...prev, has_reply: valid, page: 1 }
+      }
+      return prev
+    })
+  }, [searchParams])
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true)
@@ -45,6 +68,15 @@ export const ReviewsPage: React.FC = () => {
   }, [fetchReviews])
 
   const handleFilterChange = (key: keyof GetAdminReviewsParams, value: any) => {
+    if (key === 'has_reply') {
+      const nextParams = new URLSearchParams(searchParams)
+      if (value === 'yes' || value === 'no') {
+        nextParams.set('has_reply', value)
+      } else {
+        nextParams.delete('has_reply')
+      }
+      setSearchParams(nextParams)
+    }
     setParams(prev => ({ ...prev, [key]: value, page: 1 }))
   }
 

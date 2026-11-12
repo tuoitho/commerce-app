@@ -14,6 +14,7 @@ import (
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
+	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
@@ -30,6 +31,7 @@ type Dependencies struct {
 	Return       *returnuc.UseCase
 	Review       *reviewuc.ReviewUseCase
 	Favorite     *favoriteuc.UseCase
+	Dashboard    *dashboarduc.UseCase
 	Chat         domain.ChatUseCase
 	Post         domain.PostUseCase
 	WSHub        *ws.Hub
@@ -197,6 +199,11 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	admin := api.Group("/admin")
 	admin.Use(guard.AuthRequired, guard.RequireAdmin())
 	{
+		if deps.Dashboard != nil {
+			adminDashboardHandler := newAdminDashboardHandler(deps.Dashboard, deps.Logger)
+			admin.GET("/dashboard", adminDashboardHandler.GetDashboard)
+		}
+
 		adminCategories := admin.Group("/categories")
 		{
 			adminCategories.GET("", adminCatalogHandler.ListCategories)

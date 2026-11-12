@@ -56,7 +56,8 @@ type ReturnEligibility struct {
 	Deadline *time.Time `json:"deadline"`
 }
 
-var vietnamLocation = time.FixedZone("Asia/Ho_Chi_Minh", 7*3600)
+var VietnamLocation = time.FixedZone("Asia/Ho_Chi_Minh", 7*3600)
+var vietnamLocation = VietnamLocation
 
 func CalculateReturnDeadline(deliveredAt time.Time) time.Time {
 	local := deliveredAt.In(vietnamLocation)

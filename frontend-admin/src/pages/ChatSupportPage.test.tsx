@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatSupportPage } from './ChatSupportPage'
 import * as chatApiModule from '@/api/chat'
 import type { AdminConversation } from '@/api/chat'
+
+function LocationProbe() {
+  const location = useLocation()
+  return <output data-testid="location">{location.pathname}{location.search}</output>
+}
 
 function renderWithClient(initialEntry = '/chat') {
   const queryClient = new QueryClient({
@@ -20,8 +25,24 @@ function renderWithClient(initialEntry = '/chat') {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/chat" element={<ChatSupportPage />} />
-          <Route path="/chat/:conversationId" element={<ChatSupportPage />} />
+          <Route
+            path="/chat"
+            element={
+              <>
+                <ChatSupportPage />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route
+            path="/chat/:conversationId"
+            element={
+              <>
+                <ChatSupportPage />
+                <LocationProbe />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -259,6 +280,62 @@ describe('ChatSupportPage', () => {
         attachmentIds: undefined,
       })
       expect(screen.getByText('Dạ có giao hỏa tốc trong 2 giờ ạ!')).toBeInTheDocument()
+    })
+  })
+
+  it('initializes unread filter tab from URL ?filter=unread and fetches unread conversations', async () => {
+    renderWithClient('/chat?filter=unread')
+
+    await waitFor(() => {
+      expect(chatApiModule.listAdminConversations).toHaveBeenCalledWith(
+        expect.objectContaining({ filter: 'unread' })
+      )
+    })
+
+    const unreadTab = screen.getByTestId('filter-tab-unread')
+    expect(unreadTab.className).toContain('text-blue-700')
+  })
+
+  it('falls back to "all" filter when URL has invalid ?filter= parameter', async () => {
+    renderWithClient('/chat?filter=invalid_filter')
+
+    await waitFor(() => {
+      expect(chatApiModule.listAdminConversations).toHaveBeenCalledWith(
+        expect.objectContaining({ filter: 'all' })
+      )
+    })
+
+    const allTab = screen.getByTestId('filter-tab-all')
+    expect(allTab.className).toContain('text-blue-700')
+  })
+
+  it('updates URL search params when changing filter tabs', async () => {
+    renderWithClient('/chat')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-tab-unread')).toBeInTheDocument()
+    })
+
+    // Click "Chưa đọc"
+    fireEvent.click(screen.getByTestId('filter-tab-unread'))
+    expect(screen.getByTestId('location').textContent).toBe('/chat?filter=unread')
+
+    // Click "Tất cả"
+    fireEvent.click(screen.getByTestId('filter-tab-all'))
+    expect(screen.getByTestId('location').textContent).toBe('/chat')
+  })
+
+  it('preserves query string when selecting a conversation', async () => {
+    renderWithClient('/chat?filter=unread')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('conversation-item-conv-101')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('conversation-item-conv-101'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/chat/conv-101?filter=unread')
     })
   })
 })

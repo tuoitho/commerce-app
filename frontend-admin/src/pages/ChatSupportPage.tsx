@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search,
@@ -26,9 +26,10 @@ import { useAdminChatSocket } from '@/hooks/useAdminChatSocket'
 export function ChatSupportPage() {
   const { conversationId } = useParams<{ conversationId?: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
 
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const filter: 'all' | 'unread' = searchParams.get('filter') === 'unread' ? 'unread' : 'all'
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -219,13 +220,24 @@ export function ChatSupportPage() {
   })
 
   const handleSelectConversation = (conv: AdminConversation) => {
-    navigate(`/chat/${conv.id}`)
+    const search = searchParams.toString()
+    navigate(`/chat/${conv.id}${search ? `?${search}` : ''}`)
+  }
+
+  const handleFilterChange = (nextFilter: 'all' | 'unread') => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextFilter === 'unread') {
+      nextParams.set('filter', 'unread')
+    } else {
+      nextParams.delete('filter')
+    }
+    setSearchParams(nextParams)
   }
 
   return (
     <div
       data-testid="chat-support-page"
-      className="flex flex-col h-[calc(100vh-8.5rem)] -m-8 overflow-hidden bg-slate-100"
+      className="flex flex-col h-[calc(100vh-8.5rem)] -m-4 lg:-m-8 overflow-hidden bg-slate-100"
     >
       {/* Main Two-Column Master-Detail Layout */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -288,7 +300,7 @@ export function ChatSupportPage() {
               <button
                 type="button"
                 data-testid="filter-tab-all"
-                onClick={() => setFilter('all')}
+                onClick={() => handleFilterChange('all')}
                 className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition ${
                   filter === 'all'
                     ? 'bg-white text-blue-700 shadow-xs font-semibold'
@@ -300,7 +312,7 @@ export function ChatSupportPage() {
               <button
                 type="button"
                 data-testid="filter-tab-unread"
-                onClick={() => setFilter('unread')}
+                onClick={() => handleFilterChange('unread')}
                 className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition flex items-center justify-center gap-1.5 ${
                   filter === 'unread'
                     ? 'bg-white text-blue-700 shadow-xs font-semibold'

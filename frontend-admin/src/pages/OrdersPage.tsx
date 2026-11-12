@@ -119,6 +119,7 @@ export function OrdersPage() {
                 <option value="shipped">Đã giao cho ĐVVC</option>
                 <option value="delivered">Đã giao</option>
                 <option value="cancelled">Đã hủy</option>
+                <option value="partially_returned">{ORDER_STATUS_LABELS.partially_returned}</option>
                 <option value="returned">Đã trả hàng</option>
               </Select>
             </div>

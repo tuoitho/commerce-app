@@ -26,6 +26,7 @@ import (
 	postuc "commerce-backend/internal/usecase/post"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
+	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	"commerce-backend/internal/delivery/ws"
 	"commerce-backend/internal/storage/chatmedia"
 	"commerce-backend/internal/storage/reviewmedia"
@@ -249,6 +250,16 @@ func providePostUseCase(
 	return postuc.New(repo, catalogRepo, mediaStore, postuc.WithBroadcaster(hub))
 }
 
+func provideDashboardRepository(pool *pgxpool.Pool) *repository.DashboardRepository {
+	return repository.NewDashboardRepository(pool)
+}
+
+func provideDashboardUseCase(repo *repository.DashboardRepository) *dashboarduc.UseCase {
+	return dashboarduc.New(dashboarduc.Dependencies{
+		Repo: repo,
+	})
+}
+
 func provideGinRouter(
 	cfg *config.Config,
 	log *slog.Logger,
@@ -263,6 +274,7 @@ func provideGinRouter(
 	favoriteUC *favoriteuc.UseCase,
 	chatUC *chatuc.UseCase,
 	postUC *postuc.UseCase,
+	dashboardUC *dashboarduc.UseCase,
 	wsHub *ws.Hub,
 	jwtMgr *jwt.Manager,
 ) *gin.Engine {
@@ -281,6 +293,7 @@ func provideGinRouter(
 		Return:       returnUC,
 		Review:       reviewUC,
 		Favorite:     favoriteUC,
+		Dashboard:    dashboardUC,
 		Chat:         chatUC,
 		Post:         postUC,
 		WSHub:        wsHub,

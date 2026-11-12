@@ -59,7 +59,9 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	chatUseCase := provideChatUseCase(chatRepository, chatmediaStore, hub)
 	postRepository := providePostRepository(pool)
 	postUseCase := providePostUseCase(postRepository, catalogRepository, chatmediaStore, hub)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, hub, manager)
+	dashboardRepository := provideDashboardRepository(pool)
+	dashboardUseCase := provideDashboardUseCase(dashboardRepository)
+	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, dashboardUseCase, hub, manager)
 	server := provideHTTPServer(cfg, engine)
 	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, store, chatmediaStore, hub)
 	return app, func() {
@@ -98,6 +100,8 @@ var appProviderSet = wire.NewSet(
 	provideChatUseCase,
 	providePostRepository,
 	providePostUseCase,
+	provideDashboardRepository,
+	provideDashboardUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

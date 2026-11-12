@@ -41,6 +41,8 @@ var appProviderSet = wire.NewSet(
 	provideChatUseCase,
 	providePostRepository,
 	providePostUseCase,
+	provideDashboardRepository,
+	provideDashboardUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

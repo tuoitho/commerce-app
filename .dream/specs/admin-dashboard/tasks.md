@@ -1,0 +1,176 @@
+# Kế hoạch thực hiện (Implementation Plan)
+
+- [x] 1. Backend: API số liệu tổng quan (`GET /api/v1/admin/dashboard`)
+
+- [x] 1.1 Tầng dữ liệu tổng quan: migration index, truy vấn sqlc và repository
+  - **Produces:** Migration `backend/db/migrations/000019_dashboard_indexes.up.sql` / `.down.sql`; truy vấn `backend/db/queries/dashboard.sql` cùng code sqlc sinh lại (`make gen`); kiểu domain và interface `DashboardRepository` trong `backend/internal/domain/dashboard.go`; `backend/internal/repository/dashboard_repository.go`.
+  - **Scope:**
+    - Viết ba index đúng `DB-DASHBOARD-INDEXES@1`, rồi chạy `make db-up` và `make gen`.
+    - Viết các truy vấn theo ngữ nghĩa ở mục "Ngữ nghĩa từng query" của `design.md`:
+      - doanh thu đã giao và số đơn đã giao theo ngày giờ Việt Nam;
+      - hoàn tiền theo ngày;
+      - đơn mới và đơn hủy trong kỳ;
+      - số đơn theo trạng thái;
+      - đổi trả `pending_approval` / `received`;
+      - top 5 sản phẩm (tie-break số lượng ↓, thành tiền ↓, tên ↑; ảnh `product_images` có `position` nhỏ nhất; trả kèm `products.active` và không lọc sản phẩm đã xóa mềm);
+      - biến thể tồn kho ≤ 5 (biến thể `active` thuộc sản phẩm `active`; `COUNT(*) OVER()`; nhãn phân loại theo cách tổng hợp của `SearchVariantOptionsAdmin`; tối đa 10).
+    - Repository chạy mọi truy vấn trong một transaction `READ ONLY, REPEATABLE READ`. Số đánh giá chưa phản hồi gọi lại sqlc `CountAdminReviews` (`rating_filter = 0`, `has_reply_filter = 'no'`). Số hội thoại chưa đọc gọi lại `CountConversationsForAdmin` (`status = 'unread'`, `search = ''`).
+    - Kiểu domain gồm `DashboardRange` (`today`/`7d`/`30d` + `IsValid`) và các struct dữ liệu thô mà use case cần.
+    - Kèm integration test.
+  - **Consumes:** Bảng `orders`, `order_items`, `return_requests`, `products`, `product_images`, `product_variants`, `variant_option_values`, `product_option_groups`, `product_option_values`; truy vấn sqlc hiện có `CountAdminReviews` (`db/queries/reviews.sql`) và `CountConversationsForAdmin` (`db/queries/chat.sql`).
+  - **Contracts:** DB-DASHBOARD-INDEXES@1 (provider)
+  - **Acceptance:**
+    - Chỉ đơn có trạng thái `delivered`/`partially_returned`/`returned` và `delivered_at` trong kỳ được tính doanh thu. Đơn ở mọi trạng thái khác bị loại.
+    - Chỉ yêu cầu đổi trả `refunded` có `refunded_at` trong kỳ được tính hoàn tiền.
+    - Ngày được gom theo giờ Việt Nam, kể cả bản ghi lúc 23:30 và 00:10 giờ VN.
+    - Đơn mới và đơn hủy đếm theo `created_at` trong kỳ.
+    - Số đơn theo trạng thái và việc cần xử lý không phụ thuộc kỳ.
+    - Top sản phẩm loại đơn `cancelled`, cộng mọi biến thể của một sản phẩm và đúng tie-break. Sản phẩm đã xóa mềm vẫn được xếp hạng với `active = false`.
+    - Tồn kho thấp gồm biến thể có tồn kho đúng 5, loại tồn kho 6, loại biến thể hoặc sản phẩm inactive. `total` đúng khi có hơn 10 biến thể thỏa điều kiện. Sắp xếp tồn kho ↑ rồi tên ↑.
+    - Số chưa phản hồi và chưa đọc bằng kết quả gọi trực tiếp query gốc.
+    - Với 50.000 đơn và 200.000 dòng hàng, một lần lấy dữ liệu cho mỗi kỳ hoàn tất dưới 1 giây.
+  - **Verification:** `integration-db`: `backend/internal/repository/dashboard_repository_integration_test.go` (build tag `integration`, PostgreSQL), gồm test hiệu năng với seed 50.000 đơn / 200.000 dòng hàng.
+  - _Requirements: 2.2, 3.1, 3.2, 3.4, 3.5, 5.1, 6.1, 6.3, 7.1, 7.3, 7.6, 8.1, 8.4, 9.5_
+
+- [x] 1.2 Use case, handler, route và Wire cho API tổng quan
+  - **Produces:**
+    - Use case `backend/internal/usecase/dashboard`.
+    - Handler `backend/internal/delivery/http/admin_dashboard_handler.go`.
+    - Route `GET /api/v1/admin/dashboard` trong nhóm `admin` của `router.go`, kèm trường `Dashboard` trong `Dependencies`.
+    - Provider `provideDashboardRepository` / `provideDashboardUseCase` trong `backend/cmd/server`, với `wire_gen.go` sinh lại.
+    - Golden snapshot `.dream/specs/admin-dashboard/contract-snapshots.json`.
+  - **Scope:**
+    - Use case nhận clock được inject. Use case:
+      - kiểm tra `range` (rỗng thì dùng `7d`, sai thì trả `domain.FilterValidationError` với `fields.range = "Kỳ báo cáo không hợp lệ"`);
+      - tính `rangeStart` = 00:00 UTC+7 của ngày đầu kỳ và `rangeEnd` = `now`;
+      - lấp đủ 1/7/30 ngày bằng 0;
+      - cộng tổng doanh thu từ chuỗi theo ngày;
+      - tính `netVnd` (có thể âm) và `averageOrderVnd` (chia lấy phần nguyên, `"0"` khi không có đơn);
+      - bổ sung đủ 9 trạng thái đơn với giá trị 0.
+    - Handler map sang JSON camelCase đúng API-ADMIN-DASHBOARD@1 qua `writeSuccess` / `writeError`, với tiền là chuỗi số nguyên và số đếm là number. Lỗi không mong đợi ghi log `slog` ở mức error kèm `range`.
+    - Handler test ghi và kiểm chứng contract snapshot qua `assertOrRecordContractSnapshot` cho các trường hợp: `200` mặc định, `200` `range=today`, `400 invalid_filter`, `401` (khóa snapshot đúng tên `unauthenticated_401` mà `mountContractRoutes` yêu cầu cho route `auth: 'bearer'`), `403`.
+  - **Consumes:** `DashboardRepository` từ task 1.1; middleware `guard.AuthRequired` + `guard.RequireAdmin()` hiện có; `writeSuccess` / `writeError` hiện có.
+  - **Contracts:** API-ADMIN-DASHBOARD@1 (provider)
+  - **Acceptance:**
+    - Không token trả 401. Tài khoản customer trả 403 `forbidden`.
+    - `range=1y` trả 400 `invalid_filter` kèm `fields.range`.
+    - Thiếu `range` cho kết quả `range = "7d"` và 7 điểm `dailyRevenue`. `today` cho 1 điểm, `30d` cho 30 điểm. Các điểm theo thứ tự ngày tăng dần và không bỏ ngày nào.
+    - `revenue.*Vnd` bằng tổng các trường tương ứng trong `dailyRevenue`, và mỗi điểm có `netVnd = deliveredVnd - refundedVnd`.
+    - `averageOrderVnd` đúng, kể cả khi không có đơn.
+    - `byStatus` luôn đủ 9 khóa.
+    - Ranh giới kỳ đúng với clock lúc 23:30 và 00:10 giờ VN.
+    - Phản hồi đúng Full Status Envelope và khớp snapshot.
+  - **Verification:** `unit` (`backend/internal/usecase/dashboard/*_test.go`); `handler` (`backend/internal/delivery/http/admin_dashboard_handler_test.go`, contract snapshot). Chạy `make test`, `make vet`.
+  - _Requirements: 1.4, 2.1, 2.4, 3.3, 3.4, 4.1, 4.2, 4.3, 4.5, 5.2, 9.3, 9.4_
+
+- [x] 2. Frontend-admin: trang tổng quan và điều hướng có bộ lọc
+
+- [x] 2.1 Trang đích hiển thị đúng bộ lọc từ URL (Đánh giá, Hỗ trợ chat, Đơn hàng)
+  - **Produces:** Thay đổi trong `frontend-admin/src/pages/ReviewsPage.tsx`, `frontend-admin/src/pages/ChatSupportPage.tsx` và `frontend-admin/src/pages/OrdersPage.tsx` kèm test tương ứng.
+  - **Scope:**
+    - `ReviewsPage` khởi tạo `has_reply` từ `?has_reply=` (`yes`/`no`; giá trị khác hoặc không có tham số thì về `''`). Khi đổi bộ lọc phản hồi thì ghi tham số lên URL, và bỏ tham số khi chọn "Tất cả". `rating` và `page` giữ nguyên hành vi state hiện tại.
+    - `ChatSupportPage` khởi tạo tab từ `?filter=unread` (khác thì `'all'`). Khi đổi tab thì ghi hoặc bỏ tham số. Khi chọn hội thoại qua route `chat/:conversationId` thì giữ query string.
+    - `OrdersPage` bổ sung tùy chọn `partially_returned` ("Trả hàng một phần", nhãn từ `ORDER_STATUS_LABELS`) vào ô chọn trạng thái. Các tùy chọn và hành vi khác giữ nguyên.
+  - **Consumes:** API hiện có `GET /api/v1/admin/reviews?has_reply=` và `GET /api/v1/admin/chat/conversations?filter=` (không đổi).
+  - **Contracts:** none
+  - **Acceptance:**
+    - Mở `/reviews?has_reply=no` hiển thị bộ lọc "Chưa phản hồi" và gửi `has_reply=no`.
+    - Mở `/chat?filter=unread` chọn tab "Chưa đọc" và gửi `filter=unread`.
+    - Đổi bộ lọc thì URL cập nhật theo.
+    - Mở `/orders?status=partially_returned` hiển thị "Trả hàng một phần" trong ô chọn và gửi `status=partially_returned`.
+    - Không có tham số thì hành vi giống hiện tại (test hiện có vẫn pass).
+  - **Verification:** `component`: `frontend-admin/src/pages/ReviewsPage.test.tsx`, `frontend-admin/src/pages/ChatSupportPage.test.tsx`, `frontend-admin/src/pages/OrdersPage.test.tsx`.
+  - _Requirements: 5.3, 6.4_
+
+- [x] 2.2 API client và trang tổng quan (trừ biểu đồ)
+  - **Produces:**
+    - `frontend-admin/src/api/dashboard.ts` (`getDashboard(range)` và wire types 1:1 với API-ADMIN-DASHBOARD@1) kèm `dashboard.test.ts`.
+    - `frontend-admin/src/pages/DashboardPage.tsx` viết lại toàn bộ.
+    - Các thành phần `RangeSelector`, `RevenueSummary`, `OrderStatusBreakdown`, `PendingWorkList`, `TopProductsList`, `LowStockList` và skeleton trong `frontend-admin/src/components/dashboard/`.
+    - `frontend-admin/src/pages/DashboardPage.test.tsx`.
+    - Cập nhật `frontend-admin/src/test/App.test.tsx`: thay assertion về nội dung giữ chỗ cũ ("Thống kê nhanh", "Hệ thống", "Làm mới dữ liệu"...) bằng assertion trang tổng quan mới, và mock API dashboard cho các test render `/`.
+  - **Scope:**
+    - Kỳ báo cáo đọc và ghi qua `?range=` (`useSearchParams`). Giá trị không hợp lệ được thay bằng `7d` (`replace`).
+    - Dùng `useQuery(['admin-dashboard', range])` với `placeholderData: keepPreviousData`, `refetchOnWindowFocus: false`, không có `refetchInterval`.
+    - Nút "Làm mới" gọi `refetch()`. Hiển thị `generatedAt` theo `HH:mm dd/MM/yyyy` giờ VN.
+    - Hiển thị skeleton theo khu vực khi tải lần đầu. Khi đổi kỳ hoặc làm mới thì giữ số liệu cũ kèm chỉ báo đang tải.
+    - Khi lỗi, hiển thị thông báo "Không thể tải số liệu tổng quan" và nút "Thử lại", không render số 0.
+    - Định dạng tiền từ chuỗi không qua `Number`, hỗ trợ số âm.
+    - Thống kê trạng thái dùng `ORDER_STATUS_LABELS` và link `/orders?status=…`.
+    - Sáu mục việc cần xử lý có link đúng bảng 6.1. Mục > 0 được làm nổi bật, mục = 0 hiển thị trung tính.
+    - Top sản phẩm và tồn kho thấp link tới `/products/:id`, có nhãn "Hết hàng" và đúng thông báo trống của 7.5 / 8.5. Sản phẩm bán chạy có `active = false` hiển thị nhãn "Đã ngừng bán" và không phải là link.
+    - Phần tử tương tác là `<Link>` / `<button>` có focus ring rõ ràng. Bố cục responsive từ 320px.
+    - Biểu đồ là thành phần của task 2.3. Task này chỉ chừa vị trí và truyền `dailyRevenue`.
+  - **Consumes:** API-ADMIN-DASHBOARD@1 (đã cố định trong `design.md`, không phụ thuộc thời điểm hoàn thành task 1.2); `src/api/client.ts`; `ORDER_STATUS_LABELS` trong `src/api/types.ts`; route `/orders`, `/returns`, `/reviews`, `/chat`, `/products/:id` hiện có.
+  - **Contracts:** API-ADMIN-DASHBOARD@1 (consumer)
+  - **Acceptance:**
+    - Mặc định `7d`, đổi kỳ thì gọi API với `range` mới mà không reload, và `?range=` khôi phục khi tải lại.
+    - Không còn nội dung giữ chỗ cũ.
+    - Hiển thị đủ các chỉ số doanh thu, gồm `netVnd` âm có dấu trừ và số tiền vượt `Number.MAX_SAFE_INTEGER` hiển thị chính xác.
+    - Hiển thị "Đơn mới" / "Đơn bị hủy" và đủ 9 trạng thái với link đúng.
+    - Đủ 6 mục việc cần xử lý với link và trạng thái thị giác đúng.
+    - Top sản phẩm hiển thị thứ hạng, ảnh, tên, thương hiệu, số lượng, thành tiền. Sản phẩm đã ngừng bán có nhãn và không điều hướng được. Tồn kho thấp hiển thị tổng, tên, phân loại, tồn kho.
+    - Các trạng thái skeleton, giữ số liệu cũ, lỗi kèm "Thử lại" và "Làm mới" hoạt động đúng.
+  - **Verification:** `component` (`DashboardPage.test.tsx`, `dashboard.test.ts`). Chạy `npm test`, `npm run lint`, `npm run build`.
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 5.1, 5.2, 5.3, 6.1, 6.5, 7.2, 7.4, 7.5, 7.6, 8.2, 8.3, 8.5, 9.1, 9.2, 9.4, 10.2_
+
+- [x] 2.3 Biểu đồ doanh thu theo ngày (`RevenueChart`)
+  - **Produces:** `frontend-admin/src/components/dashboard/RevenueChart.tsx` kèm test, gắn vào vị trí biểu đồ của `DashboardPage`.
+  - **Scope:**
+    - Biểu đồ SVG/CSS thuần, không thêm dependency.
+    - Mỗi phần tử `dailyRevenue` là một nhóm gồm cột "Đã giao", cột "Đã hoàn tiền" và một điểm "Doanh thu thuần" nối thành đường. Ba chuỗi phân biệt bằng màu **và** hình dạng (cột đặc, cột sọc, điểm hình thoi), kèm legend.
+    - Mỗi ngày focus được bằng bàn phím. Khi hover, chạm hoặc focus thì hiện tooltip với ngày `dd/MM`, đã giao, đã hoàn và thuần.
+    - Có `<table>` `sr-only` chứa toàn bộ điểm dữ liệu.
+    - Hiển thị đúng 1 điểm cho `today`, 7 hoặc 30 điểm cho kỳ dài, và hiển thị các ngày có giá trị 0.
+    - Tiền định dạng từ chuỗi không qua `Number`.
+  - **Consumes:** Trường `dailyRevenue` của API-ADMIN-DASHBOARD@1; vị trí gắn biểu đồ trong `DashboardPage` từ task 2.2.
+  - **Contracts:** API-ADMIN-DASHBOARD@1 (consumer)
+  - **Acceptance:**
+    - Số nhóm cột bằng số phần tử `dailyRevenue`, theo thứ tự ngày tăng dần, kể cả ngày bằng 0.
+    - Tooltip hiển thị đúng 4 giá trị khi hover hoặc focus.
+    - Bảng `sr-only` chứa đủ các điểm.
+    - Legend và hình dạng phân biệt ba chuỗi (đã giao, đã hoàn, thuần) mà không phụ thuộc màu.
+  - **Verification:** `component` (`frontend-admin/src/components/dashboard/RevenueChart.test.tsx`).
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 10.3_
+
+- [x] 2.4 Layout quản trị responsive (`AdminLayout`)
+  - **Produces:** Thay đổi `frontend-admin/src/components/layout/AdminLayout.tsx` kèm test mới `frontend-admin/src/components/layout/AdminLayout.test.tsx`.
+  - **Scope:**
+    - Theo mục "Layout quản trị responsive (10.1, 10.4)" của `design.md`.
+    - **Dưới `lg` (1024px):** ẩn sidebar. Thêm nút menu trong header (`aria-label="Mở menu điều hướng"`, `aria-expanded`, `aria-controls`). Nút mở ngăn điều hướng dạng overlay, chứa đúng các `NavLink` hiện có; danh sách mục dùng chung với sidebar, không lặp lại.
+    - **Đóng ngăn:** khi chọn mục, nhấn Escape, hoặc nhấn lớp phủ. Focus vào ngăn khi mở và trở về nút menu khi đóng.
+    - **Chống tràn ngang:** thu nhỏ padding của header và `main` dưới `lg`. Rút gọn hoặc ẩn bớt phần phụ của header (badge phiên bản) để không tràn ngang từ 320px.
+    - **Từ `lg` trở lên:** giữ nguyên giao diện hiện tại.
+    - Không thêm dependency.
+  - **Consumes:** route và mục điều hướng hiện có trong `AdminLayout.tsx` / `App.tsx`; `lucide-react`; `src/components/ui/`.
+  - **Contracts:** none
+  - **Acceptance:**
+    - Nút menu có `aria-expanded` phản ánh đúng trạng thái.
+    - Nhấn nút mở ngăn chứa đủ các mục điều hướng.
+    - Chọn một mục thì điều hướng tới route đó và đóng ngăn. Nhấn Escape hoặc nhấn lớp phủ cũng đóng ngăn.
+    - Focus trở về nút menu sau khi đóng.
+    - Từ `lg` trở lên, sidebar hiển thị như cũ.
+    - `CategoriesPage.test.tsx`, `OrdersPage.test.tsx` và toàn bộ test hiện có vẫn pass.
+  - **Verification:** `component` (`AdminLayout.test.tsx`). Chạy `npm test`, `npm run lint`, `npm run build`. Phần `visual` của 10.1/10.4 do task 3.1 kiểm chứng.
+  - _Requirements: 10.1, 10.4_
+
+- [x] 3. Xác minh End-to-End (Mode 2)
+
+- [x] 3.1 E2E Mode 2 cho điều hướng từ trang tổng quan và bằng chứng trực quan
+  - **Produces:** Suite Playwright `frontend/e2e/admin-dashboard.spec.ts` (Page Object nếu cần đặt dưới `frontend/e2e/pages/`), ảnh chụp tại `.dream/specs/admin-dashboard/imgs/`, báo cáo `.dream/specs/admin-dashboard/report.md`.
+  - **Scope:**
+    - Load skill `e2e-testing` và thực thi đúng **`Mode 2: Shape-Locked Mock E2E`** đã phê duyệt trong `design.md`. Không tự chuyển sang Mode 1.
+    - Dùng `frontend/playwright.config.ts` hiện có (đã khởi động dev server admin `:15174`); không thêm Playwright hay cấu hình vào `frontend-admin`.
+    - Khai báo mọi route `/api/v1` trong một lần gọi `mountContractRoutes` của `frontend/e2e/fixtures/contract.ts` (không gọi `page.route` trực tiếp cho đường dẫn API). Các API trang đích và các lời gọi phiên đăng nhập admin là `StubRoute` trong cùng lần gọi đó. Snapshot dashboard được nạp trực tiếp `.dream/specs/admin-dashboard/contract-snapshots.json` (ghi từ task 1.2) cho dashboard. Các API trang đích (orders, returns, reviews, chat) được mock theo shape hiện có.
+    - Từ trang tổng quan, nhấn lần lượt sáu mục việc cần xử lý và kiểm tra trang đích hiển thị đúng bộ lọc. Nhấn một trạng thái đơn và kiểm tra `/orders?status=…` được lọc.
+    - Chụp ảnh trang tổng quan ở `1440x900` và `375x812`, ảnh ngăn điều hướng đang mở ở `375x812`, và ảnh chỉ báo focus khi điều hướng bằng bàn phím.
+    - Nếu phát hiện lỗi tích hợp trong phạm vi spec, sửa nguyên nhân gốc, chạy lại test bị ảnh hưởng cùng suite E2E, và cập nhật `imgs/` cùng `report.md`. Nếu contract đã duyệt sai hoặc thiếu, dừng lại và dùng `managing-contract-changes`.
+  - **Consumes:** API-ADMIN-DASHBOARD@1 snapshot từ task 1.2; `DashboardPage` (2.2, 2.3); đồng bộ bộ lọc URL (2.1); `AdminLayout` responsive (2.4).
+  - **Contracts:** API-ADMIN-DASHBOARD@1 (verifier)
+  - **Acceptance:**
+    - Mọi luồng điều hướng mở trang đích với đúng bộ lọc.
+    - Ảnh responsive không có cuộn ngang và không cắt số liệu.
+    - Focus ring nhìn thấy rõ.
+    - `report.md` liệt kê từng tiêu chí kèm kết quả và ảnh tương ứng.
+  - **Verification:** `mock-e2e`, `visual`: từ `frontend/` chạy `npx playwright test e2e/admin-dashboard.spec.ts`.
+  - _Requirements: 5.3, 6.2, 10.1, 10.2, 10.4_
