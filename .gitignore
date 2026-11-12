@@ -10,10 +10,6 @@ node_modules/
 dist/
 dist-ssr/
 
-# === Environment ===
-.env
-.env.local
-.env.*.local
 
 # === Logs ===
 *.log
