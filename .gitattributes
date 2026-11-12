@@ -2,3 +2,9 @@
 
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# GitHub language statistics: count frontend tests and E2E specs as documentation.
+frontend/e2e/** linguist-documentation
+frontend*/src/**/*.test.ts linguist-documentation
+frontend*/src/**/*.test.tsx linguist-documentation
+frontend*/src/test/** linguist-documentation
