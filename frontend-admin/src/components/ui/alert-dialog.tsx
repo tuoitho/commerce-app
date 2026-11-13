@@ -36,6 +36,24 @@ export function AlertDialogContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const { open, onOpenChange } = React.useContext(AlertDialogContext)
+  const cardRef = React.useRef<HTMLDivElement>(null)
+  // Captured during the first render: React applies a child's autoFocus before
+  // effects run, so reading activeElement in the effect would miss the trigger.
+  const [previous] = React.useState(() => document.activeElement)
+
+  // Move focus into the dialog unless a child already took it (autoFocus),
+  // and hand it back to the element that had it once the dialog unmounts.
+  React.useEffect(() => {
+    const card = cardRef.current
+    if (card && !card.contains(document.activeElement)) {
+      card.focus()
+    }
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus()
+      }
+    }
+  }, [previous])
 
   React.useEffect(() => {
     if (!open) return
@@ -62,8 +80,10 @@ export function AlertDialogContent({
       />
       {/* Dialog card */}
       <div
+        ref={cardRef}
+        tabIndex={-1}
         className={cn(
-          'relative z-50 w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl border border-slate-200/80 animate-in fade-in zoom-in-95 duration-200',
+          'relative z-50 w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl border border-slate-200/80 animate-in fade-in zoom-in-95 duration-200 focus:outline-none',
           className
         )}
         {...props}

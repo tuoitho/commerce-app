@@ -32,7 +32,7 @@ func (f *Users) Create(ctx context.Context, email, passwordHash, role string) (*
 	}
 	id := fmt.Sprintf("%d", f.next)
 	f.next++
-	u := &domain.User{ID: id, Email: email, PasswordHash: passwordHash, Role: role, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	u := &domain.User{ID: id, Email: email, PasswordHash: passwordHash, Role: role, Status: domain.UserStatusActive, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	f.byID[u.ID] = u
 	return u, nil
 }
@@ -73,6 +73,26 @@ func (f *Users) ByID(id string) *domain.User {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.byID[id]
+}
+
+func (f *Users) Lock(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if u, ok := f.byID[id]; ok {
+		now := time.Now()
+		u.Status = domain.UserStatusLocked
+		u.LockedAt = &now
+	}
+}
+
+func (f *Users) Unlock(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if u, ok := f.byID[id]; ok {
+		u.Status = domain.UserStatusActive
+		u.LockedAt = nil
+		u.LockReason = nil
+	}
 }
 
 type Sessions struct {
@@ -141,3 +161,15 @@ func (f *Sessions) RevokeRefreshTokensByUserID(ctx context.Context, userID strin
 
 var _ domain.UserRepository = (*Users)(nil)
 var _ domain.SessionRepository = (*Sessions)(nil)
+
+func (f *Sessions) ActiveTokenCount(userID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	count := 0
+	for _, t := range f.byHash {
+		if t.UserID == userID && t.RevokedAt == nil {
+			count++
+		}
+	}
+	return count
+}

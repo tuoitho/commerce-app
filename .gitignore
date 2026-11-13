@@ -23,3 +23,4 @@ logs/
 Thumbs.db
 .agents
 .agents/
+.claude

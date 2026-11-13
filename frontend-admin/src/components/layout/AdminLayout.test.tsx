@@ -48,6 +48,7 @@ function renderLayout(initialRoute = '/') {
             <Route path="returns" element={<div>Nội dung trả hàng</div>} />
             <Route path="reviews" element={<div>Nội dung đánh giá</div>} />
             <Route path="categories" element={<div>Nội dung danh mục</div>} />
+            <Route path="users" element={<div>Nội dung người dùng</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -181,5 +182,15 @@ describe('AdminLayout responsive behavior', () => {
     expect(screen.queryByRole('dialog', { name: 'Menu điều hướng' })).not.toBeInTheDocument()
     expect(menuButton).toHaveAttribute('aria-expanded', 'false')
     expect(document.activeElement).toBe(menuButton)
+  })
+
+  it('links the users entry to /users and marks it active there', () => {
+    renderLayout('/users')
+
+    const sidebar = screen.getAllByRole('link', { name: 'Người dùng' })[0]
+    expect(sidebar).toHaveAttribute('href', '/users')
+    expect(sidebar.className).toContain('bg-blue-50')
+    expect(sidebar).not.toHaveAttribute('title', 'Sắp ra mắt')
+    expect(screen.getByText('Cài đặt').closest('div')).toHaveAttribute('title', 'Sắp ra mắt')
   })
 })

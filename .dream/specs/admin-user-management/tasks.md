@@ -1,0 +1,138 @@
+# Kế hoạch thực hiện (Implementation Plan)
+
+- [x] 1. Backend: trạng thái tài khoản và API quản trị người dùng
+
+- [x] 1.1 Trạng thái tài khoản và chặn đăng nhập / gia hạn phiên của tài khoản bị khóa
+  - **Produces:**
+    - Migration `backend/db/migrations/000020_add_user_status.up.sql` / `.down.sql` đúng DB-USER-STATUS@1; code sqlc sinh lại (`make gen`).
+    - `domain.User` thêm `Status`, `LockedAt`, `LockReason`; hằng `UserStatusActive`, `UserStatusLocked`; lỗi `ErrAccountLocked` và ánh xạ 403 `account_locked` trong `writeError`.
+    - `auth.UseCase.Login` / `Refresh` theo API-AUTH-LOCKED@1.
+  - **Scope:**
+    - Viết migration, chạy `make db-up` và `make gen`.
+    - Mở rộng `CreateUser`, `GetUserByEmail`, `GetUserByID` (`db/queries/users.sql`) và `GetRefreshTokenByHash` (`db/queries/refresh_tokens.sql`) để trả trạng thái; cập nhật ánh xạ trong `UserRepository` và `SessionRepository`.
+    - `Login`: mật khẩu đúng và tài khoản `locked` → `ErrAccountLocked`, không tạo refresh token. Mật khẩu sai giữ `ErrInvalidCredentials`.
+    - `validRefreshToken`: tài khoản `locked` → `ErrInvalidToken` (refresh bị từ chối, logout vẫn trả thành công như hiện tại).
+    - `fakerepos.Users` tạo user với `Status = active`; thêm cách đặt trạng thái cho test.
+    - `UserPublic` và hình dạng phản hồi thành công của `/auth/*` không đổi.
+  - **Consumes:** bảng `users`, `refresh_tokens` hiện có; `writeError` hiện có.
+  - **Contracts:** DB-USER-STATUS@1 (provider); API-AUTH-LOCKED@1 (provider)
+  - **Acceptance:**
+    - Sau migration, mọi tài khoản hiện có là `active` với `locked_at`, `lock_reason` là `NULL`; tài khoản tạo mới (đăng ký, bootstrap) là `active`.
+    - Constraint từ chối `status` ngoài `active`/`locked`, `locked` không có `locked_at`, `active` có `locked_at` hoặc `lock_reason`, `lock_reason` dài hơn 500 ký tự.
+    - Đăng nhập tài khoản bị khóa đúng mật khẩu trả 403 `account_locked` với thông điệp tiếng Việt đã duyệt và không đặt cookie refresh; sai mật khẩu trả 401 `invalid_credentials`.
+    - Refresh với token chưa thu hồi của tài khoản bị khóa trả 401 `invalid_token`.
+    - Test xác thực hiện có vẫn pass; `down` migration chạy được.
+  - **Verification:** `unit` (`internal/usecase/auth`), `handler` (`auth_handler_test.go`, ghi snapshot `login_account_locked_403` vào `.dream/specs/admin-user-management/contract-snapshots.json`), `integration-db` (`internal/repository/user_admin_repository_integration_test.go` phần mặc định trạng thái, constraint và cột trạng thái trả về từ query xác thực).
+  - _Requirements: 5.5, 5.6, 6.3, 7.1, 7.2, 7.3, 7.4, 8.5_
+
+- [x] 1.2 API danh sách và chi tiết người dùng quản trị
+  - **Produces:**
+    - `backend/db/queries/user_admin.sql` (danh sách, đếm tổng, chi tiết tài khoản, tóm tắt đơn, 5 đơn gần nhất) cùng code sqlc.
+    - `domain.UserAdminRepository` và các kiểu dữ liệu liên quan; `ErrUserNotFound` → 404 `user_not_found`.
+    - `backend/internal/repository/user_admin_repository.go`.
+    - Use case `backend/internal/usecase/usermgmt` (phần đọc).
+    - Handler `backend/internal/delivery/http/admin_user_handler.go` với `GET /api/v1/admin/users` và `GET /api/v1/admin/users/:id`; trường `UserMgmt` trong `Dependencies` của router.
+    - Provider `provideUserAdminRepository`, `provideUserMgmtUseCase` trong `backend/cmd/server`, `wire_gen.go` sinh lại.
+  - **Scope:**
+    - Query theo TD-5 (tìm `strpos` trên `lower(email::text)`), TD-6 (đếm đơn cho từng dòng), sắp xếp `created_at DESC, id DESC`, `LIMIT/OFFSET`.
+    - Tóm tắt đơn: "đơn đã giao" = `delivered`, `partially_returned`, `returned`; `deliveredTotalVnd` là chuỗi số nguyên, `"0"` khi không có.
+    - Use case kiểm tra `search` (bỏ khoảng trắng, ≤ 100 ký tự), `role`, `status`; id không phải uuid → `ErrUserNotFound`.
+    - Handler phân tích `page`/`limit` theo quy tắc của `AdminOrderHandler.List`, áp thứ tự lỗi `validation_error` trước `invalid_filter` như API-ADMIN-USERS@1, ánh xạ JSON camelCase qua `writePaginatedSuccess` / `writeSuccess` / `writeError`.
+  - **Consumes:** DB-USER-STATUS@1 (task 1.1); bảng `orders` và index `orders_user_id_created_at_idx`, `orders_user_id_status_idx` hiện có; middleware `guard.AuthRequired` + `guard.RequireAdmin()`.
+  - **Contracts:** API-ADMIN-USERS@1 (provider: list, detail); DB-USER-STATUS@1 (consumer)
+  - **Acceptance:**
+    - 401 không token, 403 tài khoản customer cho cả hai route.
+    - Danh sách lọc đúng theo từ khóa (không phân biệt hoa thường; `%`, `_` theo nghĩa đen), vai trò, trạng thái và kết hợp; thứ tự ổn định; `orderCount` đúng; `meta.pagination` đúng; `page` vượt số trang trả `[]` với tổng đúng.
+    - `page=0`, `limit=101`, `search` 101 ký tự trả 400 `validation_error` với `fields` tương ứng; `role=x` / `status=x` trả 400 `invalid_filter`.
+    - Chi tiết đủ trường của `AdminUserDetail`; tài khoản chưa có đơn trả `0`, `"0"`, `null`, `[]`; tối đa 5 đơn gần nhất đúng thứ tự.
+    - Id không tồn tại và id sai định dạng đều trả 404 `user_not_found` với thông điệp tiếng Việt.
+    - Với 10.000 tài khoản và 50.000 đơn, mỗi lần lấy danh sách (không lọc, có từ khóa, có bộ lọc) và lấy chi tiết dưới 1 giây.
+  - **Verification:** `unit` (`internal/usecase/usermgmt`), `integration-db` (`user_admin_repository_integration_test.go`, gồm test hiệu năng), `handler` (`admin_user_handler_test.go` ghi snapshot `list_users_200`, `get_user_200`, `user_not_found_404`, `invalid_filter_400`, `validation_error_400`, `unauthenticated_401`, `forbidden_403`).
+  - _Requirements: 1.3, 2.1, 2.2, 2.3, 2.7, 3.1, 3.2, 3.3, 3.4, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 7.5, 8.1, 8.5_
+
+- [x] 1.3 API khóa và mở khóa tài khoản
+  - **Produces:** `POST /api/v1/admin/users/:id/lock` và `POST /api/v1/admin/users/:id/unlock` trong `admin_user_handler.go`; phương thức khóa / mở khóa của `UserAdminRepository` và `usermgmt.UseCase`; lỗi `ErrCannotLockAdmin`, `ErrUserAlreadyLocked`, `ErrUserNotLocked` và ánh xạ 409 trong `writeError`.
+  - **Scope:**
+    - Repository khóa trong một transaction theo TD-3: cập nhật có điều kiện `role = 'customer' AND status = 'active'`, ghi `locked_at = now()`, `lock_reason`, `updated_at`, rồi gọi `RevokeRefreshTokensByUserID` trong cùng transaction. Mở khóa trong một transaction: cập nhật có điều kiện `status = 'locked'`, rồi gọi `RevokeRefreshTokensByUserID` (TD-4).
+    - Use case kiểm tra `reason` (bỏ khoảng trắng, rỗng → `nil`, ≤ 500 ký tự Unicode) trước; khi không cập nhật được dòng nào, đọc lại tài khoản và phân loại lỗi theo thứ tự trong API-ADMIN-USERS@1; thành công trả `AdminUserDetail` mới.
+    - Handler đọc body tùy chọn (`{}` hoặc trống hợp lệ; JSON sai → `fields.body`), ghi log `info` `admin user locked` / `admin user unlocked` với `admin_id`, `user_id`; không log email, lý do, token.
+  - **Consumes:** phần đọc của task 1.2 (chi tiết tài khoản); `RevokeRefreshTokensByUserID` hiện có; DB-USER-STATUS@1.
+  - **Contracts:** API-ADMIN-USERS@1 (provider: lock, unlock); DB-USER-STATUS@1 (consumer)
+  - **Acceptance:**
+    - Khóa customer `active` trả 200 với `status = "locked"`, `lockedAt`, `lockReason` đã bỏ khoảng trắng (hoặc `null`); mọi refresh token của tài khoản có `revoked_at`; dữ liệu đơn hàng và bảng khác không đổi.
+    - Khóa admin trả 409 `cannot_lock_admin`; khóa tài khoản đã khóa trả 409 `user_already_locked` và giữ nguyên `locked_at`, `lock_reason`; không tồn tại trả 404.
+    - `reason` 501 ký tự trả 400 `fields.reason`; JSON sai trả 400 `fields.body`; không thay đổi dữ liệu.
+    - Mở khóa trả 200 với `status = "active"`, `lockedAt = null`, `lockReason = null`; mọi refresh token của tài khoản (kể cả token tạo sau thời điểm khóa) có `revoked_at`; mở khóa tài khoản `active` (kể cả admin) trả 409 `user_not_locked`; không tồn tại trả 404.
+    - Sau khi mở khóa, đăng nhập đúng mật khẩu thành công.
+    - 401 / 403 cho cả hai route.
+    - Log `info` có `admin_id` và `user_id`, không có email hay lý do.
+  - **Verification:** `unit` (`internal/usecase/usermgmt`), `integration-db` (`user_admin_repository_integration_test.go`), `handler` (`admin_user_handler_test.go` ghi snapshot `lock_user_200`, `unlock_user_200`, `cannot_lock_admin_409`, `user_already_locked_409`, `user_not_locked_409`, `lock_reason_validation_400`).
+  - _Requirements: 1.3, 5.2, 5.4, 5.7, 5.8, 5.9, 5.10, 5.11, 6.2, 6.3, 6.4, 6.5, 8.5, 8.6_
+
+- [x] 2. Frontend: ứng dụng quản trị và trang đăng nhập
+
+- [x] 2.1 Trang danh sách người dùng và điều hướng
+  - **Produces:** `frontend-admin/src/api/users.ts` (kiểu, nhãn và bốn hàm API), `frontend-admin/src/pages/UsersPage.tsx`, route `users` trong `App.tsx`, mục "Người dùng" dùng được trong `AdminLayout.tsx`.
+  - **Scope:**
+    - Module API theo API-ADMIN-USERS@1, qua `client.ts`.
+    - Thêm `formatVietnamDate` (`dd/MM/yyyy`, cố định `Asia/Ho_Chi_Minh`) vào `src/components/dashboard/formatters.ts` kèm test.
+    - `UsersPage` theo mục Frontend-admin của `design.md`: form tìm kiếm (`maxLength=100`, Enter / "Tìm"), bộ lọc vai trò / trạng thái, bảng (email, vai trò, trạng thái, số đơn, ngày tạo `dd/MM/yyyy` qua `formatVietnamDate`), phân trang 20 dòng, đồng bộ URL, trạng thái đang tải / lỗi kèm "Thử lại" / rỗng, link email kèm `state.from`, bảng trong vùng `overflow-x-auto`.
+    - Dùng `@tanstack/react-query` với key `['admin-users', search, role, status, page]`.
+  - **Consumes:** API-ADMIN-USERS@1 (list); `client.ts`, `Select`, `Table`, `Badge`, `Button`, `Input` hiện có; `src/components/dashboard/formatters.ts`; `ProtectedRoute`.
+  - **Contracts:** API-ADMIN-USERS@1 (consumer)
+  - **Acceptance:**
+    - Mục "Người dùng" là link tới `/users`, được đánh dấu khi đang ở `/users`, không còn "Sắp ra mắt"; "Cài đặt" vẫn bị vô hiệu.
+    - Ngày tạo hiển thị theo giờ Việt Nam (`2026-11-01T17:30:00Z` hiển thị `02/11/2026`) bất kể múi giờ của môi trường chạy.
+    - Bảng hiển thị đúng cột và nhãn tiếng Việt; tổng số, trang hiện tại / tổng trang; "Trước" vô hiệu ở trang 1, "Sau" vô hiệu ở trang cuối.
+    - Đổi từ khóa hoặc bộ lọc về trang 1 và ghi URL; mở URL có tham số khôi phục đúng; giá trị sai dùng mặc định.
+    - Rỗng hiển thị "Không tìm thấy người dùng phù hợp"; lỗi hiển thị "Không thể tải danh sách người dùng" + "Thử lại" và không hiển thị thông báo rỗng.
+    - Chọn email mở `/users/:id` với `state.from` là query hiện tại.
+    - Mọi điều khiển có nhãn truy cập được.
+  - **Verification:** `component` (`src/api/users.test.ts`, `src/pages/UsersPage.test.tsx`, test của `formatters.ts`, `src/components/layout/AdminLayout.test.tsx`, `src/test/App.test.tsx` nếu cần cho route). Chạy `npm test`, `npm run lint`, `npm run build` trong `frontend-admin/`.
+  - _Requirements: 1.1, 1.2, 2.1, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.7, 8.3, 8.5_
+
+- [x] 2.2 Trang chi tiết người dùng với khóa và mở khóa
+  - **Produces:** `frontend-admin/src/pages/UserDetailPage.tsx`, route `users/:id` trong `App.tsx`.
+  - **Scope:**
+    - Thông tin tài khoản, tóm tắt mua hàng, tối đa 5 đơn gần nhất (link `/orders/:orderId`, `ORDER_STATUS_LABELS`, `formatVND`, `formatVietnamDateTime` cho mọi thời điểm `HH:mm dd/MM/yyyy`), "Không có lý do", "Chưa có đơn hàng", "Tài khoản chưa có đơn hàng".
+    - Mở rộng `AlertDialogContent` trong `src/components/ui/alert-dialog.tsx` theo mục "Focus của hộp thoại" của `design.md` (focus khi mở, trả focus khi đóng), kèm test trong `alert-dialog.test.tsx`; test hiện có của các trang dùng `AlertDialog` vẫn pass.
+    - "Quay lại danh sách" về `/users` + `state.from` khi có.
+    - Trạng thái 404 (`user_not_found`) kèm liên kết về danh sách; lỗi khác kèm "Thử lại".
+    - Nút và hộp thoại khóa / mở khóa (dùng `AlertDialog`, `Textarea` có nhãn "Lý do khóa", `maxLength=500`) với hành vi mutation như mục Frontend-admin của `design.md`: cập nhật cache chi tiết, invalidate danh sách, thông báo `role="status"`, lỗi 409 hiển thị `role="alert"` và `refetch`, lỗi `fields.reason` tại ô, nút xác nhận vô hiệu khi đang gửi.
+  - **Consumes:** API-ADMIN-USERS@1 (detail, lock, unlock) qua `src/api/users.ts` của task 2.1; `AlertDialog`, `Textarea`, `Badge`, `Card`, `formatVietnamDateTime` hiện có.
+  - **Contracts:** API-ADMIN-USERS@1 (consumer)
+  - **Acceptance:**
+    - Hiển thị đúng thông tin, thời điểm khóa và lý do (hoặc "Không có lý do") với tài khoản bị khóa.
+    - Nút "Khóa tài khoản" chỉ hiện với customer `active`; "Mở khóa tài khoản" chỉ hiện khi `locked`; admin không có nút khóa.
+    - "Hủy" / đóng hộp thoại không gọi API; xác nhận gửi lý do đã nhập; nút xác nhận vô hiệu khi đang gửi.
+    - Thành công hiển thị "Đã khóa tài khoản" / "Đã mở khóa tài khoản" và trạng thái mới không cần tải lại trình duyệt; danh sách được làm mới.
+    - 409 hiển thị thông điệp API và tải lại chi tiết; 400 `fields.reason` hiển thị tại ô lý do.
+    - Hộp thoại nhận focus khi mở và trả focus về nút đã mở khi đóng.
+    - "Quay lại danh sách" về đúng URL có bộ lọc khi đến từ danh sách, về `/users` khi mở trực tiếp.
+  - **Verification:** `component` (`src/pages/UserDetailPage.test.tsx`, `src/components/ui/alert-dialog.test.tsx`). Chạy `npm test`, `npm run lint`, `npm run build` trong `frontend-admin/`.
+  - _Requirements: 1.2, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.8, 5.9, 5.10, 6.1, 6.2, 6.4, 8.3, 8.4, 8.5_
+
+- [x] 2.3 Thông điệp tài khoản bị khóa trên trang đăng nhập
+  - **Produces:** test component cho `account_locked` trong `frontend/src/pages/LoginPage.test.tsx` và `frontend-admin/src/pages/LoginPage.test.tsx`; chỉ sửa `LoginPage` nếu test chứng minh thông điệp không hiển thị.
+  - **Scope:** mock lời gọi đăng nhập trả `ApiError` 403 `account_locked` với thông điệp đã duyệt; assert thông điệp hiển thị và không điều hướng.
+  - **Consumes:** API-AUTH-LOCKED@1; `LoginPage` hiện có của hai ứng dụng.
+  - **Contracts:** API-AUTH-LOCKED@1 (consumer)
+  - **Acceptance:** cả hai trang đăng nhập hiển thị "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ." và giữ người dùng ở trang đăng nhập; test hiện có vẫn pass.
+  - **Verification:** `component`. Chạy `npm test` trong `frontend/` và `frontend-admin/`.
+  - _Requirements: 5.5_
+
+- [x] 3. Xác minh End-to-End (Mode 2)
+
+- [x] 3.1 E2E Mode 2 cho bố cục responsive của trang quản lý người dùng
+  - **Produces:** suite `frontend/e2e/admin-user-management.spec.ts` (Page Object dưới `frontend/e2e/pages/` nếu cần), ảnh tại `.dream/specs/admin-user-management/imgs/`, báo cáo `.dream/specs/admin-user-management/report.md`.
+  - **Scope:**
+    - Load skill `e2e-testing` và thực thi đúng **`Mode 2: Shape-Locked Mock E2E`** đã phê duyệt trong `design.md`; không tự chuyển sang Mode 1.
+    - Dùng `frontend/playwright.config.ts` hiện có (dev server admin `:15174`).
+    - Khai báo mọi route `/api/v1` trong một lần gọi `mountContractRoutes`, nạp `.dream/specs/admin-user-management/contract-snapshots.json` (ghi bởi task 1.2, 1.3) cho các route người dùng; phiên đăng nhập admin và các API của layout là `StubRoute` trong cùng lần gọi.
+    - Chụp trang danh sách và trang chi tiết ở `1440x900` và `375x812`; assert `scrollWidth <= clientWidth` ở `375x812`.
+    - Nếu phát hiện lỗi tích hợp trong phạm vi spec, sửa nguyên nhân gốc, chạy lại test bị ảnh hưởng cùng suite E2E, cập nhật `imgs/` và `report.md`. Nếu contract đã duyệt sai hoặc thiếu, dừng lại và dùng `managing-contract-changes`.
+  - **Consumes:** snapshot API-ADMIN-USERS@1 từ task 1.2, 1.3; `UsersPage` (2.1), `UserDetailPage` (2.2).
+  - **Contracts:** API-ADMIN-USERS@1 (verifier)
+  - **Acceptance:** không có cuộn ngang cấp trang ở `375x812` trên cả hai trang; ảnh không cắt nội dung; `report.md` liệt kê tiêu chí kèm kết quả và ảnh.
+  - **Verification:** `visual`: từ `frontend/` chạy `npx playwright test e2e/admin-user-management.spec.ts`.
+  - _Requirements: 8.2_

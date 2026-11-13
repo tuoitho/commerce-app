@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/repository/sqlc"
@@ -35,14 +37,7 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash, role s
 		}
 		return nil, err
 	}
-	return &domain.User{
-		ID:           u.ID,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-		UpdatedAt:    u.UpdatedAt,
-	}, nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -53,14 +48,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		}
 		return nil, err
 	}
-	return &domain.User{
-		ID:           u.ID,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-		UpdatedAt:    u.UpdatedAt,
-	}, nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, error) {
@@ -71,16 +59,30 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, 
 		}
 		return nil, err
 	}
-	return &domain.User{
-		ID:           u.ID,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-		UpdatedAt:    u.UpdatedAt,
-	}, nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) CountByRole(ctx context.Context, role string) (int64, error) {
 	return r.q.CountUsersByRole(ctx, role)
+}
+
+func toDomainUser(id, email, passwordHash, role, status string, lockedAt pgtype.Timestamptz, lockReason pgtype.Text, createdAt, updatedAt time.Time) *domain.User {
+	user := &domain.User{
+		ID:           id,
+		Email:        email,
+		PasswordHash: passwordHash,
+		Role:         role,
+		Status:       status,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+	}
+	if lockedAt.Valid {
+		t := lockedAt.Time
+		user.LockedAt = &t
+	}
+	if lockReason.Valid {
+		r := lockReason.String
+		user.LockReason = &r
+	}
+	return user
 }

@@ -326,6 +326,9 @@ type User struct {
 	UpdatedAt    time.Time
 	Role         string
 	LastActiveAt pgtype.Timestamptz
+	Status       string
+	LockedAt     pgtype.Timestamptz
+	LockReason   pgtype.Text
 }
 
 type VariantOptionValue struct {

@@ -92,6 +92,9 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (*Session,
 	if !uc.checkPassword(password, user.PasswordHash) {
 		return nil, domain.ErrInvalidCredentials
 	}
+	if user.IsLocked() {
+		return nil, domain.ErrAccountLocked
+	}
 	return uc.issueSession(ctx, user)
 }
 
@@ -141,7 +144,7 @@ func (uc *UseCase) validRefreshToken(ctx context.Context, refreshToken string) (
 		}
 		return nil, nil, err
 	}
-	if token.RevokedAt != nil || token.ExpiresAt.Before(time.Now()) {
+	if token.RevokedAt != nil || token.ExpiresAt.Before(time.Now()) || user.IsLocked() {
 		return nil, nil, domain.ErrInvalidToken
 	}
 	return token, user, nil

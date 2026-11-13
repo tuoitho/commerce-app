@@ -10,6 +10,7 @@ var (
 	ErrEmailInUse          = errors.New("email already in use")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrInvalidToken        = errors.New("invalid token")
+	ErrAccountLocked       = errors.New("account locked")
 	ErrForbidden           = errors.New("forbidden")
 	ErrNotFound            = errors.New("not found")
 	ErrProductNotFound     = errors.New("product not found")
@@ -50,6 +51,10 @@ var (
 	ErrPostCommentNotFound     = errors.New("post comment not found")
 	ErrPostMediaNotFound       = errors.New("post media not found")
 	ErrNotificationNotFound    = errors.New("notification not found")
+	ErrUserNotFound            = errors.New("user not found")
+	ErrCannotLockAdmin         = errors.New("cannot lock admin")
+	ErrUserAlreadyLocked       = errors.New("user already locked")
+	ErrUserNotLocked           = errors.New("user not locked")
 )
 
 type ValidationError struct {

@@ -19,6 +19,7 @@ import (
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
+	usermgmtuc "commerce-backend/internal/usecase/usermgmt"
 )
 
 type Dependencies struct {
@@ -32,6 +33,7 @@ type Dependencies struct {
 	Review       *reviewuc.ReviewUseCase
 	Favorite     *favoriteuc.UseCase
 	Dashboard    *dashboarduc.UseCase
+	UserMgmt     *usermgmtuc.UseCase
 	Chat         domain.ChatUseCase
 	Post         domain.PostUseCase
 	WSHub        *ws.Hub
@@ -202,6 +204,16 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		if deps.Dashboard != nil {
 			adminDashboardHandler := newAdminDashboardHandler(deps.Dashboard, deps.Logger)
 			admin.GET("/dashboard", adminDashboardHandler.GetDashboard)
+		}
+		if deps.UserMgmt != nil {
+			adminUserHandler := newAdminUserHandler(deps.UserMgmt, deps.Logger)
+			adminUsers := admin.Group("/users")
+			{
+				adminUsers.GET("", adminUserHandler.List)
+				adminUsers.GET("/:id", adminUserHandler.Get)
+				adminUsers.POST("/:id/lock", adminUserHandler.Lock)
+				adminUsers.POST("/:id/unlock", adminUserHandler.Unlock)
+			}
 		}
 
 		adminCategories := admin.Group("/categories")

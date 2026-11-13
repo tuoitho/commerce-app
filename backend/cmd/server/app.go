@@ -27,6 +27,7 @@ import (
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
 	dashboarduc "commerce-backend/internal/usecase/dashboard"
+	usermgmtuc "commerce-backend/internal/usecase/usermgmt"
 	"commerce-backend/internal/delivery/ws"
 	"commerce-backend/internal/storage/chatmedia"
 	"commerce-backend/internal/storage/reviewmedia"
@@ -260,6 +261,14 @@ func provideDashboardUseCase(repo *repository.DashboardRepository) *dashboarduc.
 	})
 }
 
+func provideUserAdminRepository(pool *pgxpool.Pool) *repository.UserAdminRepository {
+	return repository.NewUserAdminRepository(pool)
+}
+
+func provideUserMgmtUseCase(repo *repository.UserAdminRepository) *usermgmtuc.UseCase {
+	return usermgmtuc.New(usermgmtuc.Dependencies{Repo: repo})
+}
+
 func provideGinRouter(
 	cfg *config.Config,
 	log *slog.Logger,
@@ -275,6 +284,7 @@ func provideGinRouter(
 	chatUC *chatuc.UseCase,
 	postUC *postuc.UseCase,
 	dashboardUC *dashboarduc.UseCase,
+	userMgmtUC *usermgmtuc.UseCase,
 	wsHub *ws.Hub,
 	jwtMgr *jwt.Manager,
 ) *gin.Engine {
@@ -294,6 +304,7 @@ func provideGinRouter(
 		Review:       reviewUC,
 		Favorite:     favoriteUC,
 		Dashboard:    dashboardUC,
+		UserMgmt:     userMgmtUC,
 		Chat:         chatUC,
 		Post:         postUC,
 		WSHub:        wsHub,

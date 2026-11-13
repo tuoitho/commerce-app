@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItemConfig[] = [
   { to: '/returns', icon: RotateCcw, label: 'Trả hàng' },
   { to: '/reviews', icon: Star, label: 'Đánh giá' },
   { to: '/categories', icon: FolderTree, label: 'Danh mục' },
-  { icon: Users, label: 'Người dùng', disabled: true, title: 'Sắp ra mắt' },
+  { to: '/users', icon: Users, label: 'Người dùng' },
   { icon: Settings, label: 'Cài đặt', disabled: true, title: 'Sắp ra mắt' },
 ]
 

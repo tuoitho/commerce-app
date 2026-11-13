@@ -125,7 +125,17 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil dashboard usecase")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, dashboardUC, wsHub, jwtMgr)
+	userAdminRepo := provideUserAdminRepository(nil)
+	if userAdminRepo == nil {
+		t.Fatal("expected non-nil user admin repository")
+	}
+
+	userMgmtUC := provideUserMgmtUseCase(userAdminRepo)
+	if userMgmtUC == nil {
+		t.Fatal("expected non-nil user management usecase")
+	}
+
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, dashboardUC, userMgmtUC, wsHub, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

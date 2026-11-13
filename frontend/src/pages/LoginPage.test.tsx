@@ -145,4 +145,35 @@ describe('LoginPage', () => {
       expect(screen.getByText('Email hoặc mật khẩu không chính xác.')).toBeInTheDocument()
     })
   })
+
+  it('displays the locked account message on 403 account_locked and stays on the login page', async () => {
+    mockLogin.mockRejectedValueOnce(
+      new ApiError(403, {
+        code: 'account_locked',
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.',
+      })
+    )
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('name@example.com'), {
+      target: { value: 'locked@auraphone.vn' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+      target: { value: 'Password123' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Đăng nhập/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /Đăng nhập/i })).toBeInTheDocument()
+  })
 })

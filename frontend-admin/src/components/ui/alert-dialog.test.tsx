@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import {
@@ -73,5 +74,48 @@ describe('AlertDialog', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  function FocusHarness({ withAutoFocus = false }: { withAutoFocus?: boolean }) {
+    const [open, setOpen] = useState(false)
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Mở hộp thoại
+        </button>
+        <AlertDialog open={open} onOpenChange={setOpen}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Tiêu đề</AlertDialogTitle>
+            {withAutoFocus && <input aria-label="Ô nhập" autoFocus />}
+            <AlertDialogFooter>
+              <AlertDialogCancel>Hủy</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    )
+  }
+
+  it('moves focus into the dialog on open and back to the trigger on close', () => {
+    render(<FocusHarness />)
+    const trigger = screen.getByRole('button', { name: 'Mở hộp thoại' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('alertdialog').contains(document.activeElement)).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }))
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('keeps focus on an autoFocus element inside the dialog', () => {
+    render(<FocusHarness withAutoFocus />)
+    const trigger = screen.getByRole('button', { name: 'Mở hộp thoại' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    expect(document.activeElement).toBe(screen.getByLabelText('Ô nhập'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.activeElement).toBe(trigger)
   })
 })

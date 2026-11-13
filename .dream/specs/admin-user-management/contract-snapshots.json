@@ -1,0 +1,355 @@
+{
+  "feature": "admin-user-management",
+  "snapshots": {
+    "cannot_lock_admin_409": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/lock",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "cannot_lock_admin",
+          "message": "Không thể khóa tài khoản quản trị viên"
+        },
+        "message": "Không thể khóa tài khoản quản trị viên",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3110157Z"
+        },
+        "success": false
+      }
+    },
+    "forbidden_403": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users",
+      "status": 403,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "forbidden",
+          "message": "Bạn không có quyền thực hiện thao tác này"
+        },
+        "message": "Bạn không có quyền thực hiện thao tác này",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.8666422Z"
+        },
+        "success": false
+      }
+    },
+    "get_user_200": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-11-01T02:03:04Z",
+          "email": "khach@example.com",
+          "id": "7b0c6c0e-8a5e-4c1b-9a3e-1f2d3c4b5a69",
+          "lockReason": "Spam đánh giá",
+          "lockedAt": "2026-11-12T08:00:00Z",
+          "orderSummary": {
+            "deliveredOrders": 1,
+            "deliveredTotalVnd": "25990000",
+            "lastOrderAt": "2026-11-10T05:00:00Z",
+            "totalOrders": 3
+          },
+          "recentOrders": [
+            {
+              "createdAt": "2026-11-10T05:00:00Z",
+              "id": "a1b2c3d4-0000-4000-8000-000000000003",
+              "status": "delivered",
+              "totalVnd": "25990000"
+            },
+            {
+              "createdAt": "2026-11-05T05:00:00Z",
+              "id": "a1b2c3d4-0000-4000-8000-000000000002",
+              "status": "cancelled",
+              "totalVnd": "990000"
+            }
+          ],
+          "role": "customer",
+          "status": "locked"
+        },
+        "error": null,
+        "message": "User retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.9049188Z"
+        },
+        "success": true
+      }
+    },
+    "invalid_filter_400": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_filter",
+          "fields": {
+            "role": "Giá trị lọc không hợp lệ",
+            "status": "Giá trị lọc không hợp lệ"
+          },
+          "message": "Tiêu chí lọc sản phẩm không hợp lệ"
+        },
+        "message": "Tiêu chí lọc sản phẩm không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.8952941Z"
+        },
+        "success": false
+      }
+    },
+    "list_users_200": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "createdAt": "2026-11-01T02:03:04Z",
+            "email": "khach@example.com",
+            "id": "7b0c6c0e-8a5e-4c1b-9a3e-1f2d3c4b5a69",
+            "orderCount": 3,
+            "role": "customer",
+            "status": "locked"
+          },
+          {
+            "createdAt": "2026-10-01T00:00:00Z",
+            "email": "quan.tri@example.com",
+            "id": "0f1e2d3c-4b5a-4968-8776-655443322110",
+            "orderCount": 0,
+            "role": "admin",
+            "status": "active"
+          }
+        ],
+        "error": null,
+        "message": "Users retrieved successfully",
+        "meta": {
+          "pagination": {
+            "hasNext": true,
+            "hasPrev": true,
+            "limit": 20,
+            "page": 2,
+            "total": 41,
+            "totalPages": 3
+          },
+          "timestamp": "2026-11-12T19:24:54.8771279Z"
+        },
+        "success": true
+      }
+    },
+    "lock_reason_validation_400": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/lock",
+      "status": 400,
+      "requestBody": {
+        "reason": "\u003c501 characters\u003e"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "reason": "Lý do khóa tối đa 500 ký tự"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3034085Z"
+        },
+        "success": false
+      }
+    },
+    "lock_user_200": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/lock",
+      "status": 200,
+      "requestBody": {
+        "reason": "  Spam đánh giá  "
+      },
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-09-01T00:00:00Z",
+          "email": "active.customer@example.com",
+          "id": "22222222-3333-4444-8555-666666666666",
+          "lockReason": "Spam đánh giá",
+          "lockedAt": "2026-11-13T01:00:00Z",
+          "orderSummary": {
+            "deliveredOrders": 0,
+            "deliveredTotalVnd": "0",
+            "lastOrderAt": "2026-11-11T03:00:00Z",
+            "totalOrders": 1
+          },
+          "recentOrders": [
+            {
+              "createdAt": "2026-11-11T03:00:00Z",
+              "id": "a1b2c3d4-0000-4000-8000-000000000009",
+              "status": "pending_confirmation",
+              "totalVnd": "1500000"
+            }
+          ],
+          "role": "customer",
+          "status": "locked"
+        },
+        "error": null,
+        "message": "User locked successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3007412Z"
+        },
+        "success": true
+      }
+    },
+    "login_account_locked_403": {
+      "contractId": "API-AUTH-LOCKED@1",
+      "endpoint": "POST /api/v1/auth/login",
+      "status": 403,
+      "requestBody": {
+        "email": "locked@example.com",
+        "password": "\u003credacted\u003e"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "account_locked",
+          "message": "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ."
+        },
+        "message": "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.",
+        "meta": {
+          "timestamp": "2026-11-12T19:21:02.2240472Z"
+        },
+        "success": false
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.865541Z"
+        },
+        "success": false
+      }
+    },
+    "unlock_user_200": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/unlock",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-11-01T02:03:04Z",
+          "email": "khach@example.com",
+          "id": "7b0c6c0e-8a5e-4c1b-9a3e-1f2d3c4b5a69",
+          "lockReason": null,
+          "lockedAt": null,
+          "orderSummary": {
+            "deliveredOrders": 1,
+            "deliveredTotalVnd": "25990000",
+            "lastOrderAt": "2026-11-10T05:00:00Z",
+            "totalOrders": 3
+          },
+          "recentOrders": [
+            {
+              "createdAt": "2026-11-10T05:00:00Z",
+              "id": "a1b2c3d4-0000-4000-8000-000000000003",
+              "status": "delivered",
+              "totalVnd": "25990000"
+            },
+            {
+              "createdAt": "2026-11-05T05:00:00Z",
+              "id": "a1b2c3d4-0000-4000-8000-000000000002",
+              "status": "cancelled",
+              "totalVnd": "990000"
+            }
+          ],
+          "role": "customer",
+          "status": "active"
+        },
+        "error": null,
+        "message": "User unlocked successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3271252Z"
+        },
+        "success": true
+      }
+    },
+    "user_already_locked_409": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/lock",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "user_already_locked",
+          "message": "Tài khoản đã bị khóa trước đó"
+        },
+        "message": "Tài khoản đã bị khóa trước đó",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3189853Z"
+        },
+        "success": false
+      }
+    },
+    "user_not_found_404": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "user_not_found",
+          "message": "Không tìm thấy người dùng"
+        },
+        "message": "Không tìm thấy người dùng",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.9142666Z"
+        },
+        "success": false
+      }
+    },
+    "user_not_locked_409": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "POST /api/v1/admin/users/:id/unlock",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "user_not_locked",
+          "message": "Tài khoản không ở trạng thái bị khóa"
+        },
+        "message": "Tài khoản không ở trạng thái bị khóa",
+        "meta": {
+          "timestamp": "2026-11-12T19:30:38.3351981Z"
+        },
+        "success": false
+      }
+    },
+    "validation_error_400": {
+      "contractId": "API-ADMIN-USERS@1",
+      "endpoint": "GET /api/v1/admin/users",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "limit": "must be a positive integer between 1 and 100",
+            "page": "must be a positive integer"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-12T19:24:54.8868501Z"
+        },
+        "success": false
+      }
+    }
+  }
+}

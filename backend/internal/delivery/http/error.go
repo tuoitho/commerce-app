@@ -44,6 +44,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "email_in_use", "Email đã được sử dụng", nil)
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		respondError(c, 401, "invalid_credentials", "Email hoặc mật khẩu không đúng", nil)
+	case errors.Is(err, domain.ErrAccountLocked):
+		respondError(c, 403, "account_locked", "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.", nil)
 	case errors.Is(err, domain.ErrInvalidToken):
 		respondError(c, 401, "invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn", nil)
 	case errors.Is(err, domain.ErrForbidden):
@@ -110,6 +112,14 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 404, "comment_not_found", "Bình luận không tồn tại hoặc đã bị xóa", nil)
 	case errors.Is(err, domain.ErrPostMediaNotFound):
 		respondError(c, 404, "post_media_not_found", "Không tìm thấy tệp đính kèm", nil)
+	case errors.Is(err, domain.ErrUserNotFound):
+		respondError(c, 404, "user_not_found", "Không tìm thấy người dùng", nil)
+	case errors.Is(err, domain.ErrCannotLockAdmin):
+		respondError(c, 409, "cannot_lock_admin", "Không thể khóa tài khoản quản trị viên", nil)
+	case errors.Is(err, domain.ErrUserAlreadyLocked):
+		respondError(c, 409, "user_already_locked", "Tài khoản đã bị khóa trước đó", nil)
+	case errors.Is(err, domain.ErrUserNotLocked):
+		respondError(c, 409, "user_not_locked", "Tài khoản không ở trạng thái bị khóa", nil)
 	case errors.Is(err, domain.ErrNotificationNotFound):
 		respondError(c, 404, "notification_not_found", "Không tìm thấy thông báo", nil)
 	default:

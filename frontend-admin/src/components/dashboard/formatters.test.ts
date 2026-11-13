@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoneyVndExact, formatVietnamDateTime } from './formatters'
+import { formatMoneyVndExact, formatVietnamDate, formatVietnamDateTime } from './formatters'
 
 describe('dashboard formatters', () => {
   describe('formatMoneyVndExact', () => {
@@ -49,5 +49,20 @@ describe('dashboard formatters', () => {
       expect(formatVietnamDateTime(undefined)).toBe('')
       expect(formatVietnamDateTime('invalid-date')).toBe('')
     })
+  })
+})
+
+describe('formatVietnamDate', () => {
+  it('formats a date as dd/MM/yyyy in Vietnam time', () => {
+    expect(formatVietnamDate('2026-11-01T02:03:04Z')).toBe('01/11/2026')
+  })
+
+  it('moves to the next day after 17:00 UTC', () => {
+    expect(formatVietnamDate('2026-11-01T17:30:00Z')).toBe('02/11/2026')
+  })
+
+  it('returns an empty string for missing or invalid input', () => {
+    expect(formatVietnamDate(null)).toBe('')
+    expect(formatVietnamDate('not-a-date')).toBe('')
   })
 })

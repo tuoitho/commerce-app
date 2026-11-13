@@ -16,6 +16,8 @@ import { AdminReturnDetailPage } from '@/pages/AdminReturnDetailPage'
 import { ChatSupportPage } from '@/pages/ChatSupportPage'
 import { AdminPostsPage } from '@/pages/AdminPostsPage'
 import { AdminPostDetailPage } from '@/pages/AdminPostDetailPage'
+import { UsersPage } from '@/pages/UsersPage'
+import { UserDetailPage } from '@/pages/UserDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +52,8 @@ export function AppRoutes() {
 							<Route path="reviews" element={<ReviewsPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="users/:id" element={<UserDetailPage />} />
         <Route path="products/new" element={<ProductFormPage mode="create" />} />
         <Route path="products/:id" element={<ProductFormPage mode="edit" />} />
         <Route path="products/:id/edit" element={<ProductFormPage mode="edit" />} />

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { LoginPage } from './LoginPage'
 import { useAuth } from '@/context/AuthContext'
+import { ApiError } from '@/api/types'
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -117,5 +118,32 @@ describe('LoginPage', () => {
     )
 
     expect(screen.getByText('Trang Chủ Quản Trị')).toBeInTheDocument()
+  })
+
+  it('displays the locked account message on 403 account_locked and stays on the login page', async () => {
+    mockLogin.mockRejectedValueOnce(
+      new ApiError(403, {
+        code: 'account_locked',
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.',
+      })
+    )
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<div>Trang tổng quan</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'locked@auraphone.vn' } })
+    fireEvent.change(screen.getByLabelText(/Mật khẩu/i), { target: { value: 'Password123' } })
+    fireEvent.click(screen.getByRole('button', { name: /Đăng nhập/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ bộ phận hỗ trợ.')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Trang tổng quan')).not.toBeInTheDocument()
   })
 })

@@ -56,3 +56,24 @@ export function formatVietnamDateTime(dateStr: string | Date | null | undefined)
     return ''
   }
 }
+
+const vietnamDateFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+})
+
+/**
+ * Formats an ISO date string or Date object into dd/MM/yyyy in Asia/Ho_Chi_Minh timezone.
+ */
+export function formatVietnamDate(dateStr: string | Date | null | undefined): string {
+  if (!dateStr) return ''
+  const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
+  if (isNaN(d.getTime())) return ''
+  const parts: Record<string, string> = {}
+  for (const part of vietnamDateFormatter.formatToParts(d)) {
+    parts[part.type] = part.value
+  }
+  return `${parts.day}/${parts.month}/${parts.year}`
+}
