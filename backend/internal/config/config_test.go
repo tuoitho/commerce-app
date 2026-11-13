@@ -27,6 +27,11 @@ func clearEnv() func() {
 		"MINIO_SECRET_KEY",
 		"MINIO_BUCKET",
 		"MINIO_USE_SSL",
+		"MEDIAMTX_API_URL",
+		"MEDIAMTX_WEBRTC_PUBLIC_URL",
+		"MEDIAMTX_HLS_PUBLIC_URL",
+		"LIVE_SIGNAL_POLL_INTERVAL",
+		"LIVE_SIGNAL_TIMEOUT",
 	}
 
 	saved := make(map[string]string)
@@ -508,4 +513,92 @@ func TestConfig_MinioCustomSettings(t *testing.T) {
 	}
 }
 
+func setRequiredLiveTestEnv() {
+	os.Setenv("DB_URL", "postgres://localhost:5432/commerce")
+	os.Setenv("JWT_ACCESS_SECRET", "super-secret-key-that-is-at-least-32-chars-long")
+	os.Setenv("MINIO_ENDPOINT", "localhost:19000")
+	os.Setenv("MINIO_ACCESS_KEY", "minioadmin")
+	os.Setenv("MINIO_SECRET_KEY", "miniopassword")
+}
 
+func TestConfig_LiveDefaults(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+	setRequiredLiveTestEnv()
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MediaMTXAPIURL != "http://127.0.0.1:9997" {
+		t.Errorf("MediaMTXAPIURL = %q", cfg.MediaMTXAPIURL)
+	}
+	if cfg.MediaMTXWebRTCPublicURL != "http://localhost:8889" {
+		t.Errorf("MediaMTXWebRTCPublicURL = %q", cfg.MediaMTXWebRTCPublicURL)
+	}
+	if cfg.MediaMTXHLSPublicURL != "http://localhost:8888" {
+		t.Errorf("MediaMTXHLSPublicURL = %q", cfg.MediaMTXHLSPublicURL)
+	}
+	if cfg.LiveSignalPollInterval != 5*time.Second {
+		t.Errorf("LiveSignalPollInterval = %v", cfg.LiveSignalPollInterval)
+	}
+	if cfg.LiveSignalTimeout != 10*time.Minute {
+		t.Errorf("LiveSignalTimeout = %v", cfg.LiveSignalTimeout)
+	}
+}
+
+func TestConfig_LiveCustomSettings(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+	setRequiredLiveTestEnv()
+	os.Setenv("MEDIAMTX_API_URL", "http://mediamtx:9997")
+	os.Setenv("MEDIAMTX_WEBRTC_PUBLIC_URL", "https://live.example.com/webrtc/")
+	os.Setenv("MEDIAMTX_HLS_PUBLIC_URL", "https://live.example.com/hls")
+	os.Setenv("LIVE_SIGNAL_POLL_INTERVAL", "2s")
+	os.Setenv("LIVE_SIGNAL_TIMEOUT", "3m")
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MediaMTXAPIURL != "http://mediamtx:9997" {
+		t.Errorf("MediaMTXAPIURL = %q", cfg.MediaMTXAPIURL)
+	}
+	if cfg.MediaMTXWebRTCPublicURL != "https://live.example.com/webrtc" {
+		t.Errorf("trailing slash must be trimmed, got %q", cfg.MediaMTXWebRTCPublicURL)
+	}
+	if cfg.MediaMTXHLSPublicURL != "https://live.example.com/hls" {
+		t.Errorf("MediaMTXHLSPublicURL = %q", cfg.MediaMTXHLSPublicURL)
+	}
+	if cfg.LiveSignalPollInterval != 2*time.Second || cfg.LiveSignalTimeout != 3*time.Minute {
+		t.Errorf("signal settings = %v / %v", cfg.LiveSignalPollInterval, cfg.LiveSignalTimeout)
+	}
+}
+
+func TestConfig_LiveValidationFailures(t *testing.T) {
+	cases := []struct {
+		key, value, wantErr string
+	}{
+		{"MEDIAMTX_API_URL", "mediamtx:9997", "MEDIAMTX_API_URL"},
+		{"MEDIAMTX_WEBRTC_PUBLIC_URL", "ftp://example.com", "MEDIAMTX_WEBRTC_PUBLIC_URL"},
+		{"MEDIAMTX_HLS_PUBLIC_URL", "not a url", "MEDIAMTX_HLS_PUBLIC_URL"},
+		{"LIVE_SIGNAL_POLL_INTERVAL", "abc", "LIVE_SIGNAL_POLL_INTERVAL"},
+		{"LIVE_SIGNAL_POLL_INTERVAL", "500ms", "LIVE_SIGNAL_POLL_INTERVAL"},
+		{"LIVE_SIGNAL_POLL_INTERVAL", "61s", "LIVE_SIGNAL_POLL_INTERVAL"},
+		{"LIVE_SIGNAL_TIMEOUT", "0s", "LIVE_SIGNAL_TIMEOUT"},
+		{"LIVE_SIGNAL_TIMEOUT", "-1m", "LIVE_SIGNAL_TIMEOUT"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
+			restore := clearEnv()
+			defer restore()
+			setRequiredLiveTestEnv()
+			os.Setenv(tc.key, tc.value)
+
+			_, err := LoadWithFile("")
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want mention of %s", err, tc.wantErr)
+			}
+		})
+	}
+}

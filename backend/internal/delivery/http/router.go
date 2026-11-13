@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"commerce-backend/internal/delivery/livews"
 	"commerce-backend/internal/delivery/ws"
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security/jwt"
@@ -16,6 +17,7 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
+	liveuc "commerce-backend/internal/usecase/live"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
@@ -34,6 +36,8 @@ type Dependencies struct {
 	Dashboard    *dashboarduc.UseCase
 	Chat         domain.ChatUseCase
 	Post         domain.PostUseCase
+	Live         *liveuc.UseCase
+	LiveHub      *livews.Hub
 	WSHub        *ws.Hub
 	JWT          *jwt.Manager
 	RefreshTTL   time.Duration
@@ -51,6 +55,18 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 
 	authHandler := newAuthHandler(deps.UseCase, deps.RefreshTTL, deps.CookieSecure)
 	guard := newGuard(deps.JWT)
+
+	if deps.Live != nil {
+		liveHandler := newLiveHandler(deps.Live)
+		api.GET("/live/current", liveHandler.current)
+		api.GET("/live/sessions/:id", guard.AuthRequired, liveHandler.session)
+		api.POST("/live/sessions/:id/comments", guard.AuthRequired, guard.RequireRole(domain.RoleCustomer), liveHandler.comment)
+		if deps.LiveHub != nil {
+			api.GET("/live/sessions/:id/ws", livews.NewHandler(deps.LiveHub, deps.JWT).ServeWS)
+		}
+		// Called by MediaMTX, not by browsers, so it lives outside /api/v1.
+		router.POST("/internal/mediamtx/auth", newMediaMTXAuthHandler(deps.Live, deps.JWT, deps.Logger).authorize)
+	}
 
 	if deps.Post != nil {
 		postMediaHandler := newPostMediaHandler(deps.Post)
@@ -199,6 +215,21 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	admin := api.Group("/admin")
 	admin.Use(guard.AuthRequired, guard.RequireAdmin())
 	{
+		if deps.Live != nil {
+			adminLiveHandler := newAdminLiveHandler(deps.Live)
+			adminLive := admin.Group("/live")
+			{
+				adminLive.GET("/sessions/current", adminLiveHandler.current)
+				adminLive.GET("/sessions/:id", adminLiveHandler.get)
+				adminLive.POST("/sessions", adminLiveHandler.create)
+				adminLive.PUT("/sessions/:id/products", adminLiveHandler.replaceProducts)
+				adminLive.PUT("/sessions/:id/pin", adminLiveHandler.pin)
+				adminLive.POST("/sessions/:id/end", adminLiveHandler.end)
+				adminLive.POST("/sessions/:id/comments", adminLiveHandler.comment)
+				adminLive.POST("/comments/:commentId/hide", adminLiveHandler.hideComment)
+			}
+		}
+
 		if deps.Dashboard != nil {
 			adminDashboardHandler := newAdminDashboardHandler(deps.Dashboard, deps.Logger)
 			admin.GET("/dashboard", adminDashboardHandler.GetDashboard)

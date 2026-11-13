@@ -39,7 +39,11 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	orderRepository := provideOrderRepository(pool)
 	returnRepository := provideReturnRepository(pool)
 	reviewRepository := provideReviewRepository(pool)
-	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, cfg)
+	liveRepository := provideLiveRepository(pool)
+	client := provideMediaServer(cfg)
+	hub := provideLiveHub(liveRepository, log)
+	liveUseCase := provideLiveUseCase(liveRepository, client, hub, cfg, log)
+	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, liveUseCase, cfg)
 	returnsUseCase := provideReturnUseCase(returnRepository)
 	store, err := provideReviewMediaStore(cfg)
 	if err != nil {
@@ -55,15 +59,15 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 		cleanup()
 		return nil, nil, err
 	}
-	hub := provideWSHub(chatRepository, log)
-	chatUseCase := provideChatUseCase(chatRepository, chatmediaStore, hub)
+	wsHub := provideWSHub(chatRepository, log)
+	chatUseCase := provideChatUseCase(chatRepository, chatmediaStore, wsHub)
 	postRepository := providePostRepository(pool)
-	postUseCase := providePostUseCase(postRepository, catalogRepository, chatmediaStore, hub)
+	postUseCase := providePostUseCase(postRepository, catalogRepository, chatmediaStore, wsHub)
 	dashboardRepository := provideDashboardRepository(pool)
 	dashboardUseCase := provideDashboardUseCase(dashboardRepository)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, dashboardUseCase, hub, manager)
+	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, dashboardUseCase, liveUseCase, hub, wsHub, manager)
 	server := provideHTTPServer(cfg, engine)
-	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, store, chatmediaStore, hub)
+	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, store, chatmediaStore, wsHub, hub, liveUseCase)
 	return app, func() {
 		cleanup()
 	}, nil
@@ -102,6 +106,10 @@ var appProviderSet = wire.NewSet(
 	providePostUseCase,
 	provideDashboardRepository,
 	provideDashboardUseCase,
+	provideLiveRepository,
+	provideMediaServer,
+	provideLiveHub,
+	provideLiveUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

@@ -599,6 +599,32 @@ describe('CheckoutPage', () => {
     expect(mockRefreshCart).toHaveBeenCalled()
   })
 
+  it('shows the live quota message and reloads the cart when live quota is exceeded', async () => {
+    const message = 'Chỉ còn 2 suất giá live cho iPhone 15 Pro Max. Vui lòng giảm số lượng.'
+    vi.mocked(ordersApi.createOrder).mockRejectedValue(new ApiError(409, { code: 'live_quota_exceeded', message }))
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/checkout']}>
+          <Routes>
+            <Route path="/checkout" element={<CheckoutPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Đặt hàng/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Đặt hàng/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Không đủ suất giá live')).toBeInTheDocument()
+      expect(screen.getByText(message)).toBeInTheDocument()
+      expect(mockRefreshCart).toHaveBeenCalled()
+    })
+  })
+
   it('handles product_changed dialog exit option by navigating back to /cart', async () => {
     const errorDetail = {
       code: 'product_changed',

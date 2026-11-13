@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +33,12 @@ type Config struct {
 	MinioBucket            string
 	MinioChatBucket        string
 	MinioUseSSL            bool
+
+	MediaMTXAPIURL          string
+	MediaMTXWebRTCPublicURL string
+	MediaMTXHLSPublicURL    string
+	LiveSignalPollInterval  time.Duration
+	LiveSignalTimeout       time.Duration
 }
 
 const (
@@ -45,6 +52,14 @@ const (
 	defaultMinioBucket         = "product-review-media"
 	defaultMinioChatBucket     = "chat-media"
 	defaultMinioUseSSL         = false
+
+	defaultMediaMTXAPIURL          = "http://127.0.0.1:9997"
+	defaultMediaMTXWebRTCPublicURL = "http://localhost:8889"
+	defaultMediaMTXHLSPublicURL    = "http://localhost:8888"
+	defaultLiveSignalPollInterval  = 5 * time.Second
+	defaultLiveSignalTimeout       = 10 * time.Minute
+	minLiveSignalPollInterval      = time.Second
+	maxLiveSignalPollInterval      = time.Minute
 )
 
 var allowedLogLevels = map[string]bool{
@@ -82,6 +97,11 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"MINIO_BUCKET",
 		"MINIO_CHAT_BUCKET",
 		"MINIO_USE_SSL",
+		"MEDIAMTX_API_URL",
+		"MEDIAMTX_WEBRTC_PUBLIC_URL",
+		"MEDIAMTX_HLS_PUBLIC_URL",
+		"LIVE_SIGNAL_POLL_INTERVAL",
+		"LIVE_SIGNAL_TIMEOUT",
 	}
 
 	for _, key := range keys {
@@ -292,5 +312,59 @@ func LoadWithFile(envFile string) (*Config, error) {
 		cfg.MinioUseSSL = defaultMinioUseSSL
 	}
 
+	// 18. MEDIAMTX_API_URL, MEDIAMTX_WEBRTC_PUBLIC_URL, MEDIAMTX_HLS_PUBLIC_URL
+	var err error
+	if cfg.MediaMTXAPIURL, err = httpURLSetting(v, "MEDIAMTX_API_URL", defaultMediaMTXAPIURL); err != nil {
+		return nil, err
+	}
+	if cfg.MediaMTXWebRTCPublicURL, err = httpURLSetting(v, "MEDIAMTX_WEBRTC_PUBLIC_URL", defaultMediaMTXWebRTCPublicURL); err != nil {
+		return nil, err
+	}
+	if cfg.MediaMTXHLSPublicURL, err = httpURLSetting(v, "MEDIAMTX_HLS_PUBLIC_URL", defaultMediaMTXHLSPublicURL); err != nil {
+		return nil, err
+	}
+
+	// 19. LIVE_SIGNAL_POLL_INTERVAL
+	if cfg.LiveSignalPollInterval, err = durationSetting(v, "LIVE_SIGNAL_POLL_INTERVAL", defaultLiveSignalPollInterval); err != nil {
+		return nil, err
+	}
+	if cfg.LiveSignalPollInterval < minLiveSignalPollInterval || cfg.LiveSignalPollInterval > maxLiveSignalPollInterval {
+		return nil, fmt.Errorf("config: LIVE_SIGNAL_POLL_INTERVAL must be between 1s and 60s, got %s", cfg.LiveSignalPollInterval)
+	}
+
+	// 20. LIVE_SIGNAL_TIMEOUT
+	if cfg.LiveSignalTimeout, err = durationSetting(v, "LIVE_SIGNAL_TIMEOUT", defaultLiveSignalTimeout); err != nil {
+		return nil, err
+	}
+	if cfg.LiveSignalTimeout <= 0 {
+		return nil, fmt.Errorf("config: LIVE_SIGNAL_TIMEOUT must be greater than zero, got %s", cfg.LiveSignalTimeout)
+	}
+
 	return cfg, nil
+}
+
+// httpURLSetting reads an absolute http(s) URL, trimming any trailing slash so
+// callers can append paths directly.
+func httpURLSetting(v *viper.Viper, key, fallback string) (string, error) {
+	raw := strings.TrimSpace(v.GetString(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return "", fmt.Errorf("config: %s must be an absolute http(s) URL, got %q", key, raw)
+	}
+	return strings.TrimRight(raw, "/"), nil
+}
+
+func durationSetting(v *viper.Viper, key string, fallback time.Duration) (time.Duration, error) {
+	raw := strings.TrimSpace(v.GetString(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("config: %s must be a duration (e.g. 5s, 10m), got %q", key, raw)
+	}
+	return value, nil
 }

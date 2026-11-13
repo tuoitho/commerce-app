@@ -37,6 +37,7 @@ type cartItemResponse struct {
 	Quantity      int64               `json:"quantity"`
 	Selected      bool                `json:"selected"`
 	Availability  string              `json:"availability"`
+	IsLivePrice   bool                `json:"isLivePrice"`
 }
 
 type addCartItemRequest struct {
@@ -120,6 +121,7 @@ func toCartResponse(cart *domain.Cart) cartResponse {
 			ImageURL: item.ImageURL, Options: item.Options, UnitPriceVND: moneyPtr(item.UnitPriceVND),
 			LineTotalVND: moneyPtr(item.LineTotalVND), StockQuantity: item.StockQuantity,
 			Quantity: item.Quantity, Selected: item.Selected, Availability: string(item.Availability),
+			IsLivePrice: item.IsLivePrice,
 		})
 	}
 	return cartResponse{

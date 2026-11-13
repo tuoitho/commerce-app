@@ -297,6 +297,8 @@ func createIntegrationCatalog(t *testing.T, ctx context.Context, tx pgx.Tx) {
 		`CREATE TEMP TABLE product_option_values (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, group_id uuid NOT NULL, label text NOT NULL, position integer NOT NULL DEFAULT 0)`,
 		`CREATE TEMP TABLE product_variants (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, price_vnd numeric NOT NULL, stock_quantity numeric NOT NULL DEFAULT 0, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TEMP TABLE variant_option_values (variant_id uuid NOT NULL, product_id uuid NOT NULL, group_id uuid NOT NULL, option_value_id uuid NOT NULL, PRIMARY KEY (variant_id, group_id))`,
+		// No live session exists in this fixture, so no live price is in effect.
+		`CREATE TEMP VIEW live_active_variant_prices AS SELECT NULL::uuid AS session_id, NULL::uuid AS product_id, NULL::uuid AS variant_id, NULL::numeric AS live_price_vnd, NULL::integer AS quota, NULL::integer AS sold_quantity WHERE false`,
 	} {
 		if _, err := tx.Exec(ctx, statement); err != nil {
 			t.Fatal(err)

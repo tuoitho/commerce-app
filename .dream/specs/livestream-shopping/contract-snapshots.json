@@ -1,0 +1,632 @@
+{
+  "feature": "livestream-shopping",
+  "snapshots": {
+    "admin_live_create_201": {
+      "contractId": "API-LIVE-ADMIN@1",
+      "endpoint": "POST /api/v1/admin/live/sessions",
+      "status": 201,
+      "requestBody": {
+        "products": [
+          {
+            "productId": "aaaaaaaa-0000-0000-0000-00000000000a",
+            "variants": [
+              {
+                "livePriceVnd": "25990000",
+                "quota": 10,
+                "variantId": "aaaaaaaa-0000-0000-0000-0000000000a1"
+              }
+            ]
+          }
+        ],
+        "title": "Flash sale iPhone"
+      },
+      "responseBody": {
+        "data": {
+          "comments": [],
+          "endedAt": null,
+          "heartCount": 0,
+          "id": "11111111-1111-1111-1111-111111111111",
+          "media": {
+            "hlsUrl": "http://localhost:8888/live/11111111-1111-1111-1111-111111111111/index.m3u8",
+            "whepUrl": "http://localhost:8889/live/11111111-1111-1111-1111-111111111111/whep",
+            "whipUrl": "http://localhost:8889/live/11111111-1111-1111-1111-111111111111/whip"
+          },
+          "pinnedProductId": "aaaaaaaa-0000-0000-0000-00000000000a",
+          "products": [
+            {
+              "brand": "Apple",
+              "hasLivePrice": true,
+              "imageUrl": "https://example.com/a.jpg",
+              "inStock": true,
+              "livePrices": [
+                {
+                  "active": true,
+                  "livePriceVnd": "25990000",
+                  "optionLabel": "256GB / Titan Đen",
+                  "quota": 10,
+                  "regularPriceVnd": "28990000",
+                  "remaining": 7,
+                  "sold": 3,
+                  "variantId": "aaaaaaaa-0000-0000-0000-0000000000a1"
+                }
+              ],
+              "maxPriceVnd": "32990000",
+              "minPriceVnd": "25990000",
+              "name": "iPhone 16 Pro",
+              "position": 0,
+              "productId": "aaaaaaaa-0000-0000-0000-00000000000a",
+              "regularMaxPriceVnd": "32990000",
+              "regularMinPriceVnd": "28990000"
+            }
+          ],
+          "signalOnline": false,
+          "startedAt": "2026-11-13T03:00:00Z",
+          "status": "live",
+          "summary": {
+            "commentCount": 0,
+            "durationSeconds": 1200,
+            "endReason": null,
+            "heartCount": 0,
+            "peakViewers": 0
+          },
+          "title": "Flash sale iPhone",
+          "viewerCount": 0
+        },
+        "error": null,
+        "message": "Đã bắt đầu phiên live",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4357361Z"
+        },
+        "success": true
+      }
+    },
+    "admin_live_current_200": {
+      "contractId": "API-LIVE-ADMIN@1",
+      "endpoint": "GET /api/v1/admin/live/sessions/current",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "comments": [
+            {
+              "authorName": "Lan",
+              "authorRole": "customer",
+              "content": "Còn màu titan không shop?",
+              "createdAt": "2026-11-13T03:05:00Z",
+              "hidden": false,
+              "id": "44444444-4444-4444-4444-444444444444",
+              "sessionId": "11111111-1111-1111-1111-111111111111"
+            }
+          ],
+          "endedAt": null,
+          "heartCount": 128,
+          "id": "11111111-1111-1111-1111-111111111111",
+          "media": {
+            "hlsUrl": "http://localhost:8888/live/11111111-1111-1111-1111-111111111111/index.m3u8",
+            "whepUrl": "http://localhost:8889/live/11111111-1111-1111-1111-111111111111/whep",
+            "whipUrl": "http://localhost:8889/live/11111111-1111-1111-1111-111111111111/whip"
+          },
+          "pinnedProductId": "aaaaaaaa-0000-0000-0000-00000000000a",
+          "products": [
+            {
+              "brand": "Apple",
+              "hasLivePrice": true,
+              "imageUrl": "https://example.com/a.jpg",
+              "inStock": true,
+              "livePrices": [
+                {
+                  "active": true,
+                  "livePriceVnd": "25990000",
+                  "optionLabel": "256GB / Titan Đen",
+                  "quota": 10,
+                  "regularPriceVnd": "28990000",
+                  "remaining": 7,
+                  "sold": 3,
+                  "variantId": "aaaaaaaa-0000-0000-0000-0000000000a1"
+                }
+              ],
+              "maxPriceVnd": "32990000",
+              "minPriceVnd": "25990000",
+              "name": "iPhone 16 Pro",
+              "position": 0,
+              "productId": "aaaaaaaa-0000-0000-0000-00000000000a",
+              "regularMaxPriceVnd": "32990000",
+              "regularMinPriceVnd": "28990000"
+            }
+          ],
+          "signalOnline": false,
+          "startedAt": "2026-11-13T03:00:00Z",
+          "status": "live",
+          "summary": {
+            "commentCount": 1,
+            "durationSeconds": 1200,
+            "endReason": null,
+            "heartCount": 128,
+            "peakViewers": 9
+          },
+          "title": "Flash sale iPhone",
+          "viewerCount": 0
+        },
+        "error": null,
+        "message": "Live session retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4498855Z"
+        },
+        "success": true
+      }
+    },
+    "cart_add_item_200": {
+      "contractId": "TYPE-LIVE@1",
+      "endpoint": "POST /api/v1/cart/items",
+      "status": 200,
+      "requestBody": {
+        "variantId": "22222222-2222-2222-2222-222222222222"
+      },
+      "responseBody": {
+        "data": {
+          "items": [
+            {
+              "availability": "available",
+              "brandName": "Brand",
+              "id": "33333333-3333-3333-3333-333333333333",
+              "imageUrl": "/phone.jpg",
+              "isLivePrice": true,
+              "lineTotalVnd": "51980000",
+              "model": "X",
+              "options": [
+                {
+                  "groupLabel": "Color",
+                  "valueLabel": "Black"
+                }
+              ],
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "Phone",
+              "quantity": 2,
+              "selected": true,
+              "stockQuantity": 5,
+              "unitPriceVnd": "25990000",
+              "variantId": "22222222-2222-2222-2222-222222222222"
+            }
+          ],
+          "selectedLineCount": 1,
+          "selectedTotalVnd": "51980000",
+          "shippingFeeVnd": "",
+          "totalUnits": 2
+        },
+        "error": null,
+        "message": "Đã thêm sản phẩm vào giỏ hàng",
+        "meta": {
+          "timestamp": "2026-11-12T19:55:54.0183184Z"
+        },
+        "success": true
+      }
+    },
+    "cart_live_200": {
+      "contractId": "TYPE-LIVE@1",
+      "endpoint": "GET /api/v1/cart",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "items": [
+            {
+              "availability": "available",
+              "brandName": "Brand",
+              "id": "33333333-3333-3333-3333-333333333333",
+              "imageUrl": "/phone.jpg",
+              "isLivePrice": true,
+              "lineTotalVnd": "51980000",
+              "model": "X",
+              "options": [
+                {
+                  "groupLabel": "Color",
+                  "valueLabel": "Black"
+                }
+              ],
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "Phone",
+              "quantity": 2,
+              "selected": true,
+              "stockQuantity": 5,
+              "unitPriceVnd": "25990000",
+              "variantId": "22222222-2222-2222-2222-222222222222"
+            }
+          ],
+          "selectedLineCount": 1,
+          "selectedTotalVnd": "51980000",
+          "shippingFeeVnd": "",
+          "totalUnits": 2
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-12T19:55:54.0060743Z"
+        },
+        "success": true
+      }
+    },
+    "live_comment_create_201": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "POST /api/v1/live/sessions/:id/comments",
+      "status": 201,
+      "requestBody": {
+        "content": "Còn size M không shop?"
+      },
+      "responseBody": {
+        "data": {
+          "authorName": "Lan",
+          "authorRole": "customer",
+          "content": "Còn size M không shop?",
+          "createdAt": "2026-11-13T03:20:00Z",
+          "hidden": false,
+          "id": "44444444-4444-4444-4444-444444444441",
+          "sessionId": "11111111-1111-1111-1111-111111111111"
+        },
+        "error": null,
+        "message": "Đã gửi bình luận",
+        "meta": {
+          "timestamp": "2026-11-12T19:48:22.7311652Z"
+        },
+        "success": true
+      }
+    },
+    "live_comment_rate_limited_429": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "POST /api/v1/live/sessions/:id/comments",
+      "status": 429,
+      "requestBody": {
+        "content": "Còn size M không shop?"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "rate_limited",
+          "message": "Bạn bình luận quá nhanh, vui lòng thử lại sau giây lát"
+        },
+        "message": "Bạn bình luận quá nhanh, vui lòng thử lại sau giây lát",
+        "meta": {
+          "timestamp": "2026-11-12T19:48:22.7356861Z"
+        },
+        "success": false
+      }
+    },
+    "live_current_200": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "GET /api/v1/live/current",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "startedAt": "2026-11-13T03:00:00Z",
+          "title": "Flash sale iPhone"
+        },
+        "error": null,
+        "message": "Live session retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4059059Z"
+        },
+        "success": true
+      }
+    },
+    "live_current_null_200": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "GET /api/v1/live/current",
+      "status": 200,
+      "responseBody": {
+        "data": null,
+        "error": null,
+        "message": "Live session retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4048235Z"
+        },
+        "success": true
+      }
+    },
+    "live_session_200": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "GET /api/v1/live/sessions/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "comments": [
+            {
+              "authorName": "Lan",
+              "authorRole": "customer",
+              "content": "Còn màu titan không shop?",
+              "createdAt": "2026-11-13T03:05:00Z",
+              "hidden": false,
+              "id": "44444444-4444-4444-4444-444444444444",
+              "sessionId": "11111111-1111-1111-1111-111111111111"
+            }
+          ],
+          "endedAt": null,
+          "heartCount": 128,
+          "id": "11111111-1111-1111-1111-111111111111",
+          "media": {
+            "hlsUrl": "http://localhost:8888/live/11111111-1111-1111-1111-111111111111/index.m3u8",
+            "whepUrl": "http://localhost:8889/live/11111111-1111-1111-1111-111111111111/whep"
+          },
+          "pinnedProductId": "aaaaaaaa-0000-0000-0000-00000000000a",
+          "products": [
+            {
+              "brand": "Apple",
+              "hasLivePrice": true,
+              "imageUrl": "https://example.com/a.jpg",
+              "inStock": true,
+              "livePrices": [
+                {
+                  "active": true,
+                  "livePriceVnd": "25990000",
+                  "optionLabel": "256GB / Titan Đen",
+                  "quota": 10,
+                  "regularPriceVnd": "28990000",
+                  "remaining": 7,
+                  "sold": 3,
+                  "variantId": "aaaaaaaa-0000-0000-0000-0000000000a1"
+                }
+              ],
+              "maxPriceVnd": "32990000",
+              "minPriceVnd": "25990000",
+              "name": "iPhone 16 Pro",
+              "position": 0,
+              "productId": "aaaaaaaa-0000-0000-0000-00000000000a",
+              "regularMaxPriceVnd": "32990000",
+              "regularMinPriceVnd": "28990000"
+            }
+          ],
+          "signalOnline": false,
+          "startedAt": "2026-11-13T03:00:00Z",
+          "status": "live",
+          "title": "Flash sale iPhone",
+          "viewerCount": 0
+        },
+        "error": null,
+        "message": "Live session retrieved successfully",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4223572Z"
+        },
+        "success": true
+      }
+    },
+    "live_session_404": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "GET /api/v1/live/sessions/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "livestream_not_found",
+          "message": "Không tìm thấy phiên live"
+        },
+        "message": "Không tìm thấy phiên live",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4295308Z"
+        },
+        "success": false
+      }
+    },
+    "order_create_live_quota_exceeded_409": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "lines": [
+          {
+            "productName": "iPhone 16 Pro",
+            "quantity": 3,
+            "unitPriceVnd": "25990000",
+            "variantId": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "live_quota_exceeded",
+          "message": "Chỉ còn 2 suất giá live cho iPhone 16 Pro. Vui lòng giảm số lượng."
+        },
+        "message": "Chỉ còn 2 suất giá live cho iPhone 16 Pro. Vui lòng giảm số lượng.",
+        "meta": {
+          "timestamp": "2026-11-12T20:05:18.0344779Z"
+        },
+        "success": false
+      }
+    },
+    "product_detail_live_200": {
+      "contractId": "TYPE-LIVE@1",
+      "endpoint": "GET /api/v1/products/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "active": true,
+          "brand": "Apple",
+          "category": {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Apple"
+          },
+          "createdAt": "2026-11-13T02:55:54.0269222+07:00",
+          "currency": "",
+          "description": "",
+          "featured": false,
+          "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "imageUrls": [
+            "https://example.com/iphone.jpg"
+          ],
+          "inStock": true,
+          "maxPriceVnd": "32990000",
+          "minPriceVnd": "28990000",
+          "model": "A3083",
+          "name": "iPhone 16 Pro",
+          "optionGroups": [
+            {
+              "id": "group-storage",
+              "label": "Dung lượng",
+              "position": 1,
+              "values": [
+                {
+                  "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                  "label": "256GB"
+                }
+              ]
+            }
+          ],
+          "price": "",
+          "stockQuantity": 0,
+          "updatedAt": "2026-11-13T02:55:54.0269222+07:00",
+          "variants": [
+            {
+              "active": true,
+              "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+              "livePriceVnd": "25990000",
+              "liveRemaining": 7,
+              "optionValueIds": {
+                "group-storage": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+              },
+              "priceVnd": "28990000",
+              "stockQuantity": 5
+            }
+          ]
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-12T19:55:54.0269222Z"
+        },
+        "success": true
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-LIVE-PUBLIC@1",
+      "endpoint": "GET /api/v1/live/sessions/:id",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-12T19:37:52.4155136Z"
+        },
+        "success": false
+      }
+    },
+    "ws_live_comment": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "authorName": "Chủ shop",
+          "authorRole": "admin",
+          "content": "Chào cả nhà",
+          "createdAt": "2026-11-13T03:20:00Z",
+          "hidden": false,
+          "id": "44444444-4444-4444-4444-444444444441",
+          "sessionId": "11111111-1111-1111-1111-111111111111"
+        },
+        "type": "live:comment"
+      }
+    },
+    "ws_live_comment_hidden": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "commentId": "44444444-4444-4444-4444-444444444444"
+        },
+        "type": "live:comment_hidden"
+      }
+    },
+    "ws_live_ended": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "endedAt": "2026-11-13T03:45:00Z",
+          "reason": "admin"
+        },
+        "type": "live:ended"
+      }
+    },
+    "ws_live_hearts": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "bursts": [
+            {
+              "count": 10,
+              "userId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "total": 138
+        },
+        "type": "live:hearts"
+      }
+    },
+    "ws_live_products": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "pinnedProductId": "aaaaaaaa-0000-0000-0000-00000000000a",
+          "products": [
+            {
+              "brand": "Apple",
+              "hasLivePrice": true,
+              "imageUrl": "https://example.com/a.jpg",
+              "inStock": true,
+              "livePrices": [
+                {
+                  "active": true,
+                  "livePriceVnd": "25990000",
+                  "optionLabel": "256GB / Titan Đen",
+                  "quota": 10,
+                  "regularPriceVnd": "28990000",
+                  "remaining": 7,
+                  "sold": 3,
+                  "variantId": "aaaaaaaa-0000-0000-0000-0000000000a1"
+                }
+              ],
+              "maxPriceVnd": "32990000",
+              "minPriceVnd": "25990000",
+              "name": "iPhone 16 Pro",
+              "position": 0,
+              "productId": "aaaaaaaa-0000-0000-0000-00000000000a",
+              "regularMaxPriceVnd": "32990000",
+              "regularMinPriceVnd": "28990000"
+            }
+          ]
+        },
+        "type": "live:products"
+      }
+    },
+    "ws_live_signal": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "online": false
+        },
+        "type": "live:signal"
+      }
+    },
+    "ws_live_viewers": {
+      "contractId": "WS-LIVE-ROOM@1",
+      "endpoint": "WS /api/v1/live/sessions/:id/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "count": 1
+        },
+        "type": "live:viewers"
+      }
+    }
+  }
+}

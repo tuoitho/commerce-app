@@ -1,0 +1,40 @@
+###############################################
+# MediaMTX configuration for live shopping streams.
+# Admins publish over WHIP, viewers read over WHEP with LL-HLS as fallback.
+
+logLevel: info
+
+# Every publish/read request is authorized by the backend, which checks the
+# caller's access token and whether the path belongs to a live session.
+authMethod: http
+authHTTPAddress: http://host.docker.internal:18080/internal/mediamtx/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+# Control API, used by the backend to detect whether a session has a publisher.
+api: yes
+apiAddress: :9997
+
+rtsp: no
+rtmp: no
+srt: no
+moq: no
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcAdditionalHosts: [127.0.0.1]
+webrtcAllowOrigins: ['http://localhost:15173', 'http://localhost:15174']
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsAllowOrigins: ['http://localhost:15173', 'http://localhost:15174']
+
+paths:
+  # One path per live session: live/<session uuid>. A reconnecting
+  # broadcaster replaces its previous publisher session.
+  "~^live/[0-9a-f-]{36}$":
+    overridePublisher: yes

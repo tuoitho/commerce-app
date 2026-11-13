@@ -30,6 +30,11 @@ type ProductVariant struct {
 	PriceVND       MoneyVND
 	StockQuantity  int64
 	Active         bool
+	// LivePriceVND is the live-session price in effect, if any; PriceVND stays
+	// the regular price.
+	LivePriceVND *MoneyVND
+	// LiveRemaining is the live-price quota left, nil when unlimited or no live price.
+	LiveRemaining *int
 }
 
 type Product struct {

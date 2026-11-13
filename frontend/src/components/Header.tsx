@@ -25,10 +25,12 @@ import { useToast } from '@/context/ToastContext'
 import { Button } from './ui/button'
 import { Skeleton } from './ui/skeleton'
 import { NotificationBell } from './notifications/NotificationBell'
+import { useCurrentLive } from '@/hooks/useCurrentLive'
 
 export function Header() {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const { badgeCount } = useCart()
+  const currentLive = useCurrentLive()
   const { success } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -208,6 +210,17 @@ export function Header() {
               Trang chủ
             </Link>
 
+            {currentLive && (
+              <Link
+                to={`/live/${currentLive.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50"
+                title={currentLive.title}
+              >
+                <span className="live-pulse-dot h-2 w-2 rounded-full bg-rose-600" />
+                LIVE
+              </Link>
+            )}
+
             <Link
               to="/products"
               className={`px-3 py-2 rounded-lg transition-colors ${
@@ -341,6 +354,17 @@ export function Header() {
 
           {/* Right Functional Actions */}
           <div className="flex items-center gap-2.5">
+            {currentLive && (
+              <Link
+                to={`/live/${currentLive.id}`}
+                className="xl:hidden inline-flex h-10 items-center gap-1.5 rounded-xl bg-rose-600 px-3 text-xs font-bold tracking-wider text-white"
+                title={currentLive.title}
+              >
+                <span className="live-pulse-dot h-1.5 w-1.5 rounded-full bg-white" />
+                LIVE
+              </Link>
+            )}
+
             {/* Notification Bell (when authenticated) */}
             {isAuthenticated && <NotificationBell />}
 

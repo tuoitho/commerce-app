@@ -21,6 +21,10 @@ func writeError(c *gin.Context, err error) {
 	var filterErr *domain.FilterValidationError
 	var prodChangedErr *domain.ProductChangedError
 
+	if writeLiveError(c, err) {
+		return
+	}
+
 	switch {
 	case errors.As(err, &valErr):
 		respondError(c, 400, "validation_error", "Dữ liệu không hợp lệ", valErr.Fields)

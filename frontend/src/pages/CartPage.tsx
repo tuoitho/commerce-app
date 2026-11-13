@@ -275,6 +275,11 @@ export function CartPage() {
                           </div>
                           {item.unitPriceVnd && (
                             <div className="font-mono text-[11px] text-zinc-400 tabular-nums">
+                              {item.isLivePrice && (
+                                <span className="mr-1.5 rounded bg-rose-600 px-1 py-px font-sans text-[10px] font-bold uppercase text-white">
+                                  Giá live
+                                </span>
+                              )}
                               {formatVND(item.unitPriceVnd)} / chiếc
                             </div>
                           )}

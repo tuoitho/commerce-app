@@ -1,4 +1,4 @@
-.PHONY: backend frontend frontend-admin admin db-up seed minio-up minio-down run test build
+.PHONY: backend frontend frontend-admin admin db-up seed minio-up minio-down mediamtx-up mediamtx-down run test build
 
 ## Start MinIO object storage container and initialize private bucket.
 minio-up:
@@ -7,6 +7,14 @@ minio-up:
 ## Stop MinIO object storage container.
 minio-down:
 	docker compose -f compose.minio.yml down
+
+## Start the MediaMTX live video server (WHIP/WHEP :8889, HLS :8888, API 127.0.0.1:9997).
+mediamtx-up:
+	docker compose -f compose.mediamtx.yml up -d
+
+## Stop the MediaMTX live video server.
+mediamtx-down:
+	docker compose -f compose.mediamtx.yml down
 
 ## Apply database migrations against the local backend DB.
 db-up:

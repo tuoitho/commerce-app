@@ -125,6 +125,17 @@ func (r *OrderRepository) Create(ctx context.Context, userID string, addressID s
 		return nil, domain.NewProductChangedError(deduped)
 	}
 
+	// 4b. Consume live-price quota for lines priced by a live session
+	for _, line := range lines {
+		row := lockedMap[line.VariantID]
+		if row.LiveSessionID == "" {
+			continue
+		}
+		if err := consumeLiveQuota(ctx, q, row.LiveSessionID, row.VariantID, row.ProductName, line.Quantity); err != nil {
+			return nil, err
+		}
+	}
+
 	// 5. Get address snapshot
 	addr, err := q.GetAddressByID(ctx, sqlc.GetAddressByIDParams{
 		ID:     addressID,
@@ -177,18 +188,25 @@ func (r *OrderRepository) Create(ctx context.Context, userID string, addressID s
 		row := lockedMap[line.VariantID]
 		lineTotal := new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(line.Quantity)).String()
 
+		var liveSessionID pgtype.UUID
+		if row.LiveSessionID != "" {
+			if err := liveSessionID.Scan(row.LiveSessionID); err != nil {
+				return nil, err
+			}
+		}
 		err := q.InsertOrderItem(ctx, sqlc.InsertOrderItemParams{
-			OrderID:      orderRow.ID,
-			VariantID:    row.VariantID,
-			ProductID:    row.ProductID,
-			BrandName:    row.BrandName,
-			ProductName:  row.ProductName,
-			Model:        row.Model,
-			ImageUrl:     row.ImageUrl,
-			Options:      []byte(row.Options),
-			UnitPriceVnd: toNumeric(row.PriceVnd),
-			Quantity:     line.Quantity,
-			LineTotalVnd: toNumeric(lineTotal),
+			OrderID:       orderRow.ID,
+			VariantID:     row.VariantID,
+			ProductID:     row.ProductID,
+			BrandName:     row.BrandName,
+			ProductName:   row.ProductName,
+			Model:         row.Model,
+			ImageUrl:      row.ImageUrl,
+			Options:       []byte(row.Options),
+			UnitPriceVnd:  toNumeric(row.PriceVnd),
+			Quantity:      line.Quantity,
+			LineTotalVnd:  toNumeric(lineTotal),
+			LiveSessionID: liveSessionID,
 		})
 		if err != nil {
 			return nil, err
@@ -569,6 +587,9 @@ func (r *OrderRepository) Cancel(ctx context.Context, userID, orderID string) (*
 			}); err != nil {
 				return nil, err
 			}
+		}
+		if err := q.RestoreLiveQuotaForOrder(ctx, orderID); err != nil {
+			return nil, err
 		}
 
 	case domain.OrderStatusPreparing:
@@ -982,6 +1003,11 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 			}
 		}
 	}
+	if to == domain.OrderStatusCancelled {
+		if err := q.RestoreLiveQuotaForOrder(ctx, orderID); err != nil {
+			return nil, err
+		}
+	}
 
 	now := time.Now().UTC()
 	cancelledAt := orderRow.CancelledAt
@@ -1071,4 +1097,3 @@ func (r *OrderRepository) AdminTransition(ctx context.Context, orderID string, a
 
 	return order, nil
 }
-

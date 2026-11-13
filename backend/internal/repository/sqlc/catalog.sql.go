@@ -467,10 +467,15 @@ func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByID
 }
 
 const listActiveProductVariants = `-- name: ListActiveProductVariants :many
-SELECT id, price_vnd::text AS price_vnd, stock_quantity, active
-FROM product_variants
-WHERE product_id = $1 AND active
-ORDER BY price_vnd ASC, id ASC
+SELECT v.id, v.price_vnd::text AS price_vnd, v.stock_quantity, v.active,
+       (lap.variant_id IS NOT NULL)::boolean AS has_live_price,
+       COALESCE(lap.live_price_vnd, 0)::text AS live_price_vnd,
+       (lap.quota IS NOT NULL)::boolean AS has_live_quota,
+       COALESCE(lap.quota - lap.sold_quantity, 0)::integer AS live_remaining
+FROM product_variants v
+LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
+WHERE v.product_id = $1 AND v.active
+ORDER BY v.price_vnd ASC, v.id ASC
 `
 
 type ListActiveProductVariantsRow struct {
@@ -478,6 +483,10 @@ type ListActiveProductVariantsRow struct {
 	PriceVnd      string
 	StockQuantity int64
 	Active        bool
+	HasLivePrice  bool
+	LivePriceVnd  string
+	HasLiveQuota  bool
+	LiveRemaining int32
 }
 
 func (q *Queries) ListActiveProductVariants(ctx context.Context, productID string) ([]ListActiveProductVariantsRow, error) {
@@ -494,6 +503,10 @@ func (q *Queries) ListActiveProductVariants(ctx context.Context, productID strin
 			&i.PriceVnd,
 			&i.StockQuantity,
 			&i.Active,
+			&i.HasLivePrice,
+			&i.LivePriceVnd,
+			&i.HasLiveQuota,
+			&i.LiveRemaining,
 		); err != nil {
 			return nil, err
 		}

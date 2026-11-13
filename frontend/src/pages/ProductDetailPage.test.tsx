@@ -193,6 +193,47 @@ describe('ProductDetailPage', () => {
     })
   })
 
+  it('shows the live price, the struck regular price and the remaining live quota', async () => {
+    vi.mocked(catalogApi.getProduct).mockResolvedValue({
+      ...mockMultiVariantProduct,
+      variants: mockMultiVariantProduct.variants.map((v) =>
+        v.id === 'var-128-black' ? { ...v, livePriceVnd: '23990000', liveRemaining: 4 } : { ...v, livePriceVnd: null, liveRemaining: null },
+      ),
+    })
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(await screen.findByText('Giá live')).toBeInTheDocument()
+    expect(screen.getAllByText(/23\.990\.000/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByTestId('pdp-regular-price')).toHaveTextContent('25.990.000')
+    expect(screen.getByTestId('pdp-regular-price')).toHaveClass('line-through')
+    expect(screen.getByText('Còn 4 suất giá live')).toBeInTheDocument()
+  })
+
+  it('keeps the regular price display for variants without a live price', async () => {
+    vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/products/p-multi']}>
+          <Routes>
+            <Route path="/products/:id" element={<ProductDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(await screen.findByText('GIÁ NIÊM YẾT CHÍNH HÃNG')).toBeInTheDocument()
+    expect(screen.queryByText('Giá live')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pdp-regular-price')).not.toBeInTheDocument()
+  })
+
   it('dynamically updates displayed price and stock count when selecting different option variants (Req 5.1, Req 5.3)', async () => {
     vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
 

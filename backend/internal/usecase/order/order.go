@@ -15,6 +15,8 @@ type Dependencies struct {
 	Review              domain.ReviewRepository
 	ShippingFeeVND      domain.MoneyVND
 	OrderConfirmTimeout time.Duration
+	// LiveQuota, when set, learns about orders that may change live-price quota.
+	LiveQuota domain.LiveQuotaObserver
 }
 
 type UseCase struct {
@@ -23,6 +25,7 @@ type UseCase struct {
 	reviewRepo          domain.ReviewRepository
 	shippingFeeVND      domain.MoneyVND
 	orderConfirmTimeout time.Duration
+	liveQuota           domain.LiveQuotaObserver
 }
 
 func New(deps Dependencies) *UseCase {
@@ -40,6 +43,13 @@ func New(deps Dependencies) *UseCase {
 		reviewRepo:          deps.Review,
 		shippingFeeVND:      shippingFee,
 		orderConfirmTimeout: timeout,
+		liveQuota:           deps.LiveQuota,
+	}
+}
+
+func (uc *UseCase) notifyLiveQuota(ctx context.Context) {
+	if uc.liveQuota != nil {
+		uc.liveQuota.LiveQuotaChanged(ctx)
 	}
 }
 
@@ -121,6 +131,7 @@ func (uc *UseCase) Create(ctx context.Context, userID, addressID string, lines [
 	if err != nil {
 		return nil, err
 	}
+	uc.notifyLiveQuota(ctx)
 
 	if order != nil {
 		if order.Status == domain.OrderStatusPendingConfirmation {
@@ -229,6 +240,9 @@ func (uc *UseCase) Cancel(ctx context.Context, userID, orderID string) (*domain.
 	if err != nil {
 		return nil, err
 	}
+	if order != nil && order.Status == domain.OrderStatusCancelled {
+		uc.notifyLiveQuota(ctx)
+	}
 
 	if order != nil {
 		if order.Status == domain.OrderStatusPendingConfirmation {
@@ -325,6 +339,9 @@ func (uc *UseCase) AdminTransition(ctx context.Context, orderID string, action d
 	order, err := uc.order.AdminTransition(ctx, orderID, action)
 	if err != nil {
 		return nil, err
+	}
+	if order != nil && order.Status == domain.OrderStatusCancelled {
+		uc.notifyLiveQuota(ctx)
 	}
 
 	if order != nil {

@@ -28,6 +28,46 @@ describe('CartPage', () => {
     })
   })
 
+  it('labels lines sold at the live price', async () => {
+    vi.mocked(useCart).mockReturnValue({
+      cart: {
+        items: [
+          {
+            id: 'item-live', variantId: 'v-1', productId: 'p-1', brandName: 'Apple', productName: 'iPhone 15 Pro', model: 'A3102',
+            imageUrl: '', options: [], unitPriceVnd: '23990000', lineTotalVnd: '23990000', stockQuantity: 5, quantity: 1,
+            selected: true, availability: 'available', isLivePrice: true,
+          },
+          {
+            id: 'item-regular', variantId: 'v-2', productId: 'p-2', brandName: 'Samsung', productName: 'Galaxy S25', model: 'S931',
+            imageUrl: '', options: [], unitPriceVnd: '20990000', lineTotalVnd: '20990000', stockQuantity: 5, quantity: 1,
+            selected: true, availability: 'available', isLivePrice: false,
+          },
+        ],
+        totalUnits: 2,
+        selectedLineCount: 2,
+        selectedTotalVnd: '44980000',
+        shippingFeeVnd: '0',
+      },
+      isLoading: false,
+      badgeCount: 2,
+      refreshCart: vi.fn(),
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <CartPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(await screen.findAllByText('Giá live')).toHaveLength(1)
+  })
+
   it('renders cart items and summary properly', async () => {
     vi.mocked(useCart).mockReturnValue({
       cart: {

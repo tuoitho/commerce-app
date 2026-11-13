@@ -159,7 +159,12 @@ export function ProductDetailPage() {
     return product.optionGroups.every((g) => Boolean(selectedOptions[g.id]))
   }, [product, selectedOptions])
 
+  const livePriceVnd = selectedVariant?.livePriceVnd ?? null
+
   const displayedPrice = useMemo(() => {
+    if (selectedVariant?.livePriceVnd) {
+      return formatVND(selectedVariant.livePriceVnd)
+    }
     if (selectedVariant && selectedVariant.priceVnd) {
       return formatVND(selectedVariant.priceVnd)
     }
@@ -173,6 +178,7 @@ export function ProductDetailPage() {
   }, [selectedVariant, product])
 
   const numericPrice = useMemo(() => {
+    if (selectedVariant?.livePriceVnd) return Number(selectedVariant.livePriceVnd)
     if (selectedVariant && selectedVariant.priceVnd) return Number(selectedVariant.priceVnd)
     if (product?.price) return Number(product.price)
     if (product?.minPriceVnd) return Number(product.minPriceVnd)
@@ -491,14 +497,36 @@ export function ProductDetailPage() {
             {/* Editorial Price Ledger Card */}
             <div className="p-5 rounded-2xl bg-white border border-zinc-200 space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 block mb-0.5">
-                    GIÁ NIÊM YẾT CHÍNH HÃNG
-                  </span>
-                  <span className="font-mono text-3xl sm:text-4xl font-bold text-zinc-950 tracking-tight tabular-nums">
-                    {displayedPrice}
-                  </span>
-                </div>
+                {livePriceVnd && selectedVariant ? (
+                  <div>
+                    <span className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                      <span className="live-pulse-dot h-1.5 w-1.5 rounded-full bg-white" />
+                      Giá live
+                    </span>
+                    <div className="flex flex-wrap items-baseline gap-x-3">
+                      <span className="font-mono text-3xl sm:text-4xl font-bold text-rose-600 tracking-tight tabular-nums">
+                        {displayedPrice}
+                      </span>
+                      <span data-testid="pdp-regular-price" className="font-mono text-base text-zinc-400 line-through tabular-nums">
+                        {formatVND(selectedVariant.priceVnd)}
+                      </span>
+                    </div>
+                    {selectedVariant.liveRemaining != null && (
+                      <span className="mt-1 block text-xs font-semibold text-rose-600">
+                        Còn {selectedVariant.liveRemaining} suất giá live
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 block mb-0.5">
+                      GIÁ NIÊM YẾT CHÍNH HÃNG
+                    </span>
+                    <span className="font-mono text-3xl sm:text-4xl font-bold text-zinc-950 tracking-tight tabular-nums">
+                      {displayedPrice}
+                    </span>
+                  </div>
+                )}
                 {selectedVariant && (
                   <span
                     className={`font-mono text-xs font-semibold px-2.5 py-1 rounded-md ${
