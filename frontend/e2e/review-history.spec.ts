@@ -160,6 +160,11 @@ function layoutRoutes(isAuthenticated: boolean): ContractRoute[] {
         body: envelope('Lấy danh sách thông báo thành công', { items: [], unreadCount: 0 }),
       },
     },
+    {
+      method: 'GET',
+      path: '/api/v1/live/current',
+      stub: { status: 200, body: envelope('Live session retrieved successfully', null) },
+    },
   ]
 }
 

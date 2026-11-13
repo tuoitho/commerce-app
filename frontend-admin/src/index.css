@@ -52,3 +52,14 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Live broadcast: viewers' hearts drifting up the preview */
+@keyframes liveHeartFloat {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  12% { opacity: 1; transform: translate(0, -12px) scale(1); }
+  100% { opacity: 0; transform: translate(var(--live-heart-drift, 0px), -220px) scale(1.15); }
+}
+
+.live-heart {
+  animation: liveHeartFloat 1.6s ease-out forwards;
+}

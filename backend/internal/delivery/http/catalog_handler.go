@@ -80,6 +80,33 @@ type variantResponse struct {
 	Active         bool              `json:"active"`
 }
 
+// liveVariantResponse adds the live-session price in effect to a variant.
+// Only the storefront product detail exposes it; admin responses keep the
+// plain variantResponse.
+type liveVariantResponse struct {
+	variantResponse
+	LivePriceVND  *string `json:"livePriceVnd"`
+	LiveRemaining *int    `json:"liveRemaining"`
+}
+
+type storefrontProductDetailResponse struct {
+	productDetailResponse
+	Variants []liveVariantResponse `json:"variants"`
+}
+
+func toStorefrontDetailResponse(p domain.Product) storefrontProductDetailResponse {
+	base := toDetailResponse(p)
+	variants := make([]liveVariantResponse, len(base.Variants))
+	for i, v := range base.Variants {
+		variants[i] = liveVariantResponse{
+			variantResponse: v,
+			LivePriceVND:    moneyPtr(p.Variants[i].LivePriceVND),
+			LiveRemaining:   p.Variants[i].LiveRemaining,
+		}
+	}
+	return storefrontProductDetailResponse{productDetailResponse: base, Variants: variants}
+}
+
 func (h *catalogHandler) ListCategories(c *gin.Context) {
 	categories, err := h.uc.ListCategories(c)
 	if err != nil {
@@ -248,7 +275,7 @@ func (h *catalogHandler) GetProduct(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	writeSuccess(c, http.StatusOK, "", toDetailResponse(*product))
+	writeSuccess(c, http.StatusOK, "", toStorefrontDetailResponse(*product))
 }
 
 func toSummaryResponse(p domain.Product) productSummaryResponse {

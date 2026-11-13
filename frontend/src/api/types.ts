@@ -110,6 +110,10 @@ export interface ProductVariant {
   priceVnd: string
   stockQuantity: number
   active?: boolean
+  /** Live-session price in effect; priceVnd stays the regular price. */
+  livePriceVnd?: string | null
+  /** Live-price quota left; null when unlimited or no live price. */
+  liveRemaining?: number | null
 }
 
 export interface ProductDetail {
@@ -169,6 +173,8 @@ export interface CartItem {
   quantity: number
   selected: boolean
   availability: CartAvailability
+  /** unitPriceVnd is a live-session price. */
+  isLivePrice?: boolean
 }
 
 export interface Cart {

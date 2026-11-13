@@ -3,7 +3,9 @@ SELECT ci.id, ci.user_id, ci.variant_id, ci.quantity, ci.selected,
        ci.snapshot_brand_name, ci.snapshot_product_name, ci.snapshot_model,
        ci.snapshot_image_url, ci.snapshot_options::text AS snapshot_options,
        v.product_id, p.active AS product_active, v.active AS variant_active,
-       v.price_vnd::text AS price_vnd, v.stock_quantity,
+       COALESCE(lap.live_price_vnd, v.price_vnd)::text AS price_vnd,
+       COALESCE(lap.session_id::text, '')::text AS live_session_id,
+       v.stock_quantity,
        p.brand AS brand_name, p.name AS product_name, p.model,
        COALESCE((SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position, pi.id LIMIT 1), '')::text AS image_url,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('groupLabel', g.label, 'valueLabel', ov.label) ORDER BY g.position, g.id)
@@ -13,6 +15,7 @@ SELECT ci.id, ci.user_id, ci.variant_id, ci.quantity, ci.selected,
 FROM cart_items ci
 JOIN product_variants v ON v.id = ci.variant_id
 JOIN products p ON p.id = v.product_id
+LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
 WHERE ci.user_id = @user_id AND v.id = ANY(@variant_ids::uuid[])
 ORDER BY ci.created_at, ci.id
 FOR UPDATE OF ci, v;
@@ -52,12 +55,12 @@ RETURNING id, user_id, status, payment_method,
 INSERT INTO order_items (
     order_id, variant_id, product_id,
     brand_name, product_name, model, image_url, options,
-    unit_price_vnd, quantity, line_total_vnd
+    unit_price_vnd, quantity, line_total_vnd, live_session_id
 )
 VALUES (
     @order_id, @variant_id, @product_id,
     @brand_name, @product_name, @model, @image_url, @options::jsonb,
-    @unit_price_vnd::numeric, @quantity::bigint, @line_total_vnd::numeric
+    @unit_price_vnd::numeric, @quantity::bigint, @line_total_vnd::numeric, sqlc.narg(live_session_id)::uuid
 );
 
 -- name: RemoveSelectedCartItems :exec

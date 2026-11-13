@@ -16,6 +16,7 @@ import {
   FileText,
   Menu,
   X,
+  Radio,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,7 @@ interface NavItemConfig {
 const NAV_ITEMS: NavItemConfig[] = [
   { to: '/', end: true, icon: LayoutDashboard, label: 'Tổng quan' },
   { to: '/posts', icon: FileText, label: 'Bài viết' },
+  { to: '/livestream', icon: Radio, label: 'Livestream' },
   { to: '/products', icon: Package, label: 'Sản phẩm' },
   { to: '/orders', icon: ShoppingBag, label: 'Đơn hàng' },
   { to: '/chat', icon: MessageSquare, label: 'Tin nhắn hỗ trợ', showBadge: true },

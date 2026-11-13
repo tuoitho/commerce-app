@@ -348,6 +348,9 @@ export function CheckoutPage() {
               'Sản phẩm vừa được cập nhật giá hoặc thông tin. Vui lòng tải lại để xem thông tin mới nhất.'
           )
           setProductChangedDialogOpen(true)
+        } else if (err.code === 'live_quota_exceeded') {
+          toastError('Không đủ suất giá live', err.message)
+          await refreshCart()
         } else if (err.code === 'out_of_stock' || err.code === 'stock_limit') {
           toastError('Hết hàng hoặc vượt số lượng', err.message || 'Sản phẩm không đủ tồn kho.')
           await refreshCart()

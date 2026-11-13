@@ -34,6 +34,8 @@ type CartItem struct {
 	Quantity      int64
 	Selected      bool
 	Availability  CartAvailability
+	// IsLivePrice reports that UnitPriceVND is a live-session price.
+	IsLivePrice bool
 }
 
 type Cart struct {

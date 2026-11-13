@@ -14,6 +14,8 @@ import { ProductCard } from '@/components/ProductCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
+import { LiveBanner } from '@/components/live/LiveBanner'
+import { useCurrentLive } from '@/hooks/useCurrentLive'
 
 export function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<ProductSummary[]>([])
@@ -21,6 +23,7 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedBrandTab, setSelectedBrandTab] = useState<string>('all')
+  const currentLive = useCurrentLive()
 
   // Privilege allocation countdown timer
   const [timeLeft, setTimeLeft] = useState({ hours: 4, minutes: 35, seconds: 28 })
@@ -181,6 +184,8 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {currentLive && <LiveBanner live={currentLive} />}
 
       {/* Architectural Telemetry & Guarantee Bar */}
       <section className="border-b border-zinc-200 bg-white">

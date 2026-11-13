@@ -78,6 +78,55 @@ type Conversation struct {
 	UpdatedAt          time.Time
 }
 
+type LiveActiveVariantPrice struct {
+	SessionID    string
+	ProductID    string
+	VariantID    string
+	LivePriceVnd pgtype.Numeric
+	Quota        pgtype.Int4
+	SoldQuantity int32
+}
+
+type LiveComment struct {
+	ID        string
+	SessionID string
+	UserID    string
+	Content   string
+	HiddenAt  pgtype.Timestamptz
+	CreatedAt time.Time
+}
+
+type LiveSession struct {
+	ID              string
+	Title           string
+	Status          string
+	CreatedBy       string
+	PinnedProductID pgtype.UUID
+	HeartCount      int64
+	PeakViewers     int32
+	StartedAt       time.Time
+	LastSignalAt    pgtype.Timestamptz
+	EndedAt         pgtype.Timestamptz
+	EndReason       pgtype.Text
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type LiveSessionProduct struct {
+	SessionID string
+	ProductID string
+	Position  int32
+}
+
+type LiveVariantPrice struct {
+	SessionID    string
+	ProductID    string
+	VariantID    string
+	LivePriceVnd pgtype.Numeric
+	Quota        pgtype.Int4
+	SoldQuantity int32
+}
+
 type Notification struct {
 	ID               string
 	RecipientID      string
@@ -117,18 +166,19 @@ type Order struct {
 }
 
 type OrderItem struct {
-	ID           string
-	OrderID      string
-	VariantID    string
-	ProductID    string
-	BrandName    string
-	ProductName  string
-	Model        string
-	ImageUrl     string
-	Options      []byte
-	UnitPriceVnd pgtype.Numeric
-	Quantity     int64
-	LineTotalVnd pgtype.Numeric
+	ID            string
+	OrderID       string
+	VariantID     string
+	ProductID     string
+	BrandName     string
+	ProductName   string
+	Model         string
+	ImageUrl      string
+	Options       []byte
+	UnitPriceVnd  pgtype.Numeric
+	Quantity      int64
+	LineTotalVnd  pgtype.Numeric
+	LiveSessionID pgtype.UUID
 }
 
 type Post struct {

@@ -1,0 +1,280 @@
+# Implementation Plan
+
+- [x] 1. Nền tảng dữ liệu và hạ tầng media
+
+- [x] 1.1 Schema livestream, view giá hiệu lực và binding sqlc
+  - **Produces:** migration `backend/db/migrations/<NNNNNN>_create_livestream.{up,down}.sql` (số kế tiếp còn trống) đúng DB-LIVE; file `backend/db/queries/live.sql` với các query đã nêu ở DB-LIVE/DB-PRICE-QUERIES (`ConsumeLiveQuota`, `GetLiveQuotaRemaining`, `RestoreLiveQuotaForOrder`, CRUD phiên/sản phẩm/giá/bình luận, `LastCommentAtByUser`, `AddHearts`, `UpdatePeakViewers`, `TouchSignal`, `EndLiveSession`); code sqlc sinh lại.
+  - **Scope:** migration, query sqlc, `make db-up`, `make -C backend gen`, integration test tạo bảng và test bất biến.
+  - **Consumes:** bảng `users`, `products`, `product_variants`, `order_items` hiện có.
+  - **Contracts:** DB-LIVE@1 (provider)
+  - **Acceptance:** migration up/down chạy sạch; không tạo được phiên `live` thứ hai (I1); `ConsumeLiveQuota` không vượt `quota` (I2); view chỉ trả giá khi phiên `live`, còn suất và giá live nhỏ hơn giá thường (I3, D1); kết thúc phiên làm view rỗng; bỏ sản phẩm khỏi phiên xóa giá live của sản phẩm đó (cascade); `RestoreLiveQuotaForOrder` không hoàn cho phiên `ended` và không đưa `sold_quantity` xuống dưới 0 (D2).
+  - **Verification:** `integration-db` (`internal/repository/live_repository_integration_test.go` hoặc tương đương với tag `integration`).
+  - _Requirements: 1.5, 8.7, 8.8_
+
+- [x] 1.2 Cấu hình live, adapter MediaMTX và hạ tầng Docker
+  - **Produces:** các khóa CONFIG-LIVE trong `internal/config` (mặc định, kiểm tra, test); interface `domain.MediaServer` và adapter `internal/media/mediamtx` (`Ping` timeout 3 s qua Control API, `PathOnline` đọc trường `online` của `GET /v3/paths/get/{path}`, 404 → offline); `compose.mediamtx.yml`, `mediamtx.yml`, target `mediamtx-up`/`mediamtx-down` trong Makefile gốc.
+  - **Scope:** config, adapter + test bằng `httptest`, file hạ tầng.
+  - **Consumes:** Control API MediaMTX 1.21.3.
+  - **Contracts:** CONFIG-LIVE@1 (provider); CONFIG-MEDIAMTX@1 (provider); DOMAIN-LIVE-INTERFACES@1 (provider: `MediaServer`)
+  - **Acceptance:** thiếu khóa thì dùng mặc định; giá trị sai thì `config.Load` lỗi rõ ràng; adapter báo online/offline/lỗi đúng; backend không gọi MediaMTX khi khởi động.
+  - **Verification:** `unit`.
+  - _Requirements: 9.3_
+
+- [x] 2. Backend phiên live
+
+- [x] 2.1 Vòng đời phiên và giỏ hàng live (admin + xem công khai)
+  - **Produces:**
+    - `internal/domain/live.go`: kiểu, sentinel lỗi, `LiveQuotaExceededError`, `LiveRepository`, `LiveEventBroadcaster`, `LiveQuotaObserver`;
+    - `repository/live_repository.go`;
+    - `usecase/live`: tạo, lấy hiện tại, lấy theo id, cập nhật sản phẩm/giá, ghim, kết thúc, dựng `LiveProduct`/`LiveSessionView`/`AdminLiveSession`, và phát `live:products`/`live:ended` qua `LiveEventBroadcaster`;
+    - handler `GET /api/v1/live/current`, `GET /api/v1/live/sessions/:id`, toàn bộ API-LIVE-ADMIN trừ hai endpoint bình luận;
+    - ánh xạ lỗi trong `delivery/http/error.go` (gồm 503 `media_server_unavailable`, 409 `live_quota_exceeded`);
+    - Wire provider và `make wire`; provider `LiveEventBroadcaster` tạm là bản no-op cho tới khi task 2.2 thay bằng hub thật.
+  - **Scope:**
+    - Kiểm tra `LiveProductInput` đúng bảng `fields` của design.
+    - Thứ tự kết thúc theo D13; ghim tới sản phẩm ngừng kinh doanh trả `null` (D12).
+    - `AdminLiveSession.products` vẫn trả khi phiên `ended`, với `active = false`.
+    - Ghi các key snapshot của task 2.1 theo bảng contract snapshot của design.
+    - Giữ `sold_quantity` khi thay danh sách.
+    - Chỉ dựng sản phẩm `active`.
+    - Thứ tự `position`.
+    - `summary`, `media` URL từ CONFIG-LIVE.
+    - Use case live hiện thực `LiveQuotaObserver` (tải lại và phát `live:products`).
+    - Test broadcaster dùng bản giả.
+  - **Consumes:** DB-LIVE@1, CONFIG-LIVE@1, `domain.MediaServer`, middleware auth hiện có.
+  - **Contracts:** DOMAIN-LIVE-INTERFACES@1 (provider); API-LIVE-ADMIN@1 (provider); API-LIVE-PUBLIC@1 (provider: `current`, `sessions/:id`); TYPE-LIVE@1 (provider); DB-LIVE@1 (consumer); CONFIG-LIVE@1 (consumer); WS-LIVE-ROOM@1 (consumer: phát `live:products`, `live:ended`)
+  - **Acceptance:**
+    - Tạo phiên thành công trả 201 kèm `whipUrl`.
+    - Phiên thứ hai trả 409 `livestream_already_active`.
+    - MediaMTX không phản hồi trả 503 và không còn phiên `live`.
+    - 401/403 cho người không phải admin.
+    - Snapshot khách có tối đa 50 bình luận chưa ẩn, ghim, sản phẩm active.
+    - Phiên `ended`: snapshot khách trả `products`/`comments` rỗng và `media: null`; `AdminLiveSession` vẫn có `products` với `sold`/`quota` cuối cùng.
+    - Kết thúc lần hai trả 409.
+    - Ghim sản phẩm ngoài giỏ trả 400 `fields.productId`.
+    - Bỏ sản phẩm đang ghim thì bỏ ghim.
+  - **Verification:** `unit` (kiểm tra đầu vào, dựng khoảng giá), `integration-db` (repository), `handler` (ghi contract snapshot vào `.dream/specs/livestream-shopping/contract-snapshots.json`).
+  - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.8, 2.3, 2.6, 3.3, 3.6, 4.4, 6.1, 6.5, 6.6, 6.7, 7.1, 7.3, 7.4, 8.1, 8.2_
+
+- [x] 2.2 Hub WebSocket phòng live, số người xem và tim
+  - **Produces:**
+    - package `internal/delivery/livews` (Hub theo phòng, Client, Handler) hiện thực `LiveEventBroadcaster`;
+    - endpoint `GET /api/v1/live/sessions/:id/ws?token=`;
+    - đếm `customer` khác nhau và phát `live:viewers`, cập nhật `peak_viewers`;
+    - nhận `live:heart` (giới hạn 10/s/người, bỏ qua khi `ended` hoặc admin), gom `live:hearts` mỗi 300 ms, ghi `heart_count` mỗi 2 s và khi đóng phòng;
+    - gửi `live:viewers` và `live:signal` ngay khi kết nối;
+    - `FlushHearts` ghi phần tim đang chờ; `CloseRoom` đóng mọi kết nối của phòng với mã 1000 (sự kiện `live:ended` do use case phát trước đó, D13);
+    - đăng ký vòng ghi tim và đóng hub trong `App.Run`; thay provider no-op của 2.1 bằng hub.
+  - **Scope:** hub, handler, Wire, test hub/handler, ghi các key snapshot frame `ws_live_*` theo bảng contract snapshot của design. Không chạm `internal/delivery/ws` (chat).
+  - **Consumes:** DOMAIN-LIVE-INTERFACES@1, DB-LIVE@1 (`AddHearts`, `UpdatePeakViewers`), `jwt.Manager`.
+  - **Contracts:** WS-LIVE-ROOM@1 (provider); DOMAIN-LIVE-INTERFACES@1 (provider: `LiveEventBroadcaster` implementation); DB-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Token sai đóng 4001; phiên không tồn tại đóng 4004.
+    - Hai tab cùng người tính một người xem; admin không được tính.
+    - 15 tim trong 1 s chỉ cộng 10.
+    - Tim sau `ended` không được cộng.
+    - Sự kiện chỉ tới client cùng phòng.
+    - Test chat hiện có vẫn qua.
+  - **Verification:** `unit` (bộ giới hạn, gom bursts), `handler` (WebSocket qua `httptest` + gorilla client).
+  - _Requirements: 3.8, 5.2, 5.3, 5.4, 5.5, 9.2_
+
+- [x] 2.3 Bình luận live (khách, admin, ẩn)
+  - **Produces:**
+    - `POST /api/v1/live/sessions/:id/comments` (customer);
+    - `POST /api/v1/admin/live/sessions/:id/comments`;
+    - `POST /api/v1/admin/live/comments/:commentId/hide`;
+    - tên hiển thị theo D5;
+    - giới hạn 2 s cho khách (429 `rate_limited`);
+    - phát `live:comment` / `live:comment_hidden`.
+  - **Scope:** use case, repository, handler, ánh xạ lỗi, test, ghi các key snapshot của task 2.3.
+  - **Consumes:** DB-LIVE@1, DOMAIN-LIVE-INTERFACES@1, TYPE-LIVE@1.
+  - **Contracts:** API-LIVE-PUBLIC@1 (provider: comments); API-LIVE-ADMIN@1 (provider: comments, hide); TYPE-LIVE@1 (consumer); WS-LIVE-ROOM@1 (consumer)
+  - **Acceptance:**
+    - Nội dung 1–200 ký tự sau trim; ngoài khoảng đó trả 400 `fields.content`.
+    - Bình luận lần hai trong 2 s trả 429; admin không bị giới hạn.
+    - Phiên `ended` trả 409.
+    - Bình luận ẩn không có trong snapshot khách.
+    - Ẩn id không tồn tại trả 404 `livestream_comment_not_found`.
+    - Admin hiển thị "Chủ shop".
+  - **Verification:** `unit`, `integration-db`, `handler`.
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
+
+- [x] 2.4 Endpoint xác thực MediaMTX
+  - **Produces:** `POST /internal/mediamtx/auth` theo API-MEDIAMTX-AUTH.
+  - **Scope:** handler + use case kiểm tra phiên `live` theo path, lấy token từ `token` hoặc tham số `token` trong `query` (D10), test bảng quyết định.
+  - **Consumes:** `jwt.Manager`, DB-LIVE@1.
+  - **Contracts:** API-MEDIAMTX-AUTH@1 (provider); CONFIG-MEDIAMTX@1 (consumer)
+  - **Acceptance:**
+    - `publish` cần admin + phiên `live` đúng path.
+    - `read` cần token hợp lệ + phiên `live`.
+    - Token chỉ có trong `query` (HLS gốc) vẫn được chấp nhận với `read`.
+    - Token sai, path sai, phiên `ended`, hoặc action khác đều trả 401.
+    - Không log token.
+  - **Verification:** `handler`.
+  - _Requirements: 1.7, 3.2_
+
+- [x] 2.5 Theo dõi tín hiệu và tự kết thúc phiên
+  - **Produces:** `SignalMonitor` trong `usecase/live` chạy trong `App.Run` theo `LIVE_SIGNAL_POLL_INTERVAL`, `TouchSignal` khi online, phát `live:signal` khi đổi trạng thái, `signalOnline` trong snapshot, tự kết thúc với `end_reason = 'signal_lost'` sau `LIVE_SIGNAL_TIMEOUT`.
+  - **Scope:** monitor với đồng hồ inject, Wire/App, test.
+  - **Consumes:** `domain.MediaServer`, DB-LIVE@1, `LiveEventBroadcaster`, CONFIG-LIVE@1.
+  - **Contracts:** DOMAIN-LIVE-INTERFACES@1 (consumer); WS-LIVE-ROOM@1 (consumer: `live:signal`, `live:ended`); CONFIG-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Online → offline → online phát đúng hai sự kiện.
+    - Offline 10 phút tính từ `max(started_at, last_signal_at)` kết thúc phiên.
+    - Lỗi Control API được coi như offline.
+    - Không có phiên `live` thì không gọi MediaMTX.
+  - **Verification:** `unit`.
+  - _Requirements: 2.4, 2.5, 3.9_
+
+- [x] 3. Giá live trong giỏ hàng, sản phẩm và đơn hàng
+
+- [x] 3.1 Giá hiệu lực trong giỏ hàng và chi tiết sản phẩm
+  - **Produces:**
+    - Query `LockVariant`, `ListCartRows`, `ListActiveProductVariants` theo DB-PRICE-QUERIES.
+    - Cart item JSON thêm `isLivePrice`.
+    - Variant chi tiết sản phẩm thêm `livePriceVnd`, `liveRemaining`.
+    - `GET /products`, `/products/featured`, `/admin/products*` giữ giá thường.
+  - **Scope:** sqlc (`LockVariant` dùng `FOR UPDATE OF v, p`), repository mapping, handler response, test giỏ hàng/catalog, ghi các key snapshot của task 3.1.
+  - **Consumes:** DB-LIVE@1 (view).
+  - **Contracts:** DB-PRICE-QUERIES@1 (provider: cart, catalog); TYPE-LIVE@1 (provider: phần mở rộng cart/product detail); DB-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Có phiên `live` với giá live: giỏ hàng trả giá live và `isLivePrice: true`, chi tiết sản phẩm trả `livePriceVnd`.
+    - Không có phiên live, phiên `ended`, hoặc hết suất: mọi thứ như cũ.
+    - Danh sách sản phẩm và bộ lọc giá không đổi.
+  - **Verification:** `integration-db`, `handler`.
+  - _Requirements: 8.3, 8.4, 9.1_
+
+- [x] 3.2 Trừ và hoàn suất giá live khi đặt và hủy đơn
+  - **Produces:**
+    - `LockSubmittedCartItems` trả giá hiệu lực và `live_session_id`.
+    - `InsertOrderItem` ghi `live_session_id`.
+    - `OrderRepository.Create` gọi `ConsumeLiveQuota` sau kiểm tra độ lệch giá: vượt suất trả `LiveQuotaExceededError`, hết suất đồng thời trả `ProductChangedError`.
+    - `Cancel` (nhánh `cancelled`) và `AdminTransition` (`approve_cancel`) gọi `RestoreLiveQuotaForOrder`.
+    - Use case đơn hàng gọi `LiveQuotaObserver.LiveQuotaChanged` sau commit; Wire nối observer.
+  - **Scope:** query, repository, use case đơn hàng, Wire, test, ghi key snapshot của task 3.2.
+  - **Consumes:** DB-LIVE@1, DOMAIN-LIVE-INTERFACES@1 (`LiveQuotaObserver`, `LiveQuotaExceededError`).
+  - **Contracts:** DB-PRICE-QUERIES@1 (provider: orders); DB-LIVE@1 (consumer); DOMAIN-LIVE-INTERFACES@1 (consumer)
+  - **Acceptance:**
+    - Đặt 3 khi còn 2 suất trả 409 `live_quota_exceeded`, không tạo đơn, không trừ suất.
+    - Hai giao dịch đồng thời không vượt suất.
+    - Đơn ghi đơn giá live.
+    - Phiên kết thúc khi khách đang thanh toán (client gửi giá live) trả `product_changed`.
+    - Hủy khi phiên `live` hoàn suất; hủy sau khi phiên `ended` không hoàn.
+    - `cancel_requested` không hoàn.
+    - Đơn đã tạo giữ nguyên đơn giá.
+    - Test đơn hàng/đổi trả/dashboard hiện có vẫn qua.
+  - **Verification:** `unit` (gọi observer), `integration-db`, `handler` (409 `live_quota_exceeded`, contract snapshot).
+  - _Requirements: 8.5, 8.6, 8.8, 8.9, 8.10, 9.1, 9.4_
+
+- [x] 4. Cửa hàng (`frontend/`)
+
+- [x] 4.1 Lối vào LIVE trên header và trang chủ
+  - **Produces:** `src/api/live.ts` (`getCurrentLive`), `src/hooks/useCurrentLive.ts` (poll 30 s, tải lại khi focus), link "LIVE" trong `Header` (desktop + mobile, công khai), `LiveBanner` trên `HomePage`.
+  - **Scope:** API client, hook, component, component test; thêm stub `GET /api/v1/live/current` (trả `data: null`) vào các spec Playwright hiện có của cửa hàng dùng `mountContractRoutes`, để chúng không báo request chưa mock.
+  - **Consumes:** API-LIVE-PUBLIC@1 (`GET /live/current`), TYPE-LIVE@1 (`LiveSummary`).
+  - **Contracts:** API-LIVE-PUBLIC@1 (consumer); TYPE-LIVE@1 (consumer)
+  - **Acceptance:** có phiên thì hiện link và banner dẫn tới `/live/:id`; `data: null` thì không hiện; lỗi mạng thì không hiện và không phá header.
+  - **Verification:** `component`.
+  - _Requirements: 3.1_
+
+- [x] 4.2 Trang xem live: video, bình luận, tim, số người xem
+  - **Produces:**
+    - `src/api/live.ts` (session, comments, URL WebSocket);
+    - `src/hooks/useLiveSocket.ts`;
+    - `src/lib/liveMedia.ts` (WHEP + HLS dự phòng theo D10, thêm dependency `hls.js`);
+    - route `/live/:sessionId` với `LivePage` và `LivePlayer`, `LiveComments`, `HeartButton`, `FloatingHearts`, `ViewerBadge`;
+    - keyframes tim trong `index.css`;
+    - bố cục dọc dưới 768px.
+  - **Scope:** chuyển hướng `?redirect=` khi chưa đăng nhập; đồng bộ lại snapshot khi nối lại WebSocket; trạng thái ended/404/"Đang chờ tín hiệu"/"Bật âm thanh"; component test với `MockWebSocket` và `RTCPeerConnection` giả.
+  - **Consumes:** API-LIVE-PUBLIC@1, WS-LIVE-ROOM@1, TYPE-LIVE@1, `AuthContext`, `tokenStore`.
+  - **Contracts:** API-LIVE-PUBLIC@1 (consumer); WS-LIVE-ROOM@1 (consumer); TYPE-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Chưa đăng nhập thì sang `/login?redirect=/live/:id`.
+    - Bình luận mới từ WebSocket nối vào danh sách; bình luận bị ẩn biến mất.
+    - 429 hiển thị thông điệp và giữ nội dung đang nhập.
+    - Chạm tim hiện hiệu ứng ngay và gửi lô `live:heart`; `live:hearts` cập nhật tổng và bỏ phần của chính mình.
+    - `live:ended` hiện "Phiên live đã kết thúc".
+    - WHEP thất bại vì lỗi khác 401/403/404 thì chuyển HLS.
+    - Autoplay bị chặn thì hiện "Bật âm thanh".
+  - **Verification:** `component`.
+  - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.3, 4.6, 5.1, 5.2, 5.4_
+
+- [x] 4.3 Giỏ hàng live và thẻ sản phẩm ghim
+  - **Produces:** `LiveCartSheet` (danh sách, khoảng giá hiệu lực, giá thường gạch ngang, nhãn "Giá live", "Hết hàng", bộ chọn biến thể từ `GET /products/:id`, "Còn X suất giá live", thêm vào giỏ qua `useCart().addItem`, tên mở tab mới) và `PinnedProductCard` ("Mua ngay" mở sheet ở sản phẩm đó), cập nhật theo `live:products`; thêm `livePriceVnd`, `liveRemaining` vào kiểu `ProductVariant`.
+  - **Scope:** component trong `src/components/live/`, gắn vào `LivePage`, component test.
+  - **Consumes:** TYPE-LIVE@1 (`LiveProduct`), WS-LIVE-ROOM@1 (`live:products`), chi tiết sản phẩm mở rộng (DB-PRICE-QUERIES@1 qua API sản phẩm), `CartContext`.
+  - **Contracts:** TYPE-LIVE@1 (consumer); WS-LIVE-ROOM@1 (consumer)
+  - **Acceptance:**
+    - Thêm thành công hiện "Đã thêm sản phẩm vào giỏ hàng" và badge tăng.
+    - `out_of_stock` / `stock_limit` / `cart_item_unavailable` hiện thông báo tương ứng trong sheet.
+    - Ghim/bỏ ghim/hết suất cập nhật theo thời gian thực.
+    - Video không bị gỡ khi mở sheet.
+  - **Verification:** `component`.
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.7, 7.1, 7.2, 7.3, 7.4, 8.7_
+
+- [x] 4.4 Hiển thị giá live ở chi tiết sản phẩm, giỏ hàng và thanh toán
+  - **Produces:** `ProductDetailPage` hiển thị giá live, giá thường gạch ngang, nhãn "Giá live", "Còn X suất"; `CartPage` nhãn "Giá live" khi `isLivePrice`; `CheckoutPage` xử lý `live_quota_exceeded` (hiện `err.message`, tải lại giỏ); kiểu `CartItem` thêm `isLivePrice` (kiểu `ProductVariant` đã được task 4.3 mở rộng).
+  - **Scope:** component và type, component test. Không có giá live thì giao diện như cũ.
+  - **Consumes:** phần mở rộng cart/product detail của TYPE-LIVE@1, mã `live_quota_exceeded` của API-LIVE-PUBLIC@1.
+  - **Contracts:** TYPE-LIVE@1 (consumer)
+  - **Acceptance:** biến thể có `livePriceVnd` hiển thị đúng hai giá; biến thể không có giá live hiển thị như cũ; 409 `live_quota_exceeded` hiện thông điệp từ máy chủ và tải lại giỏ.
+  - **Verification:** `component`.
+  - _Requirements: 8.3, 8.6_
+
+- [x] 5. Ứng dụng quản trị (`frontend-admin/`)
+
+- [x] 5.1 Chuẩn bị và bắt đầu phát
+  - **Produces:**
+    - `src/api/live.ts`;
+    - `src/lib/whip.ts` (publisher theo D8, D9);
+    - route `/livestream` và mục sidebar "Livestream";
+    - `LivestreamPage` ở trạng thái chuẩn bị với `LiveSetupForm`, `LiveProductPicker`, `LivePriceTable`, chọn camera/micro và xem trước;
+    - gọi tạo phiên, bắt đầu WHIP, gọi kết thúc khi WHIP thất bại lần đầu (D4);
+    - phiên đang `live` thì đi thẳng tới chế độ đang phát.
+  - **Scope:** API client, lib, trang, component test với `getUserMedia`/`RTCPeerConnection` giả.
+  - **Consumes:** API-LIVE-ADMIN@1, TYPE-LIVE@1, `getAdminProducts`, `getAdminProductById` hiện có.
+  - **Contracts:** API-LIVE-ADMIN@1 (consumer); TYPE-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Từ chối quyền camera thì hiện hướng dẫn và vô hiệu nút "Bắt đầu phát".
+    - Lỗi `fields` gắn vào đúng ô.
+    - 409 chuyển tới phiên đang phát; 503 hiện "Không kết nối được máy chủ phát video".
+    - Thành công thì chuyển sang chế độ đang phát.
+  - **Verification:** `component`.
+  - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.8, 8.2_
+
+- [x] 5.2 Điều khiển khi đang phát và tóm tắt
+  - **Produces:**
+    - `src/hooks/useAdminLiveSocket.ts`;
+    - `LiveBroadcastPanel` (xem trước, trạng thái kết nối, thời lượng, người xem, tổng tim, bật/tắt mic/camera, "Kết thúc live" có xác nhận, "Tiếp tục phát" sau khi tải lại);
+    - `LiveCommentsPanel` (gửi với nhãn "Chủ shop", ẩn);
+    - `LiveProductsManager` (thêm/bỏ/sắp xếp, sửa giá/suất, ghim/bỏ ghim, đã bán/suất);
+    - `LiveSummaryCard`: thời lượng, người xem cao nhất, bình luận, tim, và số suất đã bán từng biến thể lấy từ `products[].livePrices`.
+  - **Scope:** component, hook, component test.
+  - **Consumes:** API-LIVE-ADMIN@1, WS-LIVE-ROOM@1, TYPE-LIVE@1.
+  - **Contracts:** API-LIVE-ADMIN@1 (consumer); WS-LIVE-ROOM@1 (consumer); TYPE-LIVE@1 (consumer)
+  - **Acceptance:**
+    - Sự kiện bình luận/tim/người xem/sản phẩm cập nhật bảng điều khiển.
+    - Tắt mic/camera không kết thúc phiên.
+    - Kết thúc hiển thị tóm tắt.
+    - Lỗi số suất nhỏ hơn số đã bán hiện tại ô tương ứng.
+  - **Verification:** `component`.
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6, 4.5, 4.6, 6.5, 7.1, 7.3, 8.2_
+
+- [x] 6. Kiểm chứng xuyên biên
+
+- [x] 6.1 E2E livestream (Mode 2: Shape-Locked Mock E2E)
+  - **Produces:**
+    - `frontend/e2e/livestream-shopping.spec.ts` (Page Object dưới `frontend/e2e/pages/` nếu cần) chạy ở **`Mode 2: Shape-Locked Mock E2E`** bằng `mountContractRoutes` với `.dream/specs/livestream-shopping/contract-snapshots.json`, `page.routeWebSocket` cho phòng live, script giả `RTCPeerConnection`;
+    - ảnh `visual` tại `.dream/specs/livestream-shopping/imgs/`;
+    - báo cáo `.dream/specs/livestream-shopping/report.md`.
+  - **Scope:** load skill `e2e-testing`; chạy `npx playwright test e2e/livestream-shopping.spec.ts` từ `frontend/`. Lỗi tích hợp thì sửa tận gốc ở task liên quan và chạy lại; contract hỏng thì dừng và dùng `managing-contract-changes`.
+  - **Consumes:** contract snapshot do handler test của 2.1, 2.2, 2.3, 3.1, 3.2 ghi.
+  - **Contracts:** API-LIVE-PUBLIC@1 (verifier); WS-LIVE-ROOM@1 (verifier); TYPE-LIVE@1 (verifier)
+  - **Acceptance:**
+    - Header hiện LIVE.
+    - Khách chưa đăng nhập bị chuyển sang đăng nhập và quay lại trang live.
+    - Bình luận gửi và nhận qua WebSocket giả.
+    - Giỏ hàng live mở và thêm vào giỏ.
+    - Ảnh bố cục 390×844 được lưu và kiểm tra.
+  - **Verification:** `mock-e2e`, `visual`.
+  - _Requirements: 3.1, 3.2, 3.7, 4.1, 6.1, 6.2_

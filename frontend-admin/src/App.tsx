@@ -18,6 +18,7 @@ import { AdminPostsPage } from '@/pages/AdminPostsPage'
 import { AdminPostDetailPage } from '@/pages/AdminPostDetailPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { UserDetailPage } from '@/pages/UserDetailPage'
+import { LivestreamPage } from '@/pages/LivestreamPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,7 @@ export function AppRoutes() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="posts" element={<AdminPostsPage />} />
+        <Route path="livestream" element={<LivestreamPage />} />
         <Route path="posts/:id" element={<AdminPostDetailPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/:id" element={<AdminOrderDetailPage />} />

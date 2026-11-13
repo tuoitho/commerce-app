@@ -1,0 +1,13 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.3
+    restart: unless-stopped
+    ports:
+      - "8889:8889"          # WebRTC HTTP (WHIP/WHEP)
+      - "8189:8189/udp"      # WebRTC ICE
+      - "8888:8888"          # HLS
+      - "127.0.0.1:9997:9997" # Control API, reachable from the backend host only
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro

@@ -30,6 +30,8 @@ type variantRow struct {
 	PriceVnd      string
 	StockQuantity int64
 	Active        bool
+	LivePriceVND  *domain.MoneyVND
+	LiveRemaining *int
 }
 
 type CatalogRepository struct {
@@ -637,6 +639,13 @@ func (r *CatalogRepository) mapProductWithDefaults(ctx context.Context, id, name
 			StockQuantity: v.StockQuantity,
 			Active:        v.Active,
 		}
+		if v.HasLivePrice {
+			rows[i].LivePriceVND = domain.MoneyVNDPtr(domain.MoneyVND(v.LivePriceVnd))
+			if v.HasLiveQuota {
+				remaining := int(v.LiveRemaining)
+				rows[i].LiveRemaining = &remaining
+			}
+		}
 	}
 
 	return assembleProduct(id, name, model, brand, description, categoryID, categoryName, featured, active, createdAt, updatedAt, images, groups, values, rows, links, defaultPrice, defaultCurrency, defaultStock)
@@ -725,6 +734,8 @@ func assembleProduct(id, name, model, brand, description, categoryID, categoryNa
 			PriceVND:       domain.MoneyVND(variant.PriceVnd),
 			StockQuantity:  variant.StockQuantity,
 			Active:         variant.Active,
+			LivePriceVND:   variant.LivePriceVND,
+			LiveRemaining:  variant.LiveRemaining,
 		})
 	}
 

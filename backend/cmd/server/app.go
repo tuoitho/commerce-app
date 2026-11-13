@@ -28,6 +28,9 @@ import (
 	reviewuc "commerce-backend/internal/usecase/review"
 	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	usermgmtuc "commerce-backend/internal/usecase/usermgmt"
+	liveuc "commerce-backend/internal/usecase/live"
+	"commerce-backend/internal/media/mediamtx"
+	"commerce-backend/internal/delivery/livews"
 	"commerce-backend/internal/delivery/ws"
 	"commerce-backend/internal/storage/chatmedia"
 	"commerce-backend/internal/storage/reviewmedia"
@@ -44,6 +47,8 @@ type App struct {
 	MediaStore *reviewmedia.Store
 	ChatMedia  *chatmedia.Store
 	WSHub      *ws.Hub
+	LiveHub    *livews.Hub
+	LiveUC     *liveuc.UseCase
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -68,6 +73,26 @@ func (a *App) Run(ctx context.Context) error {
 
 	if a.WSHub != nil {
 		defer a.WSHub.Close()
+	}
+
+	if a.LiveHub != nil {
+		defer a.LiveHub.Close()
+		go a.LiveHub.Run(ctx)
+	}
+
+	if a.LiveUC != nil {
+		go func() {
+			ticker := time.NewTicker(a.Config.LiveSignalPollInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					a.LiveUC.CheckSignal(ctx)
+				}
+			}
+		}()
 	}
 
 	if a.Config.AdminBootstrapEmail != "" && a.Config.AdminBootstrapPassword != "" {
@@ -196,13 +221,14 @@ func provideAddressUseCase(repo *repository.AddressRepository, areaRepo *reposit
 	})
 }
 
-func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, cfg *config.Config) *orderuc.UseCase {
+func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, liveUC *liveuc.UseCase, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
 		Order:               repo,
 		Return:              returnRepo,
 		Review:              reviewRepo,
 		ShippingFeeVND:      cfg.ShippingFeeVND,
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
+		LiveQuota:           liveUC,
 	})
 }
 
@@ -269,6 +295,30 @@ func provideUserMgmtUseCase(repo *repository.UserAdminRepository) *usermgmtuc.Us
 	return usermgmtuc.New(usermgmtuc.Dependencies{Repo: repo})
 }
 
+func provideLiveRepository(pool *pgxpool.Pool) *repository.LiveRepository {
+	return repository.NewLiveRepository(pool)
+}
+
+func provideMediaServer(cfg *config.Config) *mediamtx.Client {
+	return mediamtx.New(cfg.MediaMTXAPIURL)
+}
+
+func provideLiveHub(repo *repository.LiveRepository, log *slog.Logger) *livews.Hub {
+	return livews.NewHub(repo, log)
+}
+
+func provideLiveUseCase(repo *repository.LiveRepository, media *mediamtx.Client, hub *livews.Hub, cfg *config.Config, log *slog.Logger) *liveuc.UseCase {
+	return liveuc.New(liveuc.Dependencies{
+		Repo:            repo,
+		Media:           media,
+		Broadcaster:     hub,
+		Logger:          log,
+		SignalTimeout:   cfg.LiveSignalTimeout,
+		WebRTCPublicURL: cfg.MediaMTXWebRTCPublicURL,
+		HLSPublicURL:    cfg.MediaMTXHLSPublicURL,
+	})
+}
+
 func provideGinRouter(
 	cfg *config.Config,
 	log *slog.Logger,
@@ -285,6 +335,8 @@ func provideGinRouter(
 	postUC *postuc.UseCase,
 	dashboardUC *dashboarduc.UseCase,
 	userMgmtUC *usermgmtuc.UseCase,
+	liveUC *liveuc.UseCase,
+	liveHub *livews.Hub,
 	wsHub *ws.Hub,
 	jwtMgr *jwt.Manager,
 ) *gin.Engine {
@@ -307,6 +359,8 @@ func provideGinRouter(
 		UserMgmt:     userMgmtUC,
 		Chat:         chatUC,
 		Post:         postUC,
+		Live:         liveUC,
+		LiveHub:      liveHub,
 		WSHub:        wsHub,
 		JWT:          jwtMgr,
 		RefreshTTL:   cfg.RefreshTokenTTL,
@@ -334,6 +388,8 @@ func provideApp(
 	mediaStore *reviewmedia.Store,
 	chatMedia *chatmedia.Store,
 	wsHub *ws.Hub,
+	liveHub *livews.Hub,
+	liveUC *liveuc.UseCase,
 ) *App {
 	return &App{
 		Config:     cfg,
@@ -346,5 +402,7 @@ func provideApp(
 		MediaStore: mediaStore,
 		ChatMedia:  chatMedia,
 		WSHub:      wsHub,
+		LiveHub:    liveHub,
+		LiveUC:     liveUC,
 	}
 }

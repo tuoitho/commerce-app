@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { FavoritesProvider } from '@/context/FavoritesContext'
@@ -20,8 +20,11 @@ import { PostDetailPage } from '@/pages/PostDetailPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { LivePage } from '@/pages/LivePage'
 
 export function AppContent() {
+  // The live page is an immersive full-screen stage; the floating chat button would cover its controls.
+  const isLivePage = useLocation().pathname.startsWith('/live/')
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f7f5] font-sans text-zinc-950 selection:bg-emerald-700 selection:text-white">
       <Header />
@@ -38,13 +41,14 @@ export function AppContent() {
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/reviews" element={<ReviewHistoryPage />} />
+          <Route path="/live/:sessionId" element={<LivePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
       <Footer />
-      <ChatWidget />
+      {!isLivePage && <ChatWidget />}
     </div>
   )
 }

@@ -70,7 +70,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil review repo")
 	}
 
-	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, cfg)
+	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, nil, cfg)
 	if orderUC == nil {
 		t.Fatal("expected non-nil order use case")
 	}
@@ -135,7 +135,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil user management usecase")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, dashboardUC, userMgmtUC, wsHub, jwtMgr)
+	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, dashboardUC, userMgmtUC, nil, nil, wsHub, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}
@@ -145,7 +145,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatalf("expected http server listening on :18080, got %v", srv)
 	}
 
-	app := provideApp(cfg, log, nil, srv, nil, orderUC, postUC, nil, nil, wsHub)
+	app := provideApp(cfg, log, nil, srv, nil, orderUC, postUC, nil, nil, wsHub, nil, nil)
 	if app == nil || app.Config != cfg || app.Server != srv || app.OrderUC != orderUC || app.PostUC != postUC || app.WSHub != wsHub {
 		t.Fatal("expected valid app instance")
 	}
