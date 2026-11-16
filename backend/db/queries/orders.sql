@@ -144,6 +144,14 @@ SET status = 'confirmed',
     updated_at = now()
 WHERE status = 'pending_confirmation' AND created_at <= $1;
 
+-- name: AutoConfirmDueOrdersReturning :many
+UPDATE orders
+SET status = 'confirmed',
+    confirmed_at = now(),
+    updated_at = now()
+WHERE status = 'pending_confirmation' AND created_at <= $1
+RETURNING id, user_id, total_vnd::text AS total_vnd;
+
 -- name: ListOrdersByAdmin :many
 SELECT o.id, o.user_id, o.status, o.payment_method,
        o.subtotal_vnd::text AS subtotal_vnd,

@@ -599,4 +599,340 @@ describe('AdminNotificationBell', () => {
       expect(screen.getByText('Bạn chưa có thông báo nào')).toBeInTheDocument()
     })
   })
+
+  it('renders 4 admin category tabs, preserves global unreadCount across tab switches, handles cross-tab WS events without double counting, and deep-links order/return notifications', async () => {
+    const allItems: NotificationItem[] = [
+      {
+        id: 'adm-ord-1',
+        recipientId: 'admin-1',
+        actorId: 'u-1',
+        actorName: 'Nguyễn Minh Anh',
+        actorRole: 'customer',
+        actorCount: 1,
+        groupKey: '',
+        category: 'order',
+        notificationType: 'admin_order_created',
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        excerpt: 'Đơn hàng mới #AAAA1111',
+        metadata: {
+          orderId: 'order-uuid-1',
+          orderShortCode: '#AAAA1111',
+          targetPath: '/orders/order-uuid-1',
+        },
+        isRead: false,
+        createdAt: '2026-11-15T10:00:00Z',
+        updatedAt: '2026-11-15T10:00:00Z',
+      },
+      {
+        id: 'adm-ret-1',
+        recipientId: 'admin-1',
+        actorId: 'u-2',
+        actorName: 'Trần Gia Bảo',
+        actorRole: 'customer',
+        actorCount: 1,
+        groupKey: '',
+        category: 'return',
+        notificationType: 'admin_return_created',
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        excerpt: 'Yêu cầu trả hàng mới cho đơn #BBBB2222',
+        metadata: {
+          orderId: 'order-uuid-2',
+          orderShortCode: '#BBBB2222',
+          returnId: 'return-uuid-1',
+          targetPath: '/returns/return-uuid-1',
+        },
+        isRead: false,
+        createdAt: '2026-11-15T09:50:00Z',
+        updatedAt: '2026-11-15T09:50:00Z',
+      },
+    ]
+
+    let serverItems: NotificationItem[] = [...allItems]
+
+    vi.mocked(postsApi.listNotifications).mockImplementation(async (params = {}) => {
+      const unreadCount = serverItems.filter((item) => !item.isRead).length
+      if (params.category && params.category !== 'all') {
+        return {
+          items: serverItems.filter((item) => item.category === params.category),
+          unreadCount,
+        }
+      }
+      return { items: serverItems, unreadCount }
+    })
+    vi.mocked(postsApi.markNotificationRead).mockImplementation(async (id: string) => {
+      serverItems = serverItems.map((item) =>
+        item.id === id ? { ...item, isRead: true } : item
+      )
+      return {
+        id,
+        isRead: true,
+        unreadCount: serverItems.filter((item) => !item.isRead).length,
+      }
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminNotificationBell />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('2')
+    })
+
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+
+    expect(screen.getByTestId('notification-tab-all')).toHaveTextContent('Tất cả')
+    expect(screen.getByTestId('notification-tab-order')).toHaveTextContent('Đơn hàng')
+    expect(screen.getByTestId('notification-tab-return')).toHaveTextContent('Trả hàng')
+    expect(screen.getByTestId('notification-tab-post')).toHaveTextContent('Bài viết')
+
+    await waitFor(() => {
+      const first = screen.getByTestId('notification-item-adm-ord-1')
+      expect(first.textContent).toContain('Nguyễn Minh Anh')
+      expect(first.textContent).toContain('#AAAA1111')
+    })
+
+    // Switch to Post tab (empty), global unreadCount must stay 2
+    fireEvent.click(screen.getByTestId('notification-tab-post'))
+    await waitFor(() => {
+      expect(postsApi.listNotifications).toHaveBeenCalledWith({ limit: 30, category: 'post' })
+      expect(screen.getByText('Không có thông báo trong danh mục này')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('2')
+    })
+
+    // WS event for another category while on 'post' increments unreadCount without injecting into post tab
+    const cancelReqNotif: NotificationItem = {
+      id: 'adm-ord-cancel-req',
+      recipientId: 'admin-1',
+      actorId: 'u-3',
+      actorName: 'Lê Thu Hà',
+      actorRole: 'customer',
+      actorCount: 1,
+      groupKey: '',
+      category: 'order',
+      notificationType: 'admin_order_cancel_requested',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Yêu cầu hủy đơn hàng #CCCC3333',
+      metadata: {
+        orderId: 'order-uuid-3',
+        orderShortCode: '#CCCC3333',
+        targetPath: '/orders/order-uuid-3',
+      },
+      isRead: false,
+      createdAt: '2026-11-15T10:05:00Z',
+      updatedAt: '2026-11-15T10:05:00Z',
+    }
+    act(() => {
+      serverItems = [cancelReqNotif, ...serverItems]
+      socketCallbacks.onNotification!(cancelReqNotif)
+      // Duplicate push of same unread notification must not double count
+      socketCallbacks.onNotification!(cancelReqNotif)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('3')
+    })
+    expect(screen.queryByTestId('notification-item-adm-ord-cancel-req')).not.toBeInTheDocument()
+
+    // Switch to Order tab and receive admin_order_cancelled in realtime
+    fireEvent.click(screen.getByTestId('notification-tab-order'))
+    await waitFor(() => {
+      expect(postsApi.listNotifications).toHaveBeenCalledWith({ limit: 30, category: 'order' })
+      expect(screen.getByTestId('notification-item-adm-ord-1')).toBeInTheDocument()
+    })
+
+    const cancelledNotif: NotificationItem = {
+      id: 'adm-ord-cancelled',
+      recipientId: 'admin-1',
+      actorId: 'u-4',
+      actorName: 'Phạm Quốc Huy',
+      actorRole: 'customer',
+      actorCount: 1,
+      groupKey: '',
+      category: 'order',
+      notificationType: 'admin_order_cancelled',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Đã hủy đơn hàng #DDDD4444',
+      metadata: {
+        orderId: 'order-uuid-4',
+        orderShortCode: '#DDDD4444',
+        targetPath: '/orders/order-uuid-4',
+      },
+      isRead: false,
+      createdAt: '2026-11-15T10:06:00Z',
+      updatedAt: '2026-11-15T10:06:00Z',
+    }
+    act(() => {
+      serverItems = [cancelledNotif, ...serverItems]
+      socketCallbacks.onNotification!(cancelledNotif)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('4')
+      const item = screen.getByTestId('notification-item-adm-ord-cancelled')
+      expect(item.textContent).toContain('Phạm Quốc Huy')
+      expect(item.textContent).toContain('#DDDD4444')
+    })
+
+    // Click order notification -> markNotificationRead + navigate to /orders/:id
+    fireEvent.click(screen.getByTestId('notification-item-adm-ord-1'))
+    await waitFor(() => {
+      expect(postsApi.markNotificationRead).toHaveBeenCalledWith('adm-ord-1')
+      expect(mockNavigate).toHaveBeenCalledWith('/orders/order-uuid-1')
+    })
+
+    // Reopen, switch to Return tab, click return notification -> navigate to /returns/:id
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+    fireEvent.click(screen.getByTestId('notification-tab-return'))
+    await waitFor(() => {
+      const retItem = screen.getByTestId('notification-item-adm-ret-1')
+      expect(retItem.textContent).toContain('Trần Gia Bảo')
+      expect(retItem.textContent).toContain('#BBBB2222')
+    })
+
+    fireEvent.click(screen.getByTestId('notification-item-adm-ret-1'))
+    await waitFor(() => {
+      expect(postsApi.markNotificationRead).toHaveBeenCalledWith('adm-ret-1')
+      expect(mockNavigate).toHaveBeenCalledWith('/returns/return-uuid-1')
+    })
+  })
+
+  it('clears previous category items on tab switch, handles fast out-of-order responses, shows error retry state, and supports cross-tab retraction', async () => {
+    const initialPost: NotificationItem = {
+      id: 'adm-post-1',
+      recipientId: 'admin-1',
+      actorId: 'u-9',
+      actorName: 'Khách Post',
+      actorRole: 'customer',
+      actorCount: 1,
+      groupKey: 'post_reaction:p9',
+      category: 'post',
+      notificationType: 'post_reaction',
+      postId: 'p9',
+      commentId: null,
+      reactionType: 'love',
+      excerpt: '',
+      metadata: {},
+      isRead: false,
+      createdAt: '2026-11-15T09:00:00Z',
+    }
+    const returnItem: NotificationItem = {
+      id: 'adm-ret-fast',
+      recipientId: 'admin-1',
+      actorId: 'u-10',
+      actorName: 'Khách Trả Hàng',
+      actorRole: 'customer',
+      actorCount: 1,
+      groupKey: '',
+      category: 'return',
+      notificationType: 'admin_return_created',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Yêu cầu trả hàng #EEEE5555',
+      metadata: {
+        orderId: 'o-5',
+        orderShortCode: '#EEEE5555',
+        returnId: 'r-5',
+        targetPath: '/returns/r-5',
+      },
+      isRead: false,
+      createdAt: '2026-11-15T10:00:00Z',
+    }
+
+    let resolveOrderPromise!: (value: { items: NotificationItem[]; unreadCount: number }) => void
+    let resolveReturnPromise!: (value: { items: NotificationItem[]; unreadCount: number }) => void
+
+    vi.mocked(postsApi.listNotifications).mockImplementation((params = {}) => {
+      if (params.category === 'order') {
+        return new Promise((resolve) => {
+          resolveOrderPromise = resolve
+        })
+      }
+      if (params.category === 'return') {
+        return new Promise((resolve) => {
+          resolveReturnPromise = resolve
+        })
+      }
+      if (params.category === 'post') {
+        return Promise.reject(new Error('failed'))
+      }
+      return Promise.resolve({ items: [initialPost], unreadCount: 2 })
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminNotificationBell />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('2')
+    })
+
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-item-adm-post-1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('notification-tab-order'))
+    expect(screen.queryByTestId('notification-item-adm-post-1')).not.toBeInTheDocument()
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+
+    // Switch immediately to Return tab while Order is still in flight
+    fireEvent.click(screen.getByTestId('notification-tab-return'))
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+
+    // Late Order response must NOT clear loading state or render stale order item
+    await act(async () => {
+      resolveOrderPromise({
+        items: [
+          {
+            ...returnItem,
+            id: 'adm-ord-stale',
+            category: 'order',
+            notificationType: 'admin_order_created',
+          },
+        ],
+        unreadCount: 2,
+      })
+      await Promise.resolve()
+    })
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+    expect(screen.queryByTestId('notification-item-adm-ord-stale')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveReturnPromise({ items: [returnItem], unreadCount: 2 })
+      await Promise.resolve()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-item-adm-ret-fast')).toBeInTheDocument()
+    })
+
+    // Cross-tab retraction of hidden post item decrements unreadCount (2 -> 1)
+    act(() => {
+      socketCallbacks.onNotification!({
+        ...initialPost,
+        actorCount: 0,
+      })
+    })
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('1')
+
+    // Failed fetch clears old tab and offers retry button
+    fireEvent.click(screen.getByTestId('notification-tab-post'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('notification-item-adm-ret-fast')).not.toBeInTheDocument()
+      expect(screen.getByText('Không thể tải danh sách thông báo')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Thử lại' })).toBeInTheDocument()
+    })
+  })
 })

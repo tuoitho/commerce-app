@@ -75,13 +75,33 @@ export interface PostDetail extends PostItem {
   comments: PostCommentThread[]
 }
 
-export type NotificationCategory = 'post' | string
+export type NotificationCategory = 'all' | 'order' | 'return' | 'review' | 'live' | 'post' | string
 
 export type PostNotificationType =
   | 'post_reaction'
   | 'post_comment'
   | 'comment_reaction'
   | 'comment_reply'
+
+export type SystemNotificationType =
+  | 'order_confirmed'
+  | 'order_preparing'
+  | 'order_shipped'
+  | 'order_delivered'
+  | 'order_cancel_approved'
+  | 'order_cancel_declined'
+  | 'return_approved'
+  | 'return_rejected'
+  | 'return_received'
+  | 'return_refunded'
+  | 'review_replied'
+  | 'livestream_started'
+  | 'admin_order_created'
+  | 'admin_order_cancel_requested'
+  | 'admin_order_cancelled'
+  | 'admin_return_created'
+
+export type NotificationType = PostNotificationType | SystemNotificationType
 
 export interface NotificationActorSummary {
   id: string
@@ -98,13 +118,24 @@ export interface NotificationItem {
   groupKey?: string
   actorCount?: number
   category: NotificationCategory
-  notificationType: PostNotificationType | string
+  notificationType: NotificationType | string
   postId: string | null
   commentId: string | null
   reactionType: ReactionType | null
   excerpt: string
   metadata: {
     recentActors?: NotificationActorSummary[]
+    orderId?: string
+    orderShortCode?: string
+    returnId?: string
+    returnShortCode?: string
+    reviewId?: string
+    productId?: string
+    sessionId?: string
+    status?: string
+    targetPath?: string
+    totalVnd?: string
+    refundAmountVnd?: string
     [key: string]: unknown
   }
   isRead: boolean
@@ -144,6 +175,7 @@ export interface DeleteCommentResult {
 export interface ListNotificationsParams {
   limit?: number
   offset?: number
+  category?: NotificationCategory
 }
 
 export interface NotificationListResult {
@@ -234,6 +266,7 @@ export const postsApi = {
     const searchParams = new URLSearchParams()
     if (params.limit !== undefined) searchParams.set('limit', String(params.limit))
     if (params.offset !== undefined) searchParams.set('offset', String(params.offset))
+    if (params.category && params.category !== 'all') searchParams.set('category', params.category)
     const query = searchParams.toString() ? `?${searchParams.toString()}` : ''
     return apiClient<NotificationListResult>(`/notifications${query}`)
   },

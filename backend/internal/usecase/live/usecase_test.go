@@ -534,3 +534,39 @@ func TestCheckSignal(t *testing.T) {
 		assert.Zero(t, media.calls)
 	})
 }
+
+type fakeLiveNotificationPublisher struct {
+	sessions []*domain.AdminLiveSession
+}
+
+func (f *fakeLiveNotificationPublisher) NotifyOrderCreated(_ context.Context, _ *domain.Order) {}
+func (f *fakeLiveNotificationPublisher) NotifyOrderCustomerCancelled(_ context.Context, _ *domain.Order) {}
+func (f *fakeLiveNotificationPublisher) NotifyOrderTransition(_ context.Context, _ *domain.Order, _ domain.OrderAdminAction) {}
+func (f *fakeLiveNotificationPublisher) NotifyOrderAutoConfirmed(_ context.Context, _ []domain.AutoConfirmedOrder) {}
+func (f *fakeLiveNotificationPublisher) NotifyReturnCreated(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeLiveNotificationPublisher) NotifyReturnStatusChanged(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeLiveNotificationPublisher) NotifyReviewReplied(_ context.Context, _ *domain.Review, _ string) {}
+func (f *fakeLiveNotificationPublisher) NotifyLivestreamStarted(_ context.Context, session *domain.AdminLiveSession) {
+	if session != nil {
+		f.sessions = append(f.sessions, session)
+	}
+}
+
+func TestCreate_NotifiesLivestreamStarted(t *testing.T) {
+	repo := newFakeRepo()
+	seedValidation(repo)
+	pub := &fakeLiveNotificationPublisher{}
+	uc := New(Dependencies{
+		Repo:          repo,
+		Media:         &fakeMedia{},
+		Broadcaster:   &fakeBroadcaster{},
+		Notifications: pub,
+		Clock:         func() time.Time { return fixedNow },
+	})
+
+	sess, err := uc.Create(context.Background(), adminID, "Sale 12.12", nil)
+	require.NoError(t, err)
+	require.Len(t, pub.sessions, 1)
+	assert.Equal(t, sess.ID, pub.sessions[0].ID)
+	assert.Equal(t, "Sale 12.12", pub.sessions[0].Title)
+}

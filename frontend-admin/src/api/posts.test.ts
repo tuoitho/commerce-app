@@ -173,6 +173,17 @@ describe('postsApi', () => {
     expect(result).toEqual(mockNotifs)
   })
 
+  it('listNotifications serializes category filter and omits category=all', async () => {
+    const mockNotifs = { items: [], unreadCount: 2 }
+    const spy = vi.spyOn(clientModule, 'apiClient').mockResolvedValue(mockNotifs)
+
+    await postsApi.listNotifications({ limit: 20, category: 'order' })
+    expect(spy).toHaveBeenCalledWith('/notifications?limit=20&category=order')
+
+    await postsApi.listNotifications({ limit: 20, category: 'all' })
+    expect(spy).toHaveBeenCalledWith('/notifications?limit=20')
+  })
+
   it('markNotificationRead calls POST /notifications/:id/read', async () => {
     const mockRes = { id: 'n1', isRead: true, unreadCount: 0 }
     const spy = vi.spyOn(clientModule, 'apiClient').mockResolvedValue(mockRes)

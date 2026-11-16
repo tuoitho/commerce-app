@@ -20,21 +20,37 @@ type ReviewFileInput struct {
 }
 
 type ReviewUseCase struct {
-	repo        domain.ReviewRepository
-	mediaStore  domain.ReviewMediaStore
-	catalogRepo domain.CatalogRepository
+	repo          domain.ReviewRepository
+	mediaStore    domain.ReviewMediaStore
+	catalogRepo   domain.CatalogRepository
+	notifications domain.NotificationPublisher
+}
+
+type ReviewOption func(*ReviewUseCase)
+
+func WithNotificationPublisher(pub domain.NotificationPublisher) ReviewOption {
+	return func(uc *ReviewUseCase) {
+		uc.notifications = pub
+	}
 }
 
 func NewReviewUseCase(
 	repo domain.ReviewRepository,
 	mediaStore domain.ReviewMediaStore,
 	catalogRepo domain.CatalogRepository,
+	opts ...ReviewOption,
 ) *ReviewUseCase {
-	return &ReviewUseCase{
+	uc := &ReviewUseCase{
 		repo:        repo,
 		mediaStore:  mediaStore,
 		catalogRepo: catalogRepo,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(uc)
+		}
+	}
+	return uc
 }
 
 func detectImageMime(header []byte) (string, bool) {
@@ -408,7 +424,14 @@ func (u *ReviewUseCase) UpdateAdminReply(ctx context.Context, reviewID string, r
 		}
 		reply = &content
 	}
-	return u.repo.UpdateAdminReply(ctx, reviewID, reply)
+	updated, err := u.repo.UpdateAdminReply(ctx, reviewID, reply)
+	if err != nil {
+		return nil, err
+	}
+	if reply != nil && updated != nil && u.notifications != nil {
+		u.notifications.NotifyReviewReplied(ctx, updated, *reply)
+	}
+	return updated, nil
 }
 
 func (uc *ReviewUseCase) SetReviewVote(ctx context.Context, reviewID, userID string, vote *domain.HelpfulnessVote) (*domain.HelpfulnessState, error) {

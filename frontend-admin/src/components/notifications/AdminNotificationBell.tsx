@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   Bell,
   BellOff,
   CheckCheck,
   Check,
   MessageSquare,
+  Package,
+  RotateCcw,
   ThumbsUp,
   Heart,
+  XCircle,
 } from 'lucide-react'
 import {
   postsApi,
+  type NotificationCategory,
   type NotificationItem,
   type ReactionType,
 } from '@/api/posts'
@@ -22,6 +27,15 @@ export interface AdminNotificationBellProps {
   className?: string
 }
 
+type AdminCategoryTab = 'all' | 'order' | 'return' | 'post'
+
+const ADMIN_CATEGORY_TABS: Array<{ id: AdminCategoryTab; label: string }> = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'order', label: 'Đơn hàng' },
+  { id: 'return', label: 'Trả hàng' },
+  { id: 'post', label: 'Bài viết' },
+]
+
 const REACTION_EMOJIS: Record<ReactionType, string> = {
   like: '👍',
   love: '❤️',
@@ -31,40 +45,129 @@ const REACTION_EMOJIS: Record<ReactionType, string> = {
   angry: '😡',
 }
 
+function getMetadataString(item: NotificationItem, key: string): string {
+  const val = item.metadata?.[key]
+  return typeof val === 'string' ? val.trim() : ''
+}
+
+function resolveAdminNotificationTargetPath(notif: NotificationItem): string | null {
+  if (notif.postId) {
+    const now = Date.now()
+    if (notif.commentId) {
+      return `/posts/${notif.postId}?commentId=${notif.commentId}&focusTs=${now}`
+    }
+    return `/posts/${notif.postId}?focus=post&focusTs=${now}`
+  }
+
+  const explicitTarget = getMetadataString(notif, 'targetPath')
+  if (explicitTarget.startsWith('/')) {
+    return explicitTarget
+  }
+
+  const returnId = getMetadataString(notif, 'returnId')
+  if (returnId) {
+    return `/returns/${returnId}`
+  }
+
+  const orderId = getMetadataString(notif, 'orderId')
+  if (orderId) {
+    return `/orders/${orderId}`
+  }
+
+  return null
+}
+
 export function AdminNotificationBell({ className = '' }: AdminNotificationBellProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
 
   const [isOpen, setIsOpen] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<AdminCategoryTab>('all')
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<NotificationItem[]>([])
+  const selectedCategoryRef = useRef<AdminCategoryTab>('all')
+  const knownUnreadIdsRef = useRef<Set<string>>(new Set())
+  const fetchRequestIdRef = useRef(0)
+
   notificationsRef.current = notifications
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return
-    try {
-      setIsLoading(true)
-      const res = await postsApi.listNotifications({ limit: 30 })
-      const items = res.items || []
-      notificationsRef.current = items
-      setNotifications(items)
-      setUnreadCount(res.unreadCount || 0)
-    } catch {
-      // Ignore background fetch error
-    } finally {
-      setIsLoading(false)
-    }
-  }, [user])
+  const fetchNotifications = useCallback(
+    async (category: AdminCategoryTab = selectedCategoryRef.current) => {
+      if (!user) return
+      const requestId = ++fetchRequestIdRef.current
+      try {
+        setFetchError(false)
+        setIsLoading(true)
+        const params: { limit: number; category?: NotificationCategory } = { limit: 30 }
+        if (category !== 'all') {
+          params.category = category
+        }
+        const res = await postsApi.listNotifications(params)
+        if (fetchRequestIdRef.current !== requestId || selectedCategoryRef.current !== category) {
+          return
+        }
+        const items = res.items || []
+        notificationsRef.current = items
+        setNotifications(items)
+
+        const totalUnread = res.unreadCount || 0
+        setUnreadCount(totalUnread)
+
+        if (totalUnread === 0) {
+          knownUnreadIdsRef.current.clear()
+        } else if (category === 'all') {
+          knownUnreadIdsRef.current = new Set(
+            items.filter((i) => !i.isRead && i.id).map((i) => i.id)
+          )
+        } else {
+          for (const item of items) {
+            if (!item.id) continue
+            if (item.isRead) {
+              knownUnreadIdsRef.current.delete(item.id)
+            } else {
+              knownUnreadIdsRef.current.add(item.id)
+            }
+          }
+        }
+      } catch {
+        if (fetchRequestIdRef.current !== requestId || selectedCategoryRef.current !== category) {
+          return
+        }
+        notificationsRef.current = []
+        setNotifications([])
+        setFetchError(true)
+      } finally {
+        if (fetchRequestIdRef.current === requestId) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [user]
+  )
 
   useEffect(() => {
-    fetchNotifications()
+    void fetchNotifications(selectedCategoryRef.current)
   }, [fetchNotifications])
 
-  // Realtime notification via WebSocket (Req 6.5, 6.7, 8.2)
+  const handleCategoryChange = (category: AdminCategoryTab) => {
+    if (selectedCategoryRef.current === category && !fetchError) {
+      return
+    }
+    selectedCategoryRef.current = category
+    setActiveCategory(category)
+    notificationsRef.current = []
+    setNotifications([])
+    setFetchError(false)
+    setIsLoading(true)
+    void fetchNotifications(category)
+  }
+
+  // Realtime notification via WebSocket (API/WS contracts WS-NOTIFICATIONS@3)
   useAdminChatSocket({
     enabled: Boolean(user),
     onNotification: (newNotif) => {
@@ -80,30 +183,42 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
                 (item.commentId ?? null) === (newNotif.commentId ?? null)))
         )
         if (target) {
+          knownUnreadIdsRef.current.delete(target.id)
           const next = prev.filter((item) => item.id !== target.id)
           notificationsRef.current = next
           setNotifications(next)
           setUnreadCount((c) => Math.max(0, c - 1))
+        } else if (newNotif.id && knownUnreadIdsRef.current.has(newNotif.id)) {
+          knownUnreadIdsRef.current.delete(newNotif.id)
+          setUnreadCount((c) => Math.max(0, c - 1))
         }
         return
       }
+
+      const wasKnownUnread = knownUnreadIdsRef.current.has(newNotif.id)
+      if (!newNotif.isRead && !wasKnownUnread) {
+        knownUnreadIdsRef.current.add(newNotif.id)
+        setUnreadCount((c) => c + 1)
+      } else if (newNotif.isRead && wasKnownUnread) {
+        knownUnreadIdsRef.current.delete(newNotif.id)
+        setUnreadCount((c) => Math.max(0, c - 1))
+      }
+
+      const currentCategory = selectedCategoryRef.current
+      const matchesFilter = currentCategory === 'all' || newNotif.category === currentCategory
+      if (!matchesFilter) {
+        return
+      }
+
       const existing = prev.find((item) => item.id === newNotif.id)
       const next = existing
         ? [newNotif, ...prev.filter((item) => item.id !== newNotif.id)]
         : [newNotif, ...prev]
       notificationsRef.current = next
       setNotifications(next)
-
-      if (existing) {
-        if (existing.isRead && !newNotif.isRead) {
-          setUnreadCount((c) => c + 1)
-        }
-      } else if (!newNotif.isRead) {
-        setUnreadCount((c) => c + 1)
-      }
     },
     onReconnect: () => {
-      fetchNotifications()
+      void fetchNotifications(selectedCategoryRef.current)
     },
   })
 
@@ -132,14 +247,13 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
     }
   }, [isOpen])
 
-  // Handle clicking a notification item (Req 7.1)
   const handleNotificationClick = async (notif: NotificationItem) => {
     setIsOpen(false)
 
-    // Mark as read if not already
     if (!notif.isRead) {
       try {
         await postsApi.markNotificationRead(notif.id)
+        knownUnreadIdsRef.current.delete(notif.id)
         setNotifications((prev) =>
           prev.map((item) => (item.id === notif.id ? { ...item, isRead: true } : item))
         )
@@ -149,22 +263,17 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
       }
     }
 
-    // Deep link navigation
-    if (notif.postId) {
-      const now = Date.now()
-      if (notif.commentId) {
-        navigate(`/posts/${notif.postId}?commentId=${notif.commentId}&focusTs=${now}`)
-      } else {
-        navigate(`/posts/${notif.postId}?focus=post&focusTs=${now}`)
-      }
+    const targetPath = resolveAdminNotificationTargetPath(notif)
+    if (targetPath) {
+      navigate(targetPath)
     }
   }
 
-  // Handle mark single read
   const handleMarkSingleRead = async (e: React.MouseEvent, notifId: string) => {
     e.stopPropagation()
     try {
       await postsApi.markNotificationRead(notifId)
+      knownUnreadIdsRef.current.delete(notifId)
       setNotifications((prev) =>
         prev.map((item) => (item.id === notifId ? { ...item, isRead: true } : item))
       )
@@ -174,10 +283,10 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
     }
   }
 
-  // Handle mark all read (Req 6.6)
   const handleMarkAllRead = async () => {
     try {
       await postsApi.markAllNotificationsRead()
+      knownUnreadIdsRef.current.clear()
       setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })))
       setUnreadCount(0)
     } catch {
@@ -193,7 +302,9 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
       : []
 
     const actorNames =
-      recentActors.length > 0 ? recentActors : [item.actorName || 'Người dùng']
+      recentActors.length > 0
+        ? recentActors
+        : [item.actorName || (item.actorId === null ? 'Hệ thống' : 'Khách hàng')]
     const count =
       item.actorCount && item.actorCount > 0 ? item.actorCount : recentActors.length || 1
 
@@ -242,8 +353,57 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
   const renderNotificationContent = (item: NotificationItem) => {
     const actorNode = renderActorLabel(item)
     const emoji = item.reactionType ? REACTION_EMOJIS[item.reactionType] || '👍' : '👍'
+    const orderCode = getMetadataString(item, 'orderShortCode')
 
     switch (item.notificationType) {
+      case 'admin_order_created':
+        return (
+          <div>
+            {actorNode}{' '}
+            <span className="text-slate-600">
+              vừa đặt đơn hàng mới{' '}
+              {orderCode && <strong className="font-semibold text-slate-900">{orderCode}</strong>}
+            </span>
+          </div>
+        )
+
+      case 'admin_order_cancel_requested':
+        return (
+          <div>
+            {actorNode}{' '}
+            <span className="text-slate-600">
+              yêu cầu hủy đơn hàng{' '}
+              {orderCode && <strong className="font-semibold text-slate-900">{orderCode}</strong>}
+            </span>
+          </div>
+        )
+
+      case 'admin_order_cancelled':
+        return (
+          <div>
+            {actorNode}{' '}
+            <span className="text-slate-600">
+              đã hủy đơn hàng{' '}
+              {orderCode && <strong className="font-semibold text-slate-900">{orderCode}</strong>}
+            </span>
+          </div>
+        )
+
+      case 'admin_return_created':
+        return (
+          <div>
+            {actorNode}{' '}
+            <span className="text-slate-600">
+              gửi yêu cầu trả hàng{' '}
+              {orderCode ? (
+                <>
+                  cho đơn <strong className="font-semibold text-slate-900">{orderCode}</strong>
+                </>
+              ) : null}
+            </span>
+          </div>
+        )
+
       case 'post_reaction':
         return (
           <div>
@@ -306,13 +466,24 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
   }
 
   const getNotificationIcon = (item: NotificationItem) => {
-    if (item.notificationType === 'post_reaction' || item.notificationType === 'comment_reaction') {
-      if (item.reactionType === 'love') {
-        return <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
-      }
-      return <ThumbsUp className="h-3.5 w-3.5 text-blue-500 fill-blue-500" />
+    switch (item.notificationType) {
+      case 'admin_order_created':
+        return <Package className="h-3.5 w-3.5 text-blue-600" />
+      case 'admin_order_cancel_requested':
+        return <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+      case 'admin_order_cancelled':
+        return <XCircle className="h-3.5 w-3.5 text-rose-600" />
+      case 'admin_return_created':
+        return <RotateCcw className="h-3.5 w-3.5 text-orange-600" />
+      case 'post_reaction':
+      case 'comment_reaction':
+        if (item.reactionType === 'love') {
+          return <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
+        }
+        return <ThumbsUp className="h-3.5 w-3.5 text-blue-500 fill-blue-500" />
+      default:
+        return <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
     }
-    return <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
   }
 
   return (
@@ -328,7 +499,7 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
       >
         <Bell className="h-4 w-4 text-slate-700" />
 
-        {/* Unread count badge (Req 6.5) */}
+        {/* Unread count badge */}
         {unreadCount > 0 && (
           <span
             data-testid="notification-unread-badge"
@@ -339,11 +510,11 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
         )}
       </button>
 
-      {/* Notifications Dropdown Panel (Req 6.6) */}
+      {/* Notifications Dropdown Panel */}
       {isOpen && (
         <div
           data-testid="notifications-dropdown-panel"
-          className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-xl z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-[min(calc(100vw-2rem),24rem)] sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-xl z-50 overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
@@ -369,14 +540,57 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
             )}
           </div>
 
+          {/* Category filter tabs */}
+          <div
+            role="tablist"
+            aria-label="Lọc danh mục thông báo quản trị"
+            className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-100 bg-white px-3 py-2"
+          >
+            {ADMIN_CATEGORY_TABS.map((tab) => {
+              const isSelected = activeCategory === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  data-testid={`notification-tab-${tab.id}`}
+                  onClick={() => handleCategoryChange(tab.id)}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
           {/* List of notifications */}
           <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 text-xs">
             {isLoading && notifications.length === 0 ? (
               <div className="py-8 text-center text-slate-400">Đang tải thông báo...</div>
+            ) : fetchError && notifications.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 space-y-2 px-4">
+                <p>Không thể tải danh sách thông báo</p>
+                <button
+                  type="button"
+                  onClick={() => void fetchNotifications(activeCategory)}
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Thử lại
+                </button>
+              </div>
             ) : notifications.length === 0 ? (
               <div className="py-10 text-center text-slate-400 space-y-2">
                 <BellOff className="mx-auto h-8 w-8 text-slate-300" />
-                <p>Bạn chưa có thông báo nào</p>
+                <p>
+                  {activeCategory === 'all'
+                    ? 'Bạn chưa có thông báo nào'
+                    : 'Không có thông báo trong danh mục này'}
+                </p>
               </div>
             ) : (
               notifications.map((item) => {
@@ -385,7 +599,7 @@ export function AdminNotificationBell({ className = '' }: AdminNotificationBellP
                     (a) => a && typeof a.name === 'string' && a.name.trim().length > 0
                   )?.name ||
                   item.actorName ||
-                  'N'
+                  'H'
                 const initial = primaryActor.charAt(0).toUpperCase()
 
                 return (

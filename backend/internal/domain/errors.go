@@ -55,6 +55,7 @@ var (
 	ErrCannotLockAdmin         = errors.New("cannot lock admin")
 	ErrUserAlreadyLocked       = errors.New("user already locked")
 	ErrUserNotLocked           = errors.New("user not locked")
+	ErrAvatarNotFound          = errors.New("avatar not found")
 )
 
 type ValidationError struct {

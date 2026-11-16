@@ -90,7 +90,7 @@ func getUserAdminDetail(ctx context.Context, q *sqlc.Queries, id string) (*domai
 		})
 	}
 	return &domain.UserAdminDetail{
-		User: *toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt),
+		User: *toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.DisplayName, u.Phone, u.AvatarKey, u.CreatedAt, u.UpdatedAt),
 		OrderSummary: domain.UserOrderSummary{
 			TotalOrders:       summary.TotalOrders,
 			DeliveredOrders:   summary.DeliveredOrders,

@@ -1,41 +1,41 @@
 package domain
 
-import (
-	"encoding/json"
-	"testing"
-	"time"
-)
+import "testing"
 
-func TestUser_Public_IncludesRole(t *testing.T) {
+func TestUserPublic_IncludesProfileAndAvatarURL(t *testing.T) {
 	u := &User{
-		ID:           "u123",
-		Email:        "admin@example.com",
-		PasswordHash: "hash",
-		Role:         RoleAdmin,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:    "user-1",
+		Email: "khach@example.com",
+		Role:  RoleCustomer,
 	}
-
 	pub := u.Public()
-	if pub.ID != "u123" {
-		t.Fatalf("expected ID u123, got %s", pub.ID)
-	}
-	if pub.Email != "admin@example.com" {
-		t.Fatalf("expected Email admin@example.com, got %s", pub.Email)
-	}
-	if pub.Role != RoleAdmin {
-		t.Fatalf("expected Role admin, got %s", pub.Role)
+	if pub.DisplayName != nil || pub.Phone != nil || pub.AvatarURL != nil {
+		t.Fatalf("expected nil profile fields for default user, got %+v", pub)
 	}
 
-	data, err := json.Marshal(pub)
-	if err != nil {
-		t.Fatalf("json marshal failed: %v", err)
+	name := "Nguyễn Minh Anh"
+	phone := "0912345678"
+	avatarKey := "550e8400-e29b-41d4-a716-446655440000.webp"
+	u.DisplayName = &name
+	u.Phone = &phone
+	u.AvatarKey = &avatarKey
+
+	pub = u.Public()
+	if pub.DisplayName == nil || *pub.DisplayName != name {
+		t.Fatalf("DisplayName = %v, want %q", pub.DisplayName, name)
 	}
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		t.Fatalf("json unmarshal failed: %v", err)
+	if pub.Phone == nil || *pub.Phone != phone {
+		t.Fatalf("Phone = %v, want %q", pub.Phone, phone)
 	}
-	if raw["role"] != "admin" {
-		t.Fatalf("expected serialized role to be 'admin', got %v", raw["role"])
+	wantURL := "/media/avatars/" + avatarKey
+	if pub.AvatarURL == nil || *pub.AvatarURL != wantURL {
+		t.Fatalf("AvatarURL = %v, want %q", pub.AvatarURL, wantURL)
+	}
+
+	blank := "   "
+	u.AvatarKey = &blank
+	pub = u.Public()
+	if pub.AvatarURL != nil {
+		t.Fatalf("expected nil AvatarURL for blank avatarKey, got %q", *pub.AvatarURL)
 	}
 }

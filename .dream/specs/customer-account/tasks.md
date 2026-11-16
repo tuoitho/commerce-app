@@ -1,0 +1,85 @@
+# Kế hoạch thực hiện (Implementation Plan)
+
+- [x] 1. Backend: mở rộng hồ sơ người dùng và API tài khoản khách hàng
+
+- [x] 1.1 Migration hồ sơ người dùng, `UserPublic` mở rộng và ưu tiên `display_name` ở các phân hệ liên quan
+  - **Produces:**
+    - Migration `backend/db/migrations/000022_add_user_profile.{up,down}.sql` đúng DB-USER-PROFILE@1; chạy `make db-up` và `make gen`.
+    - `domain.User` thêm `DisplayName`, `Phone`, `AvatarKey`; `domain.UserPublic` và `User.Public()` đúng TYPE-USER-PUBLIC@1.
+    - Cập nhật `db/queries/users.sql`, `db/queries/refresh_tokens.sql`, `UserRepository`, `SessionRepository`, `UserAdminRepository` (giữ nguyên JSON admin), và `auth/fakerepos` để ánh xạ đầy đủ 3 cột mới.
+    - Cập nhật chuỗi `COALESCE` ưu tiên `NULLIF(TRIM(u.display_name), '')` trong `db/queries/posts.sql`, `db/queries/chat.sql`, `db/queries/live.sql`, sinh lại `sqlc`, và cập nhật `backend/internal/repository/post_repository.go` để `ListNotifications`, `CreateNotification` (kể cả khi gộp `existingRecent`) và `MarkNotificationRead` làm mới `metadata.recentActors[].name` qua `GetUserDisplayNames`.
+  - **Scope:**
+    - Chạy `make db-up` (kiểm tra cả round-trip down/up) và `make gen` từ `backend/`.
+    - Bảo đảm mọi test hiện có của `auth`, `post`, `chat`, `live`, `usermgmt`, `review` vẫn pass không đổi hợp đồng cũ.
+    - Viết integration test và repository unit test kiểm chứng mặc định `NULL`, các ràng buộc CHECK trên `users`, truy vấn auth trả đúng các cột mới, và ưu tiên `display_name` vs fallback cũ trên `posts`, `chat`, `live` cũng như làm mới `metadata.recentActors` trên `notifications` (đồng thời giữ nguyên nhãn `admin`).
+    - Ghi/kiểm tra golden snapshots cho `TYPE-USER-PUBLIC@1` (`auth_login_200`, `auth_me_200`) trong `auth_handler_test.go` vào `.dream/specs/customer-account/contract-snapshots.json`.
+  - **Consumes:** bảng `users`, `refresh_tokens`, `posts`, `post_comments`, `notifications`, `conversations`, `live_comments`.
+  - **Contracts:** DB-USER-PROFILE@1 (provider); TYPE-USER-PUBLIC@1 (provider)
+  - **Acceptance:**
+    - Sau migration, user cũ có `display_name`, `phone`, `avatar_key` là `NULL`; ràng buộc từ chối `display_name` > 80 ký tự hoặc rỗng, `phone` sai `^0\d{9,10}$`, `avatar_key` sai regex.
+    - `/api/v1/auth/register`, `login`, `refresh`, `me` trả `UserPublic` đủ 6 trường (`id`, `email`, `role`, `displayName`, `phone`, `avatarUrl`).
+    - Truy vấn tên khách hàng trên `posts`, `chat`, `live`, `notifications` (gồm cả `metadata.recentActors` của thông báo có sẵn và thông báo gộp) trả `display_name` khi có và fallback cũ khi `NULL`; `admin` giữ nhãn cũ; snapshot của `admin-user-management` và `product-referral-posts` không đổi.
+  - **Verification:** `unit` (`internal/domain`, `internal/usecase/auth`, `internal/repository/post_repository_test.go`), `integration-db` (`internal/repository/account_repository_integration_test.go`), `handler` (`internal/delivery/http/auth_handler_test.go`, `admin_user_handler_test.go`, `post_handler_test.go`).
+  - _Requirements: 2.1, 6.1, 6.2, 6.3, 6.4_
+
+- [x] 1.2 Domain, use case, repository và HTTP handler cho `/api/v1/account/*` và `/media/avatars/:avatarKey`
+  - **Produces:**
+    - `backend/internal/domain/account.go`, `ErrAvatarNotFound` trong `errors.go` và ánh xạ 404 trong `error.go`.
+    - `backend/db/queries/account.sql`, `backend/internal/repository/account_repository.go` (`UpdateProfile`, `UpdateAvatar`, `ChangePasswordAndRotateSession`).
+    - `backend/internal/usecase/account` (validation hồ sơ, xác thực magic bytes + dung lượng avatar, xóa best-effort ảnh cũ, đổi mật khẩu + xoay vòng refresh token + cấp `AccountSession`).
+    - `backend/internal/delivery/http/account_handler.go`, đăng ký routes `/api/v1/account/*` (`guard.AuthRequired`) và `GET|HEAD /media/avatars/:avatarKey` trong `router.go`.
+    - Khai báo Wire trong `backend/cmd/server/{app.go,wire.go}` và sinh lại `wire_gen.go`.
+    - Golden contract snapshots trong `.dream/specs/customer-account/contract-snapshots.json` cho `API-ACCOUNT@1`, `TYPE-USER-PUBLIC@1`, và `API-ADDRESSES@1` (qua `address_handler_test.go` / `account_handler_test.go`).
+  - **Scope:**
+    - Không dùng HTTP 401 cho lỗi sai `currentPassword`; luôn dùng 400 `validation_error` với `error.fields.currentPassword`.
+    - Kiểm tra chữ ký byte ảnh (`http.DetectContentType`) tránh tệp đổi đuôi giả mạo.
+    - Ghi log `slog.Info` khi đổi mật khẩu thành công chỉ với `user_id` (tuyệt đối không log mật khẩu, hash hay token).
+    - Kiểm chứng mọi snapshot `unauthenticated_401`, `get_profile_200`, `update_profile_200`, `update_profile_validation_400`, `upload_avatar_200`, `upload_avatar_validation_400`, `delete_avatar_200`, `change_password_200`, `change_password_validation_400`, và các snapshot `API-ADDRESSES@1` cần cho E2E.
+  - **Consumes:** DB-USER-PROFILE@1 (task 1.1); TYPE-USER-PUBLIC@1 (task 1.1); `*chatmedia.Store` hiện có; `jwt.Manager`; `security.HashPassword`/`CheckPassword`/`GenerateRefreshToken`; `addressHandler` hiện có.
+  - **Contracts:** API-ACCOUNT@1 (provider); TYPE-USER-PUBLIC@1 (provider); DB-USER-PROFILE@1 (consumer); API-ADDRESSES@1 (verifier)
+  - **Acceptance:**
+    - Đổi mật khẩu thành công cập nhật hash, thu hồi toàn bộ refresh token cũ (gọi `/auth/refresh` bằng cookie cũ trả 401), cấp accessToken + refresh cookie mới (gọi `/auth/refresh` bằng cookie mới trả 200), không rò rỉ secret trong body/log.
+    - Upload/xóa/stream `/media/avatars/:avatarKey` đúng status, headers (`X-Content-Type-Options: nosniff`, `Cache-Control: public, max-age=86400, immutable`), và 404 khi key sai định dạng hoặc không có.
+    - Toàn bộ endpoint `/api/v1/account/*` thiếu token trả 401.
+  - **Verification:** `unit` (`internal/usecase/account`), `integration-db` (`internal/repository/account_repository_integration_test.go`), `handler` (`internal/delivery/http/account_handler_test.go`, `address_handler_test.go`).
+  - _Requirements: 1.3, 2.1, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 4.2, 4.3, 4.4, 4.5, 4.6, 5.2, 7.4_
+
+- [x] 2. Frontend: Storefront `/account`, Header và đồng bộ Checkout
+
+- [x] 2.1 API client, AuthContext, AvatarDisplay, Header, AddressFormDialog và trang `/account`
+  - **Produces:**
+    - Mở rộng `frontend/src/api/types.ts` (`User`), tạo `frontend/src/api/account.ts`, cập nhật `frontend/src/context/AuthContext.tsx` (`updateUser`, `applySession`).
+    - `frontend/src/components/AvatarDisplay.tsx` (hỗ trợ `onError` fallback chữ cái đầu).
+    - Nâng cấp `frontend/src/components/Header.tsx` hiển thị avatar + `displayName || email` và link tới `/account` trên cả desktop (`header-account-link`) và mobile drawer (`mobile-account-link`), giữ nguyên mọi link hiện có.
+    - Trích xuất `frontend/src/components/addresses/AddressFormDialog.tsx` dùng chung giữa `CheckoutPage.tsx` và `AccountPage.tsx`.
+    - `frontend/src/pages/AccountPage.tsx` và đăng ký route `/account` trong `frontend/src/App.tsx`.
+  - **Scope:**
+    - Chưa đăng nhập truy cập `/account` chuyển hướng `/login?redirect=<encoded_url>`.
+    - Đồng bộ `?tab=profile|password|addresses` (mặc định `profile`), role `tablist`/`tab` điều khiển bằng bàn phím.
+    - Tab `profile`: email chỉ đọc, upload/xóa avatar, form `displayName` + `phone`, vô hiệu nút khi đang gửi, cập nhật tức thì `AuthContext` + `Header`, bind lỗi `ApiError.fields`.
+    - Tab `password`: kiểm tra client khớp `confirmNewPassword`, gọi `changePassword`, cập nhật session qua `applySession`, xóa trắng ô mật khẩu.
+    - Tab `addresses`: danh sách địa chỉ, đặt mặc định, thêm/sửa qua `AddressFormDialog`, hộp thoại xác nhận xóa, trạng thái tải/lỗi/rỗng.
+    - Toàn bộ copy bằng tiếng Việt; `CheckoutPage.test.tsx` và `Header.test.tsx` hiện có tiếp tục pass.
+  - **Consumes:** API-ACCOUNT@1; TYPE-USER-PUBLIC@1; API-ADDRESSES@1; `areasApi` hiện có.
+  - **Contracts:** API-ACCOUNT@1 (consumer); TYPE-USER-PUBLIC@1 (consumer); API-ADDRESSES@1 (consumer)
+  - **Acceptance:**
+    - Trang `/account` và `Header` xử lý đúng các trạng thái loading, empty, success, validation error, avatar `onError` fallback, và disable nút khi đang submit.
+    - Toàn bộ test Vitest (`npm test`), `npm run lint`, và `npm run build` trong `frontend/` pass.
+  - **Verification:** `component` (`src/api/account.test.ts`, `src/context/AuthContext.test.tsx`, `src/components/Header.test.tsx`, `src/components/AvatarDisplay.test.tsx`, `src/pages/AccountPage.test.tsx`, `src/pages/CheckoutPage.test.tsx`).
+  - _Requirements: 1.1, 1.2, 1.4, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.5, 4.1, 4.2, 4.4, 5.1, 5.2, 5.3, 7.2, 7.3, 7.4_
+
+- [x] 2.2 Kiểm thử E2E trình duyệt (Mode 2) và bằng chứng trực quan cho `customer-account`
+  - **Produces:**
+    - Page Object `frontend/e2e/pages/AccountPage.ts` và E2E spec `frontend/e2e/customer-account.spec.ts` chạy theo **`Mode 2: Shape-Locked Mock E2E`** qua `mountContractRoutes` sử dụng `.dream/specs/customer-account/contract-snapshots.json`.
+    - Ảnh bằng chứng tại `.dream/specs/customer-account/imgs/*.png` và báo cáo tại `.dream/specs/customer-account/report.md`.
+  - **Scope:**
+    - Chạy thực tế qua Chromium (`npx playwright test e2e/customer-account.spec.ts` trong `frontend/`), bao gồm kiểm tra không có API unmocked bị gọi thêm khi tải `Header`.
+    - Kiểm chứng luồng trình duyệt cho các tiêu chí: redirect chưa đăng nhập `/account?tab=addresses` → `/login` → quay lại đúng tab; chuyển/tải lại giữ tab; sửa hồ sơ thấy ngay trên `Header`; upload & xóa avatar; đổi mật khẩu giữ đăng nhập; thêm/sửa/đặt mặc định/xóa địa chỉ tại `/account?tab=addresses` rồi chuyển sang `/checkout` thấy địa chỉ đồng bộ.
+    - Chụp và đọc kiểm tra ảnh màn hình desktop `1440x900` và mobile `375x812` xác nhận không có tràn ngang (`scrollWidth <= clientWidth`).
+  - **Consumes:** API-ACCOUNT@1, TYPE-USER-PUBLIC@1, API-ADDRESSES@1 (qua `contract-snapshots.json` từ task 1.2); trang `/account`, `/login`, `/checkout`, `Header` (từ task 2.1).
+  - **Contracts:** API-ACCOUNT@1 (verifier); TYPE-USER-PUBLIC@1 (verifier); API-ADDRESSES@1 (verifier)
+  - **Acceptance:**
+    - Mọi test trong `e2e/customer-account.spec.ts` pass hoàn toàn ở Mode 2 không dùng `page.route` trực tiếp trên `/api/v1`.
+    - Ảnh chụp `imgs/` đầy đủ cho các tab ở desktop `1440x900` và mobile `375x812`, `scrollWidth <= clientWidth`, không lỗi hiển thị; `report.md` liên kết đủ ảnh và ghi nhận đúng phạm vi Mode 2.
+  - **Verification:** `mock-e2e`, `visual` (`frontend/e2e/customer-account.spec.ts`).
+  - _Requirements: 1.1, 1.2, 1.4, 2.3, 3.1, 3.3, 4.2, 5.4, 7.1_

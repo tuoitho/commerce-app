@@ -19,6 +19,10 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      '/media': {
+        target: `http://localhost:${process.env.HTTP_PORT ?? 18080}`,
+        changeOrigin: true,
+      },
     },
   },
   test: {

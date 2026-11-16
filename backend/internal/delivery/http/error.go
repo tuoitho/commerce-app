@@ -126,6 +126,8 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "user_not_locked", "Tài khoản không ở trạng thái bị khóa", nil)
 	case errors.Is(err, domain.ErrNotificationNotFound):
 		respondError(c, 404, "notification_not_found", "Không tìm thấy thông báo", nil)
+	case errors.Is(err, domain.ErrAvatarNotFound):
+		respondError(c, 404, "avatar_not_found", "Không tìm thấy ảnh đại diện", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

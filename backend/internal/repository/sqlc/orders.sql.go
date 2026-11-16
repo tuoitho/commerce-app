@@ -25,6 +25,41 @@ func (q *Queries) AutoConfirmDueOrders(ctx context.Context, createdAt time.Time)
 	return err
 }
 
+const autoConfirmDueOrdersReturning = `-- name: AutoConfirmDueOrdersReturning :many
+UPDATE orders
+SET status = 'confirmed',
+    confirmed_at = now(),
+    updated_at = now()
+WHERE status = 'pending_confirmation' AND created_at <= $1
+RETURNING id, user_id, total_vnd::text AS total_vnd
+`
+
+type AutoConfirmDueOrdersReturningRow struct {
+	ID       string
+	UserID   string
+	TotalVnd string
+}
+
+func (q *Queries) AutoConfirmDueOrdersReturning(ctx context.Context, createdAt time.Time) ([]AutoConfirmDueOrdersReturningRow, error) {
+	rows, err := q.db.Query(ctx, autoConfirmDueOrdersReturning, createdAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AutoConfirmDueOrdersReturningRow
+	for rows.Next() {
+		var i AutoConfirmDueOrdersReturningRow
+		if err := rows.Scan(&i.ID, &i.UserID, &i.TotalVnd); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countOrdersByStatus = `-- name: CountOrdersByStatus :many
 SELECT status, count(*) AS count
 FROM orders

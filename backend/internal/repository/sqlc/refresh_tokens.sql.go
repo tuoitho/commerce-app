@@ -40,25 +40,33 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 
 const getRefreshTokenByHash = `-- name: GetRefreshTokenByHash :one
 SELECT rt.id, rt.token_hash, rt.expires_at, rt.revoked_at, rt.created_at,
-       u.id AS user_id, u.email, u.password_hash, u.role AS user_role, u.status AS user_status, u.created_at AS user_created_at, u.updated_at AS user_updated_at
+       u.id AS user_id, u.email, u.password_hash, u.role AS user_role, u.status AS user_status,
+       u.locked_at AS user_locked_at, u.lock_reason AS user_lock_reason,
+       u.display_name AS user_display_name, u.phone AS user_phone, u.avatar_key AS user_avatar_key,
+       u.created_at AS user_created_at, u.updated_at AS user_updated_at
 FROM refresh_tokens rt
 JOIN users u ON u.id = rt.user_id
 WHERE rt.token_hash = $1
 `
 
 type GetRefreshTokenByHashRow struct {
-	ID            string
-	TokenHash     string
-	ExpiresAt     time.Time
-	RevokedAt     pgtype.Timestamptz
-	CreatedAt     time.Time
-	UserID        string
-	Email         string
-	PasswordHash  string
-	UserRole      string
-	UserStatus    string
-	UserCreatedAt time.Time
-	UserUpdatedAt time.Time
+	ID              string
+	TokenHash       string
+	ExpiresAt       time.Time
+	RevokedAt       pgtype.Timestamptz
+	CreatedAt       time.Time
+	UserID          string
+	Email           string
+	PasswordHash    string
+	UserRole        string
+	UserStatus      string
+	UserLockedAt    pgtype.Timestamptz
+	UserLockReason  pgtype.Text
+	UserDisplayName pgtype.Text
+	UserPhone       pgtype.Text
+	UserAvatarKey   pgtype.Text
+	UserCreatedAt   time.Time
+	UserUpdatedAt   time.Time
 }
 
 func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error) {
@@ -75,6 +83,11 @@ func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (
 		&i.PasswordHash,
 		&i.UserRole,
 		&i.UserStatus,
+		&i.UserLockedAt,
+		&i.UserLockReason,
+		&i.UserDisplayName,
+		&i.UserPhone,
+		&i.UserAvatarKey,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)

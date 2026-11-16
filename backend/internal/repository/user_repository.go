@@ -37,7 +37,7 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash, role s
 		}
 		return nil, err
 	}
-	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.DisplayName, u.Phone, u.AvatarKey, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -48,7 +48,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		}
 		return nil, err
 	}
-	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.DisplayName, u.Phone, u.AvatarKey, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, error) {
@@ -59,30 +59,38 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*domain.User, 
 		}
 		return nil, err
 	}
-	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.CreatedAt, u.UpdatedAt), nil
+	return toDomainUser(u.ID, u.Email, u.PasswordHash, u.Role, u.Status, u.LockedAt, u.LockReason, u.DisplayName, u.Phone, u.AvatarKey, u.CreatedAt, u.UpdatedAt), nil
 }
 
 func (r *UserRepository) CountByRole(ctx context.Context, role string) (int64, error) {
 	return r.q.CountUsersByRole(ctx, role)
 }
 
-func toDomainUser(id, email, passwordHash, role, status string, lockedAt pgtype.Timestamptz, lockReason pgtype.Text, createdAt, updatedAt time.Time) *domain.User {
+func pgTextToPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	v := t.String
+	return &v
+}
+
+func toDomainUser(id, email, passwordHash, role, status string, lockedAt pgtype.Timestamptz, lockReason, displayName, phone, avatarKey pgtype.Text, createdAt, updatedAt time.Time) *domain.User {
 	user := &domain.User{
 		ID:           id,
 		Email:        email,
 		PasswordHash: passwordHash,
 		Role:         role,
 		Status:       status,
+		LockReason:   pgTextToPtr(lockReason),
+		DisplayName:  pgTextToPtr(displayName),
+		Phone:        pgTextToPtr(phone),
+		AvatarKey:    pgTextToPtr(avatarKey),
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 	}
 	if lockedAt.Valid {
 		t := lockedAt.Time
 		user.LockedAt = &t
-	}
-	if lockReason.Valid {
-		r := lockReason.String
-		user.LockReason = &r
 	}
 	return user
 }

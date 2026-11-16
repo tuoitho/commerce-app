@@ -379,6 +379,9 @@ type User struct {
 	Status       string
 	LockedAt     pgtype.Timestamptz
 	LockReason   pgtype.Text
+	DisplayName  pgtype.Text
+	Phone        pgtype.Text
+	AvatarKey    pgtype.Text
 }
 
 type VariantOptionValue struct {

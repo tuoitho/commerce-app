@@ -21,6 +21,7 @@ type Dependencies struct {
 	Repo            domain.LiveRepository
 	Media           domain.MediaServer
 	Broadcaster     domain.LiveEventBroadcaster
+	Notifications   domain.NotificationPublisher
 	Clock           func() time.Time
 	Logger          *slog.Logger
 	WebRTCPublicURL string
@@ -30,14 +31,15 @@ type Dependencies struct {
 }
 
 type UseCase struct {
-	repo        domain.LiveRepository
-	media       domain.MediaServer
-	broadcaster domain.LiveEventBroadcaster
-	clock       func() time.Time
-	logger      *slog.Logger
-	webrtcURL   string
-	hlsURL      string
-	timeout     time.Duration
+	repo          domain.LiveRepository
+	media         domain.MediaServer
+	broadcaster   domain.LiveEventBroadcaster
+	notifications domain.NotificationPublisher
+	clock         func() time.Time
+	logger        *slog.Logger
+	webrtcURL     string
+	hlsURL        string
+	timeout       time.Duration
 
 	signalMu      sync.RWMutex
 	signal        map[string]bool
@@ -64,15 +66,16 @@ func New(deps Dependencies) *UseCase {
 		timeout = 10 * time.Minute
 	}
 	return &UseCase{
-		repo:        deps.Repo,
-		media:       deps.Media,
-		broadcaster: broadcaster,
-		clock:       clock,
-		logger:      logger,
-		webrtcURL:   deps.WebRTCPublicURL,
-		hlsURL:      deps.HLSPublicURL,
-		timeout:     timeout,
-		signal:      map[string]bool{},
+		repo:          deps.Repo,
+		media:         deps.Media,
+		broadcaster:   broadcaster,
+		notifications: deps.Notifications,
+		clock:         clock,
+		logger:        logger,
+		webrtcURL:     deps.WebRTCPublicURL,
+		hlsURL:        deps.HLSPublicURL,
+		timeout:       timeout,
+		signal:        map[string]bool{},
 	}
 }
 
@@ -139,7 +142,14 @@ func (uc *UseCase) Create(ctx context.Context, adminID, title string, products [
 	if err != nil {
 		return nil, err
 	}
-	return uc.adminView(ctx, s)
+	view, err := uc.adminView(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyLivestreamStarted(ctx, view)
+	}
+	return view, nil
 }
 
 // ReplaceProducts replaces the live cart, keeping units already sold.

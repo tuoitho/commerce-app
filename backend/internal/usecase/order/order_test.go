@@ -1488,5 +1488,103 @@ func (m *mockReturnForListRefunded) ListRefundedOrderItemIDs(ctx context.Context
 	return m.refundedMap, nil
 }
 
+type fakeOrderNotificationPublisher struct {
+	createdOrders       []string
+	customerCancelled   []string
+	adminTransitions    []domain.OrderAdminAction
+	autoConfirmedOrders []domain.AutoConfirmedOrder
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderCreated(_ context.Context, order *domain.Order) {
+	if order != nil {
+		f.createdOrders = append(f.createdOrders, order.ID)
+	}
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderCustomerCancelled(_ context.Context, order *domain.Order) {
+	if order != nil {
+		f.customerCancelled = append(f.customerCancelled, order.ID)
+	}
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderTransition(_ context.Context, _ *domain.Order, action domain.OrderAdminAction) {
+	f.adminTransitions = append(f.adminTransitions, action)
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderAutoConfirmed(_ context.Context, orders []domain.AutoConfirmedOrder) {
+	f.autoConfirmedOrders = append(f.autoConfirmedOrders, orders...)
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyReturnCreated(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeOrderNotificationPublisher) NotifyReturnStatusChanged(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeOrderNotificationPublisher) NotifyReviewReplied(_ context.Context, _ *domain.Review, _ string) {}
+func (f *fakeOrderNotificationPublisher) NotifyLivestreamStarted(_ context.Context, _ *domain.AdminLiveSession) {}
+
+type fakeReturningOrderRepo struct {
+	*fakeOrderRepo
+	confirmed []domain.AutoConfirmedOrder
+}
+
+func (f *fakeReturningOrderRepo) AutoConfirmDueReturning(_ context.Context, cutoff time.Time) ([]domain.AutoConfirmedOrder, error) {
+	f.lastAutoConfirmCutoff = cutoff
+	return f.confirmed, f.autoConfirmErr
+}
+
+func TestOrderUseCase_PublishesNotifications(t *testing.T) {
+	ctx := context.Background()
+	userID := "11111111-1111-1111-1111-111111111111"
+	addrID := "22222222-2222-2222-2222-222222222222"
+	varID := "33333333-3333-3333-3333-333333333333"
+	orderID := "44444444-4444-4444-4444-444444444444"
+
+	pub := &fakeOrderNotificationPublisher{}
+	baseRepo := &fakeOrderRepo{
+		createdOrder: &domain.Order{ID: orderID, UserID: userID, Status: domain.OrderStatusPendingConfirmation, CreatedAt: time.Now().UTC()},
+		cancelOrder:  &domain.Order{ID: orderID, UserID: userID, Status: domain.OrderStatusCancelRequested},
+		adminTransitionOrder: &domain.Order{ID: orderID, UserID: userID, Status: domain.OrderStatusShipped},
+	}
+	retRepo := &fakeReturningOrderRepo{
+		fakeOrderRepo: baseRepo,
+		confirmed:     []domain.AutoConfirmedOrder{{ID: orderID, UserID: userID, TotalVND: "1000000"}},
+	}
+
+	uc := orderuc.New(orderuc.Dependencies{
+		Order:               retRepo,
+		ShippingFeeVND:      "0",
+		OrderConfirmTimeout: 30 * time.Minute,
+		Notifications:       pub,
+	})
+
+	_, err := uc.Create(ctx, userID, addrID, []domain.OrderLineInput{{VariantID: varID, Quantity: 1}})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+	_, err = uc.Cancel(ctx, userID, orderID)
+	if err != nil {
+		t.Fatalf("cancel failed: %v", err)
+	}
+	_, err = uc.AdminTransition(ctx, orderID, domain.OrderAdminActionShip)
+	if err != nil {
+		t.Fatalf("transition failed: %v", err)
+	}
+	if err := uc.AutoConfirmDue(ctx, time.Now().UTC()); err != nil {
+		t.Fatalf("auto confirm failed: %v", err)
+	}
+
+	if len(pub.createdOrders) != 1 || pub.createdOrders[0] != orderID {
+		t.Errorf("expected NotifyOrderCreated for %s, got %+v", orderID, pub.createdOrders)
+	}
+	if len(pub.customerCancelled) != 1 || pub.customerCancelled[0] != orderID {
+		t.Errorf("expected NotifyOrderCustomerCancelled for %s, got %+v", orderID, pub.customerCancelled)
+	}
+	if len(pub.adminTransitions) != 1 || pub.adminTransitions[0] != domain.OrderAdminActionShip {
+		t.Errorf("expected NotifyOrderTransition(ship), got %+v", pub.adminTransitions)
+	}
+	if len(pub.autoConfirmedOrders) != 1 || pub.autoConfirmedOrders[0].ID != orderID {
+		t.Errorf("expected NotifyOrderAutoConfirmed for %s, got %+v", orderID, pub.autoConfirmedOrders)
+	}
+}
+
+
 
 

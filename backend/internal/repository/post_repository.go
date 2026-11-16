@@ -1398,6 +1398,8 @@ func (r *PostRepository) CreateNotification(ctx context.Context, input domain.Cr
 					existingRecent = []domain.NotificationActorSummary{*prevActor}
 					existingActorIDs = append(existingActorIDs, prevActor.ID)
 				}
+			} else if len(existingRecent) > 0 {
+				existingRecent = refreshActorSummaries(ctx, q, existingRecent)
 			}
 
 			mergedRecent, mergedActorIDs, newCount := mergeNotificationRollupActors(
@@ -1511,11 +1513,13 @@ func (r *PostRepository) CreateNotification(ctx context.Context, input domain.Cr
 		return nil, err
 	}
 
+	item := mapGetNotificationRow(fullRow)
+	refreshNotificationRecentActors(ctx, q, []*domain.NotificationItem{&item})
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
-	item := mapGetNotificationRow(fullRow)
 	return &item, nil
 }
 
@@ -1707,11 +1711,13 @@ func (r *PostRepository) SyncUnreadReactionNotification(ctx context.Context, rec
 		return nil, err
 	}
 
+	item := mapGetNotificationRow(fullRow)
+	refreshNotificationRecentActors(ctx, q, []*domain.NotificationItem{&item})
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
-	item := mapGetNotificationRow(fullRow)
 	return &item, nil
 }
 
@@ -1749,6 +1755,11 @@ func (r *PostRepository) ListNotifications(ctx context.Context, recipientID stri
 	for _, row := range rows {
 		items = append(items, mapNotificationRow(row))
 	}
+	itemPtrs := make([]*domain.NotificationItem, len(items))
+	for i := range items {
+		itemPtrs[i] = &items[i]
+	}
+	refreshNotificationRecentActors(ctx, q, itemPtrs)
 
 	return &domain.NotificationsListResult{
 		Items:       items,
@@ -1785,7 +1796,101 @@ func (r *PostRepository) MarkNotificationRead(ctx context.Context, notificationI
 	}
 
 	item := mapGetNotificationRow(fullRow)
+	refreshNotificationRecentActors(ctx, q, []*domain.NotificationItem{&item})
 	return &item, nil
+}
+
+func fetchDisplayNamesByID(ctx context.Context, q *sqlc.Queries, ids []string) map[string]string {
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := q.GetUserDisplayNames(ctx, ids)
+	if err != nil || len(rows) == 0 {
+		return nil
+	}
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		if trimmed := strings.TrimSpace(row.DisplayName); trimmed != "" {
+			names[row.ID] = trimmed
+		}
+	}
+	return names
+}
+
+func refreshActorSummaries(ctx context.Context, q *sqlc.Queries, actors []domain.NotificationActorSummary) []domain.NotificationActorSummary {
+	if len(actors) == 0 {
+		return actors
+	}
+	seen := make(map[string]bool, len(actors))
+	ids := make([]string, 0, len(actors))
+	for _, a := range actors {
+		id := strings.TrimSpace(a.ID)
+		if id != "" && !seen[id] {
+			if _, err := parseUUID(id); err == nil {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	names := fetchDisplayNamesByID(ctx, q, ids)
+	if len(names) == 0 {
+		return actors
+	}
+	out := make([]domain.NotificationActorSummary, len(actors))
+	for i, a := range actors {
+		if fresh, ok := names[a.ID]; ok {
+			a.Name = fresh
+		}
+		out[i] = a
+	}
+	return out
+}
+
+func refreshNotificationRecentActors(ctx context.Context, q *sqlc.Queries, items []*domain.NotificationItem) {
+	if len(items) == 0 {
+		return
+	}
+	seen := make(map[string]bool)
+	var ids []string
+	for _, item := range items {
+		if item == nil || item.Metadata == nil {
+			continue
+		}
+		actors, ok := item.Metadata["recentActors"].([]domain.NotificationActorSummary)
+		if !ok || len(actors) == 0 {
+			continue
+		}
+		for _, a := range actors {
+			id := strings.TrimSpace(a.ID)
+			if id != "" && !seen[id] {
+				if _, err := parseUUID(id); err == nil {
+					seen[id] = true
+					ids = append(ids, id)
+				}
+			}
+		}
+	}
+	names := fetchDisplayNamesByID(ctx, q, ids)
+	if len(names) == 0 {
+		return
+	}
+	for _, item := range items {
+		if item == nil || item.Metadata == nil {
+			continue
+		}
+		actors, ok := item.Metadata["recentActors"].([]domain.NotificationActorSummary)
+		if !ok || len(actors) == 0 {
+			continue
+		}
+		updated := make([]domain.NotificationActorSummary, len(actors))
+		for i, a := range actors {
+			if fresh, exists := names[a.ID]; exists {
+				a.Name = fresh
+			}
+			updated[i] = a
+		}
+		item.Metadata["recentActors"] = updated
+	}
 }
 
 func (r *PostRepository) MarkAllNotificationsRead(ctx context.Context, recipientID string) error {

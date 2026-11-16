@@ -53,6 +53,9 @@ export interface User {
   id: string
   email: string
   role?: string
+  displayName?: string | null
+  phone?: string | null
+  avatarUrl?: string | null
 }
 
 export interface SessionResponse {

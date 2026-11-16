@@ -29,6 +29,7 @@ func NewOrderRepository(db orderDB) *OrderRepository {
 }
 
 var _ domain.OrderRepository = (*OrderRepository)(nil)
+var _ domain.AutoConfirmReturningRepository = (*OrderRepository)(nil)
 
 func (r *OrderRepository) Create(ctx context.Context, userID string, addressID string, lines []domain.OrderLineInput, shippingFeeVND domain.MoneyVND) (*domain.Order, error) {
 	if len(lines) == 0 {
@@ -794,6 +795,23 @@ func (r *OrderRepository) UndoCancelRequest(ctx context.Context, userID, orderID
 func (r *OrderRepository) AutoConfirmDue(ctx context.Context, cutoff time.Time) error {
 	q := sqlc.New(r.db)
 	return q.AutoConfirmDueOrders(ctx, cutoff)
+}
+
+func (r *OrderRepository) AutoConfirmDueReturning(ctx context.Context, cutoff time.Time) ([]domain.AutoConfirmedOrder, error) {
+	q := sqlc.New(r.db)
+	rows, err := q.AutoConfirmDueOrdersReturning(ctx, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.AutoConfirmedOrder, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.AutoConfirmedOrder{
+			ID:       row.ID,
+			UserID:   row.UserID,
+			TotalVND: domain.MoneyVND(row.TotalVnd),
+		})
+	}
+	return out, nil
 }
 
 func (r *OrderRepository) ListByAdmin(ctx context.Context, statuses []string) ([]domain.Order, error) {

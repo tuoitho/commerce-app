@@ -1,0 +1,325 @@
+{
+  "feature": "system-notifications",
+  "snapshots": {
+    "list_notifications_200": {
+      "contractId": "API-NOTIFICATIONS@3",
+      "endpoint": "GET /api/v1/notifications?limit=20\u0026offset=0",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "items": [
+            {
+              "actorCount": 1,
+              "actorId": null,
+              "actorName": null,
+              "actorRole": null,
+              "category": "order",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Đơn hàng #AAAA1111 đã được bàn giao cho đơn vị vận chuyển.",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666601",
+              "isRead": false,
+              "metadata": {
+                "orderId": "aaaa1111-2222-3333-4444-555566667777",
+                "orderShortCode": "#AAAA1111",
+                "status": "shipped",
+                "targetPath": "/orders/aaaa1111-2222-3333-4444-555566667777",
+                "totalVnd": "29990000"
+              },
+              "notificationType": "order_shipped",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "22222222-2222-2222-2222-222222222222",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": null,
+              "actorName": null,
+              "actorRole": null,
+              "category": "return",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Yêu cầu trả hàng đơn #AAAA1111 đã được hoàn tiền.",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666602",
+              "isRead": false,
+              "metadata": {
+                "orderId": "aaaa1111-2222-3333-4444-555566667777",
+                "orderShortCode": "#AAAA1111",
+                "refundAmountVnd": "29990000",
+                "returnId": "bbbb1111-2222-3333-4444-555566667777",
+                "status": "refunded",
+                "targetPath": "/orders/aaaa1111-2222-3333-4444-555566667777"
+              },
+              "notificationType": "return_refunded",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "22222222-2222-2222-2222-222222222222",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": null,
+              "actorName": null,
+              "actorRole": null,
+              "category": "review",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Cảm ơn bạn đã tin tưởng sản phẩm chính hãng của AuraPhone!",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666603",
+              "isRead": true,
+              "metadata": {
+                "orderId": "aaaa1111-2222-3333-4444-555566667777",
+                "productId": "77777777-7777-7777-7777-777777777777",
+                "productName": "iPhone 15 Pro Max",
+                "reviewId": "cccc1111-2222-3333-4444-555566667777",
+                "targetPath": "/reviews"
+              },
+              "notificationType": "review_replied",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "22222222-2222-2222-2222-222222222222",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": null,
+              "actorName": null,
+              "actorRole": null,
+              "category": "live",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Phiên livestream \"Flash Sale Cuối Tuần\" đang phát trực tiếp.",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666604",
+              "isRead": false,
+              "metadata": {
+                "sessionId": "dddd1111-2222-3333-4444-555566667777",
+                "sessionTitle": "Flash Sale Cuối Tuần",
+                "status": "live",
+                "targetPath": "/live/dddd1111-2222-3333-4444-555566667777"
+              },
+              "notificationType": "livestream_started",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "22222222-2222-2222-2222-222222222222",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": "11111111-1111-1111-1111-111111111111",
+              "actorName": "Nguyễn Minh Anh",
+              "actorRole": "customer",
+              "category": "post",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Ưu đãi tháng 11...",
+              "groupKey": "post_reaction:33333333-3333-3333-3333-333333333333",
+              "id": "66666666-6666-6666-6666-666666666605",
+              "isRead": true,
+              "metadata": {
+                "recentActors": [
+                  {
+                    "id": "22222222-2222-2222-2222-222222222222",
+                    "name": "Nguyễn Minh Anh",
+                    "role": "customer"
+                  }
+                ]
+              },
+              "notificationType": "post_reaction",
+              "postId": "33333333-3333-3333-3333-333333333333",
+              "reactionType": "love",
+              "recipientId": "22222222-2222-2222-2222-222222222222",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": "22222222-2222-2222-2222-222222222222",
+              "actorName": "Nguyễn Minh Anh",
+              "actorRole": "customer",
+              "category": "order",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Đơn hàng mới #AAAA1111",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666606",
+              "isRead": false,
+              "metadata": {
+                "orderId": "aaaa1111-2222-3333-4444-555566667777",
+                "orderShortCode": "#AAAA1111",
+                "recentActors": [
+                  {
+                    "id": "22222222-2222-2222-2222-222222222222",
+                    "name": "Nguyễn Minh Anh",
+                    "role": "customer"
+                  }
+                ],
+                "status": "pending_confirmation",
+                "targetPath": "/orders/aaaa1111-2222-3333-4444-555566667777",
+                "totalVnd": "29990000"
+              },
+              "notificationType": "admin_order_created",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "11111111-1111-1111-1111-111111111111",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            },
+            {
+              "actorCount": 1,
+              "actorId": "22222222-2222-2222-2222-222222222222",
+              "actorName": "Nguyễn Minh Anh",
+              "actorRole": "customer",
+              "category": "return",
+              "commentId": null,
+              "createdAt": "2026-11-15T10:00:00Z",
+              "excerpt": "Yêu cầu trả hàng mới cho đơn #AAAA1111",
+              "groupKey": "",
+              "id": "66666666-6666-6666-6666-666666666607",
+              "isRead": false,
+              "metadata": {
+                "orderId": "aaaa1111-2222-3333-4444-555566667777",
+                "orderShortCode": "#AAAA1111",
+                "recentActors": [
+                  {
+                    "id": "22222222-2222-2222-2222-222222222222",
+                    "name": "Nguyễn Minh Anh",
+                    "role": "customer"
+                  }
+                ],
+                "returnId": "bbbb1111-2222-3333-4444-555566667777",
+                "status": "pending_approval",
+                "targetPath": "/returns/bbbb1111-2222-3333-4444-555566667777"
+              },
+              "notificationType": "admin_return_created",
+              "postId": null,
+              "reactionType": null,
+              "recipientId": "11111111-1111-1111-1111-111111111111",
+              "updatedAt": "2026-11-15T10:00:00Z"
+            }
+          ],
+          "unreadCount": 3
+        },
+        "error": null,
+        "message": "Lấy danh sách thông báo thành công",
+        "meta": {
+          "timestamp": "2026-11-16T06:35:13.487235Z"
+        },
+        "success": true
+      }
+    },
+    "list_notifications_invalid_filter_400": {
+      "contractId": "API-NOTIFICATIONS@3",
+      "endpoint": "GET /api/v1/notifications?category=unknown",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_filter",
+          "fields": {
+            "category": "Danh mục thông báo không hợp lệ"
+          },
+          "message": "Tiêu chí lọc sản phẩm không hợp lệ"
+        },
+        "message": "Tiêu chí lọc sản phẩm không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-16T06:35:13.4956811Z"
+        },
+        "success": false
+      }
+    },
+    "mark_all_notifications_read_200": {
+      "contractId": "API-NOTIFICATIONS@3",
+      "endpoint": "POST /api/v1/notifications/read-all",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "unreadCount": 0
+        },
+        "error": null,
+        "message": "Đánh dấu tất cả đã đọc thành công",
+        "meta": {
+          "timestamp": "2026-11-16T06:35:13.5117061Z"
+        },
+        "success": true
+      }
+    },
+    "mark_notification_read_200": {
+      "contractId": "API-NOTIFICATIONS@3",
+      "endpoint": "POST /api/v1/notifications/:id/read",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "id": "66666666-6666-6666-6666-666666666601",
+          "isRead": true,
+          "unreadCount": 2
+        },
+        "error": null,
+        "message": "Đánh dấu đã đọc thành công",
+        "meta": {
+          "timestamp": "2026-11-16T06:35:13.5036969Z"
+        },
+        "success": true
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-NOTIFICATIONS@3",
+      "endpoint": "GET /api/v1/notifications",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-16T06:35:13.4866821Z"
+        },
+        "success": false
+      }
+    },
+    "ws_notification_new": {
+      "contractId": "WS-NOTIFICATIONS@3",
+      "endpoint": "WS /api/v1/chat/ws",
+      "status": 200,
+      "responseBody": {
+        "payload": {
+          "actorCount": 1,
+          "actorId": "22222222-2222-2222-2222-222222222222",
+          "actorName": "Nguyễn Minh Anh",
+          "actorRole": "customer",
+          "category": "order",
+          "commentId": null,
+          "createdAt": "2026-11-15T10:00:00Z",
+          "excerpt": "Đơn hàng mới #AAAA1111",
+          "groupKey": "",
+          "id": "66666666-6666-6666-6666-666666666699",
+          "isRead": false,
+          "metadata": {
+            "orderId": "aaaa1111-2222-3333-4444-555566667777",
+            "orderShortCode": "#AAAA1111",
+            "recentActors": [
+              {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "name": "Nguyễn Minh Anh",
+                "role": "customer"
+              }
+            ],
+            "status": "pending_confirmation",
+            "targetPath": "/orders/aaaa1111-2222-3333-4444-555566667777",
+            "totalVnd": "29990000"
+          },
+          "notificationType": "admin_order_created",
+          "postId": null,
+          "reactionType": null,
+          "recipientId": "11111111-1111-1111-1111-111111111111",
+          "updatedAt": "2026-11-15T10:00:00Z"
+        },
+        "type": "notification:new"
+      }
+    }
+  }
+}

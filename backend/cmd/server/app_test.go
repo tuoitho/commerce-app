@@ -60,7 +60,23 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil return repo")
 	}
 
-	returnUC := provideReturnUseCase(returnRepo)
+	chatRepo := provideChatRepository(nil)
+	if chatRepo == nil {
+		t.Fatal("expected non-nil chat repository")
+	}
+
+	wsHub := provideWSHub(chatRepo, log)
+	if wsHub == nil {
+		t.Fatal("expected non-nil ws hub")
+	}
+
+	notifRepo := provideNotificationRepository(nil)
+	notifSvc := provideNotificationService(notifRepo, wsHub, log)
+	if notifSvc == nil {
+		t.Fatal("expected non-nil notification service")
+	}
+
+	returnUC := provideReturnUseCase(returnRepo, notifSvc)
 	if returnUC == nil {
 		t.Fatal("expected non-nil return use case")
 	}
@@ -70,7 +86,7 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil review repo")
 	}
 
-	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, nil, cfg)
+	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, nil, notifSvc, cfg)
 	if orderUC == nil {
 		t.Fatal("expected non-nil order use case")
 	}
@@ -85,19 +101,9 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil favorite use case")
 	}
 
-	reviewUC := provideReviewUseCase(reviewRepo, nil, nil)
+	reviewUC := provideReviewUseCase(reviewRepo, nil, nil, notifSvc)
 	if reviewUC == nil {
 		t.Fatal("expected non-nil review use case")
-	}
-
-	chatRepo := provideChatRepository(nil)
-	if chatRepo == nil {
-		t.Fatal("expected non-nil chat repository")
-	}
-
-	wsHub := provideWSHub(chatRepo, log)
-	if wsHub == nil {
-		t.Fatal("expected non-nil ws hub")
 	}
 
 	chatUC := provideChatUseCase(chatRepo, nil, wsHub)
@@ -135,7 +141,9 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil user management usecase")
 	}
 
-	router := provideGinRouter(cfg, log, nil, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, dashboardUC, userMgmtUC, nil, nil, wsHub, jwtMgr)
+	accountRepo := provideAccountRepository(nil)
+	accountUC := provideAccountUseCase(accountRepo, nil, jwtMgr, cfg, log)
+	router := provideGinRouter(cfg, log, nil, accountUC, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, notifSvc, dashboardUC, userMgmtUC, nil, nil, wsHub, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

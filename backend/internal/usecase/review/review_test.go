@@ -703,3 +703,40 @@ func TestHelpfulnessVoting_UseCase(t *testing.T) {
 	})
 }
 
+type fakeReviewNotificationPublisher struct {
+	replied []string
+}
+
+func (f *fakeReviewNotificationPublisher) NotifyOrderCreated(_ context.Context, _ *domain.Order) {}
+func (f *fakeReviewNotificationPublisher) NotifyOrderCustomerCancelled(_ context.Context, _ *domain.Order) {}
+func (f *fakeReviewNotificationPublisher) NotifyOrderTransition(_ context.Context, _ *domain.Order, _ domain.OrderAdminAction) {}
+func (f *fakeReviewNotificationPublisher) NotifyOrderAutoConfirmed(_ context.Context, _ []domain.AutoConfirmedOrder) {}
+func (f *fakeReviewNotificationPublisher) NotifyReturnCreated(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeReviewNotificationPublisher) NotifyReturnStatusChanged(_ context.Context, _ *domain.ReturnRequest) {}
+func (f *fakeReviewNotificationPublisher) NotifyReviewReplied(_ context.Context, rev *domain.Review, replyText string) {
+	if rev != nil {
+		f.replied = append(f.replied, rev.ID+":"+replyText)
+	}
+}
+func (f *fakeReviewNotificationPublisher) NotifyLivestreamStarted(_ context.Context, _ *domain.AdminLiveSession) {}
+
+func TestUpdateAdminReply_NotifiesOnlyOnNonNilReply(t *testing.T) {
+	ctx := context.Background()
+	pub := &fakeReviewNotificationPublisher{}
+	repo := &mockReviewRepo{
+		updateAdminReplyFn: func(_ context.Context, reviewID string, reply *string) (*domain.Review, error) {
+			return &domain.Review{ID: reviewID, AdminReply: reply}, nil
+		},
+	}
+	uc := NewReviewUseCase(repo, nil, nil, WithNotificationPublisher(pub))
+
+	msg := "Cảm ơn bạn!"
+	_, err := uc.UpdateAdminReply(ctx, "rev-99", &msg)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"rev-99:Cảm ơn bạn!"}, pub.replied)
+
+	_, err = uc.UpdateAdminReply(ctx, "rev-99", nil)
+	require.NoError(t, err)
+	assert.Len(t, pub.replied, 1, "deleting admin reply must not notify")
+}
+

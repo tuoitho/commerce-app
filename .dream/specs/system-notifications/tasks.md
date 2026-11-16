@@ -1,0 +1,100 @@
+# Kế hoạch Thực hiện (Implementation Plan)
+
+- [x] 1. Backend: CSDL thông báo, dịch vụ phát/lọc và tích hợp luồng nghiệp vụ
+
+- [x] 1.1 Migration chỉ mục/ràng buộc thông báo, Repository lọc danh mục, `notification.Service` và API `GET /api/v1/notifications?category=`
+  - **Produces:**
+    - Migration `backend/db/migrations/000023_system_notifications_indexes.{up,down}.sql` áp dụng `notifications_category_chk` và `idx_notifications_recipient_category_updated` theo `DB-SYS-NOTIFICATIONS@1`; chạy `make db-up` và kiểm tra round-trip `down`/`up` trên database `commercesdd`.
+    - Domain contracts trong `backend/internal/domain/notification.go` (`NotificationCategory.IsValid()`, 16 `NotificationType`, `ReviewNotificationContext`, `AutoConfirmedOrder`, `AutoConfirmReturningRepository`, `NotificationRepository`, `NotificationUseCase`, `NotificationPublisher`).
+    - Queries mới trong `backend/db/queries/notifications.sql` (`ListNotificationsByRecipientFiltered`, `ListActiveAdminIDs`, `BatchCreateCustomerLiveNotifications`, `GetReviewNotificationContext`) và `AutoConfirmDueOrdersReturning` trong `backend/db/queries/orders.sql`; sinh lại `sqlc`.
+    - `backend/internal/repository/notification_repository.go` và `OrderRepository.AutoConfirmDueReturning` trong `backend/internal/repository/order_repository.go`.
+    - `backend/internal/usecase/notification/service.go` triển khai `NotificationUseCase` (lọc category + `FilterValidationError` `invalid_filter`) và `NotificationPublisher` (định dạng `excerpt`/`metadata` theo `TYPE-NOTIFICATION-METADATA@1`, best-effort `slog.Warn` khi lỗi, kiểm tra `OnlineChecker` trước khi phát livestream WS).
+    - Cập nhật `backend/internal/delivery/http/notification_handler.go` và `router.go` hỗ trợ `?category=` với adapter fallback khi `deps.Notification == nil`; ghi/kiểm tra golden contract snapshots `.dream/specs/system-notifications/contract-snapshots.json` (`unauthenticated_401`, `list_notifications_200` gồm các phần tử đại diện đủ hình dạng `metadata`, `list_notifications_invalid_filter_400`, `mark_notification_read_200`, `mark_all_notifications_read_200`, `ws_notification_new`).
+  - **Scope:**
+    - Bảo toàn chính xác 17 trường JSON cấp 1 trên `NotificationItem` và giữ toàn bộ test của `post_handler_test.go`, `admin_user_handler_test.go` pass không đổi snapshot cũ.
+    - Viết unit test (`domain/notification_test.go`, `usecase/notification/service_test.go`), integration-db test (`repository/notification_repository_integration_test.go`, `repository/order_repository_test.go`), và handler test (`delivery/http/notification_handler_test.go`).
+  - **Consumes:** bảng `notifications`, `users`, `orders`, `order_items`, `product_reviews`; `DB-USER-PROFILE@1`; `ws.Hub`; `PostRepository` notification mappers trong package `repository`.
+  - **Contracts:** DB-SYS-NOTIFICATIONS@1 (provider); API-NOTIFICATIONS@3 (provider); WS-NOTIFICATIONS@3 (provider); TYPE-NOTIFICATION-METADATA@1 (provider); DB-USER-PROFILE@1 (consumer)
+  - **Acceptance:**
+    - `notifications_category_chk` từ chối danh mục ngoài `('post','order','return','review','live')`; `ListNotificationsByRecipientFiltered` lọc đúng `category` và giải quyết `actorName` ưu tiên `users.display_name`, trong khi `unreadCount` đếm toàn cục mọi danh mục.
+    - `GET /api/v1/notifications?category=invalid` trả về HTTP 400 `invalid_filter` với `error.fields.category`; thiếu JWT trả HTTP 401; không truyền hoặc truyền category hợp lệ trả HTTP 200 khớp snapshot.
+    - `notification.Service` nuốt an toàn lỗi DB/WS kèm `slog.Warn` và chỉ đẩy WS livestream tới `recipientId` đang online khi `OnlineChecker` được cung cấp.
+  - **Verification:** `unit`, `integration-db`, `handler`.
+  - _Requirements: 1.1, 2.2, 2.4, 3.1, 3.4, 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3_
+
+- [x] 1.2 Tích hợp `NotificationPublisher` vào `order`, `returns`, `review`, `live` và cấu hình Wire DI
+  - **Produces:**
+    - Cập nhật `backend/internal/usecase/order/order.go` phát `NotifyOrderCreated`, `NotifyOrderCustomerCancelled`, `NotifyOrderTransition`, `NotifyOrderAutoConfirmed` (qua `AutoConfirmReturningRepository` nếu repo hỗ trợ).
+    - Cập nhật `backend/internal/usecase/returns/returns.go` phát `NotifyReturnCreated` và `NotifyReturnStatusChanged` ở `Create`, `AdminApprove`, `AdminReject`, `AdminReceive`, `AdminRefund`.
+    - Cập nhật `backend/internal/usecase/review/review.go` thêm `WithNotificationPublisher(pub)` gọi `NotifyReviewReplied` chỉ khi `reply != nil`.
+    - Cập nhật `backend/internal/usecase/live/usecase.go` gọi `NotifyLivestreamStarted` sau khi `CreateSession` thành công.
+    - Đăng ký `provideNotificationRepository`, `provideNotificationService` trong `backend/cmd/server/{app.go,app_test.go,wire.go}` và sinh lại `wire_gen.go`.
+  - **Scope:**
+    - Mọi hook phát thông báo chỉ chạy **sau khi** repository hoàn tất ghi dữ liệu thành công; không thay đổi hành vi hay chữ ký lỗi của luồng nghiệp vụ khi `Notifications == nil` hoặc `Notifications` gặp lỗi nội bộ.
+    - Viết/bổ sung unit test ở `usecase/order/order_test.go`, `usecase/returns/returns_test.go`, `usecase/review/review_test.go`, `usecase/live/usecase_test.go` và cập nhật `cmd/server/app_test.go`.
+  - **Consumes:** DB-SYS-NOTIFICATIONS@1, WS-NOTIFICATIONS@3, TYPE-NOTIFICATION-METADATA@1, `notification.Service` (từ task 1.1).
+  - **Contracts:** TYPE-NOTIFICATION-METADATA@1 (provider); WS-NOTIFICATIONS@3 (consumer)
+  - **Acceptance:**
+    - Đặt đơn (`Create`), hủy/yêu cầu hủy (`Cancel`), chuyển trạng thái Admin (`confirm_preparing`, `ship`, `deliver`, `approve_cancel`, `decline_cancel`) và `AutoConfirmDue` phát đúng loại thông báo tới Admin hoặc Khách hàng.
+    - Tạo yêu cầu trả hàng (`Create`) và cập nhật trạng thái trả hàng (`Approve`, `Reject`, `Receive`, `Refund`) phát đúng thông báo tới Admin hoặc Khách hàng.
+    - `UpdateAdminReply` với `reply != nil` phát `review_replied`, còn `reply == nil` không phát thông báo.
+    - `live.UseCase.Create` thành công kích hoạt `NotifyLivestreamStarted`.
+    - Toàn bộ `go test -count=1 ./...` và `go vet ./...` trong `backend/` pass.
+  - **Verification:** `unit`.
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 5.1, 5.3_
+
+- [x] 2. Frontend: Chuông thông báo đa danh mục trên Storefront và Admin Portal
+
+- [x] 2.1 Mở rộng API & chuông thông báo đa danh mục kèm deep-link trên Storefront (`frontend`)
+  - **Produces:**
+    - Cập nhật `frontend/src/api/posts.ts` bổ sung kiểu `NotificationCategory`, 16 `NotificationType`, `metadata` deep-link fields và tham số `category` trong `listNotifications`.
+    - Nâng cấp `frontend/src/components/notifications/NotificationBell.tsx` với 6 tab lọc (`Tất cả`, `Đơn hàng`, `Đổi trả`, `Đánh giá`, `Live`, `Bài viết`), badge `unreadCount` toàn cục, icon & copy tiếng Việt cho tất cả loại thông báo (hiển thị `'Cửa hàng'` khi `actorId == null`), xử lý realtime WS `onNotification` khớp bộ lọc, và điều hướng deep-link `/orders/:orderId`, `/reviews`, `/live/:sessionId`, `/posts/:postId`.
+    - Cập nhật/bổ sung test trong `frontend/src/components/notifications/NotificationBell.test.tsx`.
+  - **Scope:**
+    - Dùng `knownNotificationIdsRef` (hoặc tương đương) để không đếm trùng `unreadCount` khi có rollup hoặc khi sự kiện WS thuộc tab khác tab đang xem.
+    - Bảo đảm cuộn ngang thanh tab mượt trên mobile 375px và không vỡ các test `NotificationBell` hiện có của phân hệ Bài viết.
+    - Chạy `npm run lint`, `npm test`, `npm run build` tại `frontend/`.
+  - **Consumes:** API-NOTIFICATIONS@3, WS-NOTIFICATIONS@3, TYPE-NOTIFICATION-METADATA@1.
+  - **Contracts:** API-NOTIFICATIONS@3 (consumer); WS-NOTIFICATIONS@3 (consumer); TYPE-NOTIFICATION-METADATA@1 (consumer)
+  - **Acceptance:**
+    - Chuyển giữa 6 tab gọi `postsApi.listNotifications` với `category` tương ứng mà giữ nguyên `unreadCount` toàn cục; trạng thái loading/empty và mọi copy hiển thị đúng tiếng Việt.
+    - WS `notification:new` tăng `unreadCount` tức thì và chỉ prepend vào danh sách đang xem nếu tab là `all` hoặc trùng `category`.
+    - Bấm vào thông báo đánh dấu đã đọc, đóng dropdown và gọi đúng route đích `/orders/:id`, `/reviews`, `/live/:sessionId`, `/posts/:id`.
+  - **Verification:** `component`.
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+
+- [x] 2.2 Proxy `/media`, mở rộng API & chuông thông báo Admin đa danh mục (`frontend-admin`)
+  - **Produces:**
+    - Bổ sung proxy `/media` trong `frontend-admin/vite.config.ts`.
+    - Cập nhật `frontend-admin/src/api/posts.ts` mở rộng `NotificationCategory`, `NotificationType`, `metadata` và tham số `category` trên `listNotifications`.
+    - Nâng cấp `frontend-admin/src/components/notifications/AdminNotificationBell.tsx` với 4 tab lọc (`Tất cả`, `Đơn hàng`, `Trả hàng`, `Bài viết`), badge `unreadCount` toàn cục, icon & copy tiếng Việt kèm `actorName` khách hàng và mã đơn/trả hàng, đồng bộ WS realtime và deep-link tới `/orders/:orderId`, `/returns/:returnId`, `/posts/:postId`.
+    - Viết unit/component tests tại `frontend-admin/src/components/notifications/AdminNotificationBell.test.tsx`.
+  - **Scope:**
+    - Giữ nguyên tương thích với các thông báo `post` hiện có trên Admin Portal.
+    - Chạy `npm run lint`, `npm test`, `npm run build` tại `frontend-admin/`.
+  - **Consumes:** API-NOTIFICATIONS@3, WS-NOTIFICATIONS@3, TYPE-NOTIFICATION-METADATA@1.
+  - **Contracts:** API-NOTIFICATIONS@3 (consumer); WS-NOTIFICATIONS@3 (consumer); TYPE-NOTIFICATION-METADATA@1 (consumer)
+  - **Acceptance:**
+    - 4 tab lọc gọi `postsApi.listNotifications` đúng `category`, giữ nguyên `unreadCount` tổng; WS `notification:new` cho `admin_order_created`, `admin_order_cancel_requested`, `admin_order_cancelled`, `admin_return_created` cập nhật badge & danh sách tức thì.
+    - Click thông báo đánh dấu đã đọc, đóng panel và điều hướng đúng tới `/orders/:orderId`, `/returns/:returnId`, `/posts/:postId`.
+    - `npm run lint`, `npm test`, `npm run build` trong `frontend-admin/` pass không lỗi.
+  - **Verification:** `component`.
+  - _Requirements: 7.1, 7.2, 7.3_
+
+- [x] 3. Xác minh E2E Trình duyệt & Trực quan
+
+- [x] 3.1 Kiểm thử E2E trình duyệt (Mode 2) trên Storefront và Admin Portal kèm bằng chứng trực quan
+  - **Produces:**
+    - E2E spec `frontend/e2e/system-notifications.spec.ts` chạy theo **`Mode 2: Shape-Locked Mock E2E`** qua `mountContractRoutes` sử dụng `.dream/specs/system-notifications/contract-snapshots.json` và `page.routeWebSocket(/\/api\/v1\/chat\/ws/, ...)`.
+    - Ảnh chụp bằng chứng tại `.dream/specs/system-notifications/imgs/*.png` và báo cáo kiểm thử `.dream/specs/system-notifications/report.md`.
+  - **Scope:**
+    - Kiểm thử trên cả Storefront (`http://localhost:15173`) và Admin Portal (`http://localhost:15174`) qua Chromium thực (`npx playwright test e2e/system-notifications.spec.ts` trong `frontend/`).
+    - Xác minh nhận thông báo WS `notification:new` realtime cho khách hàng (`order_shipped`, `return_refunded`, `review_replied`, `livestream_started`) và quản trị viên (`admin_order_created`, `admin_return_created`), lọc tab danh mục giữ nguyên tổng badge `unreadCount`, đánh dấu đã đọc và điều hướng deep-link tới `/orders/:id`, `/returns/:id`, `/reviews`, `/live/:sessionId`, `/posts/:id`.
+    - Chụp và kiểm tra trực quan bằng `read_file` tối thiểu: Storefront dropdown & filter tabs ở desktop `1440x900` và mobile `375x812`, cùng Admin Portal dropdown ở desktop `1440x900`, xác nhận không tràn ngang (`scrollWidth <= innerWidth`) và không bị cắt/chồng chữ.
+  - **Consumes:** API-NOTIFICATIONS@3, WS-NOTIFICATIONS@3, TYPE-NOTIFICATION-METADATA@1 (qua `contract-snapshots.json` từ task 1.1); Storefront `NotificationBell` (task 2.1); Admin `AdminNotificationBell` (task 2.2).
+  - **Contracts:** API-NOTIFICATIONS@3 (verifier); WS-NOTIFICATIONS@3 (verifier); TYPE-NOTIFICATION-METADATA@1 (verifier)
+  - **Acceptance:**
+    - Toàn bộ kịch bản trong `e2e/system-notifications.spec.ts` pass ở Mode 2 không dùng `page.route` trực tiếp trên `/api/v1`.
+    - Ảnh chụp `imgs/` đầy đủ cho Storefront (`1440x900` & `375x812`) và Admin (`1440x900`), không tràn ngang, và `report.md` liên kết đủ ảnh cùng kết quả Mode 2.
+  - **Verification:** `mock-e2e`, `visual`.
+  - _Requirements: 1.4, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4_

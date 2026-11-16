@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -358,3 +359,96 @@ func TestRegisterHandler_ShortPassword(t *testing.T) {
 		t.Fatalf("unexpected error body: %+v", eb.Error)
 	}
 }
+
+func TestAuthHandler_UserPublicProfileFieldsAndSnapshots(t *testing.T) {
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "customer-account", "contract-snapshots.json")
+	router, users := newTestRouter(t)
+
+	regW, _ := doRequest(t, router, http.MethodPost, "/api/v1/auth/register", map[string]string{
+		"email": "profile.customer@example.com", "password": "password123",
+	})
+	if regW.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", regW.Code, regW.Body.String())
+	}
+
+	u := users.ByID("1")
+	name := "Nguyễn Minh Anh"
+	phone := "0912345678"
+	avatarKey := "550e8400-e29b-41d4-a716-446655440000.webp"
+	u.DisplayName = &name
+	u.Phone = &phone
+	u.AvatarKey = &avatarKey
+
+	loginBody := map[string]string{
+		"email": "profile.customer@example.com", "password": "password123",
+	}
+	loginW, loginCookies := doRequest(t, router, http.MethodPost, "/api/v1/auth/login", loginBody)
+	if loginW.Code != http.StatusOK {
+		t.Fatalf("login status = %d, body = %s", loginW.Code, loginW.Body.String())
+	}
+	assertOrRecordContractSnapshot(
+		t,
+		snapshotPath,
+		"customer-account",
+		"auth_login_200",
+		"TYPE-USER-PUBLIC@1",
+		"POST /api/v1/auth/login",
+		loginBody,
+		loginW,
+	)
+
+	var loginEnv struct {
+		Data sessionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginEnv); err != nil {
+		t.Fatal(err)
+	}
+	if loginEnv.Data.User.DisplayName == nil || *loginEnv.Data.User.DisplayName != name {
+		t.Fatalf("login DisplayName = %v, want %q", loginEnv.Data.User.DisplayName, name)
+	}
+	if loginEnv.Data.User.Phone == nil || *loginEnv.Data.User.Phone != phone {
+		t.Fatalf("login Phone = %v, want %q", loginEnv.Data.User.Phone, phone)
+	}
+	wantAvatarURL := "/media/avatars/" + avatarKey
+	if loginEnv.Data.User.AvatarURL == nil || *loginEnv.Data.User.AvatarURL != wantAvatarURL {
+		t.Fatalf("login AvatarURL = %v, want %q", loginEnv.Data.User.AvatarURL, wantAvatarURL)
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	meReq.Header.Set("Authorization", "Bearer "+loginEnv.Data.AccessToken)
+	meW := httptest.NewRecorder()
+	router.ServeHTTP(meW, meReq)
+	if meW.Code != http.StatusOK {
+		t.Fatalf("me status = %d, body = %s", meW.Code, meW.Body.String())
+	}
+	assertOrRecordContractSnapshot(
+		t,
+		snapshotPath,
+		"customer-account",
+		"auth_me_200",
+		"TYPE-USER-PUBLIC@1",
+		"GET /api/v1/auth/me",
+		nil,
+		meW,
+	)
+
+	ck := refreshCookie(loginCookies)
+	if ck == nil {
+		t.Fatal("expected refresh cookie from login")
+	}
+	refreshW, _ := doRequest(t, router, http.MethodPost, "/api/v1/auth/refresh", nil, ck)
+	if refreshW.Code != http.StatusOK {
+		t.Fatalf("refresh status = %d, body = %s", refreshW.Code, refreshW.Body.String())
+	}
+	assertOrRecordContractSnapshot(
+		t,
+		snapshotPath,
+		"customer-account",
+		"auth_refresh_200",
+		"TYPE-USER-PUBLIC@1",
+		"POST /api/v1/auth/refresh",
+		nil,
+		refreshW,
+	)
+}
+

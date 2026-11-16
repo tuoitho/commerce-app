@@ -20,25 +20,18 @@ import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { addressesApi } from '@/api/addresses'
-import { areasApi } from '@/api/areas'
 import { ordersApi } from '@/api/orders'
 import {
   ApiError,
   type Address,
-  type AddressInput,
-  type Province,
-  type Ward,
   type CreateOrderInput,
 } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { AddressFormDialog } from '@/components/addresses/AddressFormDialog'
 import {
   Dialog,
   DialogContent,
@@ -47,24 +40,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-
-interface AddressFormData {
-  recipientName: string
-  phone: string
-  provinceCode: number | ''
-  wardCode: number | ''
-  detailAddress: string
-  isDefault: boolean
-}
-
-const initialAddressFormData: AddressFormData = {
-  recipientName: '',
-  phone: '',
-  provinceCode: '',
-  wardCode: '',
-  detailAddress: '',
-  isDefault: false,
-}
 
 export function CheckoutPage() {
   const navigate = useNavigate()
@@ -78,13 +53,6 @@ export function CheckoutPage() {
 
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false)
   const [editingAddress, setEditingAddress] = useState<Address | null>(null)
-  const [addressFormData, setAddressFormData] = useState<AddressFormData>(initialAddressFormData)
-  const [addressFormErrors, setAddressFormErrors] = useState<Record<string, string>>({})
-  const [isSavingAddress, setIsSavingAddress] = useState(false)
-
-  const [provinces, setProvinces] = useState<Province[]>([])
-  const [wards, setWards] = useState<Ward[]>([])
-  const [wardsLoading, setWardsLoading] = useState(false)
 
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
 
@@ -96,21 +64,6 @@ export function CheckoutPage() {
       navigate('/login?redirect=/checkout')
     }
   }, [authLoading, isAuthenticated, navigate])
-
-  useEffect(() => {
-    let active = true
-    areasApi
-      .listProvinces()
-      .then((data) => {
-        if (active) setProvinces(data)
-      })
-      .catch(() => {
-        // Handled silently or retryable
-      })
-    return () => {
-      active = false
-    }
-  }, [])
 
   const fetchAddresses = useCallback(async () => {
     if (!isAuthenticated) return
@@ -141,136 +94,14 @@ export function CheckoutPage() {
     }
   }, [isAuthenticated, fetchAddresses])
 
-  const fetchWardsForProvince = useCallback(async (provinceCode: number) => {
-    try {
-      setWardsLoading(true)
-      const data = await areasApi.listWards(provinceCode)
-      setWards(data)
-    } catch {
-      setWards([])
-      toastError('Lỗi tải phường/xã', 'Không thể tải danh sách phường/xã.')
-    } finally {
-      setWardsLoading(false)
-    }
-  }, [toastError])
-
-  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value
-    const code = val ? Number(val) : ''
-    setAddressFormData((prev) => ({
-      ...prev,
-      provinceCode: code,
-      wardCode: '',
-    }))
-    setAddressFormErrors((prev) => {
-      const next = { ...prev }
-      delete next.provinceCode
-      delete next.wardCode
-      return next
-    })
-
-    if (code) {
-      fetchWardsForProvince(code)
-    } else {
-      setWards([])
-    }
-  }
-
   const handleOpenCreateAddress = () => {
     setEditingAddress(null)
-    setAddressFormData({
-      ...initialAddressFormData,
-      isDefault: addresses.length === 0,
-    })
-    setAddressFormErrors({})
-    setWards([])
     setIsAddressDialogOpen(true)
   }
 
   const handleOpenEditAddress = (addr: Address) => {
     setEditingAddress(addr)
-    setAddressFormData({
-      recipientName: addr.recipientName,
-      phone: addr.phone,
-      provinceCode: addr.provinceCode,
-      wardCode: addr.wardCode,
-      detailAddress: addr.detailAddress,
-      isDefault: addr.isDefault,
-    })
-    setAddressFormErrors({})
     setIsAddressDialogOpen(true)
-    fetchWardsForProvince(addr.provinceCode)
-  }
-
-  const validateAddressForm = (): boolean => {
-    const errors: Record<string, string> = {}
-    if (!addressFormData.recipientName.trim()) {
-      errors.recipientName = 'Vui lòng nhập họ và tên người nhận'
-    }
-    if (!addressFormData.phone.trim()) {
-      errors.phone = 'Vui lòng nhập số điện thoại'
-    } else if (!/^0\d{9,10}$/.test(addressFormData.phone.trim())) {
-      errors.phone = 'Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0)'
-    }
-    if (!addressFormData.provinceCode) {
-      errors.provinceCode = 'Vui lòng chọn Tỉnh/Thành phố'
-    }
-    if (!addressFormData.wardCode) {
-      errors.wardCode = 'Vui lòng chọn Phường/Xã'
-    }
-    if (!addressFormData.detailAddress.trim()) {
-      errors.detailAddress = 'Vui lòng nhập địa chỉ chi tiết'
-    }
-
-    setAddressFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSaveAddress = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateAddressForm()) return
-
-    try {
-      setIsSavingAddress(true)
-      const payload: AddressInput = {
-        recipientName: addressFormData.recipientName.trim(),
-        phone: addressFormData.phone.trim(),
-        provinceCode: Number(addressFormData.provinceCode),
-        wardCode: Number(addressFormData.wardCode),
-        detailAddress: addressFormData.detailAddress.trim(),
-        isDefault: addressFormData.isDefault,
-      }
-
-      if (editingAddress) {
-        await addressesApi.updateAddress(editingAddress.id, payload)
-        success('Cập nhật thành công', 'Địa chỉ giao hàng đã được cập nhật.')
-      } else {
-        const created = await addressesApi.createAddress(payload)
-        success('Thêm thành công', 'Địa chỉ giao hàng mới đã được lưu.')
-        if (created.isDefault || addresses.length === 0) {
-          setSelectedAddressId(created.id)
-        }
-      }
-
-      setIsAddressDialogOpen(false)
-      await fetchAddresses()
-    } catch (err: unknown) {
-      if (err instanceof ApiError && err.fields) {
-        const mappedErrors: Record<string, string> = {}
-        if (err.fields.recipient_name) mappedErrors.recipientName = err.fields.recipient_name
-        if (err.fields.phone) mappedErrors.phone = err.fields.phone
-        if (err.fields.province_code) mappedErrors.provinceCode = err.fields.province_code
-        if (err.fields.ward_code) mappedErrors.wardCode = err.fields.ward_code
-        if (err.fields.detail_address) mappedErrors.detailAddress = err.fields.detail_address
-        setAddressFormErrors(mappedErrors)
-      } else if (err instanceof ApiError) {
-        toastError('Không thể lưu địa chỉ', err.message)
-      } else {
-        toastError('Lỗi', 'Có lỗi xảy ra khi lưu địa chỉ.')
-      }
-    } finally {
-      setIsSavingAddress(false)
-    }
   }
 
   const handleSetDefaultAddress = async (addrId: string) => {
@@ -790,173 +621,18 @@ export function CheckoutPage() {
       </div>
 
       {/* Address Form Dialog (Create / Edit) */}
-      <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {editingAddress ? 'Chỉnh sửa địa chỉ nhận hàng' : 'Thêm địa chỉ nhận hàng mới'}
-            </DialogTitle>
-            <DialogDescription>
-              Điền thông tin người nhận và địa chỉ giao hàng chính xác để chúng tôi giao hàng đúng hẹn.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveAddress} className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="recipientName" required>
-                Họ và tên người nhận
-              </Label>
-              <Input
-                id="recipientName"
-                placeholder="VD: Nguyễn Văn A"
-                value={addressFormData.recipientName}
-                onChange={(e) =>
-                  setAddressFormData((prev) => ({ ...prev, recipientName: e.target.value }))
-                }
-                error={Boolean(addressFormErrors.recipientName)}
-              />
-              {addressFormErrors.recipientName && (
-                <p className="text-xs text-rose-600">{addressFormErrors.recipientName}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="phone" required>
-                Số điện thoại
-              </Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="VD: 0987654321"
-                value={addressFormData.phone}
-                onChange={(e) =>
-                  setAddressFormData((prev) => ({ ...prev, phone: e.target.value }))
-                }
-                error={Boolean(addressFormErrors.phone)}
-              />
-              {addressFormErrors.phone && (
-                <p className="text-xs text-rose-600">{addressFormErrors.phone}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="provinceCode" required>
-                  Tỉnh / Thành phố
-                </Label>
-                <Select
-                  id="provinceCode"
-                  value={addressFormData.provinceCode}
-                  onChange={handleProvinceChange}
-                  error={Boolean(addressFormErrors.provinceCode)}
-                >
-                  <option value="">Chọn Tỉnh / Thành phố</option>
-                  {provinces.map((p) => (
-                    <option key={p.code} value={p.code}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-                {addressFormErrors.provinceCode && (
-                  <p className="text-xs text-rose-600">{addressFormErrors.provinceCode}</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="wardCode" required>
-                  Phường / Xã
-                </Label>
-                <Select
-                  id="wardCode"
-                  value={addressFormData.wardCode}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    setAddressFormData((prev) => ({
-                      ...prev,
-                      wardCode: val ? Number(val) : '',
-                    }))
-                    setAddressFormErrors((prev) => {
-                      const next = { ...prev }
-                      delete next.wardCode
-                      return next
-                    })
-                  }}
-                  disabled={!addressFormData.provinceCode || wardsLoading}
-                  error={Boolean(addressFormErrors.wardCode)}
-                >
-                  <option value="">
-                    {wardsLoading
-                      ? 'Đang tải...'
-                      : !addressFormData.provinceCode
-                      ? 'Chọn tỉnh trước'
-                      : 'Chọn Phường / Xã'}
-                  </option>
-                  {wards.map((w) => (
-                    <option key={w.code} value={w.code}>
-                      {w.name}
-                    </option>
-                  ))}
-                </Select>
-                {addressFormErrors.wardCode && (
-                  <p className="text-xs text-rose-600">{addressFormErrors.wardCode}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="detailAddress" required>
-                Địa chỉ chi tiết (Số nhà, tên đường, tòa nhà...)
-              </Label>
-              <Input
-                id="detailAddress"
-                placeholder="VD: Số 123 Đường Cầu Giấy"
-                value={addressFormData.detailAddress}
-                onChange={(e) =>
-                  setAddressFormData((prev) => ({ ...prev, detailAddress: e.target.value }))
-                }
-                error={Boolean(addressFormErrors.detailAddress)}
-              />
-              {addressFormErrors.detailAddress && (
-                <p className="text-xs text-rose-600">{addressFormErrors.detailAddress}</p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <Checkbox
-                id="isDefault"
-                checked={addressFormData.isDefault}
-                onCheckedChange={(checked) =>
-                  setAddressFormData((prev) => ({ ...prev, isDefault: Boolean(checked) }))
-                }
-              />
-              <Label htmlFor="isDefault" className="cursor-pointer text-xs font-normal text-zinc-700">
-                Đặt làm địa chỉ nhận hàng mặc định
-              </Label>
-            </div>
-
-            <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsAddressDialogOpen(false)}
-                disabled={isSavingAddress}
-                className="rounded-xl"
-              >
-                Hủy
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={isSavingAddress}
-                disabled={isSavingAddress}
-                className="rounded-xl font-semibold"
-              >
-                {editingAddress ? 'Cập nhật địa chỉ' : 'Lưu địa chỉ'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <AddressFormDialog
+        open={isAddressDialogOpen}
+        onOpenChange={setIsAddressDialogOpen}
+        editingAddress={editingAddress}
+        defaultNewAddress={addresses.length === 0}
+        onSaved={async (saved, isEdit) => {
+          if (!isEdit && (saved.isDefault || addresses.length === 0)) {
+            setSelectedAddressId(saved.id)
+          }
+          await fetchAddresses()
+        }}
+      />
 
       {/* Product Changed Dialog */}
       <Dialog open={productChangedDialogOpen} onOpenChange={setProductChangedDialogOpen}>

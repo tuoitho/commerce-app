@@ -23,6 +23,7 @@ SELECT p.id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -62,6 +63,7 @@ SELECT p.id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -306,6 +308,7 @@ SELECT c.id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -318,6 +321,7 @@ SELECT c.id,
            WHEN ru.id IS NULL THEN ''
            WHEN ru.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(ru.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = ru.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = ru.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(ru.email::text, '@', 1)), ''),
@@ -353,6 +357,7 @@ SELECT c.id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -365,6 +370,7 @@ SELECT c.id,
            WHEN ru.id IS NULL THEN ''
            WHEN ru.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(ru.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = ru.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = ru.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(ru.email::text, '@', 1)), ''),
@@ -555,6 +561,7 @@ SELECT n.id,
            WHEN u.id IS NULL THEN ''
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -587,6 +594,7 @@ SELECT n.id,
            WHEN u.id IS NULL THEN ''
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -624,6 +632,7 @@ SELECT r.user_id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -644,6 +653,7 @@ SELECT r.user_id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -662,6 +672,7 @@ SELECT u.id,
        (CASE
            WHEN u.role = 'admin' THEN 'Quản trị viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),

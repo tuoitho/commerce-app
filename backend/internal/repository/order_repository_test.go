@@ -96,7 +96,12 @@ func (f *fakeOrderDB) Exec(_ context.Context, sql string, args ...any) (pgconn.C
 	return pgconn.NewCommandTag("UPDATE 1"), f.execErr
 }
 
-func (f *fakeOrderDB) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+func (f *fakeOrderDB) Query(_ context.Context, sql string, args ...any) (pgx.Rows, error) {
+	f.lastSQL = sql
+	f.lastArgs = args
+	if f.execErr != nil {
+		return nil, f.execErr
+	}
 	return nil, errors.New("not implemented")
 }
 
@@ -140,6 +145,20 @@ func TestOrderRepository_AutoConfirmDue(t *testing.T) {
 		err := repo.AutoConfirmDue(ctx, cutoff)
 		if !errors.Is(err, customErr) {
 			t.Errorf("expected error %v, got %v", customErr, err)
+		}
+	})
+
+	t.Run("AutoConfirmDueReturning propagates error and passes cutoff", func(t *testing.T) {
+		customErr := errors.New("query error")
+		db := &fakeOrderDB{execErr: customErr}
+		repo := repository.NewOrderRepository(db)
+
+		_, err := repo.AutoConfirmDueReturning(ctx, cutoff)
+		if !errors.Is(err, customErr) {
+			t.Errorf("expected error %v, got %v", customErr, err)
+		}
+		if len(db.lastArgs) != 1 {
+			t.Fatalf("expected 1 arg passed to Query, got %d", len(db.lastArgs))
 		}
 	})
 }

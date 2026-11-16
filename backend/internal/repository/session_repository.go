@@ -50,15 +50,20 @@ func (r *SessionRepository) GetRefreshTokenByHash(ctx context.Context, tokenHash
 		revoked := row.RevokedAt.Time
 		token.RevokedAt = &revoked
 	}
-	user := &domain.User{
-		ID:           row.UserID,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		Role:         row.UserRole,
-		Status:       row.UserStatus,
-		CreatedAt:    row.UserCreatedAt,
-		UpdatedAt:    row.UserUpdatedAt,
-	}
+	user := toDomainUser(
+		row.UserID,
+		row.Email,
+		row.PasswordHash,
+		row.UserRole,
+		row.UserStatus,
+		row.UserLockedAt,
+		row.UserLockReason,
+		row.UserDisplayName,
+		row.UserPhone,
+		row.UserAvatarKey,
+		row.UserCreatedAt,
+		row.UserUpdatedAt,
+	)
 	return token, user, nil
 }
 

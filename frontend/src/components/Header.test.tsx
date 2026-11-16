@@ -383,4 +383,41 @@ describe('Header Component', () => {
 
     expect(screen.getByTestId('notification-bell-button')).toBeInTheDocument()
   })
+
+  it('links desktop and mobile account pills to /account with displayName fallback to email', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: {
+        id: 'u-1',
+        email: 'khach@example.com',
+        displayName: 'Nguyễn Minh Anh',
+        avatarUrl: null,
+      },
+      accessToken: 'token',
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const desktopAccountLink = screen.getByTestId('header-account-link')
+    expect(desktopAccountLink).toHaveAttribute('href', '/account')
+    expect(desktopAccountLink).toHaveTextContent('Nguyễn Minh Anh')
+    expect(desktopAccountLink).not.toHaveTextContent('khach@example.com')
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle menu/i }))
+    await waitFor(() => {
+      const mobileAccountLink = screen.getByTestId('mobile-account-link')
+      expect(mobileAccountLink).toHaveAttribute('href', '/account')
+      expect(mobileAccountLink).toHaveTextContent('Nguyễn Minh Anh')
+    })
+  })
 })

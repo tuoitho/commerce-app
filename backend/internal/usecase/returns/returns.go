@@ -10,16 +10,19 @@ import (
 )
 
 type Dependencies struct {
-	Return domain.ReturnRepository
+	Return        domain.ReturnRepository
+	Notifications domain.NotificationPublisher
 }
 
 type UseCase struct {
-	returnRepo domain.ReturnRepository
+	returnRepo    domain.ReturnRepository
+	notifications domain.NotificationPublisher
 }
 
 func New(deps Dependencies) *UseCase {
 	return &UseCase{
-		returnRepo: deps.Return,
+		returnRepo:    deps.Return,
+		notifications: deps.Notifications,
 	}
 }
 
@@ -55,13 +58,20 @@ func (uc *UseCase) Create(ctx context.Context, userID, orderID string, itemIDs [
 		return nil, domain.NewValidationError(map[string]string{"description": "Mô tả không được vượt quá 1000 ký tự"})
 	}
 
-	return uc.returnRepo.CreateReturnRequest(ctx, domain.CreateReturnInput{
+	ret, err := uc.returnRepo.CreateReturnRequest(ctx, domain.CreateReturnInput{
 		OrderID:      orderID,
 		UserID:       userID,
 		OrderItemIDs: itemIDs,
 		ReasonCode:   reasonCode,
 		Description:  trimmedDesc,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyReturnCreated(ctx, ret)
+	}
+	return ret, nil
 }
 
 func (uc *UseCase) Cancel(ctx context.Context, userID, orderID, returnID string) (*domain.ReturnRequest, error) {
@@ -110,7 +120,14 @@ func (uc *UseCase) AdminApprove(ctx context.Context, returnID string) (*domain.R
 	if _, err := uuid.Parse(returnID); err != nil {
 		return nil, domain.ErrReturnRequestNotFound
 	}
-	return uc.returnRepo.ApproveAdmin(ctx, returnID)
+	ret, err := uc.returnRepo.ApproveAdmin(ctx, returnID)
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyReturnStatusChanged(ctx, ret)
+	}
+	return ret, nil
 }
 
 func (uc *UseCase) AdminReject(ctx context.Context, returnID, rejectReason string) (*domain.ReturnRequest, error) {
@@ -125,7 +142,14 @@ func (uc *UseCase) AdminReject(ctx context.Context, returnID, rejectReason strin
 		return nil, domain.NewValidationError(map[string]string{"rejectReason": "Lý do từ chối không được vượt quá 1000 ký tự"})
 	}
 
-	return uc.returnRepo.RejectAdmin(ctx, returnID, trimmed)
+	ret, err := uc.returnRepo.RejectAdmin(ctx, returnID, trimmed)
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyReturnStatusChanged(ctx, ret)
+	}
+	return ret, nil
 }
 
 func (uc *UseCase) AdminReceive(ctx context.Context, returnID string, mappings []domain.ReceiveItemMapping) (*domain.ReturnRequest, error) {
@@ -150,7 +174,14 @@ func (uc *UseCase) AdminReceive(ctx context.Context, returnID string, mappings [
 		seen[m.OrderItemID] = true
 	}
 
-	return uc.returnRepo.ReceiveAdmin(ctx, returnID, mappings)
+	ret, err := uc.returnRepo.ReceiveAdmin(ctx, returnID, mappings)
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyReturnStatusChanged(ctx, ret)
+	}
+	return ret, nil
 }
 
 func (uc *UseCase) AdminRefund(ctx context.Context, returnID, adminUserID string) (*domain.ReturnRequest, error) {
@@ -161,7 +192,14 @@ func (uc *UseCase) AdminRefund(ctx context.Context, returnID, adminUserID string
 		return nil, domain.ErrForbidden
 	}
 
-	return uc.returnRepo.RefundAdmin(ctx, returnID, adminUserID)
+	ret, err := uc.returnRepo.RefundAdmin(ctx, returnID, adminUserID)
+	if err != nil {
+		return nil, err
+	}
+	if uc.notifications != nil {
+		uc.notifications.NotifyReturnStatusChanged(ctx, ret)
+	}
+	return ret, nil
 }
 
 func (uc *UseCase) AdminSearchVariantOptions(ctx context.Context, query string, page, limit int) ([]domain.VariantOptionInfo, int, error) {

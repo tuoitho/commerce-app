@@ -1,0 +1,455 @@
+{
+  "feature": "customer-account",
+  "snapshots": {
+    "address_create_201": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "POST /api/v1/addresses",
+      "status": 201,
+      "requestBody": {
+        "detailAddress": "Số 1 Tràng Tiền",
+        "isDefault": true,
+        "phone": "0987654321",
+        "provinceCode": 1,
+        "recipientName": "Nguyễn Minh Anh",
+        "wardCode": 4
+      },
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-11-16T05:49:33.4783842Z",
+          "detailAddress": "Số 1 Tràng Tiền",
+          "id": "addr-12345",
+          "isDefault": true,
+          "phone": "0987654321",
+          "provinceCode": 1,
+          "provinceName": "Thành phố Hà Nội",
+          "recipientName": "Nguyễn Minh Anh",
+          "updatedAt": "2026-11-16T05:49:33.4783842Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardCode": 4,
+          "wardName": "Phường Ba Đình"
+        },
+        "error": null,
+        "message": "Thêm địa chỉ thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.4783842Z"
+        },
+        "success": true
+      }
+    },
+    "address_delete_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "DELETE /api/v1/addresses/:id",
+      "status": 200,
+      "responseBody": {
+        "data": null,
+        "error": null,
+        "message": "Xóa địa chỉ thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.5862381Z"
+        },
+        "success": true
+      }
+    },
+    "address_set_default_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "PATCH /api/v1/addresses/:id/default",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-11-16T05:49:33.4783842Z",
+          "detailAddress": "Số 2 Tràng Tiền",
+          "id": "addr-12345",
+          "isDefault": true,
+          "phone": "0912345678",
+          "provinceCode": 1,
+          "provinceName": "Thành phố Hà Nội",
+          "recipientName": "Nguyễn Minh Anh",
+          "updatedAt": "2026-11-16T05:49:33.5560981Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardCode": 4,
+          "wardName": "Phường Ba Đình"
+        },
+        "error": null,
+        "message": "Đặt địa chỉ mặc định thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.5560981Z"
+        },
+        "success": true
+      }
+    },
+    "address_update_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "PUT /api/v1/addresses/:id",
+      "status": 200,
+      "requestBody": {
+        "detailAddress": "Số 2 Tràng Tiền",
+        "isDefault": true,
+        "phone": "0912345678",
+        "provinceCode": 1,
+        "recipientName": "Nguyễn Minh Anh",
+        "wardCode": 4
+      },
+      "responseBody": {
+        "data": {
+          "createdAt": "2026-11-16T05:49:33.4783842Z",
+          "detailAddress": "Số 2 Tràng Tiền",
+          "id": "addr-12345",
+          "isDefault": true,
+          "phone": "0912345678",
+          "provinceCode": 1,
+          "provinceName": "Thành phố Hà Nội",
+          "recipientName": "Nguyễn Minh Anh",
+          "updatedAt": "2026-11-16T05:49:33.5275444Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardCode": 4,
+          "wardName": "Phường Ba Đình"
+        },
+        "error": null,
+        "message": "Cập nhật địa chỉ thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.5275444Z"
+        },
+        "success": true
+      }
+    },
+    "addresses_list_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "GET /api/v1/addresses",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "createdAt": "2026-11-16T05:49:33.4783842Z",
+            "detailAddress": "Số 1 Tràng Tiền",
+            "id": "addr-12345",
+            "isDefault": true,
+            "phone": "0987654321",
+            "provinceCode": 1,
+            "provinceName": "Thành phố Hà Nội",
+            "recipientName": "Nguyễn Minh Anh",
+            "updatedAt": "2026-11-16T05:49:33.4783842Z",
+            "userId": "11111111-1111-1111-1111-111111111111",
+            "wardCode": 4,
+            "wardName": "Phường Ba Đình"
+          }
+        ],
+        "error": null,
+        "message": "Danh sách địa chỉ",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.5096997Z"
+        },
+        "success": true
+      }
+    },
+    "auth_login_200": {
+      "contractId": "TYPE-USER-PUBLIC@1",
+      "endpoint": "POST /api/v1/auth/login",
+      "status": 200,
+      "requestBody": {
+        "email": "profile.customer@example.com",
+        "password": "password123"
+      },
+      "responseBody": {
+        "data": {
+          "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiY3VzdG9tZXIiLCJpc3MiOiJjb21tZXJjZS1iYWNrZW5kIiwic3ViIjoiMSIsImV4cCI6MTc5NDgwODY5OSwiaWF0IjoxNzk0ODA3Nzk5fQ.GglHLO0KFrUikAAHdXjEXJnrZ48Wph8Ri3eDQhgd0bs",
+          "user": {
+            "avatarUrl": "/media/avatars/550e8400-e29b-41d4-a716-446655440000.webp",
+            "displayName": "Nguyễn Minh Anh",
+            "email": "profile.customer@example.com",
+            "id": "1",
+            "phone": "0912345678",
+            "role": "customer"
+          }
+        },
+        "error": null,
+        "message": "Đăng nhập thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:43:19.0984193Z"
+        },
+        "success": true
+      }
+    },
+    "auth_me_200": {
+      "contractId": "TYPE-USER-PUBLIC@1",
+      "endpoint": "GET /api/v1/auth/me",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "avatarUrl": "/media/avatars/550e8400-e29b-41d4-a716-446655440000.webp",
+          "displayName": "Nguyễn Minh Anh",
+          "email": "profile.customer@example.com",
+          "id": "1",
+          "phone": "0912345678",
+          "role": "customer"
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-16T05:43:19.1010081Z"
+        },
+        "success": true
+      }
+    },
+    "auth_refresh_200": {
+      "contractId": "TYPE-USER-PUBLIC@1",
+      "endpoint": "POST /api/v1/auth/refresh",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiY3VzdG9tZXIiLCJpc3MiOiJjb21tZXJjZS1iYWNrZW5kIiwic3ViIjoiMSIsImV4cCI6MTc5NDgwODY5OSwiaWF0IjoxNzk0ODA3Nzk5fQ.GglHLO0KFrUikAAHdXjEXJnrZ48Wph8Ri3eDQhgd0bs",
+          "user": {
+            "avatarUrl": "/media/avatars/550e8400-e29b-41d4-a716-446655440000.webp",
+            "displayName": "Nguyễn Minh Anh",
+            "email": "profile.customer@example.com",
+            "id": "1",
+            "phone": "0912345678",
+            "role": "customer"
+          }
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-16T05:43:19.1291348Z"
+        },
+        "success": true
+      }
+    },
+    "change_password_200": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "PUT /api/v1/account/password",
+      "status": 200,
+      "requestBody": {
+        "currentPassword": "oldpassword1",
+        "newPassword": "newpassword123"
+      },
+      "responseBody": {
+        "data": {
+          "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiY3VzdG9tZXIiLCJpc3MiOiJjb21tZXJjZS1iYWNrZW5kIiwic3ViIjoiMSIsImV4cCI6MTc5NDgwOTA3MywiaWF0IjoxNzk0ODA4MTczfQ.BZgaN5nDNkykO2L9zdpkv4MwrV5l2oVr8AL7qRkChFk",
+          "user": {
+            "avatarUrl": null,
+            "displayName": "Nguyễn Minh Anh",
+            "email": "khach@example.com",
+            "id": "1",
+            "phone": "0912345678",
+            "role": "customer"
+          }
+        },
+        "error": null,
+        "message": "Đổi mật khẩu thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.4066737Z"
+        },
+        "success": true
+      }
+    },
+    "change_password_validation_400": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "PUT /api/v1/account/password",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "currentPassword": "Mật khẩu hiện tại không chính xác"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.1448699Z"
+        },
+        "success": false
+      }
+    },
+    "delete_avatar_200": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "DELETE /api/v1/account/avatar",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "avatarUrl": null,
+          "displayName": "Nguyễn Minh Anh",
+          "email": "khach@example.com",
+          "id": "1",
+          "phone": "0912345678",
+          "role": "customer"
+        },
+        "error": null,
+        "message": "Đã xóa ảnh đại diện",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9953235Z"
+        },
+        "success": true
+      }
+    },
+    "get_profile_200": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "GET /api/v1/account/profile",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "avatarUrl": "/media/avatars/c217c8fb-51a3-474f-8616-1aa01d7300df.png",
+          "displayName": "Nguyễn Minh Anh",
+          "email": "khach@example.com",
+          "id": "1",
+          "phone": "0912345678",
+          "role": "customer"
+        },
+        "error": null,
+        "message": "Lấy thông tin tài khoản thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9487752Z"
+        },
+        "success": true
+      }
+    },
+    "provinces_list_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "GET /api/v1/provinces",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "code": 1,
+            "name": "Thành phố Hà Nội"
+          },
+          {
+            "code": 79,
+            "name": "Thành phố Hồ Chí Minh"
+          }
+        ],
+        "error": null,
+        "message": "Danh sách tỉnh/thành phố",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.4350663Z"
+        },
+        "success": true
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "GET /api/v1/account/profile",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.6759055Z"
+        },
+        "success": false
+      }
+    },
+    "update_profile_200": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "PUT /api/v1/account/profile",
+      "status": 200,
+      "requestBody": {
+        "displayName": "Nguyễn Minh Anh",
+        "phone": "0912345678"
+      },
+      "responseBody": {
+        "data": {
+          "avatarUrl": null,
+          "displayName": "Nguyễn Minh Anh",
+          "email": "khach@example.com",
+          "id": "1",
+          "phone": "0912345678",
+          "role": "customer"
+        },
+        "error": null,
+        "message": "Cập nhật hồ sơ thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9087739Z"
+        },
+        "success": true
+      }
+    },
+    "update_profile_validation_400": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "PUT /api/v1/account/profile",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "displayName": "Tên hiển thị tối đa 80 ký tự",
+            "phone": "Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0)"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9104456Z"
+        },
+        "success": false
+      }
+    },
+    "upload_avatar_200": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "POST /api/v1/account/avatar",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "avatarUrl": "/media/avatars/c217c8fb-51a3-474f-8616-1aa01d7300df.png",
+          "displayName": "Nguyễn Minh Anh",
+          "email": "khach@example.com",
+          "id": "1",
+          "phone": "0912345678",
+          "role": "customer"
+        },
+        "error": null,
+        "message": "Cập nhật ảnh đại diện thành công",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9287683Z"
+        },
+        "success": true
+      }
+    },
+    "upload_avatar_validation_400": {
+      "contractId": "API-ACCOUNT@1",
+      "endpoint": "POST /api/v1/account/avatar",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "avatar": "Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:32.9674203Z"
+        },
+        "success": false
+      }
+    },
+    "wards_list_200": {
+      "contractId": "API-ADDRESSES@1",
+      "endpoint": "GET /api/v1/provinces/:code/wards",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "code": 4,
+            "name": "Phường Ba Đình",
+            "provinceCode": 1
+          }
+        ],
+        "error": null,
+        "message": "Danh sách phường/xã",
+        "meta": {
+          "timestamp": "2026-11-16T05:49:33.4559449Z"
+        },
+        "success": true
+      }
+    }
+  }
+}

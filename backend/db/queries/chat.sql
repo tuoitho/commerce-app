@@ -14,6 +14,7 @@ SELECT c.id, c.user_id, c.last_message_at, c.customer_last_read_at, c.admin_last
        u.email::text AS customer_email,
        u.last_active_at AS customer_last_active,
        COALESCE(
+           NULLIF(TRIM(u.display_name), ''),
            NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id ORDER BY a.created_at DESC LIMIT 1)), ''),
@@ -59,6 +60,7 @@ SELECT c.id, c.user_id, c.last_message_at, c.customer_last_read_at, c.admin_last
        u.email::text AS customer_email,
        u.last_active_at AS customer_last_active,
        COALESCE(
+           NULLIF(TRIM(u.display_name), ''),
            NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id ORDER BY a.created_at DESC LIMIT 1)), ''),
@@ -104,6 +106,7 @@ SELECT c.id, c.user_id, c.last_message_at, c.customer_last_read_at, c.admin_last
        u.email::text AS customer_email,
        u.last_active_at AS customer_last_active,
        COALESCE(
+           NULLIF(TRIM(u.display_name), ''),
            NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
            NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id ORDER BY a.created_at DESC LIMIT 1)), ''),
@@ -228,6 +231,7 @@ SELECT m.id, m.conversation_id, m.sender_id, m.sender_role, m.content,
        CASE
            WHEN m.sender_role = 'admin' THEN 'Hỗ trợ viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = c.user_id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = c.user_id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = c.user_id ORDER BY a.created_at DESC LIMIT 1)), ''),
@@ -251,6 +255,7 @@ SELECT m.id, m.conversation_id, m.sender_id, m.sender_role, m.content,
        CASE
            WHEN m.sender_role = 'admin' THEN 'Hỗ trợ viên'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = c.user_id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = c.user_id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = c.user_id ORDER BY a.created_at DESC LIMIT 1)), ''),

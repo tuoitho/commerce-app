@@ -11,6 +11,7 @@ import (
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security/jwt"
 	addressuc "commerce-backend/internal/usecase/address"
+	accountuc "commerce-backend/internal/usecase/account"
 	areauc "commerce-backend/internal/usecase/area"
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
@@ -26,6 +27,7 @@ import (
 
 type Dependencies struct {
 	UseCase      *authuc.UseCase
+	Account      *accountuc.UseCase
 	Catalog      *cataloguc.UseCase
 	Cart         *cartuc.UseCase
 	Area         *areauc.UseCase
@@ -38,6 +40,7 @@ type Dependencies struct {
 	UserMgmt     *usermgmtuc.UseCase
 	Chat         domain.ChatUseCase
 	Post         domain.PostUseCase
+	Notification domain.NotificationUseCase
 	Live         *liveuc.UseCase
 	LiveHub      *livews.Hub
 	WSHub        *ws.Hub
@@ -90,8 +93,14 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		{
 			postComments.PUT("/:commentId/reactions", postHandler.setCommentReaction)
 		}
+	}
 
-		notificationHandler := newNotificationHandler(deps.Post)
+	if deps.Notification != nil || deps.Post != nil {
+		notifUC := deps.Notification
+		if notifUC == nil {
+			notifUC = &postNotificationAdapter{postUC: deps.Post}
+		}
+		notificationHandler := newNotificationHandler(notifUC)
 		notifications := api.Group("/notifications")
 		notifications.Use(guard.AuthRequired)
 		{
@@ -111,10 +120,24 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	}
 
 	reviewHandler := newReviewHandler(deps.Review)
+	accountHandler := newAccountHandler(deps.Account, deps.RefreshTTL, deps.CookieSecure, deps.Logger)
+	if deps.Account != nil {
+		accountGroup := api.Group("/account")
+		accountGroup.Use(guard.AuthRequired)
+		{
+			accountGroup.GET("/profile", accountHandler.GetProfile)
+			accountGroup.PUT("/profile", accountHandler.UpdateProfile)
+			accountGroup.POST("/avatar", accountHandler.UploadAvatar)
+			accountGroup.DELETE("/avatar", accountHandler.DeleteAvatar)
+			accountGroup.PUT("/password", accountHandler.ChangePassword)
+		}
+	}
 
 	// Media binary routes outside /api/v1
 	router.GET("/media/reviews/:mediaId", reviewHandler.getMedia)
 	router.HEAD("/media/reviews/:mediaId", reviewHandler.getMedia)
+	router.GET("/media/avatars/:avatarKey", accountHandler.GetAvatarMedia)
+	router.HEAD("/media/avatars/:avatarKey", accountHandler.GetAvatarMedia)
 
 	if deps.Chat != nil {
 		chatMediaHandler := newChatMediaHandler(deps.Chat)

@@ -527,4 +527,247 @@ describe('NotificationBell Component', () => {
       expect(screen.getByTestId('notification-item-n-2')).toBeInTheDocument()
     })
   })
+
+  it('filters by 6 category tabs, keeps global unreadCount, avoids double counting cross-tab WS, and deep-links system notifications', async () => {
+    const orderNotif: NotificationItem = {
+      id: 'n-order-1',
+      recipientId: 'user-1',
+      actorId: null,
+      actorName: null,
+      actorRole: null,
+      category: 'order',
+      notificationType: 'order_shipped',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Đơn hàng #AABB1122 đã được bàn giao cho đơn vị vận chuyển.',
+      metadata: {
+        orderId: 'order-1122',
+        orderShortCode: '#AABB1122',
+        status: 'shipped',
+        targetPath: '/orders/order-1122',
+      },
+      isRead: false,
+      createdAt: '2026-11-16T08:00:00Z',
+    }
+    const reviewNotif: NotificationItem = {
+      id: 'n-review-1',
+      recipientId: 'user-1',
+      actorId: null,
+      actorName: null,
+      actorRole: null,
+      category: 'review',
+      notificationType: 'review_replied',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Cảm ơn bạn đã tin dùng sản phẩm!',
+      metadata: {
+        reviewId: 'rev-1',
+        orderId: 'order-1122',
+        productName: 'iPhone 15 Pro Max',
+        targetPath: '/reviews',
+      },
+      isRead: true,
+      createdAt: '2026-11-16T07:50:00Z',
+    }
+
+    vi.mocked(postsApi.listNotifications).mockImplementation(async (params) => {
+      if (params?.category === 'order') {
+        return { items: [orderNotif], unreadCount: 2 }
+      }
+      if (params?.category === 'return') {
+        return { items: [], unreadCount: 2 }
+      }
+      return { items: [orderNotif, sampleNotifications[0], reviewNotif], unreadCount: 2 }
+    })
+    vi.mocked(postsApi.markNotificationRead).mockResolvedValue({
+      id: 'n-order-1',
+      isRead: true,
+      unreadCount: 1,
+    })
+
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-tab-all')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-tab-order')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-tab-return')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-tab-review')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-tab-live')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-tab-post')).toBeInTheDocument()
+      expect(screen.getByTestId('notification-item-n-order-1').textContent).toContain('Cửa hàng')
+      expect(screen.getByTestId('notification-item-n-review-1').textContent).toContain('iPhone 15 Pro Max')
+    })
+
+    // Switch to Đơn hàng tab -> calls API with category=order while keeping badge at 2
+    fireEvent.click(screen.getByTestId('notification-tab-order'))
+    await waitFor(() => {
+      expect(postsApi.listNotifications).toHaveBeenCalledWith({ limit: 30, category: 'order' })
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('2')
+    })
+
+    // Incoming WS live notification while viewing Đơn hàng tab: increments badge to 3 without adding into Đơn hàng list
+    const liveNotif: NotificationItem = {
+      id: 'n-live-1',
+      recipientId: 'user-1',
+      actorId: null,
+      actorName: null,
+      actorRole: null,
+      category: 'live',
+      notificationType: 'livestream_started',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Phiên livestream "Flash Sale" đang phát trực tiếp.',
+      metadata: {
+        sessionId: 'live-99',
+        sessionTitle: 'Flash Sale',
+        targetPath: '/live/live-99',
+      },
+      isRead: false,
+      createdAt: '2026-11-16T08:05:00Z',
+    }
+    act(() => {
+      mockOnNotificationCallback!(liveNotif)
+    })
+    // Rolled up existing unread n-1 from initial fetch while viewing 'order' tab must NOT double-increment!
+    act(() => {
+      mockOnNotificationCallback!({
+        ...sampleNotifications[0],
+        actorCount: 2,
+      })
+    })
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('3')
+    expect(screen.queryByTestId('notification-item-n-live-1')).not.toBeInTheDocument()
+
+    // Click order notification -> marks read and deep-links to /orders/order-1122
+    fireEvent.click(screen.getByTestId('notification-item-n-order-1'))
+    await waitFor(() => {
+      expect(postsApi.markNotificationRead).toHaveBeenCalledWith('n-order-1')
+      expect(mockNavigate).toHaveBeenCalledWith('/orders/order-1122')
+    })
+
+    // Empty filtered category message
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+    fireEvent.click(screen.getByTestId('notification-tab-return'))
+    await waitFor(() => {
+      expect(screen.getByText(/Chưa có thông báo nào trong mục này/i)).toBeInTheDocument()
+    })
+  })
+
+  it('clears previous category items on tab switch, ignores superseded out-of-order responses, shows retry on error, and decrements unreadCount on cross-tab retraction', async () => {
+    const postItem = sampleNotifications[0]
+    const liveItem: NotificationItem = {
+      id: 'n-live-tab',
+      recipientId: 'user-1',
+      actorId: null,
+      actorName: null,
+      actorRole: null,
+      category: 'live',
+      notificationType: 'livestream_started',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Livestream đang phát',
+      metadata: { sessionId: 'live-1', targetPath: '/live/live-1' },
+      isRead: false,
+      createdAt: '2026-11-16T08:10:00Z',
+    }
+
+    let resolveOrderPromise!: (value: { items: NotificationItem[]; unreadCount: number }) => void
+    let resolveLivePromise!: (value: { items: NotificationItem[]; unreadCount: number }) => void
+
+    vi.mocked(postsApi.listNotifications).mockImplementation((params = {}) => {
+      if (params.category === 'order') {
+        return new Promise((resolve) => {
+          resolveOrderPromise = resolve
+        })
+      }
+      if (params.category === 'live') {
+        return new Promise((resolve) => {
+          resolveLivePromise = resolve
+        })
+      }
+      if (params.category === 'return') {
+        return Promise.reject(new Error('network error'))
+      }
+      return Promise.resolve({ items: [postItem], unreadCount: 2 })
+    })
+
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('2')
+    })
+
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-item-n-1')).toBeInTheDocument()
+    })
+
+    // Cross-tab WS retraction for n-1 while viewing Đơn hàng must decrement unreadCount (2 -> 1)
+    fireEvent.click(screen.getByTestId('notification-tab-order'))
+    expect(screen.queryByTestId('notification-item-n-1')).not.toBeInTheDocument()
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+
+    // Quickly switch to Live before Đơn hàng finishes
+    fireEvent.click(screen.getByTestId('notification-tab-live'))
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+
+    // Superseded Đơn hàng resolves AFTER switching to Live -> must keep loading and NOT show order item
+    await act(async () => {
+      resolveOrderPromise({
+        items: [
+          {
+            ...postItem,
+            id: 'n-stale-order',
+            category: 'order',
+            notificationType: 'order_shipped',
+            excerpt: 'Stale order item',
+          },
+        ],
+        unreadCount: 2,
+      })
+      await Promise.resolve()
+    })
+    expect(screen.getByText('Đang tải thông báo...')).toBeInTheDocument()
+    expect(screen.queryByTestId('notification-item-n-stale-order')).not.toBeInTheDocument()
+
+    // Now Live resolves
+    await act(async () => {
+      resolveLivePromise({ items: [liveItem], unreadCount: 2 })
+      await Promise.resolve()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-item-n-live-tab')).toBeInTheDocument()
+    })
+
+    // Cross-tab retraction for n1 (post notification not visible in Live tab) decrements unreadCount (2 -> 1)
+    act(() => {
+      mockOnNotificationCallback!({
+        ...postItem,
+        actorCount: 0,
+      })
+    })
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('1')
+
+    // Failed fetch on Đổi trả must NOT render stale Live item, shows retryable error instead
+    fireEvent.click(screen.getByTestId('notification-tab-return'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('notification-item-n-live-tab')).not.toBeInTheDocument()
+      expect(screen.getByText('Không thể tải danh sách thông báo')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Thử lại' })).toBeInTheDocument()
+    })
+  })
 })

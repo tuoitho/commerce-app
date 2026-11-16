@@ -12,16 +12,19 @@ import (
 
 	"commerce-backend/internal/config"
 	delivery "commerce-backend/internal/delivery/http"
+	"commerce-backend/internal/domain"
 	"commerce-backend/internal/repository"
 	"commerce-backend/internal/security"
 	"commerce-backend/internal/security/jwt"
 	addressuc "commerce-backend/internal/usecase/address"
+	accountuc "commerce-backend/internal/usecase/account"
 	areauc "commerce-backend/internal/usecase/area"
 	authuc "commerce-backend/internal/usecase/auth"
 	cartuc "commerce-backend/internal/usecase/cart"
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	chatuc "commerce-backend/internal/usecase/chat"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
+	notifuc "commerce-backend/internal/usecase/notification"
 	orderuc "commerce-backend/internal/usecase/order"
 	postuc "commerce-backend/internal/usecase/post"
 	returnuc "commerce-backend/internal/usecase/returns"
@@ -143,6 +146,28 @@ func provideUserRepository(pool *pgxpool.Pool) *repository.UserRepository {
 	return repository.NewUserRepository(pool)
 }
 
+func provideAccountRepository(pool *pgxpool.Pool) *repository.AccountRepository {
+	return repository.NewAccountRepository(pool)
+}
+
+func provideAccountUseCase(repo *repository.AccountRepository, store *chatmedia.Store, jwtMgr *jwt.Manager, cfg *config.Config, log *slog.Logger) *accountuc.UseCase {
+	var avatarStore domain.AvatarStore
+	if store != nil {
+		avatarStore = store
+	}
+	return accountuc.New(accountuc.Dependencies{
+		Repo:                 repo,
+		Store:                avatarStore,
+		JWT:                  jwtMgr,
+		AccessTTL:            cfg.AccessTokenTTL,
+		RefreshTTL:           cfg.RefreshTokenTTL,
+		HashPassword:         security.HashPassword,
+		CheckPassword:        security.CheckPassword,
+		GenerateRefreshToken: security.GenerateRefreshToken,
+		Logger:               log,
+	})
+}
+
 func provideSessionRepository(pool *pgxpool.Pool) *repository.SessionRepository {
 	return repository.NewSessionRepository(pool)
 }
@@ -221,7 +246,37 @@ func provideAddressUseCase(repo *repository.AddressRepository, areaRepo *reposit
 	})
 }
 
-func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, liveUC *liveuc.UseCase, cfg *config.Config) *orderuc.UseCase {
+func asNotificationPublisher(svc *notifuc.Service) domain.NotificationPublisher {
+	if svc != nil {
+		return svc
+	}
+	return nil
+}
+
+func asNotificationUseCase(svc *notifuc.Service) domain.NotificationUseCase {
+	if svc != nil {
+		return svc
+	}
+	return nil
+}
+
+func provideNotificationRepository(pool *pgxpool.Pool) *repository.NotificationRepository {
+	return repository.NewNotificationRepository(pool)
+}
+
+func provideNotificationService(repo *repository.NotificationRepository, hub *ws.Hub, log *slog.Logger) *notifuc.Service {
+	var notifRepo domain.NotificationRepository
+	if repo != nil {
+		notifRepo = repo
+	}
+	var broadcaster domain.NotificationBroadcaster
+	if hub != nil {
+		broadcaster = hub
+	}
+	return notifuc.NewService(notifRepo, broadcaster, log)
+}
+
+func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, liveUC *liveuc.UseCase, notifSvc *notifuc.Service, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
 		Order:               repo,
 		Return:              returnRepo,
@@ -229,17 +284,19 @@ func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repositor
 		ShippingFeeVND:      cfg.ShippingFeeVND,
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
 		LiveQuota:           liveUC,
+		Notifications:       asNotificationPublisher(notifSvc),
 	})
 }
 
-func provideReturnUseCase(repo *repository.ReturnRepository) *returnuc.UseCase {
+func provideReturnUseCase(repo *repository.ReturnRepository, notifSvc *notifuc.Service) *returnuc.UseCase {
 	return returnuc.New(returnuc.Dependencies{
-		Return: repo,
+		Return:        repo,
+		Notifications: asNotificationPublisher(notifSvc),
 	})
 }
 
-func provideReviewUseCase(repo *repository.ReviewRepository, mediaStore *reviewmedia.Store, catalogRepo *repository.CatalogRepository) *reviewuc.ReviewUseCase {
-	return reviewuc.NewReviewUseCase(repo, mediaStore, catalogRepo)
+func provideReviewUseCase(repo *repository.ReviewRepository, mediaStore *reviewmedia.Store, catalogRepo *repository.CatalogRepository, notifSvc *notifuc.Service) *reviewuc.ReviewUseCase {
+	return reviewuc.NewReviewUseCase(repo, mediaStore, catalogRepo, reviewuc.WithNotificationPublisher(asNotificationPublisher(notifSvc)))
 }
 
 func provideFavoriteUseCase(repo *repository.FavoriteRepository) *favoriteuc.UseCase {
@@ -307,11 +364,12 @@ func provideLiveHub(repo *repository.LiveRepository, log *slog.Logger) *livews.H
 	return livews.NewHub(repo, log)
 }
 
-func provideLiveUseCase(repo *repository.LiveRepository, media *mediamtx.Client, hub *livews.Hub, cfg *config.Config, log *slog.Logger) *liveuc.UseCase {
+func provideLiveUseCase(repo *repository.LiveRepository, media *mediamtx.Client, hub *livews.Hub, notifSvc *notifuc.Service, cfg *config.Config, log *slog.Logger) *liveuc.UseCase {
 	return liveuc.New(liveuc.Dependencies{
 		Repo:            repo,
 		Media:           media,
 		Broadcaster:     hub,
+		Notifications:   asNotificationPublisher(notifSvc),
 		Logger:          log,
 		SignalTimeout:   cfg.LiveSignalTimeout,
 		WebRTCPublicURL: cfg.MediaMTXWebRTCPublicURL,
@@ -323,6 +381,7 @@ func provideGinRouter(
 	cfg *config.Config,
 	log *slog.Logger,
 	authUC *authuc.UseCase,
+	accountUC *accountuc.UseCase,
 	catalogUC *cataloguc.UseCase,
 	cartUC *cartuc.UseCase,
 	areaUC *areauc.UseCase,
@@ -333,6 +392,7 @@ func provideGinRouter(
 	favoriteUC *favoriteuc.UseCase,
 	chatUC *chatuc.UseCase,
 	postUC *postuc.UseCase,
+	notifSvc *notifuc.Service,
 	dashboardUC *dashboarduc.UseCase,
 	userMgmtUC *usermgmtuc.UseCase,
 	liveUC *liveuc.UseCase,
@@ -347,6 +407,7 @@ func provideGinRouter(
 	router.Use(delivery.LoggingMiddleware(log), delivery.RecoveryMiddleware(log))
 	delivery.NewRouter(router, delivery.Dependencies{
 		UseCase:      authUC,
+		Account:      accountUC,
 		Catalog:      catalogUC,
 		Cart:         cartUC,
 		Area:         areaUC,
@@ -359,6 +420,7 @@ func provideGinRouter(
 		UserMgmt:     userMgmtUC,
 		Chat:         chatUC,
 		Post:         postUC,
+		Notification: asNotificationUseCase(notifSvc),
 		Live:         liveUC,
 		LiveHub:      liveHub,
 		WSHub:        wsHub,

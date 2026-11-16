@@ -24,6 +24,13 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	sessionRepository := provideSessionRepository(pool)
 	manager := provideJWTManager(cfg)
 	useCase := provideAuthUseCase(userRepository, sessionRepository, manager, cfg)
+	accountRepository := provideAccountRepository(pool)
+	store, err := provideChatMediaStore(cfg)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	accountUseCase := provideAccountUseCase(accountRepository, store, manager, cfg, log)
 	catalogRepository := provideCatalogRepository(pool)
 	catalogUseCase := provideCatalogUseCase(catalogRepository)
 	cartRepository := provideCartRepository(pool)
@@ -42,34 +49,31 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	liveRepository := provideLiveRepository(pool)
 	client := provideMediaServer(cfg)
 	hub := provideLiveHub(liveRepository, log)
-	liveUseCase := provideLiveUseCase(liveRepository, client, hub, cfg, log)
-	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, liveUseCase, cfg)
-	returnsUseCase := provideReturnUseCase(returnRepository)
-	store, err := provideReviewMediaStore(cfg)
+	notificationRepository := provideNotificationRepository(pool)
+	chatRepository := provideChatRepository(pool)
+	wsHub := provideWSHub(chatRepository, log)
+	service := provideNotificationService(notificationRepository, wsHub, log)
+	liveUseCase := provideLiveUseCase(liveRepository, client, hub, service, cfg, log)
+	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, liveUseCase, service, cfg)
+	returnsUseCase := provideReturnUseCase(returnRepository, service)
+	reviewmediaStore, err := provideReviewMediaStore(cfg)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	reviewUseCase := provideReviewUseCase(reviewRepository, store, catalogRepository)
+	reviewUseCase := provideReviewUseCase(reviewRepository, reviewmediaStore, catalogRepository, service)
 	favoriteRepository := provideFavoriteRepository(pool)
 	favoriteUseCase := provideFavoriteUseCase(favoriteRepository)
-	chatRepository := provideChatRepository(pool)
-	chatmediaStore, err := provideChatMediaStore(cfg)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	wsHub := provideWSHub(chatRepository, log)
-	chatUseCase := provideChatUseCase(chatRepository, chatmediaStore, wsHub)
+	chatUseCase := provideChatUseCase(chatRepository, store, wsHub)
 	postRepository := providePostRepository(pool)
-	postUseCase := providePostUseCase(postRepository, catalogRepository, chatmediaStore, wsHub)
+	postUseCase := providePostUseCase(postRepository, catalogRepository, store, wsHub)
 	dashboardRepository := provideDashboardRepository(pool)
 	dashboardUseCase := provideDashboardUseCase(dashboardRepository)
 	userAdminRepository := provideUserAdminRepository(pool)
 	usermgmtUseCase := provideUserMgmtUseCase(userAdminRepository)
-	engine := provideGinRouter(cfg, log, useCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, dashboardUseCase, usermgmtUseCase, liveUseCase, hub, wsHub, manager)
+	engine := provideGinRouter(cfg, log, useCase, accountUseCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, service, dashboardUseCase, usermgmtUseCase, liveUseCase, hub, wsHub, manager)
 	server := provideHTTPServer(cfg, engine)
-	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, store, chatmediaStore, wsHub, hub, liveUseCase)
+	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, reviewmediaStore, store, wsHub, hub, liveUseCase)
 	return app, func() {
 		cleanup()
 	}, nil
@@ -80,6 +84,7 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 var appProviderSet = wire.NewSet(
 	providePgxPool,
 	provideUserRepository,
+	provideAccountRepository,
 	provideSessionRepository,
 	provideCatalogRepository,
 	provideCartRepository,
@@ -92,6 +97,7 @@ var appProviderSet = wire.NewSet(
 	provideFavoriteRepository,
 	provideJWTManager,
 	provideAuthUseCase,
+	provideAccountUseCase,
 	provideCatalogUseCase,
 	provideCartUseCase,
 	provideAreaUseCase,
@@ -106,6 +112,8 @@ var appProviderSet = wire.NewSet(
 	provideChatUseCase,
 	providePostRepository,
 	providePostUseCase,
+	provideNotificationRepository,
+	provideNotificationService,
 	provideDashboardRepository,
 	provideDashboardUseCase,
 	provideUserAdminRepository,

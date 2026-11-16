@@ -17,6 +17,7 @@ import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ReviewHistoryPage } from '@/pages/ReviewHistoryPage'
 import { PostsFeedPage } from '@/pages/PostsFeedPage'
 import { PostDetailPage } from '@/pages/PostDetailPage'
+import { AccountPage } from '@/pages/AccountPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -41,6 +42,7 @@ export function AppContent() {
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/reviews" element={<ReviewHistoryPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/live/:sessionId" element={<LivePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

@@ -25,6 +25,7 @@ import { useToast } from '@/context/ToastContext'
 import { Button } from './ui/button'
 import { Skeleton } from './ui/skeleton'
 import { NotificationBell } from './notifications/NotificationBell'
+import { AvatarDisplay } from './AvatarDisplay'
 import { useCurrentLive } from '@/hooks/useCurrentLive'
 
 export function Header() {
@@ -391,12 +392,19 @@ export function Header() {
                 <Skeleton data-testid="auth-loading-skeleton" className="h-10 w-28 rounded-xl" />
               ) : isAuthenticated && user ? (
                 <div className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-semibold text-zinc-900 max-w-[170px] truncate">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-950 text-white font-mono font-bold text-xs uppercase shrink-0">
-                      {user.email.charAt(0)}
-                    </div>
-                    <span className="truncate">{user.email}</span>
-                  </div>
+                  <Link
+                    to="/account"
+                    data-testid="header-account-link"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-semibold text-zinc-900 max-w-[190px] hover:border-zinc-900 transition-colors"
+                  >
+                    <AvatarDisplay
+                      src={user.avatarUrl}
+                      name={user.displayName}
+                      email={user.email}
+                      size="xs"
+                    />
+                    <span className="truncate">{user.displayName || user.email}</span>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="p-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
@@ -576,9 +584,22 @@ export function Header() {
               <Skeleton data-testid="mobile-auth-loading-skeleton" className="h-10 w-full rounded-xl" />
             ) : isAuthenticated && user ? (
               <div className="space-y-3">
-                <div className="px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-medium text-zinc-600">
-                  Tài khoản: <span className="font-bold text-zinc-950">{user.email}</span>
-                </div>
+                <Link
+                  to="/account"
+                  data-testid="mobile-account-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-medium text-zinc-600 hover:border-zinc-900 transition-colors"
+                >
+                  <AvatarDisplay
+                    src={user.avatarUrl}
+                    name={user.displayName}
+                    email={user.email}
+                    size="xs"
+                  />
+                  <span className="truncate">
+                    Tài khoản: <span className="font-bold text-zinc-950">{user.displayName || user.email}</span>
+                  </span>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"

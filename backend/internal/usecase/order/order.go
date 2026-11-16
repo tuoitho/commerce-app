@@ -17,6 +17,8 @@ type Dependencies struct {
 	OrderConfirmTimeout time.Duration
 	// LiveQuota, when set, learns about orders that may change live-price quota.
 	LiveQuota domain.LiveQuotaObserver
+	// Notifications, when set, publishes order lifecycle notifications post-commit.
+	Notifications domain.NotificationPublisher
 }
 
 type UseCase struct {
@@ -26,6 +28,7 @@ type UseCase struct {
 	shippingFeeVND      domain.MoneyVND
 	orderConfirmTimeout time.Duration
 	liveQuota           domain.LiveQuotaObserver
+	notifications       domain.NotificationPublisher
 }
 
 func New(deps Dependencies) *UseCase {
@@ -44,6 +47,7 @@ func New(deps Dependencies) *UseCase {
 		shippingFeeVND:      shippingFee,
 		orderConfirmTimeout: timeout,
 		liveQuota:           deps.LiveQuota,
+		notifications:       deps.Notifications,
 	}
 }
 
@@ -139,6 +143,9 @@ func (uc *UseCase) Create(ctx context.Context, userID, addressID string, lines [
 			order.CancellableUntil = &cancellableUntil
 		}
 		uc.hydrateOrderReviewStates(ctx, order)
+		if uc.notifications != nil {
+			uc.notifications.NotifyOrderCreated(ctx, order)
+		}
 	}
 
 	return order, nil
@@ -250,6 +257,9 @@ func (uc *UseCase) Cancel(ctx context.Context, userID, orderID string) (*domain.
 			order.CancellableUntil = &cancellableUntil
 		}
 		uc.hydrateOrderReviewStates(ctx, order)
+		if uc.notifications != nil {
+			uc.notifications.NotifyOrderCustomerCancelled(ctx, order)
+		}
 	}
 
 	return order, nil
@@ -280,6 +290,16 @@ func (uc *UseCase) UndoCancel(ctx context.Context, userID, orderID string) (*dom
 }
 
 func (uc *UseCase) AutoConfirmDue(ctx context.Context, cutoff time.Time) error {
+	if returningRepo, ok := uc.order.(domain.AutoConfirmReturningRepository); ok {
+		confirmed, err := returningRepo.AutoConfirmDueReturning(ctx, cutoff)
+		if err != nil {
+			return err
+		}
+		if uc.notifications != nil && len(confirmed) > 0 {
+			uc.notifications.NotifyOrderAutoConfirmed(ctx, confirmed)
+		}
+		return nil
+	}
 	return uc.order.AutoConfirmDue(ctx, cutoff)
 }
 
@@ -346,6 +366,9 @@ func (uc *UseCase) AdminTransition(ctx context.Context, orderID string, action d
 
 	if order != nil {
 		uc.hydrateOrderReviewStates(ctx, order)
+		if uc.notifications != nil {
+			uc.notifications.NotifyOrderTransition(ctx, order, action)
+		}
 	}
 
 	return order, nil

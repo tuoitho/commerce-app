@@ -201,5 +201,32 @@ describe('AuthContext (Customer Store)', () => {
       expect(result.current.isLoading).toBe(false)
     })
   })
+
+  it('updates user profile state and tokenStore via updateUser and rotates session via applySession', async () => {
+    const initialUser = { id: 'user-1', email: 'customer@auraphone.vn', role: 'customer', displayName: null, phone: null, avatarUrl: null }
+    tokenStore.setToken('initial-jwt')
+    tokenStore.setUser(initialUser)
+    vi.mocked(authApi.getMe).mockResolvedValueOnce(initialUser)
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    const updatedUser = { ...initialUser, displayName: 'Nguyễn Minh Anh', avatarUrl: '/media/avatars/a.webp' }
+    act(() => {
+      result.current.updateUser?.(updatedUser)
+    })
+    expect(result.current.user).toEqual(updatedUser)
+    expect(tokenStore.getUser()).toEqual(updatedUser)
+
+    act(() => {
+      result.current.applySession?.({ user: updatedUser, accessToken: 'rotated-jwt' })
+    })
+    expect(result.current.accessToken).toBe('rotated-jwt')
+    expect(tokenStore.getToken()).toBe('rotated-jwt')
+    expect(result.current.isAuthenticated).toBe(true)
+  })
 })
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"commerce-backend/internal/domain"
 	"commerce-backend/internal/security/jwt"
 	addressuc "commerce-backend/internal/usecase/address"
+	areauc "commerce-backend/internal/usecase/area"
 )
 
 const addressTestUser = "11111111-1111-1111-1111-111111111111"
@@ -179,9 +181,11 @@ func newAddressTestRouter(addrRepo *fakeAddressUsecaseRepo) (*gin.Engine, string
 		Address: addrRepo,
 		Area:    areaRepo,
 	})
+	areaUC := areauc.New(areauc.Dependencies{Area: areaRepo})
 
 	router := gin.New()
 	NewRouter(router, Dependencies{
+		Area:    areaUC,
 		Address: uc,
 		JWT:     manager,
 	})
@@ -356,3 +360,70 @@ func TestAddressHTTP_CRUD_Flow(t *testing.T) {
 		t.Fatalf("DELETE /addresses/non-existent: expected 404, got %d, body: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestAddressHTTP_CustomerAccountContractSnapshots(t *testing.T) {
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "customer-account", "contract-snapshots.json")
+	repo := newFakeAddressUsecaseRepo()
+	router, token := newAddressTestRouter(repo)
+
+	provW := execAddressRequest(router, "", http.MethodGet, "/api/v1/provinces", "")
+	if provW.Code != http.StatusOK {
+		t.Fatalf("GET /provinces: expected 200, got %d", provW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "provinces_list_200", "API-ADDRESSES@1", "GET /api/v1/provinces", nil, provW)
+
+	wardW := execAddressRequest(router, "", http.MethodGet, "/api/v1/provinces/1/wards", "")
+	if wardW.Code != http.StatusOK {
+		t.Fatalf("GET /provinces/1/wards: expected 200, got %d", wardW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "wards_list_200", "API-ADDRESSES@1", "GET /api/v1/provinces/:code/wards", nil, wardW)
+
+	createReq := map[string]any{
+		"recipientName": "Nguyễn Minh Anh",
+		"phone":         "0987654321",
+		"provinceCode":  1,
+		"wardCode":      4,
+		"detailAddress": "Số 1 Tràng Tiền",
+		"isDefault":     true,
+	}
+	createBytes, _ := json.Marshal(createReq)
+	createW := execAddressRequest(router, token, http.MethodPost, "/api/v1/addresses", string(createBytes))
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("POST /addresses: expected 201, got %d", createW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "address_create_201", "API-ADDRESSES@1", "POST /api/v1/addresses", createReq, createW)
+
+	listW := execAddressRequest(router, token, http.MethodGet, "/api/v1/addresses", "")
+	if listW.Code != http.StatusOK {
+		t.Fatalf("GET /addresses: expected 200, got %d", listW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "addresses_list_200", "API-ADDRESSES@1", "GET /api/v1/addresses", nil, listW)
+
+	updateReq := map[string]any{
+		"recipientName": "Nguyễn Minh Anh",
+		"phone":         "0912345678",
+		"provinceCode":  1,
+		"wardCode":      4,
+		"detailAddress": "Số 2 Tràng Tiền",
+		"isDefault":     true,
+	}
+	updateBytes, _ := json.Marshal(updateReq)
+	updW := execAddressRequest(router, token, http.MethodPut, "/api/v1/addresses/addr-12345", string(updateBytes))
+	if updW.Code != http.StatusOK {
+		t.Fatalf("PUT /addresses/:id: expected 200, got %d", updW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "address_update_200", "API-ADDRESSES@1", "PUT /api/v1/addresses/:id", updateReq, updW)
+
+	defW := execAddressRequest(router, token, http.MethodPatch, "/api/v1/addresses/addr-12345/default", "")
+	if defW.Code != http.StatusOK {
+		t.Fatalf("PATCH /addresses/:id/default: expected 200, got %d", defW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "address_set_default_200", "API-ADDRESSES@1", "PATCH /api/v1/addresses/:id/default", nil, defW)
+
+	delW := execAddressRequest(router, token, http.MethodDelete, "/api/v1/addresses/addr-12345", "")
+	if delW.Code != http.StatusOK {
+		t.Fatalf("DELETE /addresses/:id: expected 200, got %d", delW.Code)
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "customer-account", "address_delete_200", "API-ADDRESSES@1", "DELETE /api/v1/addresses/:id", nil, delW)
+}
+

@@ -28,7 +28,7 @@ func (q *Queries) CountUsersByRole(ctx context.Context, role string) (int64, err
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, role)
 VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, status, locked_at, lock_reason, created_at, updated_at
+RETURNING id, email, password_hash, role, status, locked_at, lock_reason, display_name, phone, avatar_key, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -45,6 +45,9 @@ type CreateUserRow struct {
 	Status       string
 	LockedAt     pgtype.Timestamptz
 	LockReason   pgtype.Text
+	DisplayName  pgtype.Text
+	Phone        pgtype.Text
+	AvatarKey    pgtype.Text
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -60,6 +63,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.Status,
 		&i.LockedAt,
 		&i.LockReason,
+		&i.DisplayName,
+		&i.Phone,
+		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -67,7 +73,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, status, locked_at, lock_reason, created_at, updated_at
+SELECT id, email, password_hash, role, status, locked_at, lock_reason, display_name, phone, avatar_key, created_at, updated_at
 FROM users
 WHERE email = $1
 `
@@ -80,6 +86,9 @@ type GetUserByEmailRow struct {
 	Status       string
 	LockedAt     pgtype.Timestamptz
 	LockReason   pgtype.Text
+	DisplayName  pgtype.Text
+	Phone        pgtype.Text
+	AvatarKey    pgtype.Text
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -95,6 +104,9 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 		&i.Status,
 		&i.LockedAt,
 		&i.LockReason,
+		&i.DisplayName,
+		&i.Phone,
+		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -102,7 +114,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, status, locked_at, lock_reason, created_at, updated_at
+SELECT id, email, password_hash, role, status, locked_at, lock_reason, display_name, phone, avatar_key, created_at, updated_at
 FROM users
 WHERE id = $1
 `
@@ -115,6 +127,9 @@ type GetUserByIDRow struct {
 	Status       string
 	LockedAt     pgtype.Timestamptz
 	LockReason   pgtype.Text
+	DisplayName  pgtype.Text
+	Phone        pgtype.Text
+	AvatarKey    pgtype.Text
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -130,6 +145,9 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (GetUserByIDRow, e
 		&i.Status,
 		&i.LockedAt,
 		&i.LockReason,
+		&i.DisplayName,
+		&i.Phone,
+		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

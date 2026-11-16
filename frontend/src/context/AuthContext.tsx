@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { authApi } from '@/api/auth'
 import { tokenStore } from '@/api/tokenStore'
-import { ApiError, type User } from '@/api/types'
+import { ApiError, type SessionResponse, type User } from '@/api/types'
 
 export interface AuthContextType {
   user: User | null
@@ -12,6 +12,8 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  updateUser?: (user: User) => void
+  applySession?: (session: SessionResponse) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -149,6 +151,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const updateUser = useCallback((nextUser: User) => {
+    setUser(nextUser)
+    tokenStore.setUser(nextUser)
+  }, [])
+
+  const applySession = useCallback((session: SessionResponse) => {
+    setUser(session.user)
+    tokenStore.setUser(session.user)
+    setAccessToken(session.accessToken)
+    tokenStore.setToken(session.accessToken)
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -160,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        updateUser,
+        applySession,
       }}
     >
       {children}

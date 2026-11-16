@@ -127,6 +127,9 @@ describe('postsApi client module', () => {
     await postsApi.listNotifications({ limit: 20, offset: 0 })
     expect(apiClient).toHaveBeenCalledWith('/notifications?limit=20&offset=0')
 
+    await postsApi.listNotifications({ limit: 30, category: 'order' })
+    expect(apiClient).toHaveBeenCalledWith('/notifications?limit=30&category=order')
+
     vi.mocked(apiClient).mockResolvedValue({ id: 'notif-1', isRead: true, unreadCount: 0 })
     await postsApi.markNotificationRead('notif-1')
     expect(apiClient).toHaveBeenCalledWith('/notifications/notif-1/read', { method: 'POST' })

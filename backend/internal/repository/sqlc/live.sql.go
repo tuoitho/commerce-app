@@ -199,6 +199,7 @@ SELECT lc.id, lc.session_id, lc.user_id, lc.content, lc.hidden_at, lc.created_at
        (CASE
            WHEN u.role = 'admin' THEN 'Chủ shop'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),
@@ -522,6 +523,7 @@ SELECT lc.id, lc.session_id, lc.user_id, lc.content, lc.hidden_at, lc.created_at
        (CASE
            WHEN u.role = 'admin' THEN 'Chủ shop'
            ELSE COALESCE(
+               NULLIF(TRIM(u.display_name), ''),
                NULLIF(TRIM((SELECT o.recipient_name FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1)), ''),
                NULLIF(TRIM((SELECT a.recipient_name FROM addresses a WHERE a.user_id = u.id AND a.is_default LIMIT 1)), ''),
                NULLIF(TRIM(split_part(u.email::text, '@', 1)), ''),

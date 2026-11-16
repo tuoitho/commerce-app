@@ -231,3 +231,78 @@ func TestReturnUseCase_AdminReceive_Validation(t *testing.T) {
 		t.Fatal("expected validation error for duplicate item mappings")
 	}
 }
+
+type fakeReturnNotificationPublisher struct {
+	created []string
+	changed []domain.ReturnStatus
+}
+
+func (f *fakeReturnNotificationPublisher) NotifyOrderCreated(_ context.Context, _ *domain.Order) {}
+func (f *fakeReturnNotificationPublisher) NotifyOrderCustomerCancelled(_ context.Context, _ *domain.Order) {}
+func (f *fakeReturnNotificationPublisher) NotifyOrderTransition(_ context.Context, _ *domain.Order, _ domain.OrderAdminAction) {}
+func (f *fakeReturnNotificationPublisher) NotifyOrderAutoConfirmed(_ context.Context, _ []domain.AutoConfirmedOrder) {}
+func (f *fakeReturnNotificationPublisher) NotifyReturnCreated(_ context.Context, ret *domain.ReturnRequest) {
+	if ret != nil {
+		f.created = append(f.created, ret.ID)
+	}
+}
+func (f *fakeReturnNotificationPublisher) NotifyReturnStatusChanged(_ context.Context, ret *domain.ReturnRequest) {
+	if ret != nil {
+		f.changed = append(f.changed, ret.Status)
+	}
+}
+func (f *fakeReturnNotificationPublisher) NotifyReviewReplied(_ context.Context, _ *domain.Review, _ string) {}
+func (f *fakeReturnNotificationPublisher) NotifyLivestreamStarted(_ context.Context, _ *domain.AdminLiveSession) {}
+
+func TestReturnUseCase_PublishesNotifications(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.NewString()
+	orderID := uuid.NewString()
+	itemID := uuid.NewString()
+	varID := uuid.NewString()
+	returnID := uuid.NewString()
+	adminID := uuid.NewString()
+
+	pub := &fakeReturnNotificationPublisher{}
+	repo := &mockReturnRepo{
+		createFn: func(_ context.Context, _ domain.CreateReturnInput) (*domain.ReturnRequest, error) {
+			return &domain.ReturnRequest{ID: returnID, OrderID: orderID, UserID: userID, Status: domain.ReturnStatusPendingApproval}, nil
+		},
+		approveAdminFn: func(_ context.Context, id string) (*domain.ReturnRequest, error) {
+			return &domain.ReturnRequest{ID: id, OrderID: orderID, UserID: userID, Status: domain.ReturnStatusApproved}, nil
+		},
+		rejectAdminFn: func(_ context.Context, id, reason string) (*domain.ReturnRequest, error) {
+			return &domain.ReturnRequest{ID: id, OrderID: orderID, UserID: userID, Status: domain.ReturnStatusRejected, RejectReason: reason}, nil
+		},
+		receiveAdminFn: func(_ context.Context, id string, _ []domain.ReceiveItemMapping) (*domain.ReturnRequest, error) {
+			return &domain.ReturnRequest{ID: id, OrderID: orderID, UserID: userID, Status: domain.ReturnStatusReceived}, nil
+		},
+		refundAdminFn: func(_ context.Context, id, _ string) (*domain.ReturnRequest, error) {
+			return &domain.ReturnRequest{ID: id, OrderID: orderID, UserID: userID, Status: domain.ReturnStatusRefunded}, nil
+		},
+	}
+
+	uc := New(Dependencies{Return: repo, Notifications: pub})
+	if _, err := uc.Create(ctx, userID, orderID, []string{itemID}, domain.ReturnReasonDefective, "hỏng"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.AdminApprove(ctx, returnID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.AdminReject(ctx, returnID, "không đủ điều kiện"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.AdminReceive(ctx, returnID, []domain.ReceiveItemMapping{{OrderItemID: itemID, ReceivedVariantID: varID}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.AdminRefund(ctx, returnID, adminID); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pub.created) != 1 || pub.created[0] != returnID {
+		t.Fatalf("expected NotifyReturnCreated for %s, got %+v", returnID, pub.created)
+	}
+	if len(pub.changed) != 4 {
+		t.Fatalf("expected 4 NotifyReturnStatusChanged calls, got %+v", pub.changed)
+	}
+}

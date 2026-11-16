@@ -1201,4 +1201,77 @@ func TestPostRepository_SyncUnreadReactionNotification_RetractAndUpdate(t *testi
 	assert.Nil(t, cSynced0)
 }
 
+func TestPostRepository_NotificationsRefreshRecentActorsDisplayName(t *testing.T) {
+	ctx := context.Background()
+	db := newFakeNotificationPostDB()
+	repo := NewPostRepository(db)
+
+	adminID := uuid.NewString()
+	cust1ID := uuid.NewString()
+	cust2ID := uuid.NewString()
+	postID := uuid.NewString()
+
+	db.seedUser(adminID, "admin@example.com", "admin", "Quản trị viên")
+	db.seedUser(cust1ID, "cust1@example.com", "customer", "Tên Cũ 1")
+	db.seedUser(cust2ID, "cust2@example.com", "customer", "Tên Cũ 2")
+
+	groupKey := domain.NotificationGroupKeyPostReaction(postID)
+	likeRx := domain.ReactionTypeLike
+	loveRx := domain.ReactionTypeLove
+
+	notif1, err := repo.CreateNotification(ctx, domain.CreateNotificationInput{
+		RecipientID:      adminID,
+		ActorID:          &cust1ID,
+		GroupKey:         groupKey,
+		Category:         domain.NotificationCategoryPost,
+		NotificationType: domain.NotificationTypePostReaction,
+		PostID:           &postID,
+		ReactionType:     &likeRx,
+		Excerpt:          "Bài viết mới",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, notif1)
+
+	// Customers update display_name after notification was persisted
+	db.seedUser(cust1ID, "cust1@example.com", "customer", "Nguyễn Minh Anh")
+	db.seedUser(cust2ID, "cust2@example.com", "customer", "Trần Bảo Ngọc")
+
+	// 1. ListNotifications must refresh recentActors[].name
+	listed, err := repo.ListNotifications(ctx, adminID, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	recentListed := extractTestRecentActors(t, listed.Items[0].Metadata)
+	require.Len(t, recentListed, 1)
+	assert.Equal(t, "Nguyễn Minh Anh", recentListed[0].Name)
+
+	// 2. CreateNotification rollup (existingRecent branch) must refresh stale names for existing actors
+	rolledUp, err := repo.CreateNotification(ctx, domain.CreateNotificationInput{
+		RecipientID:      adminID,
+		ActorID:          &cust2ID,
+		GroupKey:         groupKey,
+		Category:         domain.NotificationCategoryPost,
+		NotificationType: domain.NotificationTypePostReaction,
+		PostID:           &postID,
+		ReactionType:     &loveRx,
+		Excerpt:          "Bài viết mới",
+	})
+	require.NoError(t, err)
+	recentRollup := extractTestRecentActors(t, rolledUp.Metadata)
+	require.Len(t, recentRollup, 2)
+	assert.Equal(t, "Trần Bảo Ngọc", recentRollup[0].Name)
+	assert.Equal(t, "Nguyễn Minh Anh", recentRollup[1].Name)
+
+	// Update again before MarkNotificationRead
+	db.seedUser(cust1ID, "cust1@example.com", "customer", "Nguyễn Minh Anh Mới")
+
+	// 3. MarkNotificationRead must refresh recentActors[].name
+	readNotif, err := repo.MarkNotificationRead(ctx, rolledUp.ID, adminID)
+	require.NoError(t, err)
+	recentRead := extractTestRecentActors(t, readNotif.Metadata)
+	require.Len(t, recentRead, 2)
+	assert.Equal(t, "Trần Bảo Ngọc", recentRead[0].Name)
+	assert.Equal(t, "Nguyễn Minh Anh Mới", recentRead[1].Name)
+}
+
+
 
