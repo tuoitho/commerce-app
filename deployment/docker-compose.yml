@@ -1,0 +1,184 @@
+name: commerce-stack
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-commerce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-commerce}
+      POSTGRES_DB: ${POSTGRES_DB:-commercesdd}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-commerce} -d ${POSTGRES_DB:-commercesdd}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  db-migrate:
+    image: migrate/migrate:v4.18.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../backend/db/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://${POSTGRES_USER:-commerce}:${POSTGRES_PASSWORD:-commerce}@postgres:5432/${POSTGRES_DB:-commercesdd}?sslmode=disable"
+      - "up"
+
+  db-seed:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      DB_URL: postgres://${POSTGRES_USER:-commerce}:${POSTGRES_PASSWORD:-commerce}@postgres:5432/${POSTGRES_DB:-commercesdd}?sslmode=disable
+      CUSTOMER_BOOTSTRAP_EMAIL: ${CUSTOMER_BOOTSTRAP_EMAIL:-customer@example.com}
+      CUSTOMER_BOOTSTRAP_PASSWORD: ${CUSTOMER_BOOTSTRAP_PASSWORD:-Customer123456@}
+    volumes:
+      - ../backend/db/seed:/seed:ro
+      - ./seed:/deployment-seed:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /deployment-seed/init-seed.sh | /bin/sh"]
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-19000}:19000"
+      - "${MINIO_CONSOLE_PORT:-19001}:19001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-miniopassword}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":19001" --address ":19000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19000/minio/health/live"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-miniopassword}
+      MINIO_BUCKET: ${MINIO_BUCKET:-product-review-media}
+      MINIO_CHAT_BUCKET: ${MINIO_CHAT_BUCKET:-chat-media}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set localminio http://minio:19000 \"$$MINIO_ACCESS_KEY\" \"$$MINIO_SECRET_KEY\"; do
+        sleep 1;
+      done;
+      mc mb --ignore-existing localminio/\"$$MINIO_BUCKET\";
+      mc anonymous set none localminio/\"$$MINIO_BUCKET\";
+      mc mb --ignore-existing localminio/\"$$MINIO_CHAT_BUCKET\";
+      mc anonymous set none localminio/\"$$MINIO_CHAT_BUCKET\";
+      exit 0;
+      "
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.3
+    restart: unless-stopped
+    ports:
+      - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
+      - "${MEDIAMTX_UDP_PORT:-8189}:8189/udp"
+      - "${MEDIAMTX_HLS_PORT:-8888}:8888"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      db-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
+    ports:
+      - "${BACKEND_PORT:-18080}:18080"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      HTTP_PORT: "18080"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_URL: postgres://${POSTGRES_USER:-commerce}:${POSTGRES_PASSWORD:-commerce}@postgres:5432/${POSTGRES_DB:-commercesdd}?sslmode=disable
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-to-a-random-secret-at-least-32-chars}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-999999h}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-720h}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@example.com}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-Admin123456@}
+      MINIO_ENDPOINT: minio:19000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-miniopassword}
+      MINIO_BUCKET: ${MINIO_BUCKET:-product-review-media}
+      MINIO_CHAT_BUCKET: ${MINIO_CHAT_BUCKET:-chat-media}
+      MINIO_USE_SSL: "false"
+      MEDIAMTX_API_URL: http://mediamtx:9997
+      MEDIAMTX_WEBRTC_PUBLIC_URL: ${MEDIAMTX_WEBRTC_PUBLIC_URL:-http://localhost:8889}
+      MEDIAMTX_HLS_PUBLIC_URL: ${MEDIAMTX_HLS_PUBLIC_URL:-http://localhost:8888}
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:-MOMO}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:-F8BBA842ECF85}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY:-K951B6PE1waDMi640xX08PD3vg6EkVlz}
+      MOMO_ENDPOINT: ${MOMO_ENDPOINT:-https://test-payment.momo.vn/v2/gateway/api/create}
+      MOMO_REDIRECT_URL: ${MOMO_REDIRECT_URL:-http://localhost:15173/momo-return}
+      MOMO_IPN_URL: ${MOMO_IPN_URL:-http://localhost:18080/api/v1/payments/momo/ipn}
+      MOMO_REQUEST_TYPE: ${MOMO_REQUEST_TYPE:-payWithMethod}
+      MOMO_PARTNER_NAME: ${MOMO_PARTNER_NAME:-Test}
+      MOMO_STORE_ID: ${MOMO_STORE_ID:-MomoTestStore}
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:18080/api/v1/categories"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-15173}:80"
+    environment:
+      BACKEND_UPSTREAM: http://backend:18080
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+  frontend-admin:
+    build:
+      context: ../frontend-admin
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${ADMIN_PORT:-15174}:80"
+    environment:
+      BACKEND_UPSTREAM: http://backend:18080
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+volumes:
+  postgres-data:
+  minio-data:

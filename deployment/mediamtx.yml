@@ -1,0 +1,35 @@
+###############################################
+# MediaMTX configuration for Docker Compose deployment.
+# Admins publish over WHIP, viewers read over WHEP with LL-HLS as fallback.
+
+logLevel: info
+
+authMethod: http
+authHTTPAddress: http://backend:18080/internal/mediamtx/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+api: yes
+apiAddress: :9997
+
+rtsp: no
+rtmp: no
+srt: no
+moq: no
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcAdditionalHosts: [127.0.0.1]
+webrtcAllowOrigins: ['*']
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsAllowOrigins: ['*']
+
+paths:
+  "~^live/[0-9a-f-]{36}$":
+    overridePublisher: yes
