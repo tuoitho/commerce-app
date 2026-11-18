@@ -15,8 +15,8 @@ export function LoginPage() {
   const { login } = useAuth()
   const { success } = useToast()
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('customer@example.com')
+  const [password, setPassword] = useState('Customer123456@')
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 

@@ -1,0 +1,92 @@
+# Kế hoạch Thực hiện (Implementation Plan)
+
+- [x] 1. Backend: Cấu hình MoMo, Lược đồ CSDL, Cổng Thanh toán và API Đơn hàng
+
+- [x] 1.1 Cấu hình môi trường `CONFIG-MOMO@1`, adapter `momo.Client`, migration `000024` và tầng Repository giao dịch thanh toán / hoàn trả
+  - **Produces:**
+    - Mở rộng `backend/internal/config/config.go` nạp và xác thực 9 biến môi trường `MOMO_*` theo `CONFIG-MOMO@1`; cập nhật `backend/.env` với bộ giá trị Sandbox từ `DacSanSocTrang` (điều chỉnh cổng `:15173` / `:18080`) và cập nhật `backend/.env.example`.
+    - Bổ sung kiểu dữ liệu, hằng số `PaymentMethodMomo = "momo"`, `PaymentStatus` (`pending`, `paid`, `failed`, `refunded`), interface `domain.MomoGateway`, `domain.MomoOrderRepository` và các sentinel error trong `backend/internal/domain/{order,errors,notification}.go`.
+    - Cài đặt `backend/internal/payment/momo/client.go` thực thi `domain.MomoGateway` (`CreatePaymentURL` với timeout `15s` và chữ ký HMAC-SHA256 trên `<orderUUID>_<unixMilli>`, cùng `VerifyCallbackSignature` hằng thời gian theo `API-MOMO-GATEWAY@1`, tuyệt đối không ghi log `MomoSecretKey`).
+    - Thêm cặp migration `backend/db/migrations/000024_add_momo_payment.{up,down}.sql` mở rộng `orders_payment_method_check`, bổ sung `payment_status`, `payment_transaction_id`, `paid_at`, backfill dữ liệu cũ và tạo chỉ mục `orders_pending_payment_timeout_idx` theo `DB-MOMO-PAYMENT@1`; áp dụng migration và kiểm chứng round-trip `down`/`up`.
+    - Cập nhật `backend/db/queries/orders.sql` (bao gồm các truy vấn đọc/khóa/ghi `orders`, `AutoConfirmDueOrdersReturning` chỉ lọc `payment_method = 'cod'`, truy vấn quét đơn `momo` quá hạn và cập nhật `payment_status`), chạy `sqlc generate`, và mở rộng `backend/internal/repository/order_repository.go` cùng `ReturnRepository.RefundAdmin` trong `backend/internal/repository/return_repository.go` (`CreateWithPaymentMethod` kiểm tra hạn mức `1.000..50.000.000` trước khi ghi DB/xóa giỏ, `SetPaymentFailed`, `ResetPaymentPending`, `ApplyMomoCallback` có `FOR UPDATE`, `AutoCancelExpiredMomoOrders` hoàn tồn kho biến thể + hoàn suất giá Livestream, cập nhật `payment_status = 'paid'` khi giao đơn `cod` và `'refunded'` khi đơn đã thanh toán `payment_status = 'paid'` chuyển sang `'cancelled'` hoặc `'returned'`).
+  - **Scope:**
+    - Bảo toàn nguyên vẹn chữ ký `domain.OrderRepository.Create` để mọi mock/fake hiện có tiếp tục biên dịch.
+    - Viết unit tests (`backend/internal/config/config_test.go`, `backend/internal/payment/momo/client_test.go`) và integration-db tests (`backend/internal/repository/order_repository_test.go`).
+  - **Consumes:** bảng `orders`, `order_items`, `cart_items`, `product_variants`, `live_variant_prices`, `return_requests` hiện hữu; cơ chế Viper trong `internal/config`.
+  - **Contracts:** CONFIG-MOMO@1 (provider); API-MOMO-GATEWAY@1 (provider); DB-MOMO-PAYMENT@1 (provider)
+  - **Acceptance:**
+    - `config.LoadWithFile` đọc đúng ưu tiên biến môi trường tiến trình so với `.env` cho 9 khóa `MOMO_*` và từ chối URL `MOMO_ENDPOINT` / `MOMO_REDIRECT_URL` / `MOMO_IPN_URL` sai định dạng; log `slog` không bao giờ chứa `MomoSecretKey`.
+    - `momo.Client` tạo đúng chuỗi `rawSignature` request/response chuẩn MoMo v2, xác thực chữ ký chính xác và từ chối payload bị chỉnh sửa hoặc sai `partnerCode`.
+    - Đơn `momo` ngoài khoảng `1.000..50.000.000` bị từ chối trước khi thay đổi tồn kho, suất giá Livestream hoặc giỏ hàng; `ApplyMomoCallback` xử lý nguyên tử `resultCode = 0` (`paid` + `confirmed`), `resultCode != 0` (`failed`) và an toàn bất biến khi gọi lặp hoặc đơn đã hủy; `AutoConfirmDue` chỉ xác nhận đơn `cod` và hủy hoàn kho/quota cho đơn `momo` quá hạn; giao đơn `cod` đặt `paid`, hủy hoặc hoàn trả toàn phần (`RefundAdmin` -> `returned`) mọi đơn đang `paid` đặt `refunded`.
+  - **Verification:** `unit`, `integration-db`.
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.4, 4.5, 4.6_
+
+- [x] 1.2 Điều phối `order.UseCase`, thông báo thanh toán, HTTP Handlers (`API-ORDER-MOMO@1`), Wire DI và Contract Snapshots
+  - **Produces:**
+    - Mở rộng `backend/internal/usecase/notification/service.go` phát thông báo `order_confirmed` khi thanh toán MoMo thành công và `order_payment_expired` khi đơn MoMo quá hạn thanh toán bị hủy tự động.
+    - Mở rộng `backend/internal/usecase/order/order.go` triển khai `CreateWithMethod` (gọi `MomoGateway.CreatePaymentURL` sau khi commit DB; nếu lỗi cổng MoMo thì đánh dấu `paymentStatus = "failed"` và vẫn trả đơn hàng không kèm `payUrl`), `RetryMomoPayment`, `HandleMomoReturn`, `HandleMomoIPN` và tích hợp hủy tự động đơn `momo` quá hạn trong `AutoConfirmDue`.
+    - Cập nhật `backend/internal/delivery/http/{order_handler,admin_order_handler,error,router}.go` triển khai `POST /api/v1/orders` (có `paymentMethod` tùy chọn), `POST /api/v1/orders/:id/momo/retry`, `POST /api/v1/payments/momo/return`, `POST /api/v1/payments/momo/ipn` (HTTP `204 No Content`), mở rộng `orderResponse` / `adminOrderResponse` theo `TYPE-ORDER-PAYMENT@1`, và ánh xạ đầy đủ các mã lỗi tiếng Việt.
+    - Đăng ký provider `momo.Client` trong `backend/cmd/server/{app.go,wire.go}` và sinh lại `wire_gen.go`.
+    - Ghi và xác minh `.dream/specs/momo-payment/contract-snapshots.json` trong handler tests bao phủ đầy đủ `unauthenticated_401`, các biến thể `Order` / `AdminOrder` chờ thanh toán và đã thanh toán (`get_order_momo_pending_200`, `get_order_momo_paid_200`, `list_orders_200`, `admin_list_orders_200`, `admin_order_detail_momo_pending_200`, `admin_order_detail_momo_paid_200`) cùng toàn bộ phản hồi tạo đơn / retry (`409 payment_retry_not_allowed`) / return / IPN để phục vụ `mountContractRoutes` ở Task 3.1.
+  - **Scope:**
+    - Đảm bảo `POST /api/v1/payments/momo/return` và `POST /api/v1/payments/momo/ipn` chấp nhận linh hoạt kiểu số hoặc chuỗi cho `amount`, `resultCode`, `transId`, `responseTime` khi giải mã JSON để dùng chung bộ xác thực chữ ký MoMo v2.
+    - Viết unit tests (`backend/internal/usecase/order/order_test.go`, `backend/internal/usecase/notification/service_test.go`) và handler tests (`backend/internal/delivery/http/order_handler_test.go`, `admin_order_handler_test.go`).
+  - **Consumes:** `CONFIG-MOMO@1`, `API-MOMO-GATEWAY@1`, `DB-MOMO-PAYMENT@1` và các thành phần hạ tầng từ task 1.1; `ws.Hub` & `notification.Service` hiện hữu.
+  - **Contracts:** API-ORDER-MOMO@1 (provider); TYPE-ORDER-PAYMENT@1 (provider); CONFIG-MOMO@1 (consumer); API-MOMO-GATEWAY@1 (consumer); DB-MOMO-PAYMENT@1 (consumer)
+  - **Acceptance:**
+    - `POST /api/v1/orders` mặc định `"cod"` khi không gửi `paymentMethod`, trả HTTP `400` khi `paymentMethod` sai, HTTP `409 momo_amount_out_of_range` khi vượt hạn mức, HTTP `201` kèm `payUrl` khi cổng MoMo thành công hoặc `paymentStatus = "failed"` (không có `payUrl`) khi cổng MoMo lỗi lúc tạo đơn.
+    - `POST /api/v1/orders/:id/momo/retry` trả HTTP `200` kèm `payUrl` mới khi hợp lệ, HTTP `404 order_not_found` khi không thuộc người gọi, HTTP `409 payment_retry_not_allowed` khi sai điều kiện/quá hạn và HTTP `502 momo_gateway_error` khi cổng MoMo lỗi.
+    - `POST /api/v1/payments/momo/return` trả HTTP `200` kèm `Order` cập nhật và `POST /api/v1/payments/momo/ipn` trả HTTP `204` khi chữ ký & số tiền hợp lệ (phát đúng 1 thông báo `order_confirmed` khi chuyển sang `confirmed`), hoặc HTTP `400 invalid_momo_callback` khi chữ ký/`partnerCode`/`amount` sai.
+  - **Verification:** `unit`, `handler`.
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 4.2, 4.3, 4.4_
+
+- [x] 2. Frontend: Luồng Thanh toán MoMo trên Storefront và Hiển thị Quản trị trên Admin Portal
+
+- [x] 2.1 Chọn phương thức MoMo tại Checkout, trang `/momo-return`, đếm ngược & Thanh toán lại trên Storefront (`frontend`)
+  - **Produces:**
+    - Mở rộng `frontend/src/api/types.ts` (`PaymentMethod`, `PaymentStatus`, các trường thanh toán trên `Order` tương thích fixture hiện có, `CreateOrderInput.paymentMethod`, `MomoReturnPayload`), `frontend/src/api/orders.ts` (`retryMomoPayment`, `confirmMomoReturn`), và `frontend/src/api/posts.ts` + `NotificationBell.tsx` (`order_payment_expired`).
+    - Cập nhật `frontend/src/pages/CheckoutPage.tsx` cho phép chọn giữa **Thanh toán khi nhận hàng (COD)** và **Ví điện tử MoMo**, tự động khóa lựa chọn MoMo kèm chú thích tiếng Việt khi tổng đơn ngoài `1.000 ₫ – 50.000.000 ₫`, chuyển hướng trình duyệt tới `payUrl` hoặc điều hướng về `/orders/:id` kèm cảnh báo nếu `payUrl` trống.
+    - Tạo mới `frontend/src/pages/MomoReturnPage.tsx` và đăng ký route `/momo-return` trong `frontend/src/App.tsx` xử lý xác thực kết quả một lần sau khi `AuthContext` sẵn sàng, làm mới giỏ hàng và hiển thị giao diện thành công / thất bại tiếng Việt.
+    - Cập nhật `frontend/src/pages/OrderHistoryPage.tsx` và `frontend/src/pages/OrderDetailPage.tsx` hiển thị phương thức thanh toán, huy hiệu trạng thái thanh toán tiếng Việt, mã giao dịch MoMo, đồng hồ đếm ngược và nút **Thanh toán lại qua MoMo**.
+  - **Scope:**
+    - Viết/bổ sung component tests tại `frontend/src/pages/{CheckoutPage,MomoReturnPage,OrderHistoryPage,OrderDetailPage}.test.tsx` và chạy kiểm tra `lint`, `test`, `build` trong `frontend/`.
+  - **Consumes:** `API-ORDER-MOMO@1` và `TYPE-ORDER-PAYMENT@1` từ `design.md`; `AuthContext`, `CartContext`, `ToastContext` hiện hữu.
+  - **Contracts:** API-ORDER-MOMO@1 (consumer); TYPE-ORDER-PAYMENT@1 (provider)
+  - **Acceptance:**
+    - Trang Checkout chọn mặc định `COD`, cho phép chọn `Ví điện tử MoMo` khi tổng tiền hợp lệ và khóa lựa chọn MoMo khi vượt 50.000.000 ₫ hoặc dưới 1.000 ₫; khi đặt đơn MoMo thành công sẽ chuyển hướng `payUrl` (hoặc chuyển tới `/orders/:id` khi cổng lỗi).
+    - Trang `/momo-return` gọi `confirmMomoReturn` đúng 1 lần, cập nhật giỏ hàng và hiển thị đúng thông tin đơn hàng, số tiền, mã giao dịch hoặc lý do thất bại kèm các nút điều hướng.
+    - Trang `/orders` và `/orders/:id` hiển thị đúng nhãn phương thức, huy hiệu `Chờ thanh toán` / `Đã thanh toán` / `Thanh toán thất bại` / `Đã hoàn tiền`, đếm ngược thời gian còn lại và thực hiện `retryMomoPayment` chuyển sang `payUrl` mới.
+  - **Verification:** `component`.
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [x] 2.2 Hiển thị phương thức thanh toán, trạng thái thanh toán và mã giao dịch MoMo trên Admin Portal (`frontend-admin`)
+  - **Produces:**
+    - Mở rộng `frontend-admin/src/api/types.ts` bổ sung `PaymentMethod`, `PaymentStatus` và các trường `paymentStatus`, `paymentTransactionId`, `paidAt` trên `Order` (tương thích ngược với các fixture test hiện có).
+    - Cập nhật `frontend-admin/src/pages/OrdersPage.tsx` hiển thị phương thức thanh toán (`COD` / `MoMo`) và huy hiệu trạng thái thanh toán tiếng Việt trên bảng đơn hàng.
+    - Cập nhật `frontend-admin/src/pages/AdminOrderDetailPage.tsx` hiển thị tên phương thức thanh toán tiếng Việt (`Thanh toán khi nhận hàng (COD)` / `Ví điện tử MoMo`), trạng thái thanh toán, thời điểm thanh toán `paidAt` và mã giao dịch `paymentTransactionId`.
+  - **Scope:**
+    - Viết/bổ sung component tests tại `frontend-admin/src/pages/{OrdersPage,AdminOrderDetailPage}.test.tsx` và chạy kiểm tra `lint`, `test`, `build` trong `frontend-admin/`.
+  - **Consumes:** `API-ORDER-MOMO@1` và `TYPE-ORDER-PAYMENT@1` từ `design.md`.
+  - **Contracts:** API-ORDER-MOMO@1 (consumer); TYPE-ORDER-PAYMENT@1 (provider)
+  - **Acceptance:**
+    - Bảng danh sách đơn hàng Admin hiển thị rõ phương thức và huy hiệu trạng thái thanh toán tiếng Việt cho cả đơn `cod` và `momo`.
+    - Trang chi tiết đơn hàng Admin hiển thị đầy đủ phương thức `Ví điện tử MoMo`, trạng thái thanh toán, `paidAt` và `paymentTransactionId` khi có dữ liệu.
+  - **Verification:** `component`.
+  - _Requirements: 6.1, 6.2_
+
+- [x] 3. Xác minh E2E Trình duyệt & Trực quan
+
+- [x] 3.1 Kiểm thử E2E trình duyệt (`Mode 2: Shape-Locked Mock E2E`) và bằng chứng trực quan trên Storefront & Admin Portal
+  - **Produces:**
+    - Bộ kiểm thử `frontend/e2e/momo-payment.spec.ts` nạp kỹ năng `e2e-testing` và thực thi theo chế độ **`Mode 2: Shape-Locked Mock E2E`** qua `mountContractRoutes` bám sát `.dream/specs/momo-payment/contract-snapshots.json` (không gọi `page.route` trực tiếp trên `/api/v1`).
+    - Ảnh chụp bằng chứng trực quan tại `.dream/specs/momo-payment/imgs/*.png` và báo cáo tổng hợp `.dream/specs/momo-payment/report.md`.
+  - **Scope:**
+    - Thực thi trên trình duyệt thực đối với Storefront (`http://localhost:15173`) và Admin Portal (`http://localhost:15174`): kiểm chứng chọn `COD`/`MoMo` và khóa hạn mức trên `/checkout`, điều hướng kết quả thành công và thất bại tại `/momo-return`, hiển thị trạng thái thanh toán / mã giao dịch / đếm ngược / nút **Thanh toán lại qua MoMo** trên `/orders` và `/orders/:id`, cùng bảng đơn hàng và chi tiết đơn hàng trên Admin Portal.
+    - Kiểm tra không tràn ngang (`scrollWidth <= innerWidth`), chụp và tự đọc kiểm tra ảnh cho desktop (`1440x900`) và mobile (`375x812`) trên Storefront cùng desktop (`1440x900`) trên Admin Portal.
+  - **Consumes:** `.dream/specs/momo-payment/contract-snapshots.json` (từ task 1.2), giao diện Storefront (task 2.1) và giao diện Admin Portal (task 2.2).
+  - **Contracts:** API-ORDER-MOMO@1 (verifier); TYPE-ORDER-PAYMENT@1 (verifier)
+  - **Acceptance:**
+    - Toàn bộ kịch bản Playwright trong `frontend/e2e/momo-payment.spec.ts` vượt qua ở `Mode 2: Shape-Locked Mock E2E`.
+    - Ảnh chụp trong `.dream/specs/momo-payment/imgs/` hiển thị rõ ràng, đúng ngôn ngữ thiết kế, không lỗi tràn ngang hay che khuất phần tử, và `.dream/specs/momo-payment/report.md` ghi nhận đầy đủ kết quả kiểm chứng.
+  - **Verification:** `mock-e2e`, `visual`.
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2_

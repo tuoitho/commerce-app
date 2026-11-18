@@ -249,3 +249,43 @@ func TestNotificationService_SwallowsErrorsAndLogsWarning(t *testing.T) {
 	})
 	assert.Contains(t, buf.String(), "notification")
 }
+
+func TestNotificationService_MomoNotifications(t *testing.T) {
+	ctx := context.Background()
+	custID := uuid.NewString()
+	orderID := "a1b2c3d4-0000-0000-0000-000000000099"
+
+	repo := &fakeNotificationRepo{}
+	broadcaster := &fakeBroadcaster{
+		onlineUsers: map[string]bool{custID: true},
+	}
+	svc := notifuc.NewService(repo, broadcaster, slog.Default())
+
+	svc.NotifyOrderMomoPaid(ctx, &domain.Order{
+		ID:       orderID,
+		UserID:   custID,
+		Status:   domain.OrderStatusConfirmed,
+		TotalVND: "3190000",
+	})
+	svc.NotifyOrderPaymentExpired(ctx, []domain.AutoConfirmedOrder{
+		{ID: orderID, UserID: custID, TotalVND: "3190000"},
+	})
+
+	require.Len(t, repo.singleInputs, 2)
+	paidNotif := repo.singleInputs[0]
+	assert.Equal(t, domain.NotificationCategoryOrder, paidNotif.Category)
+	assert.Equal(t, domain.NotificationTypeOrderConfirmed, paidNotif.NotificationType)
+	assert.Nil(t, paidNotif.ActorID)
+	assert.Equal(t, "Thanh toán MoMo thành công. Đơn hàng #A1B2C3D4 đã được xác nhận.", paidNotif.Excerpt)
+	assert.Equal(t, "/orders/"+orderID, paidNotif.Metadata["targetPath"])
+
+	expiredNotif := repo.singleInputs[1]
+	assert.Equal(t, domain.NotificationCategoryOrder, expiredNotif.Category)
+	assert.Equal(t, domain.NotificationTypeOrderPaymentExpired, expiredNotif.NotificationType)
+	assert.Nil(t, expiredNotif.ActorID)
+	assert.Equal(t, "cancelled", expiredNotif.Metadata["status"])
+	assert.Equal(t, "Đơn hàng #A1B2C3D4 đã tự động hủy do quá thời hạn thanh toán MoMo.", expiredNotif.Excerpt)
+	assert.Equal(t, "/orders/"+orderID, expiredNotif.Metadata["targetPath"])
+
+	require.Len(t, broadcaster.broadcasts, 2)
+}

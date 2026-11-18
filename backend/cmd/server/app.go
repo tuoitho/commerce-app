@@ -13,6 +13,7 @@ import (
 	"commerce-backend/internal/config"
 	delivery "commerce-backend/internal/delivery/http"
 	"commerce-backend/internal/domain"
+	"commerce-backend/internal/payment/momo"
 	"commerce-backend/internal/repository"
 	"commerce-backend/internal/security"
 	"commerce-backend/internal/security/jwt"
@@ -276,11 +277,16 @@ func provideNotificationService(repo *repository.NotificationRepository, hub *ws
 	return notifuc.NewService(notifRepo, broadcaster, log)
 }
 
-func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, liveUC *liveuc.UseCase, notifSvc *notifuc.Service, cfg *config.Config) *orderuc.UseCase {
+func provideMomoClient(cfg *config.Config, log *slog.Logger) *momo.Client {
+	return momo.NewClient(cfg, log)
+}
+
+func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, momoClient *momo.Client, liveUC *liveuc.UseCase, notifSvc *notifuc.Service, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
 		Order:               repo,
 		Return:              returnRepo,
 		Review:              reviewRepo,
+		MomoGateway:         momoClient,
 		ShippingFeeVND:      cfg.ShippingFeeVND,
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
 		LiveQuota:           liveUC,

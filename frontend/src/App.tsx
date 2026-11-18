@@ -13,6 +13,7 @@ import { CartPage } from '@/pages/CartPage'
 import { CheckoutPage } from '@/pages/CheckoutPage'
 import { OrderHistoryPage } from '@/pages/OrderHistoryPage'
 import { OrderDetailPage } from '@/pages/OrderDetailPage'
+import { MomoReturnPage } from '@/pages/MomoReturnPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ReviewHistoryPage } from '@/pages/ReviewHistoryPage'
 import { PostsFeedPage } from '@/pages/PostsFeedPage'
@@ -39,6 +40,7 @@ export function AppContent() {
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/momo-return" element={<MomoReturnPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/reviews" element={<ReviewHistoryPage />} />

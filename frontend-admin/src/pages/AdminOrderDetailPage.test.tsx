@@ -375,4 +375,27 @@ describe('AdminOrderDetailPage', () => {
 
     expect(screen.getByText('Danh sách đơn hàng')).toBeInTheDocument()
   })
+
+  it('displays MoMo payment method, payment status badge, transactionId, and paidAt timestamp', async () => {
+    vi.mocked(ordersApi.getAdminOrder).mockResolvedValueOnce({
+      ...mockOrder,
+      id: 'ord-momo-paid',
+      status: 'confirmed',
+      paymentMethod: 'momo',
+      paymentStatus: 'paid',
+      paymentTransactionId: '4088812345',
+      paidAt: '2026-11-16T10:02:00Z',
+    })
+
+    renderWithClient(<AdminOrderDetailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Ví điện tử MoMo')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Đã thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('4088812345')).toBeInTheDocument()
+    expect(screen.getByText('Thời điểm thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('Mã giao dịch MoMo')).toBeInTheDocument()
+  })
 })

@@ -35,16 +35,16 @@ WHERE id = @id;
 
 -- name: InsertOrder :one
 INSERT INTO orders (
-    user_id, status, payment_method,
+    user_id, status, payment_method, payment_status,
     subtotal_vnd, shipping_fee_vnd, total_vnd,
     recipient_name, phone, province_name, ward_name, detail_address
 )
 VALUES (
-    @user_id, @status, @payment_method,
+    @user_id, @status, @payment_method, @payment_status,
     @subtotal_vnd::numeric, @shipping_fee_vnd::numeric, @total_vnd::numeric,
     @recipient_name, @phone, @province_name, @ward_name, @detail_address
 )
-RETURNING id, user_id, status, payment_method,
+RETURNING id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
           subtotal_vnd::text AS subtotal_vnd,
           shipping_fee_vnd::text AS shipping_fee_vnd,
           total_vnd::text AS total_vnd,
@@ -68,7 +68,7 @@ DELETE FROM cart_items
 WHERE user_id = $1 AND selected = true;
 
 -- name: GetOrderByID :one
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -100,7 +100,7 @@ WHERE order_id = ANY(@order_ids::uuid[])
 ORDER BY order_id, id ASC;
 
 -- name: ListOrdersByUser :many
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -118,7 +118,7 @@ WHERE user_id = $1
 GROUP BY status;
 
 -- name: LockOrderForUpdate :one
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -137,23 +137,83 @@ SET status = $2,
     updated_at = now()
 WHERE id = $1;
 
+-- name: SetOrderPaymentFailed :exec
+UPDATE orders
+SET payment_status = 'failed',
+    updated_at = now()
+WHERE id = @id
+  AND status = 'pending_confirmation'
+  AND payment_status = 'pending';
+
+-- name: SetOrderPaymentPending :exec
+UPDATE orders
+SET payment_status = 'pending',
+    updated_at = now()
+WHERE id = @id;
+
+-- name: SetOrderPaymentPaid :exec
+UPDATE orders
+SET payment_status = 'paid',
+    payment_transaction_id = sqlc.narg(payment_transaction_id)::text,
+    paid_at = COALESCE(paid_at, @paid_at::timestamptz),
+    updated_at = now()
+WHERE id = @id;
+
+-- name: SetOrderPaymentRefunded :exec
+UPDATE orders
+SET payment_status = 'refunded',
+    updated_at = now()
+WHERE id = @id;
+
+-- name: ConfirmOrderMomoPaid :exec
+UPDATE orders
+SET status = 'confirmed',
+    confirmed_at = COALESCE(confirmed_at, @now::timestamptz),
+    payment_status = 'paid',
+    payment_transaction_id = sqlc.narg(payment_transaction_id)::text,
+    paid_at = COALESCE(paid_at, @now::timestamptz),
+    updated_at = now()
+WHERE id = @id;
+
 -- name: AutoConfirmDueOrders :exec
 UPDATE orders
 SET status = 'confirmed',
     confirmed_at = now(),
     updated_at = now()
-WHERE status = 'pending_confirmation' AND created_at <= $1;
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'cod'
+  AND created_at <= $1;
 
 -- name: AutoConfirmDueOrdersReturning :many
 UPDATE orders
 SET status = 'confirmed',
     confirmed_at = now(),
     updated_at = now()
-WHERE status = 'pending_confirmation' AND created_at <= $1
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'cod'
+  AND created_at <= $1
 RETURNING id, user_id, total_vnd::text AS total_vnd;
 
+-- name: LockExpiredMomoOrders :many
+SELECT id, user_id, total_vnd::text AS total_vnd
+FROM orders
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'momo'
+  AND payment_status IN ('pending', 'failed')
+  AND created_at <= @cutoff::timestamptz
+ORDER BY created_at ASC, id ASC
+FOR UPDATE SKIP LOCKED;
+
+-- name: MarkOrderMomoExpiredCancelled :exec
+UPDATE orders
+SET status = 'cancelled',
+    cancelled_at = @cancelled_at::timestamptz,
+    payment_status = 'failed',
+    updated_at = now()
+WHERE id = @id;
+
 -- name: ListOrdersByAdmin :many
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -166,7 +226,7 @@ WHERE (COALESCE(cardinality(@statuses::text[]), 0) = 0 OR o.status = ANY(@status
 ORDER BY o.created_at DESC, o.id DESC;
 
 -- name: GetOrderByAdminID :one
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -178,7 +238,7 @@ JOIN users u ON u.id = o.user_id
 WHERE o.id = $1;
 
 -- name: LockOrderForUpdateAdmin :one
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -188,10 +248,10 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
 FROM orders o
 JOIN users u ON u.id = o.user_id
 WHERE o.id = $1
-FOR UPDATE;
+FOR UPDATE OF o;
 
 -- name: ListReviewableOrdersByUser :many
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,

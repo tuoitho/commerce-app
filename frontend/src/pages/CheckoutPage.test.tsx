@@ -687,4 +687,237 @@ describe('CheckoutPage', () => {
       expect(mockRefreshCart).toHaveBeenCalled()
     })
   })
+
+  it('disables MoMo option with Vietnamese explanation when total exceeds 50.000.000 ₫ or is below 1.000 ₫', async () => {
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/checkout']}>
+          <CheckoutPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Thanh toán khi nhận hàng \(COD\)/i)).toBeChecked()
+    })
+
+    const momoRadioOverLimit = screen.getByLabelText(/Ví điện tử MoMo/i)
+    expect(momoRadioOverLimit).toBeDisabled()
+    expect(screen.getByText(/1\.000 ₫ đến 50\.000\.000 ₫/i)).toBeInTheDocument()
+
+    vi.mocked(useCart).mockReturnValue({
+      cart: {
+        ...mockCart,
+        items: [
+          {
+            ...mockCart.items[0],
+            unitPriceVnd: '500',
+            lineTotalVnd: '500',
+            quantity: 1,
+          },
+        ],
+        totalUnits: 1,
+        selectedLineCount: 1,
+        selectedTotalVnd: '500',
+        shippingFeeVnd: '0',
+      },
+      isLoading: false,
+      badgeCount: 1,
+      refreshCart: mockRefreshCart,
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/checkout']}>
+          <CheckoutPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      const radios = screen.getAllByLabelText(/Ví điện tử MoMo/i)
+      expect(radios[radios.length - 1]).toBeDisabled()
+    })
+  })
+
+  it('allows selecting MoMo for eligible total, sends paymentMethod momo, and redirects browser to payUrl', async () => {
+    const eligibleCart = {
+      ...mockCart,
+      items: [
+        {
+          ...mockCart.items[0],
+          unitPriceVnd: '3190000',
+          lineTotalVnd: '3190000',
+          quantity: 1,
+        },
+      ],
+      totalUnits: 1,
+      selectedLineCount: 1,
+      selectedTotalVnd: '3190000',
+      shippingFeeVnd: '0',
+    }
+    vi.mocked(useCart).mockReturnValue({
+      cart: eligibleCart,
+      isLoading: false,
+      badgeCount: 1,
+      refreshCart: mockRefreshCart,
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+
+    const momoCreatedOrder: Order = {
+      id: 'momo-order-123',
+      userId: 'user-1',
+      status: 'pending_confirmation',
+      paymentMethod: 'momo',
+      paymentStatus: 'pending',
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?t=123',
+      recipientName: 'Nguyễn Văn A',
+      phone: '0912345678',
+      provinceName: 'Thành phố Hà Nội',
+      wardName: 'Phường Phúc Xá',
+      detailAddress: '123 Đường Cầu Giấy',
+      subtotalVnd: '3190000',
+      shippingFeeVnd: '0',
+      totalVnd: '3190000',
+      items: [],
+      createdAt: '2026-11-16T10:00:00Z',
+      updatedAt: '2026-11-16T10:00:00Z',
+    }
+    vi.mocked(ordersApi.createOrder).mockResolvedValue(momoCreatedOrder)
+
+    const originalLocation = window.location
+    const assignMock = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, assign: assignMock },
+      writable: true,
+      configurable: true,
+    })
+
+    try {
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <Routes>
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/orders/:id" element={<div>Order Detail Page momo-order-123</div>} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Ví điện tử MoMo/i)).toBeEnabled()
+      })
+
+      fireEvent.click(screen.getByLabelText(/Ví điện tử MoMo/i))
+      fireEvent.click(screen.getByRole('button', { name: /Đặt hàng/i }))
+
+      await waitFor(() => {
+        expect(ordersApi.createOrder).toHaveBeenCalledWith({
+          addressId: 'addr-1',
+          paymentMethod: 'momo',
+          lines: [
+            {
+              variantId: 'v-1',
+              quantity: 1,
+              productName: 'iPhone 15 Pro Max',
+              unitPriceVnd: '3190000',
+            },
+          ],
+        })
+      })
+      await waitFor(() => {
+        expect(assignMock).toHaveBeenCalledWith('https://test-payment.momo.vn/v2/gateway/pay?t=123')
+      })
+      expect(mockRefreshCart).toHaveBeenCalled()
+      expect(screen.queryByText('Order Detail Page momo-order-123')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      })
+    }
+  })
+
+  it('navigates to order detail with warning when MoMo order has empty payUrl', async () => {
+    const eligibleCart = {
+      ...mockCart,
+      items: [
+        {
+          ...mockCart.items[0],
+          unitPriceVnd: '3190000',
+          lineTotalVnd: '3190000',
+          quantity: 1,
+        },
+      ],
+      totalUnits: 1,
+      selectedLineCount: 1,
+      selectedTotalVnd: '3190000',
+      shippingFeeVnd: '0',
+    }
+    vi.mocked(useCart).mockReturnValue({
+      cart: eligibleCart,
+      isLoading: false,
+      badgeCount: 1,
+      refreshCart: mockRefreshCart,
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+
+    const fallbackOrder: Order = {
+      id: 'momo-fallback-123',
+      userId: 'user-1',
+      status: 'pending_confirmation',
+      paymentMethod: 'momo',
+      paymentStatus: 'failed',
+      recipientName: 'Nguyễn Văn A',
+      phone: '0912345678',
+      provinceName: 'Thành phố Hà Nội',
+      wardName: 'Phường Phúc Xá',
+      detailAddress: '123 Đường Cầu Giấy',
+      subtotalVnd: '3190000',
+      shippingFeeVnd: '0',
+      totalVnd: '3190000',
+      items: [],
+      createdAt: '2026-11-16T10:00:00Z',
+      updatedAt: '2026-11-16T10:00:00Z',
+    }
+    vi.mocked(ordersApi.createOrder).mockResolvedValue(fallbackOrder)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/checkout']}>
+          <Routes>
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/orders/:id" element={<div>Order Detail Fallback momo-fallback-123</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Ví điện tử MoMo/i)).toBeEnabled()
+    })
+
+    fireEvent.click(screen.getByLabelText(/Ví điện tử MoMo/i))
+    fireEvent.click(screen.getByRole('button', { name: /Đặt hàng/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Order Detail Fallback momo-fallback-123')).toBeInTheDocument()
+      expect(screen.getByText(/Chưa thể chuyển đến cổng MoMo/i)).toBeInTheDocument()
+    })
+  })
 })

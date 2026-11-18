@@ -90,6 +90,7 @@ export type SystemNotificationType =
   | 'order_delivered'
   | 'order_cancel_approved'
   | 'order_cancel_declined'
+  | 'order_payment_expired'
   | 'return_approved'
   | 'return_rejected'
   | 'return_received'

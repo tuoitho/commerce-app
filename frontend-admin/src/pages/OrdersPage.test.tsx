@@ -488,4 +488,58 @@ describe('OrdersPage', () => {
     expect(option).toBeInTheDocument()
     expect(option).toHaveValue('partially_returned')
   })
+
+  it('displays COD and MoMo payment methods with Vietnamese payment status badges', async () => {
+    const momoPaidOrder: AdminOrder = {
+      ...mockOrders[0],
+      id: 'ord-momo-1',
+      paymentMethod: 'momo',
+      paymentStatus: 'paid',
+      paymentTransactionId: '4088812345',
+      paidAt: '2026-11-16T10:02:00Z',
+    }
+    const momoFailedOrder: AdminOrder = {
+      ...mockOrders[0],
+      id: 'ord-momo-2',
+      paymentMethod: 'momo',
+      paymentStatus: 'failed',
+    }
+    const momoRefundedOrder: AdminOrder = {
+      ...mockOrders[0],
+      id: 'ord-momo-3',
+      paymentMethod: 'momo',
+      paymentStatus: 'refunded',
+      paymentTransactionId: '4088899999',
+    }
+
+    vi.mocked(ordersApi.getAdminOrders).mockResolvedValue({
+      data: [mockOrders[0], momoPaidOrder, momoFailedOrder, momoRefundedOrder],
+      meta: {
+        timestamp: '2026-11-16T10:05:00Z',
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 4,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+      message: '',
+    })
+
+    renderWithClient(<OrdersPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('#ord-momo-1')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('COD')).toBeInTheDocument()
+    expect(screen.getAllByText('MoMo').length).toBe(3)
+    expect(screen.getByText('Chờ thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('Đã thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('Thanh toán thất bại')).toBeInTheDocument()
+    expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
+  })
 })

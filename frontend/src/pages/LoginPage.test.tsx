@@ -52,6 +52,8 @@ describe('LoginPage', () => {
       </ToastProvider>
     )
 
+    fireEvent.change(screen.getByPlaceholderText('name@example.com'), { target: { value: '' } })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: '' } })
     const form = screen.getByRole('button', { name: /Đăng nhập/i }).closest('form')!
     fireEvent.submit(form)
 

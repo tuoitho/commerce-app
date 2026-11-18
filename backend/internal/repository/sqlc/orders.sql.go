@@ -17,7 +17,9 @@ UPDATE orders
 SET status = 'confirmed',
     confirmed_at = now(),
     updated_at = now()
-WHERE status = 'pending_confirmation' AND created_at <= $1
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'cod'
+  AND created_at <= $1
 `
 
 func (q *Queries) AutoConfirmDueOrders(ctx context.Context, createdAt time.Time) error {
@@ -30,7 +32,9 @@ UPDATE orders
 SET status = 'confirmed',
     confirmed_at = now(),
     updated_at = now()
-WHERE status = 'pending_confirmation' AND created_at <= $1
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'cod'
+  AND created_at <= $1
 RETURNING id, user_id, total_vnd::text AS total_vnd
 `
 
@@ -58,6 +62,28 @@ func (q *Queries) AutoConfirmDueOrdersReturning(ctx context.Context, createdAt t
 		return nil, err
 	}
 	return items, nil
+}
+
+const confirmOrderMomoPaid = `-- name: ConfirmOrderMomoPaid :exec
+UPDATE orders
+SET status = 'confirmed',
+    confirmed_at = COALESCE(confirmed_at, $1::timestamptz),
+    payment_status = 'paid',
+    payment_transaction_id = $2::text,
+    paid_at = COALESCE(paid_at, $1::timestamptz),
+    updated_at = now()
+WHERE id = $3
+`
+
+type ConfirmOrderMomoPaidParams struct {
+	Now                  time.Time
+	PaymentTransactionID pgtype.Text
+	ID                   string
+}
+
+func (q *Queries) ConfirmOrderMomoPaid(ctx context.Context, arg ConfirmOrderMomoPaidParams) error {
+	_, err := q.db.Exec(ctx, confirmOrderMomoPaid, arg.Now, arg.PaymentTransactionID, arg.ID)
+	return err
 }
 
 const countOrdersByStatus = `-- name: CountOrdersByStatus :many
@@ -144,7 +170,7 @@ func (q *Queries) DecrementVariantStock(ctx context.Context, arg DecrementVarian
 }
 
 const getOrderByAdminID = `-- name: GetOrderByAdminID :one
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -157,24 +183,27 @@ WHERE o.id = $1
 `
 
 type GetOrderByAdminIDRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
-	BuyerEmail     string
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
+	BuyerEmail           string
 }
 
 func (q *Queries) GetOrderByAdminID(ctx context.Context, id string) (GetOrderByAdminIDRow, error) {
@@ -185,6 +214,9 @@ func (q *Queries) GetOrderByAdminID(ctx context.Context, id string) (GetOrderByA
 		&i.UserID,
 		&i.Status,
 		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.PaymentTransactionID,
+		&i.PaidAt,
 		&i.SubtotalVnd,
 		&i.ShippingFeeVnd,
 		&i.TotalVnd,
@@ -204,7 +236,7 @@ func (q *Queries) GetOrderByAdminID(ctx context.Context, id string) (GetOrderByA
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -220,23 +252,26 @@ type GetOrderByIDParams struct {
 }
 
 type GetOrderByIDRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
 }
 
 func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (GetOrderByIDRow, error) {
@@ -247,6 +282,9 @@ func (q *Queries) GetOrderByID(ctx context.Context, arg GetOrderByIDParams) (Get
 		&i.UserID,
 		&i.Status,
 		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.PaymentTransactionID,
+		&i.PaidAt,
 		&i.SubtotalVnd,
 		&i.ShippingFeeVnd,
 		&i.TotalVnd,
@@ -283,16 +321,16 @@ func (q *Queries) IncrementVariantStock(ctx context.Context, arg IncrementVarian
 
 const insertOrder = `-- name: InsertOrder :one
 INSERT INTO orders (
-    user_id, status, payment_method,
+    user_id, status, payment_method, payment_status,
     subtotal_vnd, shipping_fee_vnd, total_vnd,
     recipient_name, phone, province_name, ward_name, detail_address
 )
 VALUES (
-    $1, $2, $3,
-    $4::numeric, $5::numeric, $6::numeric,
-    $7, $8, $9, $10, $11
+    $1, $2, $3, $4,
+    $5::numeric, $6::numeric, $7::numeric,
+    $8, $9, $10, $11, $12
 )
-RETURNING id, user_id, status, payment_method,
+RETURNING id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
           subtotal_vnd::text AS subtotal_vnd,
           shipping_fee_vnd::text AS shipping_fee_vnd,
           total_vnd::text AS total_vnd,
@@ -304,6 +342,7 @@ type InsertOrderParams struct {
 	UserID         string
 	Status         string
 	PaymentMethod  string
+	PaymentStatus  string
 	SubtotalVnd    pgtype.Numeric
 	ShippingFeeVnd pgtype.Numeric
 	TotalVnd       pgtype.Numeric
@@ -315,23 +354,26 @@ type InsertOrderParams struct {
 }
 
 type InsertOrderRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
 }
 
 func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) (InsertOrderRow, error) {
@@ -339,6 +381,7 @@ func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) (Inser
 		arg.UserID,
 		arg.Status,
 		arg.PaymentMethod,
+		arg.PaymentStatus,
 		arg.SubtotalVnd,
 		arg.ShippingFeeVnd,
 		arg.TotalVnd,
@@ -354,6 +397,9 @@ func (q *Queries) InsertOrder(ctx context.Context, arg InsertOrderParams) (Inser
 		&i.UserID,
 		&i.Status,
 		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.PaymentTransactionID,
+		&i.PaidAt,
 		&i.SubtotalVnd,
 		&i.ShippingFeeVnd,
 		&i.TotalVnd,
@@ -538,7 +584,7 @@ func (q *Queries) ListOrderItemsByOrderIDs(ctx context.Context, orderIds []strin
 }
 
 const listOrdersByAdmin = `-- name: ListOrdersByAdmin :many
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -552,24 +598,27 @@ ORDER BY o.created_at DESC, o.id DESC
 `
 
 type ListOrdersByAdminRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
-	BuyerEmail     string
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
+	BuyerEmail           string
 }
 
 func (q *Queries) ListOrdersByAdmin(ctx context.Context, statuses []string) ([]ListOrdersByAdminRow, error) {
@@ -586,6 +635,9 @@ func (q *Queries) ListOrdersByAdmin(ctx context.Context, statuses []string) ([]L
 			&i.UserID,
 			&i.Status,
 			&i.PaymentMethod,
+			&i.PaymentStatus,
+			&i.PaymentTransactionID,
+			&i.PaidAt,
 			&i.SubtotalVnd,
 			&i.ShippingFeeVnd,
 			&i.TotalVnd,
@@ -612,7 +664,7 @@ func (q *Queries) ListOrdersByAdmin(ctx context.Context, statuses []string) ([]L
 }
 
 const listOrdersByUser = `-- name: ListOrdersByUser :many
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -630,23 +682,26 @@ type ListOrdersByUserParams struct {
 }
 
 type ListOrdersByUserRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
 }
 
 func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]ListOrdersByUserRow, error) {
@@ -663,6 +718,9 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 			&i.UserID,
 			&i.Status,
 			&i.PaymentMethod,
+			&i.PaymentStatus,
+			&i.PaymentTransactionID,
+			&i.PaidAt,
 			&i.SubtotalVnd,
 			&i.ShippingFeeVnd,
 			&i.TotalVnd,
@@ -688,7 +746,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 }
 
 const listReviewableOrdersByUser = `-- name: ListReviewableOrdersByUser :many
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -718,23 +776,26 @@ ORDER BY o.created_at DESC, o.id DESC
 `
 
 type ListReviewableOrdersByUserRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
 }
 
 func (q *Queries) ListReviewableOrdersByUser(ctx context.Context, userID string) ([]ListReviewableOrdersByUserRow, error) {
@@ -751,6 +812,9 @@ func (q *Queries) ListReviewableOrdersByUser(ctx context.Context, userID string)
 			&i.UserID,
 			&i.Status,
 			&i.PaymentMethod,
+			&i.PaymentStatus,
+			&i.PaymentTransactionID,
+			&i.PaidAt,
 			&i.SubtotalVnd,
 			&i.ShippingFeeVnd,
 			&i.TotalVnd,
@@ -775,8 +839,45 @@ func (q *Queries) ListReviewableOrdersByUser(ctx context.Context, userID string)
 	return items, nil
 }
 
+const lockExpiredMomoOrders = `-- name: LockExpiredMomoOrders :many
+SELECT id, user_id, total_vnd::text AS total_vnd
+FROM orders
+WHERE status = 'pending_confirmation'
+  AND payment_method = 'momo'
+  AND payment_status IN ('pending', 'failed')
+  AND created_at <= $1::timestamptz
+ORDER BY created_at ASC, id ASC
+FOR UPDATE SKIP LOCKED
+`
+
+type LockExpiredMomoOrdersRow struct {
+	ID       string
+	UserID   string
+	TotalVnd string
+}
+
+func (q *Queries) LockExpiredMomoOrders(ctx context.Context, cutoff time.Time) ([]LockExpiredMomoOrdersRow, error) {
+	rows, err := q.db.Query(ctx, lockExpiredMomoOrders, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockExpiredMomoOrdersRow
+	for rows.Next() {
+		var i LockExpiredMomoOrdersRow
+		if err := rows.Scan(&i.ID, &i.UserID, &i.TotalVnd); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockOrderForUpdate = `-- name: LockOrderForUpdate :one
-SELECT id, user_id, status, payment_method,
+SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
        total_vnd::text AS total_vnd,
@@ -793,23 +894,26 @@ type LockOrderForUpdateParams struct {
 }
 
 type LockOrderForUpdateRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
 }
 
 func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdateParams) (LockOrderForUpdateRow, error) {
@@ -820,6 +924,9 @@ func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdate
 		&i.UserID,
 		&i.Status,
 		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.PaymentTransactionID,
+		&i.PaidAt,
 		&i.SubtotalVnd,
 		&i.ShippingFeeVnd,
 		&i.TotalVnd,
@@ -838,7 +945,7 @@ func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdate
 }
 
 const lockOrderForUpdateAdmin = `-- name: LockOrderForUpdateAdmin :one
-SELECT o.id, o.user_id, o.status, o.payment_method,
+SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
        o.total_vnd::text AS total_vnd,
@@ -848,28 +955,31 @@ SELECT o.id, o.user_id, o.status, o.payment_method,
 FROM orders o
 JOIN users u ON u.id = o.user_id
 WHERE o.id = $1
-FOR UPDATE
+FOR UPDATE OF o
 `
 
 type LockOrderForUpdateAdminRow struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    string
-	ShippingFeeVnd string
-	TotalVnd       string
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
-	BuyerEmail     string
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
+	SubtotalVnd          string
+	ShippingFeeVnd       string
+	TotalVnd             string
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
+	BuyerEmail           string
 }
 
 func (q *Queries) LockOrderForUpdateAdmin(ctx context.Context, id string) (LockOrderForUpdateAdminRow, error) {
@@ -880,6 +990,9 @@ func (q *Queries) LockOrderForUpdateAdmin(ctx context.Context, id string) (LockO
 		&i.UserID,
 		&i.Status,
 		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.PaymentTransactionID,
+		&i.PaidAt,
 		&i.SubtotalVnd,
 		&i.ShippingFeeVnd,
 		&i.TotalVnd,
@@ -992,6 +1105,25 @@ func (q *Queries) LockSubmittedCartItems(ctx context.Context, arg LockSubmittedC
 	return items, nil
 }
 
+const markOrderMomoExpiredCancelled = `-- name: MarkOrderMomoExpiredCancelled :exec
+UPDATE orders
+SET status = 'cancelled',
+    cancelled_at = $1::timestamptz,
+    payment_status = 'failed',
+    updated_at = now()
+WHERE id = $2
+`
+
+type MarkOrderMomoExpiredCancelledParams struct {
+	CancelledAt time.Time
+	ID          string
+}
+
+func (q *Queries) MarkOrderMomoExpiredCancelled(ctx context.Context, arg MarkOrderMomoExpiredCancelledParams) error {
+	_, err := q.db.Exec(ctx, markOrderMomoExpiredCancelled, arg.CancelledAt, arg.ID)
+	return err
+}
+
 const removeSelectedCartItems = `-- name: RemoveSelectedCartItems :exec
 DELETE FROM cart_items
 WHERE user_id = $1 AND selected = true
@@ -999,6 +1131,64 @@ WHERE user_id = $1 AND selected = true
 
 func (q *Queries) RemoveSelectedCartItems(ctx context.Context, userID string) error {
 	_, err := q.db.Exec(ctx, removeSelectedCartItems, userID)
+	return err
+}
+
+const setOrderPaymentFailed = `-- name: SetOrderPaymentFailed :exec
+UPDATE orders
+SET payment_status = 'failed',
+    updated_at = now()
+WHERE id = $1
+  AND status = 'pending_confirmation'
+  AND payment_status = 'pending'
+`
+
+func (q *Queries) SetOrderPaymentFailed(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setOrderPaymentFailed, id)
+	return err
+}
+
+const setOrderPaymentPaid = `-- name: SetOrderPaymentPaid :exec
+UPDATE orders
+SET payment_status = 'paid',
+    payment_transaction_id = $1::text,
+    paid_at = COALESCE(paid_at, $2::timestamptz),
+    updated_at = now()
+WHERE id = $3
+`
+
+type SetOrderPaymentPaidParams struct {
+	PaymentTransactionID pgtype.Text
+	PaidAt               time.Time
+	ID                   string
+}
+
+func (q *Queries) SetOrderPaymentPaid(ctx context.Context, arg SetOrderPaymentPaidParams) error {
+	_, err := q.db.Exec(ctx, setOrderPaymentPaid, arg.PaymentTransactionID, arg.PaidAt, arg.ID)
+	return err
+}
+
+const setOrderPaymentPending = `-- name: SetOrderPaymentPending :exec
+UPDATE orders
+SET payment_status = 'pending',
+    updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) SetOrderPaymentPending(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setOrderPaymentPending, id)
+	return err
+}
+
+const setOrderPaymentRefunded = `-- name: SetOrderPaymentRefunded :exec
+UPDATE orders
+SET payment_status = 'refunded',
+    updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) SetOrderPaymentRefunded(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setOrderPaymentRefunded, id)
 	return err
 }
 

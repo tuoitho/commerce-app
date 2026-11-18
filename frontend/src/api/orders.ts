@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Order, CreateOrderInput, OrderStatusBucket, OrderStats } from './types'
+import type { Order, CreateOrderInput, OrderStatusBucket, OrderStats, MomoReturnPayload } from './types'
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
   return apiClient<Order>('/orders', {
@@ -33,6 +33,19 @@ export async function undoCancelOrder(id: string): Promise<Order> {
   })
 }
 
+export async function retryMomoPayment(id: string): Promise<Order> {
+  return apiClient<Order>(`/orders/${id}/momo/retry`, {
+    method: 'POST',
+  })
+}
+
+export async function confirmMomoReturn(payload: MomoReturnPayload): Promise<Order> {
+  return apiClient<Order>('/payments/momo/return', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export const ordersApi = {
   createOrder,
   listOrders,
@@ -40,4 +53,6 @@ export const ordersApi = {
   getOrder,
   cancelOrder,
   undoCancelOrder,
+  retryMomoPayment,
+  confirmMomoReturn,
 }

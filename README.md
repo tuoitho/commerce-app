@@ -64,3 +64,15 @@ Backend verification additionally runs `go vet ./...` and checks that
 - `GET /api/v1/products/:id` — public product detail
 
 Run `make seed` from the repository root after `make db-up` to load repeatable sample catalog data.
+
+## Sample accounts (local development)
+
+`make seed` loads catalog data only and does not create user accounts. For local testing, both login pages pre-fill these sample credentials:
+
+| Role | App | Email | Password |
+| --- | --- | --- | --- |
+| Admin | `frontend-admin` (`http://localhost:15174/login`) | `admin@example.com` | `Admin123456@` |
+| Customer | `frontend` (`http://localhost:15173/login`) | `customer@example.com` | `Customer123456@` |
+
+- **Admin bootstrap:** Set `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` in `backend/.env` when starting with an empty `users` table (see `backend/.env.example`), or register via `POST /api/v1/auth/register` and promote the row in PostgreSQL (`UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';`).
+- **Customer:** Register via `/register` or `POST /api/v1/auth/register`.

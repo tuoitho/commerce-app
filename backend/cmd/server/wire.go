@@ -26,6 +26,7 @@ var appProviderSet = wire.NewSet(
 	provideReviewRepository,
 	provideReviewMediaStore,
 	provideFavoriteRepository,
+	provideMomoClient,
 	provideJWTManager,
 	provideAuthUseCase,
 	provideAccountUseCase,

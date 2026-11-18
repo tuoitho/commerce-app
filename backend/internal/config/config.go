@@ -39,6 +39,16 @@ type Config struct {
 	MediaMTXHLSPublicURL    string
 	LiveSignalPollInterval  time.Duration
 	LiveSignalTimeout       time.Duration
+
+	MomoPartnerCode string
+	MomoAccessKey   string
+	MomoSecretKey   string
+	MomoEndpoint    string
+	MomoRedirectURL string
+	MomoIPNURL      string
+	MomoRequestType string
+	MomoPartnerName string
+	MomoStoreID     string
 }
 
 const (
@@ -60,6 +70,14 @@ const (
 	defaultLiveSignalTimeout       = 10 * time.Minute
 	minLiveSignalPollInterval      = time.Second
 	maxLiveSignalPollInterval      = time.Minute
+
+	defaultMomoPartnerCode = "MOMO"
+	defaultMomoEndpoint    = "https://test-payment.momo.vn/v2/gateway/api/create"
+	defaultMomoRedirectURL = "http://localhost:15173/momo-return"
+	defaultMomoIPNURL      = "http://localhost:18080/api/v1/payments/momo/ipn"
+	defaultMomoRequestType = "payWithMethod"
+	defaultMomoPartnerName = "Test"
+	defaultMomoStoreID     = "MomoTestStore"
 )
 
 var allowedLogLevels = map[string]bool{
@@ -102,6 +120,15 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"MEDIAMTX_HLS_PUBLIC_URL",
 		"LIVE_SIGNAL_POLL_INTERVAL",
 		"LIVE_SIGNAL_TIMEOUT",
+		"MOMO_PARTNER_CODE",
+		"MOMO_ACCESS_KEY",
+		"MOMO_SECRET_KEY",
+		"MOMO_ENDPOINT",
+		"MOMO_REDIRECT_URL",
+		"MOMO_IPN_URL",
+		"MOMO_REQUEST_TYPE",
+		"MOMO_PARTNER_NAME",
+		"MOMO_STORE_ID",
 	}
 
 	for _, key := range keys {
@@ -340,7 +367,32 @@ func LoadWithFile(envFile string) (*Config, error) {
 		return nil, fmt.Errorf("config: LIVE_SIGNAL_TIMEOUT must be greater than zero, got %s", cfg.LiveSignalTimeout)
 	}
 
+	// 21. MoMo Payment Gateway v2 settings
+	cfg.MomoPartnerCode = stringSetting(v, "MOMO_PARTNER_CODE", defaultMomoPartnerCode)
+	cfg.MomoAccessKey = stringSetting(v, "MOMO_ACCESS_KEY", "")
+	cfg.MomoSecretKey = stringSetting(v, "MOMO_SECRET_KEY", "")
+	if cfg.MomoEndpoint, err = httpURLSetting(v, "MOMO_ENDPOINT", defaultMomoEndpoint); err != nil {
+		return nil, err
+	}
+	if cfg.MomoRedirectURL, err = httpURLSetting(v, "MOMO_REDIRECT_URL", defaultMomoRedirectURL); err != nil {
+		return nil, err
+	}
+	if cfg.MomoIPNURL, err = httpURLSetting(v, "MOMO_IPN_URL", defaultMomoIPNURL); err != nil {
+		return nil, err
+	}
+	cfg.MomoRequestType = stringSetting(v, "MOMO_REQUEST_TYPE", defaultMomoRequestType)
+	cfg.MomoPartnerName = stringSetting(v, "MOMO_PARTNER_NAME", defaultMomoPartnerName)
+	cfg.MomoStoreID = stringSetting(v, "MOMO_STORE_ID", defaultMomoStoreID)
+
 	return cfg, nil
+}
+
+func stringSetting(v *viper.Viper, key, fallback string) string {
+	raw := strings.TrimSpace(v.GetString(key))
+	if raw == "" {
+		return fallback
+	}
+	return raw
 }
 
 // httpURLSetting reads an absolute http(s) URL, trimming any trailing slash so

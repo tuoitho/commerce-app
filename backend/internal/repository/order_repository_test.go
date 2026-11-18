@@ -163,3 +163,43 @@ func TestOrderRepository_AutoConfirmDue(t *testing.T) {
 	})
 }
 
+func TestOrderRepository_MomoMethodGuards(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewOrderRepository(nil)
+
+	t.Run("CreateWithPaymentMethod rejects invalid paymentMethod", func(t *testing.T) {
+		_, err := repo.CreateWithPaymentMethod(ctx, "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", []domain.OrderLineInput{
+			{VariantID: "33333333-3333-3333-3333-333333333333", Quantity: 1, ProductName: "Phone", UnitPriceVND: "1000000"},
+		}, "0", "bank_transfer")
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["paymentMethod"] == "" {
+			t.Fatalf("expected ValidationError for paymentMethod, got %v", err)
+		}
+	})
+
+	t.Run("SetPaymentFailed rejects invalid UUID", func(t *testing.T) {
+		err := repo.SetPaymentFailed(ctx, "not-a-uuid")
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+	})
+
+	t.Run("ResetPaymentPending rejects invalid UUIDs", func(t *testing.T) {
+		_, err := repo.ResetPaymentPending(ctx, "bad", "bad")
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+	})
+
+	t.Run("ApplyMomoCallback rejects invalid order UUID", func(t *testing.T) {
+		_, _, err := repo.ApplyMomoCallback(ctx, "bad", "", "100000", "123", 0)
+		if !errors.Is(err, domain.ErrMomoInvalidCallback) {
+			t.Fatalf("expected ErrMomoInvalidCallback for IPN, got %v", err)
+		}
+		_, _, err = repo.ApplyMomoCallback(ctx, "bad", "11111111-1111-1111-1111-111111111111", "100000", "123", 0)
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound for user return, got %v", err)
+		}
+	})
+}
+

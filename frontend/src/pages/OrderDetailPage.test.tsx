@@ -18,6 +18,7 @@ vi.mock('@/api/orders', () => ({
     getOrder: vi.fn(),
     cancelOrder: vi.fn(),
     undoCancelOrder: vi.fn(),
+    retryMomoPayment: vi.fn(),
   },
 }))
 
@@ -567,5 +568,125 @@ describe('OrderDetailPage', () => {
     expect(event.detail.order.totalVnd).toBe(60030000)
 
     window.removeEventListener('open-chat-with-order', eventListener)
+  })
+
+  it('renders MoMo failed order details with countdown and retries MoMo payment', async () => {
+    const now = Date.now()
+    const failedMomoOrder: Order = {
+      ...baseMockOrder,
+      id: 'ord-momo-detail-1',
+      status: 'pending_confirmation',
+      paymentMethod: 'momo',
+      paymentStatus: 'failed',
+      createdAt: new Date(now - 3 * 60 * 1000).toISOString(),
+      cancellableUntil: new Date(now + 12 * 60 * 1000).toISOString(),
+    }
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(failedMomoOrder)
+    vi.mocked(ordersApi.retryMomoPayment).mockResolvedValue({
+      ...failedMomoOrder,
+      paymentStatus: 'pending',
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?t=detail-retry',
+    })
+
+    const originalLocation = window.location
+    const assignMock = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, assign: assignMock },
+      writable: true,
+      configurable: true,
+    })
+
+    try {
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/orders/ord-momo-detail-1']}>
+            <Routes>
+              <Route path="/orders/:id" element={<OrderDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ví điện tử MoMo')).toBeInTheDocument()
+      })
+
+      expect(screen.getByText('Thanh toán thất bại')).toBeInTheDocument()
+      expect(screen.getByText(/Hạn thanh toán MoMo:/i)).toBeInTheDocument()
+
+      const retryBtn = screen.getByRole('button', { name: /Thanh toán lại qua MoMo/i })
+      fireEvent.click(retryBtn)
+
+      await waitFor(() => {
+        expect(ordersApi.retryMomoPayment).toHaveBeenCalledWith('ord-momo-detail-1')
+        expect(assignMock).toHaveBeenCalledWith(
+          'https://test-payment.momo.vn/v2/gateway/pay?t=detail-retry'
+        )
+      })
+    } finally {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      })
+    }
+  })
+
+  it('hides MoMo retry button when payment deadline has passed and shows paid transaction info', async () => {
+    const expiredMomoOrder: Order = {
+      ...baseMockOrder,
+      id: 'ord-momo-expired',
+      status: 'pending_confirmation',
+      paymentMethod: 'momo',
+      paymentStatus: 'pending',
+      createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+      cancellableUntil: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    }
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(expiredMomoOrder)
+
+    const { unmount } = render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-momo-expired']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Ví điện tử MoMo')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: /Thanh toán lại qua MoMo/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/Đã hết hạn thanh toán MoMo/i)).toBeInTheDocument()
+    unmount()
+
+    const paidMomoOrder: Order = {
+      ...baseMockOrder,
+      id: 'ord-momo-paid',
+      status: 'confirmed',
+      paymentMethod: 'momo',
+      paymentStatus: 'paid',
+      paymentTransactionId: '4088812345',
+      paidAt: '2026-11-16T10:02:00Z',
+      cancellableUntil: null,
+    }
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(paidMomoOrder)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-momo-paid']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Đã thanh toán')).toBeInTheDocument()
+    })
+    expect(screen.getByText('4088812345')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Thanh toán lại qua MoMo/i })).not.toBeInTheDocument()
   })
 })

@@ -941,6 +941,12 @@ func (r *ReturnRepository) RefundAdmin(ctx context.Context, returnID, adminUserI
 		return nil, err
 	}
 
+	if newOrderStatus == domain.OrderStatusReturned && domain.PaymentStatus(orderRow.PaymentStatus) == domain.PaymentStatusPaid {
+		if err := q.SetOrderPaymentRefunded(ctx, reqRow.OrderID); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}

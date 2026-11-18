@@ -29,6 +29,7 @@ import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
 } from '@/api/types'
+import { getPaymentMethodFullLabel, getPaymentStatusBadge } from '@/lib/payment'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -80,12 +81,6 @@ function apiMessage(error: unknown, fallback: string): string {
     return error.message
   }
   return fallback
-}
-
-function formatPaymentMethod(method: string): string {
-  if (method === 'cod') return 'Thanh toán khi nhận hàng (COD)'
-  if (method === 'bank_transfer') return 'Chuyển khoản ngân hàng'
-  return method
 }
 
 export function AdminOrderDetailPage() {
@@ -404,9 +399,40 @@ export function AdminOrderDetailPage() {
               <span className="text-xs text-slate-500 block">Phương thức thanh toán</span>
               <span className="font-medium text-slate-800 flex items-center gap-1.5 mt-0.5">
                 <CreditCard className="h-3.5 w-3.5 text-slate-400" />
-                {formatPaymentMethod(order.paymentMethod)}
+                {getPaymentMethodFullLabel(order.paymentMethod)}
               </span>
             </div>
+            {(() => {
+              const paymentBadge = getPaymentStatusBadge(order.paymentStatus)
+              return (
+                <>
+                  <div>
+                    <span className="text-xs text-slate-500 block">Trạng thái thanh toán</span>
+                    <div className="mt-1">
+                      <Badge variant="outline" className={paymentBadge.className}>
+                        {paymentBadge.label}
+                      </Badge>
+                    </div>
+                  </div>
+                  {order.paymentTransactionId && (
+                    <div>
+                      <span className="text-xs text-slate-500 block">Mã giao dịch MoMo</span>
+                      <span className="font-mono font-medium text-slate-900 mt-0.5 block">
+                        {order.paymentTransactionId}
+                      </span>
+                    </div>
+                  )}
+                  {order.paidAt && (
+                    <div>
+                      <span className="text-xs text-slate-500 block">Thời điểm thanh toán</span>
+                      <span className="font-medium text-slate-800 mt-0.5 block">
+                        {formatDateTime(order.paidAt)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </CardContent>
         </Card>
 

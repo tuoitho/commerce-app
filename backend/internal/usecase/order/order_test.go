@@ -1493,6 +1493,18 @@ type fakeOrderNotificationPublisher struct {
 	customerCancelled   []string
 	adminTransitions    []domain.OrderAdminAction
 	autoConfirmedOrders []domain.AutoConfirmedOrder
+	momoPaidOrders      []string
+	momoExpiredOrders   []domain.AutoConfirmedOrder
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderMomoPaid(_ context.Context, order *domain.Order) {
+	if order != nil {
+		f.momoPaidOrders = append(f.momoPaidOrders, order.ID)
+	}
+}
+
+func (f *fakeOrderNotificationPublisher) NotifyOrderPaymentExpired(_ context.Context, orders []domain.AutoConfirmedOrder) {
+	f.momoExpiredOrders = append(f.momoExpiredOrders, orders...)
 }
 
 func (f *fakeOrderNotificationPublisher) NotifyOrderCreated(_ context.Context, order *domain.Order) {
@@ -1583,6 +1595,277 @@ func TestOrderUseCase_PublishesNotifications(t *testing.T) {
 	if len(pub.autoConfirmedOrders) != 1 || pub.autoConfirmedOrders[0].ID != orderID {
 		t.Errorf("expected NotifyOrderAutoConfirmed for %s, got %+v", orderID, pub.autoConfirmedOrders)
 	}
+}
+
+type fakeMomoOrderRepo struct {
+	*fakeReturningOrderRepo
+	createMethodUsed string
+	failedOrderIDs   []string
+	resetPendingRes  *domain.Order
+	resetPendingErr  error
+	callbackRes      *domain.Order
+	callbackJustPaid bool
+	callbackErr      error
+	lastCallbackUser string
+	expiredMomo      []domain.AutoConfirmedOrder
+	expiredMomoErr   error
+}
+
+func (f *fakeMomoOrderRepo) CreateWithPaymentMethod(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput, shippingFeeVND domain.MoneyVND, paymentMethod string) (*domain.Order, error) {
+	f.createMethodUsed = paymentMethod
+	return f.Create(ctx, userID, addressID, lines, shippingFeeVND)
+}
+
+func (f *fakeMomoOrderRepo) SetPaymentFailed(_ context.Context, orderID string) error {
+	f.failedOrderIDs = append(f.failedOrderIDs, orderID)
+	if f.createdOrder != nil && f.createdOrder.ID == orderID {
+		f.createdOrder.PaymentStatus = domain.PaymentStatusFailed
+	}
+	return nil
+}
+
+func (f *fakeMomoOrderRepo) ResetPaymentPending(_ context.Context, _, _ string) (*domain.Order, error) {
+	if f.resetPendingErr != nil {
+		return nil, f.resetPendingErr
+	}
+	return f.resetPendingRes, nil
+}
+
+func (f *fakeMomoOrderRepo) ApplyMomoCallback(_ context.Context, _, userID, _, _ string, _ int) (*domain.Order, bool, error) {
+	f.lastCallbackUser = userID
+	return f.callbackRes, f.callbackJustPaid, f.callbackErr
+}
+
+func (f *fakeMomoOrderRepo) AutoCancelExpiredMomoOrders(_ context.Context, _ time.Time) ([]domain.AutoConfirmedOrder, error) {
+	return f.expiredMomo, f.expiredMomoErr
+}
+
+type fakeMomoGateway struct {
+	payURL    string
+	createErr error
+	sigValid  bool
+	calls     int
+}
+
+func (f *fakeMomoGateway) CreatePaymentURL(_ context.Context, _ domain.MomoCreateInput) (string, error) {
+	f.calls++
+	return f.payURL, f.createErr
+}
+
+func (f *fakeMomoGateway) VerifyCallbackSignature(_ domain.MomoCallbackPayload) bool {
+	return f.sigValid
+}
+
+type fakeLiveObserver struct {
+	calls int
+}
+
+func (f *fakeLiveObserver) LiveQuotaChanged(_ context.Context) {
+	f.calls++
+}
+
+func TestOrderUseCase_MomoFlows(t *testing.T) {
+	ctx := context.Background()
+	userID := "11111111-1111-1111-1111-111111111111"
+	addrID := "22222222-2222-2222-2222-222222222222"
+	varID := "33333333-3333-3333-3333-333333333333"
+	orderID := "44444444-4444-4444-4444-444444444444"
+	now := time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)
+
+	t.Run("CreateWithMethod defaults empty to cod, rejects invalid, returns payUrl on momo success, marks failed on gateway error", func(t *testing.T) {
+		gw := &fakeMomoGateway{payURL: "https://test-payment.momo.vn/pay/123"}
+		repo := &fakeMomoOrderRepo{
+			fakeReturningOrderRepo: &fakeReturningOrderRepo{
+				fakeOrderRepo: &fakeOrderRepo{
+					createdOrder: &domain.Order{
+						ID:            orderID,
+						UserID:        userID,
+						Status:        domain.OrderStatusPendingConfirmation,
+						PaymentMethod: domain.PaymentMethodCOD,
+						PaymentStatus: domain.PaymentStatusPending,
+						TotalVND:      "1000000",
+						CreatedAt:     now,
+					},
+				},
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			MomoGateway:         gw,
+			OrderConfirmTimeout: 30 * time.Minute,
+		})
+
+		// Empty paymentMethod defaults to cod
+		codOrder, err := uc.CreateWithMethod(ctx, userID, addrID, []domain.OrderLineInput{{VariantID: varID, Quantity: 1}}, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.createMethodUsed != domain.PaymentMethodCOD || codOrder.PayURL != "" || gw.calls != 0 {
+			t.Fatalf("expected COD creation without MoMo gateway call")
+		}
+
+		// Invalid paymentMethod returns ValidationError
+		_, err = uc.CreateWithMethod(ctx, userID, addrID, []domain.OrderLineInput{{VariantID: varID, Quantity: 1}}, "crypto")
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["paymentMethod"] == "" {
+			t.Fatalf("expected validation error for paymentMethod, got %v", err)
+		}
+
+		// MoMo success returns payUrl
+		repo.createdOrder.PaymentMethod = domain.PaymentMethodMomo
+		momoOrder, err := uc.CreateWithMethod(ctx, userID, addrID, []domain.OrderLineInput{{VariantID: varID, Quantity: 1}}, "momo")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if momoOrder.PayURL != gw.payURL {
+			t.Fatalf("expected PayURL %q, got %q", gw.payURL, momoOrder.PayURL)
+		}
+
+		// MoMo gateway failure sets failed and returns order without PayURL
+		gw.payURL = ""
+		gw.createErr = domain.ErrMomoGateway
+		repo.createdOrder.PayURL = ""
+		repo.createdOrder.PaymentStatus = domain.PaymentStatusPending
+		failedOrder, err := uc.CreateWithMethod(ctx, userID, addrID, []domain.OrderLineInput{{VariantID: varID, Quantity: 1}}, "momo")
+		if err != nil {
+			t.Fatalf("gateway error during create should still return order, got %v", err)
+		}
+		if failedOrder.PaymentStatus != domain.PaymentStatusFailed || failedOrder.PayURL != "" || len(repo.failedOrderIDs) != 1 {
+			t.Fatalf("expected failed paymentStatus without payUrl, got %+v", failedOrder)
+		}
+	})
+
+	t.Run("RetryMomoPayment enforces eligibility, timeout, and gateway error 502", func(t *testing.T) {
+		gw := &fakeMomoGateway{payURL: "https://test-payment.momo.vn/pay/retry"}
+		repo := &fakeMomoOrderRepo{
+			fakeReturningOrderRepo: &fakeReturningOrderRepo{
+				fakeOrderRepo: &fakeOrderRepo{
+					getByIDOrder: &domain.Order{
+						ID:            orderID,
+						UserID:        userID,
+						Status:        domain.OrderStatusPendingConfirmation,
+						PaymentMethod: domain.PaymentMethodMomo,
+						PaymentStatus: domain.PaymentStatusFailed,
+						TotalVND:      "1000000",
+						CreatedAt:     now,
+					},
+				},
+			},
+			resetPendingRes: &domain.Order{
+				ID:            orderID,
+				UserID:        userID,
+				Status:        domain.OrderStatusPendingConfirmation,
+				PaymentMethod: domain.PaymentMethodMomo,
+				PaymentStatus: domain.PaymentStatusPending,
+				TotalVND:      "1000000",
+				CreatedAt:     now,
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			MomoGateway:         gw,
+			OrderConfirmTimeout: 30 * time.Minute,
+			Now:                 func() time.Time { return now.Add(10 * time.Minute) },
+		})
+
+		retried, err := uc.RetryMomoPayment(ctx, userID, orderID)
+		if err != nil || retried.PayURL != gw.payURL {
+			t.Fatalf("expected retry payUrl, got order=%+v err=%v", retried, err)
+		}
+
+		// Gateway error -> ErrMomoGateway
+		gw.createErr = domain.ErrMomoGateway
+		_, err = uc.RetryMomoPayment(ctx, userID, orderID)
+		if !errors.Is(err, domain.ErrMomoGateway) {
+			t.Fatalf("expected ErrMomoGateway, got %v", err)
+		}
+		gw.createErr = nil
+
+		// Expired (> 30m) -> ErrPaymentRetryNotAllowed
+		ucExpired := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			MomoGateway:         gw,
+			OrderConfirmTimeout: 30 * time.Minute,
+			Now:                 func() time.Time { return now.Add(31 * time.Minute) },
+		})
+		_, err = ucExpired.RetryMomoPayment(ctx, userID, orderID)
+		if !errors.Is(err, domain.ErrPaymentRetryNotAllowed) {
+			t.Fatalf("expected ErrPaymentRetryNotAllowed on expired order, got %v", err)
+		}
+
+		// Already paid -> ErrPaymentRetryNotAllowed
+		repo.getByIDOrder.PaymentStatus = domain.PaymentStatusPaid
+		_, err = uc.RetryMomoPayment(ctx, userID, orderID)
+		if !errors.Is(err, domain.ErrPaymentRetryNotAllowed) {
+			t.Fatalf("expected ErrPaymentRetryNotAllowed on paid order, got %v", err)
+		}
+	})
+
+	t.Run("HandleMomoReturn and HandleMomoIPN validate signature, notify once, and AutoConfirmDue cancels expired momo", func(t *testing.T) {
+		gw := &fakeMomoGateway{sigValid: false}
+		pub := &fakeOrderNotificationPublisher{}
+		liveObs := &fakeLiveObserver{}
+		repo := &fakeMomoOrderRepo{
+			fakeReturningOrderRepo: &fakeReturningOrderRepo{
+				fakeOrderRepo: &fakeOrderRepo{},
+				confirmed:     []domain.AutoConfirmedOrder{{ID: "cod-1", UserID: userID, TotalVND: "100000"}},
+			},
+			callbackRes: &domain.Order{
+				ID:            orderID,
+				UserID:        userID,
+				Status:        domain.OrderStatusConfirmed,
+				PaymentMethod: domain.PaymentMethodMomo,
+				PaymentStatus: domain.PaymentStatusPaid,
+			},
+			callbackJustPaid: true,
+			expiredMomo:      []domain.AutoConfirmedOrder{{ID: "momo-exp-1", UserID: userID, TotalVND: "500000"}},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			MomoGateway:         gw,
+			Notifications:       pub,
+			LiveQuota:           liveObs,
+			OrderConfirmTimeout: 30 * time.Minute,
+		})
+
+		cb := domain.MomoCallbackPayload{
+			PartnerCode: "MOMO",
+			OrderID:     orderID + "_1763281800000",
+			Amount:      "1000000",
+			ResultCode:  0,
+			TransID:     "4088812345",
+		}
+
+		// Invalid signature -> ErrMomoInvalidCallback
+		_, err := uc.HandleMomoReturn(ctx, userID, cb)
+		if !errors.Is(err, domain.ErrMomoInvalidCallback) {
+			t.Fatalf("expected ErrMomoInvalidCallback, got %v", err)
+		}
+
+		// Valid signature -> HandleMomoReturn emits 1 notification
+		gw.sigValid = true
+		_, err = uc.HandleMomoReturn(ctx, userID, cb)
+		if err != nil || repo.lastCallbackUser != userID || len(pub.momoPaidOrders) != 1 {
+			t.Fatalf("expected HandleMomoReturn to notify once, err=%v notified=%v", err, pub.momoPaidOrders)
+		}
+
+		// Duplicate IPN (justPaid=false) -> no second notification
+		repo.callbackJustPaid = false
+		if err := uc.HandleMomoIPN(ctx, cb); err != nil {
+			t.Fatalf("HandleMomoIPN error: %v", err)
+		}
+		if repo.lastCallbackUser != "" || len(pub.momoPaidOrders) != 1 {
+			t.Fatalf("expected IPN duplicate not to re-notify, got %v", pub.momoPaidOrders)
+		}
+
+		// AutoConfirmDue confirms COD and expires MoMo with notification & live quota signal
+		if err := uc.AutoConfirmDue(ctx, now); err != nil {
+			t.Fatalf("AutoConfirmDue error: %v", err)
+		}
+		if len(pub.autoConfirmedOrders) != 1 || len(pub.momoExpiredOrders) != 1 || liveObs.calls != 1 {
+			t.Fatalf("expected COD confirmed + MoMo expired notification + live quota notify, got conf=%v exp=%v live=%d", pub.autoConfirmedOrders, pub.momoExpiredOrders, liveObs.calls)
+		}
+	})
 }
 
 

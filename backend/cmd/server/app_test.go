@@ -86,7 +86,12 @@ func TestApp_ProvidersUnit(t *testing.T) {
 		t.Fatal("expected non-nil review repo")
 	}
 
-	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, nil, notifSvc, cfg)
+	momoClient := provideMomoClient(cfg, log)
+	if momoClient == nil {
+		t.Fatal("expected non-nil momo client")
+	}
+
+	orderUC := provideOrderUseCase(orderRepo, returnRepo, reviewRepo, momoClient, nil, notifSvc, cfg)
 	if orderUC == nil {
 		t.Fatal("expected non-nil order use case")
 	}

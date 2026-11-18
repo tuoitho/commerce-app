@@ -133,27 +133,31 @@ func toReturnRequestResponse(rr *domain.ReturnRequest, isAdmin bool) *returnRequ
 }
 
 type orderResponse struct {
-	ID                  string                     `json:"id"`
-	UserID              string                     `json:"userId"`
-	Status              string                     `json:"status"`
-	PaymentMethod       string                     `json:"paymentMethod"`
-	RecipientName       string                     `json:"recipientName"`
-	Phone               string                     `json:"phone"`
-	ProvinceName        string                     `json:"provinceName"`
-	WardName            string                     `json:"wardName"`
-	DetailAddress       string                     `json:"detailAddress"`
-	SubtotalVND         string                     `json:"subtotalVnd"`
-	ShippingFeeVND      string                     `json:"shippingFeeVnd"`
-	TotalVND            string                     `json:"totalVnd"`
-	Items               []orderItemResponse        `json:"items"`
-	CreatedAt           time.Time                  `json:"createdAt"`
-	UpdatedAt           time.Time                  `json:"updatedAt"`
-	ConfirmedAt         *time.Time                 `json:"confirmedAt,omitempty"`
-	CancelledAt         *time.Time                 `json:"cancelledAt,omitempty"`
-	DeliveredAt         *time.Time                 `json:"deliveredAt,omitempty"`
-	CancellableUntil    *time.Time                 `json:"cancellableUntil,omitempty"`
-	ReturnEligibility   *returnEligibilityResponse `json:"returnEligibility,omitempty"`
-	LatestReturnRequest *returnRequestResponse     `json:"latestReturnRequest"`
+	ID                   string                     `json:"id"`
+	UserID               string                     `json:"userId"`
+	Status               string                     `json:"status"`
+	PaymentMethod        string                     `json:"paymentMethod"`
+	PaymentStatus        string                     `json:"paymentStatus"`
+	PaymentTransactionID *string                    `json:"paymentTransactionId,omitempty"`
+	PaidAt               *time.Time                 `json:"paidAt,omitempty"`
+	PayURL               string                     `json:"payUrl,omitempty"`
+	RecipientName        string                     `json:"recipientName"`
+	Phone                string                     `json:"phone"`
+	ProvinceName         string                     `json:"provinceName"`
+	WardName             string                     `json:"wardName"`
+	DetailAddress        string                     `json:"detailAddress"`
+	SubtotalVND          string                     `json:"subtotalVnd"`
+	ShippingFeeVND       string                     `json:"shippingFeeVnd"`
+	TotalVND             string                     `json:"totalVnd"`
+	Items                []orderItemResponse        `json:"items"`
+	CreatedAt            time.Time                  `json:"createdAt"`
+	UpdatedAt            time.Time                  `json:"updatedAt"`
+	ConfirmedAt          *time.Time                 `json:"confirmedAt,omitempty"`
+	CancelledAt          *time.Time                 `json:"cancelledAt,omitempty"`
+	DeliveredAt          *time.Time                 `json:"deliveredAt,omitempty"`
+	CancellableUntil     *time.Time                 `json:"cancellableUntil,omitempty"`
+	ReturnEligibility    *returnEligibilityResponse `json:"returnEligibility,omitempty"`
+	LatestReturnRequest  *returnRequestResponse     `json:"latestReturnRequest"`
 }
 
 func toOrderResponse(order domain.Order) orderResponse {
@@ -188,28 +192,37 @@ func toOrderResponse(order domain.Order) orderResponse {
 		}
 	}
 
+	paymentStatus := string(order.PaymentStatus)
+	if paymentStatus == "" {
+		paymentStatus = string(domain.PaymentStatusPending)
+	}
+
 	return orderResponse{
-		ID:                  order.ID,
-		UserID:              order.UserID,
-		Status:              string(order.Status),
-		PaymentMethod:       order.PaymentMethod,
-		RecipientName:       order.ShippingInfo.RecipientName,
-		Phone:               order.ShippingInfo.Phone,
-		ProvinceName:        order.ShippingInfo.ProvinceName,
-		WardName:            order.ShippingInfo.WardName,
-		DetailAddress:       order.ShippingInfo.DetailAddress,
-		SubtotalVND:         string(order.SubtotalVND),
-		ShippingFeeVND:      string(order.ShippingFeeVND),
-		TotalVND:            string(order.TotalVND),
-		Items:               items,
-		CreatedAt:           order.CreatedAt,
-		UpdatedAt:           order.UpdatedAt,
-		ConfirmedAt:         order.ConfirmedAt,
-		CancelledAt:         order.CancelledAt,
-		DeliveredAt:         order.DeliveredAt,
-		CancellableUntil:    order.CancellableUntil,
-		ReturnEligibility:   returnEligibility,
-		LatestReturnRequest: toReturnRequestResponse(order.LatestReturnRequest, false),
+		ID:                   order.ID,
+		UserID:               order.UserID,
+		Status:               string(order.Status),
+		PaymentMethod:        order.PaymentMethod,
+		PaymentStatus:        paymentStatus,
+		PaymentTransactionID: order.PaymentTransactionID,
+		PaidAt:               order.PaidAt,
+		PayURL:               order.PayURL,
+		RecipientName:        order.ShippingInfo.RecipientName,
+		Phone:                order.ShippingInfo.Phone,
+		ProvinceName:         order.ShippingInfo.ProvinceName,
+		WardName:             order.ShippingInfo.WardName,
+		DetailAddress:        order.ShippingInfo.DetailAddress,
+		SubtotalVND:          string(order.SubtotalVND),
+		ShippingFeeVND:       string(order.ShippingFeeVND),
+		TotalVND:             string(order.TotalVND),
+		Items:                items,
+		CreatedAt:            order.CreatedAt,
+		UpdatedAt:            order.UpdatedAt,
+		ConfirmedAt:          order.ConfirmedAt,
+		CancelledAt:          order.CancelledAt,
+		DeliveredAt:          order.DeliveredAt,
+		CancellableUntil:     order.CancellableUntil,
+		ReturnEligibility:    returnEligibility,
+		LatestReturnRequest:  toReturnRequestResponse(order.LatestReturnRequest, false),
 	}
 }
 
@@ -221,8 +234,9 @@ type orderLineRequest struct {
 }
 
 type createOrderRequest struct {
-	AddressID string             `json:"addressId"`
-	Lines     []orderLineRequest `json:"lines"`
+	AddressID     string             `json:"addressId"`
+	PaymentMethod string             `json:"paymentMethod"`
+	Lines         []orderLineRequest `json:"lines"`
 }
 
 func (h *orderHandler) Create(c *gin.Context) {
@@ -248,7 +262,7 @@ func (h *orderHandler) Create(c *gin.Context) {
 		}
 	}
 
-	order, err := h.uc.Create(c.Request.Context(), userID, req.AddressID, lines)
+	order, err := h.uc.CreateWithMethod(c.Request.Context(), userID, req.AddressID, lines, req.PaymentMethod)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -365,6 +379,23 @@ func (h *orderHandler) UndoCancel(c *gin.Context) {
 	}
 
 	writeSuccess(c, http.StatusOK, "Hoàn tác yêu cầu hủy thành công", toOrderResponse(*order))
+}
+
+func (h *orderHandler) RetryMomo(c *gin.Context) {
+	orderID := c.Param("id")
+	userID := callerUserID(c)
+	if h.uc == nil {
+		writeError(c, domain.ErrNotFound)
+		return
+	}
+
+	order, err := h.uc.RetryMomoPayment(c.Request.Context(), userID, orderID)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	writeSuccess(c, http.StatusOK, "Khởi tạo thanh toán MoMo thành công", toOrderResponse(*order))
 }
 
 

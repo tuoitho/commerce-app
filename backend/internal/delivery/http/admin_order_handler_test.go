@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -588,4 +589,64 @@ func TestAdminOrder_Transitions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAdminOrderHTTP_MomoPaymentFieldsAndSnapshots(t *testing.T) {
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "momo-payment", "contract-snapshots.json")
+	fixedTime := time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)
+	paidTime := fixedTime.Add(2 * time.Minute)
+	transID := "4088812345"
+
+	pendingOrder := sampleAdminOrder("44444444-4444-4444-4444-444444444444", domain.OrderStatusPendingConfirmation, "momo-pending@example.com")
+	pendingOrder.PaymentMethod = domain.PaymentMethodMomo
+	pendingOrder.PaymentStatus = domain.PaymentStatusPending
+	pendingOrder.CreatedAt = fixedTime
+	pendingOrder.UpdatedAt = fixedTime
+
+	paidOrder := sampleAdminOrder("55555555-5555-5555-5555-555555555555", domain.OrderStatusConfirmed, "momo-paid@example.com")
+	paidOrder.PaymentMethod = domain.PaymentMethodMomo
+	paidOrder.PaymentStatus = domain.PaymentStatusPaid
+	paidOrder.PaymentTransactionID = &transID
+	paidOrder.PaidAt = &paidTime
+	paidOrder.ConfirmedAt = &paidTime
+	paidOrder.CreatedAt = fixedTime
+	paidOrder.UpdatedAt = paidTime
+
+	repo := &fakeAdminOrderRepo{
+		adminListOrders:   []domain.Order{pendingOrder, paidOrder},
+		adminGetOrderByID: &pendingOrder,
+	}
+	router, manager, _ := setupAdminOrderTestRouter(repo)
+	token := adminBearerToken(t, manager)
+
+	// admin_list_orders_200
+	reqList := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders?page=1&limit=20", nil)
+	reqList.Header.Set("Authorization", token)
+	wList := httptest.NewRecorder()
+	router.ServeHTTP(wList, reqList)
+	if wList.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", wList.Code, wList.Body.String())
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "admin_list_orders_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/admin/orders", nil, wList)
+
+	// admin_order_detail_momo_pending_200
+	reqPending := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders/"+pendingOrder.ID, nil)
+	reqPending.Header.Set("Authorization", token)
+	wPending := httptest.NewRecorder()
+	router.ServeHTTP(wPending, reqPending)
+	if wPending.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", wPending.Code, wPending.Body.String())
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "admin_order_detail_momo_pending_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/admin/orders/:id", nil, wPending)
+
+	// admin_order_detail_momo_paid_200
+	repo.adminGetOrderByID = &paidOrder
+	reqPaid := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders/"+paidOrder.ID, nil)
+	reqPaid.Header.Set("Authorization", token)
+	wPaid := httptest.NewRecorder()
+	router.ServeHTTP(wPaid, reqPaid)
+	if wPaid.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", wPaid.Code, wPaid.Body.String())
+	}
+	assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "admin_order_detail_momo_paid_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/admin/orders/:id", nil, wPaid)
 }

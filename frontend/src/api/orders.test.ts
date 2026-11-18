@@ -260,4 +260,84 @@ describe('ordersApi', () => {
     const objResult = await ordersApi.undoCancelOrder('ord-123')
     expect(objResult).toEqual(preparingOrder)
   })
+
+  it('retryMomoPayment calls POST /orders/:id/momo/retry', async () => {
+    const retriedOrder = {
+      ...mockOrder,
+      paymentMethod: 'momo',
+      paymentStatus: 'pending' as const,
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?t=retry',
+    }
+    const mockResponse = {
+      success: true,
+      message: 'Khởi tạo thanh toán MoMo thành công',
+      data: retriedOrder,
+      error: null,
+      meta: { timestamp: '2026-11-16T10:00:00.000Z' },
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await ordersApi.retryMomoPayment('ord-123')
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/orders/ord-123/momo/retry'),
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(result).toEqual(retriedOrder)
+  })
+
+  it('confirmMomoReturn calls POST /payments/momo/return with callback payload', async () => {
+    const paidOrder = {
+      ...mockOrder,
+      status: 'confirmed' as const,
+      paymentMethod: 'momo',
+      paymentStatus: 'paid' as const,
+      paymentTransactionId: '4088812345',
+      paidAt: '2026-11-16T10:02:00.000Z',
+    }
+    const mockResponse = {
+      success: true,
+      message: 'Xác thực thanh toán MoMo thành công',
+      data: paidOrder,
+      error: null,
+      meta: { timestamp: '2026-11-16T10:02:00.000Z' },
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const payload = {
+      partnerCode: 'MOMO',
+      orderId: 'ord-123_1763281800000',
+      requestId: 'ord-123_1763281800000',
+      amount: '3190000',
+      orderInfo: 'Thanh toan don hang',
+      orderType: 'momo_wallet',
+      transId: '4088812345',
+      resultCode: 0,
+      message: 'Thành công.',
+      payType: 'qr',
+      responseTime: '1763281800000',
+      extraData: '',
+      signature: 'abc123',
+    }
+    const result = await ordersApi.confirmMomoReturn(payload)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/payments/momo/return'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+    )
+    expect(result).toEqual(paidOrder)
+  })
 })

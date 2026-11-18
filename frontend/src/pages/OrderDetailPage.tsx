@@ -31,7 +31,15 @@ import {
   type Review,
 } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
+import {
+  canRetryMomoPayment,
+  getMomoPaymentDeadlineMs,
+  getPaymentMethodLabel,
+  getPaymentStatusBadge,
+  retryMomoAndRedirect,
+} from '@/lib/payment'
 import { orderToAttachedOrderCard } from '@/lib/chatUtils'
+import { MomoCountdown } from '@/components/orders/MomoCountdown'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -197,6 +205,8 @@ export function OrderDetailPage() {
 
   const [dialogType, setDialogType] = useState<'cancel' | 'request_cancel' | 'undo_cancel' | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const [isRetryingMomo, setIsRetryingMomo] = useState(false)
+  const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
   const [isCancelReturnDialogOpen, setIsCancelReturnDialogOpen] = useState(false)
   const [isSubmittingReturnCancel, setIsSubmittingReturnCancel] = useState(false)
@@ -245,6 +255,7 @@ export function OrderDetailPage() {
       setIsNotFound(false)
       const data = await ordersApi.getOrder(id)
       setOrder(data)
+      setNowMs(Date.now())
     } catch (err: unknown) {
       if (err instanceof ApiError && (err.status === 404 || err.code === 'order_not_found')) {
         setIsNotFound(true)
@@ -263,6 +274,24 @@ export function OrderDetailPage() {
       fetchOrderDetail()
     }
   }, [isAuthenticated, id, fetchOrderDetail])
+
+  const handleRetryMomo = async () => {
+    if (!order) return
+    setIsRetryingMomo(true)
+    try {
+      const { redirected, order: retried } = await retryMomoAndRedirect(order.id)
+      if (redirected) return
+      setOrder(retried)
+      toastError('Chưa thể chuyển đến cổng MoMo', 'Vui lòng thử lại sau ít phút.')
+    } catch (err: unknown) {
+      toastError(
+        'Thanh toán lại thất bại',
+        err instanceof ApiError ? err.message : 'Không thể tạo liên kết thanh toán MoMo mới.'
+      )
+    } finally {
+      setIsRetryingMomo(false)
+    }
+  }
 
   const handleConfirmCancelOrRequest = async () => {
     if (!order) return
@@ -507,11 +536,26 @@ export function OrderDetailPage() {
               </div>
             </div>
 
-            {order.status === 'pending_confirmation' && order.cancellableUntil && (
-              <div className="sm:self-center shrink-0">
-                <CountdownTimer cancellableUntil={order.cancellableUntil} />
-              </div>
-            )}
+            {order.status === 'pending_confirmation' &&
+              order.paymentMethod === 'momo' &&
+              order.paymentStatus !== 'paid' && (
+                <div className="sm:self-center shrink-0">
+                  <MomoCountdown
+                    deadlineMs={getMomoPaymentDeadlineMs(order)}
+                    label="Hạn thanh toán MoMo:"
+                    expiredLabel="Đã hết hạn thanh toán MoMo"
+                    onExpire={() => setNowMs(Date.now())}
+                  />
+                </div>
+              )}
+
+            {order.status === 'pending_confirmation' &&
+              order.paymentMethod !== 'momo' &&
+              order.cancellableUntil && (
+                <div className="sm:self-center shrink-0">
+                  <CountdownTimer cancellableUntil={order.cancellableUntil} />
+                </div>
+              )}
           </div>
         </div>
 
@@ -786,25 +830,59 @@ export function OrderDetailPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-200 bg-zinc-50">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-zinc-950 text-sm">
-                      Thanh toán khi nhận hàng (COD)
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] text-zinc-700 border-zinc-200 bg-white"
-                    >
-                      Tiền mặt
-                    </Badge>
+              {(() => {
+                const paymentBadge = getPaymentStatusBadge(order.paymentStatus)
+                const isMomo = order.paymentMethod === 'momo'
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-200 bg-zinc-50 gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-zinc-950 text-sm">
+                            {getPaymentMethodLabel(order.paymentMethod)}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] text-zinc-700 border-zinc-200 bg-white"
+                          >
+                            {isMomo ? 'Ví MoMo' : 'Tiền mặt'}
+                          </Badge>
+                          <Badge variant="outline" className={`text-[10px] ${paymentBadge.className}`}>
+                            {paymentBadge.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-zinc-500">
+                          {isMomo
+                            ? 'Thanh toán trực tuyến an toàn qua ví điện tử MoMo.'
+                            : 'Thanh toán trực tiếp cho nhân viên giao hàng khi nhận được bưu kiện.'}
+                        </p>
+                      </div>
+                      <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0" />
+                    </div>
+
+                    {isMomo && (order.paymentTransactionId || order.paidAt) && (
+                      <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 text-xs space-y-1.5">
+                        {order.paymentTransactionId && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-zinc-500">Mã giao dịch MoMo</span>
+                            <span className="font-mono font-semibold text-zinc-950">
+                              {order.paymentTransactionId}
+                            </span>
+                          </div>
+                        )}
+                        {order.paidAt && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-zinc-500">Thời gian thanh toán</span>
+                            <span className="font-medium text-zinc-800">
+                              {formatDateTime(order.paidAt)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-zinc-500">
-                    Thanh toán trực tiếp cho nhân viên giao hàng khi nhận được bưu kiện.
-                  </p>
-                </div>
-                <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0" />
-              </div>
+                )
+              })()}
             </div>
           </div>
 
@@ -841,6 +919,18 @@ export function OrderDetailPage() {
               </div>
 
               <div className="pt-4 border-t border-zinc-100 space-y-3">
+                {canRetryMomoPayment(order, nowMs) && (
+                  <Button
+                    size="lg"
+                    onClick={handleRetryMomo}
+                    disabled={isRetryingMomo}
+                    className="w-full rounded-xl font-semibold gap-2 bg-[#ae2070] text-white hover:bg-[#931a5e]"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>{isRetryingMomo ? 'Đang chuyển tới MoMo...' : 'Thanh toán lại qua MoMo'}</span>
+                  </Button>
+                )}
+
                 {order.status === 'pending_confirmation' && (
                   <Button
                     variant="destructive"

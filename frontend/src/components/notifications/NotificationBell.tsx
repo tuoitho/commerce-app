@@ -438,6 +438,8 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
         return renderStoreMessage(item, 'đã duyệt yêu cầu hủy đơn:')
       case 'order_cancel_declined':
         return renderStoreMessage(item, 'đã từ chối hủy đơn hàng:')
+      case 'order_payment_expired':
+        return renderStoreMessage(item, 'đã hủy đơn do quá hạn thanh toán MoMo:')
 
       case 'return_approved':
         return renderStoreMessage(item, 'đã duyệt yêu cầu trả hàng:')

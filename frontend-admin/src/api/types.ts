@@ -240,11 +240,18 @@ export interface OrderItem {
   lineTotalVnd: string
 }
 
+export type PaymentMethod = 'cod' | 'momo'
+
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
+
 export interface Order {
   id: string
   userId: string
   status: OrderStatus
-  paymentMethod: string
+  paymentMethod: PaymentMethod | string
+  paymentStatus?: PaymentStatus
+  paymentTransactionId?: string | null
+  paidAt?: string | null
   recipientName: string
   phone: string
   provinceName: string

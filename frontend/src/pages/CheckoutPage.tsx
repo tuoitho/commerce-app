@@ -21,10 +21,12 @@ import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { addressesApi } from '@/api/addresses'
 import { ordersApi } from '@/api/orders'
+import { getMomoIneligibleReason, isMomoAmountEligible } from '@/lib/payment'
 import {
   ApiError,
   type Address,
   type CreateOrderInput,
+  type PaymentMethod,
 } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -55,6 +57,7 @@ export function CheckoutPage() {
   const [editingAddress, setEditingAddress] = useState<Address | null>(null)
 
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
 
   const [productChangedDialogOpen, setProductChangedDialogOpen] = useState(false)
   const [productChangedMessage, setProductChangedMessage] = useState('')
@@ -143,6 +146,14 @@ export function CheckoutPage() {
   const totalVnd = (
     BigInt(subtotalVnd || '0') + BigInt(shippingFeeVnd || '0')
   ).toString()
+  const momoEligible = isMomoAmountEligible(totalVnd)
+  const momoIneligibleReason = getMomoIneligibleReason(totalVnd)
+
+  useEffect(() => {
+    if (!momoEligible && paymentMethod === 'momo') {
+      setPaymentMethod('cod')
+    }
+  }, [momoEligible, paymentMethod])
 
   const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
@@ -157,8 +168,10 @@ export function CheckoutPage() {
 
     setIsPlacingOrder(true)
     try {
+      const effectiveMethod: PaymentMethod = momoEligible ? paymentMethod : 'cod'
       const payload: CreateOrderInput = {
         addressId: selectedAddressId,
+        ...(effectiveMethod === 'momo' ? { paymentMethod: 'momo' } : {}),
         lines: selectedItems.map((item) => ({
           variantId: item.variantId,
           quantity: item.quantity,
@@ -169,6 +182,18 @@ export function CheckoutPage() {
 
       const order = await ordersApi.createOrder(payload)
       await refreshCart()
+      if (order.paymentMethod === 'momo') {
+        if (order.payUrl) {
+          window.location.assign(order.payUrl)
+          return
+        }
+        toastError(
+          'Chưa thể chuyển đến cổng MoMo',
+          'Đơn hàng đã được tạo. Bạn có thể thanh toán lại qua MoMo trong chi tiết đơn hàng.'
+        )
+        navigate(`/orders/${order.id}`)
+        return
+      }
       success('Đặt hàng thành công', 'Đơn hàng của bạn đã được tiếp nhận.')
       navigate(`/orders/${order.id}`)
     } catch (err: unknown) {
@@ -512,33 +537,93 @@ export function CheckoutPage() {
                 <div>
                   <h2 className="text-lg font-bold text-zinc-950">Phương thức thanh toán</h2>
                   <p className="text-xs text-zinc-500">
-                    Hiện hệ thống áp dụng phương thức COD tiêu chuẩn
+                    Chọn phương thức thanh toán phù hợp cho đơn hàng của bạn
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 p-4 rounded-xl border border-zinc-950 bg-zinc-50/60">
-                <div className="pt-0.5">
-                  <input
-                    type="radio"
-                    id="payment-cod"
-                    name="paymentMethod"
-                    checked
-                    readOnly
-                    className="h-4 w-4 text-zinc-950 border-zinc-300 focus:ring-zinc-950 cursor-pointer"
-                  />
-                </div>
-                <label htmlFor="payment-cod" className="space-y-1 cursor-pointer">
-                  <div className="flex items-center gap-2 font-bold text-zinc-950 text-sm">
-                    <span>Thanh toán khi nhận hàng (COD)</span>
-                    <Badge variant="outline" className="text-[10px] text-emerald-800 border-emerald-200 bg-emerald-50">
-                      Khả dụng
-                    </Badge>
+              <div className="space-y-3">
+                <div
+                  className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${
+                    paymentMethod === 'cod'
+                      ? 'border-zinc-950 bg-zinc-50/70'
+                      : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  }`}
+                >
+                  <div className="pt-0.5">
+                    <input
+                      type="radio"
+                      id="payment-cod"
+                      name="paymentMethod"
+                      value="cod"
+                      checked={paymentMethod === 'cod'}
+                      onChange={() => setPaymentMethod('cod')}
+                      className="h-4 w-4 text-zinc-950 border-zinc-300 focus:ring-zinc-950 cursor-pointer"
+                    />
                   </div>
-                  <p className="text-xs text-zinc-600 leading-relaxed">
-                    Bạn sẽ kiểm tra hàng và thanh toán trực tiếp bằng tiền mặt cho nhân viên giao hàng khi nhận được bưu phẩm.
-                  </p>
-                </label>
+                  <label htmlFor="payment-cod" className="flex-1 space-y-1 cursor-pointer">
+                    <div className="flex items-center gap-2 font-bold text-zinc-950 text-sm">
+                      <span>Thanh toán khi nhận hàng (COD)</span>
+                      <Badge variant="outline" className="text-[10px] text-emerald-800 border-emerald-200 bg-emerald-50">
+                        Khả dụng
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      Bạn sẽ kiểm tra hàng và thanh toán trực tiếp bằng tiền mặt cho nhân viên giao hàng khi nhận được bưu phẩm.
+                    </p>
+                  </label>
+                </div>
+
+                <div
+                  className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${
+                    !momoEligible
+                      ? 'border-zinc-200 bg-zinc-50/40 opacity-75'
+                      : paymentMethod === 'momo'
+                        ? 'border-zinc-950 bg-pink-50/40'
+                        : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  }`}
+                >
+                  <div className="pt-0.5">
+                    <input
+                      type="radio"
+                      id="payment-momo"
+                      name="paymentMethod"
+                      value="momo"
+                      checked={paymentMethod === 'momo'}
+                      disabled={!momoEligible}
+                      onChange={() => setPaymentMethod('momo')}
+                      className="h-4 w-4 text-zinc-950 border-zinc-300 focus:ring-zinc-950 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <label
+                    htmlFor="payment-momo"
+                    className={`flex-1 space-y-1 ${momoEligible ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2 font-bold text-zinc-950 text-sm">
+                      <span>Ví điện tử MoMo</span>
+                      <span className="inline-flex items-center rounded-md bg-[#ae2070] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">
+                        MoMo
+                      </span>
+                      {momoEligible ? (
+                        <Badge variant="outline" className="text-[10px] text-emerald-800 border-emerald-200 bg-emerald-50">
+                          Khả dụng
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-amber-800 border-amber-200 bg-amber-50">
+                          Ngoài hạn mức
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      Thanh toán trực tuyến an toàn qua ứng dụng MoMo hoặc quét mã QR. Đơn hàng sẽ tự động xác nhận ngay sau khi thanh toán thành công.
+                    </p>
+                    {!momoEligible && momoIneligibleReason && (
+                      <p className="text-xs font-medium text-amber-700 pt-1">
+                        {momoIneligibleReason}
+                      </p>
+                    )}
+                  </label>
+                </div>
               </div>
             </div>
           </div>

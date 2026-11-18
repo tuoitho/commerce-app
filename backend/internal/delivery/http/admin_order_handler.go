@@ -24,49 +24,55 @@ func newAdminOrderHandler(orderUC *orderuc.UseCase) *AdminOrderHandler {
 }
 
 type adminOrderResponse struct {
-	ID             string              `json:"id"`
-	UserID         string              `json:"userId"`
-	BuyerEmail     string              `json:"buyerEmail"`
-	Status         string              `json:"status"`
-	PaymentMethod  string              `json:"paymentMethod"`
-	RecipientName  string              `json:"recipientName"`
-	Phone          string              `json:"phone"`
-	ProvinceName   string              `json:"provinceName"`
-	WardName       string              `json:"wardName"`
-	DetailAddress  string              `json:"detailAddress"`
-	SubtotalVND    string              `json:"subtotalVnd"`
-	ShippingFeeVND string              `json:"shippingFeeVnd"`
-	TotalVND       string              `json:"totalVnd"`
-	Items          []orderItemResponse `json:"items"`
-	CreatedAt      time.Time           `json:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt"`
-	ConfirmedAt    *time.Time          `json:"confirmedAt,omitempty"`
-	CancelledAt    *time.Time          `json:"cancelledAt,omitempty"`
-	DeliveredAt    *time.Time          `json:"deliveredAt,omitempty"`
+	ID                   string              `json:"id"`
+	UserID               string              `json:"userId"`
+	BuyerEmail           string              `json:"buyerEmail"`
+	Status               string              `json:"status"`
+	PaymentMethod        string              `json:"paymentMethod"`
+	PaymentStatus        string              `json:"paymentStatus"`
+	PaymentTransactionID *string             `json:"paymentTransactionId,omitempty"`
+	PaidAt               *time.Time          `json:"paidAt,omitempty"`
+	RecipientName        string              `json:"recipientName"`
+	Phone                string              `json:"phone"`
+	ProvinceName         string              `json:"provinceName"`
+	WardName             string              `json:"wardName"`
+	DetailAddress        string              `json:"detailAddress"`
+	SubtotalVND          string              `json:"subtotalVnd"`
+	ShippingFeeVND       string              `json:"shippingFeeVnd"`
+	TotalVND             string              `json:"totalVnd"`
+	Items                []orderItemResponse `json:"items"`
+	CreatedAt            time.Time           `json:"createdAt"`
+	UpdatedAt            time.Time           `json:"updatedAt"`
+	ConfirmedAt          *time.Time          `json:"confirmedAt,omitempty"`
+	CancelledAt          *time.Time          `json:"cancelledAt,omitempty"`
+	DeliveredAt          *time.Time          `json:"deliveredAt,omitempty"`
 }
 
 func toAdminOrderResponse(order domain.Order) adminOrderResponse {
 	base := toOrderResponse(order)
 	return adminOrderResponse{
-		ID:             base.ID,
-		UserID:         base.UserID,
-		BuyerEmail:     order.BuyerEmail,
-		Status:         base.Status,
-		PaymentMethod:  base.PaymentMethod,
-		RecipientName:  base.RecipientName,
-		Phone:          base.Phone,
-		ProvinceName:   base.ProvinceName,
-		WardName:       base.WardName,
-		DetailAddress:  base.DetailAddress,
-		SubtotalVND:    base.SubtotalVND,
-		ShippingFeeVND: base.ShippingFeeVND,
-		TotalVND:       base.TotalVND,
-		Items:          base.Items,
-		CreatedAt:      base.CreatedAt,
-		UpdatedAt:      base.UpdatedAt,
-		ConfirmedAt:    base.ConfirmedAt,
-		CancelledAt:    base.CancelledAt,
-		DeliveredAt:    base.DeliveredAt,
+		ID:                   base.ID,
+		UserID:               base.UserID,
+		BuyerEmail:           order.BuyerEmail,
+		Status:               base.Status,
+		PaymentMethod:        base.PaymentMethod,
+		PaymentStatus:        base.PaymentStatus,
+		PaymentTransactionID: base.PaymentTransactionID,
+		PaidAt:               base.PaidAt,
+		RecipientName:        base.RecipientName,
+		Phone:                base.Phone,
+		ProvinceName:         base.ProvinceName,
+		WardName:             base.WardName,
+		DetailAddress:        base.DetailAddress,
+		SubtotalVND:          base.SubtotalVND,
+		ShippingFeeVND:       base.ShippingFeeVND,
+		TotalVND:             base.TotalVND,
+		Items:                base.Items,
+		CreatedAt:            base.CreatedAt,
+		UpdatedAt:            base.UpdatedAt,
+		ConfirmedAt:          base.ConfirmedAt,
+		CancelledAt:          base.CancelledAt,
+		DeliveredAt:          base.DeliveredAt,
 	}
 }
 

@@ -17,6 +17,7 @@ vi.mock('@/api/orders', () => ({
   ordersApi: {
     getOrderStats: vi.fn(),
     listOrders: vi.fn(),
+    retryMomoPayment: vi.fn(),
   },
 }))
 
@@ -448,5 +449,103 @@ describe('OrderHistoryPage', () => {
       expect(screen.getByText('Refunded Item')).toBeInTheDocument()
       expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
     })
+  })
+
+  it('renders MoMo method label, all Vietnamese payment status badges, transaction ID, countdown, and retries MoMo payment', async () => {
+    const now = Date.now()
+    const momoOrders: Order[] = [
+      {
+        ...mockOrders[0],
+        id: 'ord-momo-pending',
+        status: 'pending_confirmation',
+        paymentMethod: 'momo',
+        paymentStatus: 'pending',
+        createdAt: new Date(now - 2 * 60 * 1000).toISOString(),
+        cancellableUntil: new Date(now + 13 * 60 * 1000).toISOString(),
+      },
+      {
+        ...mockOrders[0],
+        id: 'ord-momo-paid',
+        status: 'confirmed',
+        paymentMethod: 'momo',
+        paymentStatus: 'paid',
+        paymentTransactionId: '4088812345',
+        paidAt: new Date(now - 1 * 60 * 1000).toISOString(),
+        cancellableUntil: null,
+      },
+      {
+        ...mockOrders[0],
+        id: 'ord-momo-failed',
+        status: 'pending_confirmation',
+        paymentMethod: 'momo',
+        paymentStatus: 'failed',
+        createdAt: new Date(now - 20 * 60 * 1000).toISOString(),
+        cancellableUntil: new Date(now - 5 * 60 * 1000).toISOString(),
+      },
+      {
+        ...mockOrders[0],
+        id: 'ord-momo-refunded',
+        status: 'cancelled',
+        paymentMethod: 'momo',
+        paymentStatus: 'refunded',
+        paymentTransactionId: '4088899999',
+        cancellableUntil: null,
+      },
+    ]
+
+    vi.mocked(ordersApi.listOrders).mockResolvedValue(momoOrders)
+    vi.mocked(ordersApi.retryMomoPayment).mockResolvedValue({
+      ...momoOrders[0],
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?t=retry-list',
+    })
+
+    const originalLocation = window.location
+    const assignMock = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, assign: assignMock },
+      writable: true,
+      configurable: true,
+    })
+
+    try {
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/orders']}>
+            <Routes>
+              <Route path="/orders" element={<OrderHistoryPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Ví MoMo').length).toBeGreaterThanOrEqual(4)
+      })
+
+      expect(screen.getByText('Chờ thanh toán')).toBeInTheDocument()
+      expect(screen.getByText('Đã thanh toán')).toBeInTheDocument()
+      expect(screen.getByText('Thanh toán thất bại')).toBeInTheDocument()
+      expect(screen.getByText('Đã hoàn tiền')).toBeInTheDocument()
+      expect(screen.getByText(/4088812345/)).toBeInTheDocument()
+      expect(screen.getByText(/Hết hạn sau:/i)).toBeInTheDocument()
+
+      // Only the non-expired pending MoMo order shows the retry CTA
+      const retryButtons = screen.getAllByRole('button', { name: /Thanh toán lại qua MoMo/i })
+      expect(retryButtons).toHaveLength(1)
+      fireEvent.click(retryButtons[0])
+
+      await waitFor(() => {
+        expect(ordersApi.retryMomoPayment).toHaveBeenCalledWith('ord-momo-pending')
+        expect(assignMock).toHaveBeenCalledWith(
+          'https://test-payment.momo.vn/v2/gateway/pay?t=retry-list'
+        )
+      })
+    } finally {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      })
+    }
   })
 })

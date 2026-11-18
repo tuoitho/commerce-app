@@ -7,7 +7,7 @@ VALUES (
 )
 RETURNING id, order_id, user_id, status, reason_code, description, reject_reason,
           expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-          refund_amount_vnd::text AS refund_amount_vnd,
+          COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
           refunded_by_user_id, created_at, updated_at,
           approved_at, rejected_at, received_at, refunded_at, cancelled_at;
 
@@ -22,7 +22,7 @@ VALUES (
 -- name: GetLatestReturnRequestByOrderID :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -34,7 +34,7 @@ LIMIT 1;
 SELECT DISTINCT ON (order_id)
        id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -66,7 +66,7 @@ ORDER BY rri.return_request_id, oi.id ASC;
 -- name: LockReturnRequestForUpdate :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -76,7 +76,7 @@ FOR UPDATE;
 -- name: LockReturnRequestByOrderAndUser :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -129,7 +129,7 @@ WHERE id = @id;
 -- name: ListReturnRequestsAdmin :many
 SELECT rr.id, rr.order_id, rr.user_id, rr.status, rr.reason_code, rr.description, rr.reject_reason,
        rr.expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       rr.refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(rr.refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        rr.refunded_by_user_id, rr.created_at, rr.updated_at,
        rr.approved_at, rr.rejected_at, rr.received_at, rr.refunded_at, rr.cancelled_at,
        u.email AS buyer_email,
@@ -143,7 +143,7 @@ LIMIT @limit_count OFFSET @offset_count;
 -- name: GetReturnRequestAdminByID :one
 SELECT rr.id, rr.order_id, rr.user_id, rr.status, rr.reason_code, rr.description, rr.reject_reason,
        rr.expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       rr.refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(rr.refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        rr.refunded_by_user_id, rr.created_at, rr.updated_at,
        rr.approved_at, rr.rejected_at, rr.received_at, rr.refunded_at, rr.cancelled_at,
        u.email AS buyer_email

@@ -2,7 +2,10 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type OrderStatus string
@@ -86,7 +89,39 @@ func (b OrderStatusBucket) Statuses() []OrderStatus {
 	}
 }
 
-const PaymentMethodCOD = "cod"
+const (
+	PaymentMethodCOD  = "cod"
+	PaymentMethodMomo = "momo"
+)
+
+type PaymentStatus string
+
+const (
+	PaymentStatusPending  PaymentStatus = "pending"
+	PaymentStatusPaid     PaymentStatus = "paid"
+	PaymentStatusFailed   PaymentStatus = "failed"
+	PaymentStatusRefunded PaymentStatus = "refunded"
+)
+
+const (
+	MomoMinAmountVND int64 = 1000
+	MomoMaxAmountVND int64 = 50000000
+)
+
+// ParseMomoOrderID extracts and validates the original order UUID from a MoMo
+// orderId formatted as "<orderUUID>_<timestamp>".
+func ParseMomoOrderID(momoOrderID string) (string, bool) {
+	trimmed := strings.TrimSpace(momoOrderID)
+	idx := strings.IndexByte(trimmed, '_')
+	if idx <= 0 || idx >= len(trimmed)-1 {
+		return "", false
+	}
+	orderUUID := trimmed[:idx]
+	if _, err := uuid.Parse(orderUUID); err != nil {
+		return "", false
+	}
+	return orderUUID, true
+}
 
 type ShippingInfo struct {
 	RecipientName string
@@ -114,24 +149,63 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID                  string
-	UserID              string
-	BuyerEmail          string
-	Status              OrderStatus
-	PaymentMethod       string
-	SubtotalVND         MoneyVND
-	ShippingFeeVND      MoneyVND
-	TotalVND            MoneyVND
-	ShippingInfo        ShippingInfo
-	Items               []OrderItem
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	ConfirmedAt         *time.Time
-	CancelledAt         *time.Time
-	DeliveredAt         *time.Time
-	CancellableUntil    *time.Time
-	ReturnEligibility   *ReturnEligibility
-	LatestReturnRequest *ReturnRequest
+	ID                   string
+	UserID               string
+	BuyerEmail           string
+	Status               OrderStatus
+	PaymentMethod        string
+	PaymentStatus        PaymentStatus
+	PaymentTransactionID *string
+	PaidAt               *time.Time
+	PayURL               string
+	SubtotalVND          MoneyVND
+	ShippingFeeVND       MoneyVND
+	TotalVND             MoneyVND
+	ShippingInfo         ShippingInfo
+	Items                []OrderItem
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          *time.Time
+	CancelledAt          *time.Time
+	DeliveredAt          *time.Time
+	CancellableUntil     *time.Time
+	ReturnEligibility    *ReturnEligibility
+	LatestReturnRequest  *ReturnRequest
+}
+
+type MomoCreateInput struct {
+	OrderID   string
+	AmountVND int64
+	OrderInfo string
+}
+
+type MomoCallbackPayload struct {
+	PartnerCode  string
+	OrderID      string
+	RequestID    string
+	Amount       string
+	OrderInfo    string
+	OrderType    string
+	TransID      string
+	ResultCode   int
+	Message      string
+	PayType      string
+	ResponseTime string
+	ExtraData    string
+	Signature    string
+}
+
+type MomoGateway interface {
+	CreatePaymentURL(ctx context.Context, input MomoCreateInput) (payURL string, err error)
+	VerifyCallbackSignature(payload MomoCallbackPayload) bool
+}
+
+type MomoOrderRepository interface {
+	CreateWithPaymentMethod(ctx context.Context, userID, addressID string, lines []OrderLineInput, shippingFeeVND MoneyVND, paymentMethod string) (*Order, error)
+	SetPaymentFailed(ctx context.Context, orderID string) error
+	ResetPaymentPending(ctx context.Context, userID, orderID string) (*Order, error)
+	ApplyMomoCallback(ctx context.Context, orderID, userID, amountVND, transID string, resultCode int) (order *Order, justPaid bool, err error)
+	AutoCancelExpiredMomoOrders(ctx context.Context, cutoff time.Time) ([]AutoConfirmedOrder, error)
 }
 
 type OrderAdminAction string

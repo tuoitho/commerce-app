@@ -15,21 +15,31 @@ import {
   Star,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
-import type {
-  Order,
-  OrderStats,
-  OrderStatus,
-  OrderStatusBucket,
-  OrderItem,
-  Review,
+import {
+  ApiError,
+  type Order,
+  type OrderStats,
+  type OrderStatus,
+  type OrderStatusBucket,
+  type OrderItem,
+  type Review,
 } from '@/api/types'
 import { formatVND, formatDateTime } from '@/lib/utils'
+import {
+  canRetryMomoPayment,
+  getMomoPaymentDeadlineMs,
+  getPaymentMethodShortLabel,
+  getPaymentStatusBadge,
+  retryMomoAndRedirect,
+} from '@/lib/payment'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { ReviewFormDialog } from '@/components/ReviewFormDialog'
+import { MomoCountdown } from '@/components/orders/MomoCountdown'
 
 interface StatusBadgeConfig {
   label: string
@@ -105,6 +115,7 @@ export function OrderHistoryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { error: toastError } = useToast()
 
   const currentTab = (searchParams.get('status') as OrderStatusBucket) || 'all'
   const activeTab: OrderStatusBucket = TABS.some((t) => t.key === currentTab)
@@ -116,6 +127,8 @@ export function OrderHistoryPage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true)
   const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [errorOrders, setErrorOrders] = useState<string | null>(null)
+  const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null)
+  const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
   const [reviewDialogState, setReviewDialogState] = useState<{
     isOpen: boolean
@@ -155,12 +168,30 @@ export function OrderHistoryPage() {
       setErrorOrders(null)
       const data = await ordersApi.listOrders(bucket)
       setOrders(data)
+      setNowMs(Date.now())
     } catch {
       setErrorOrders('Không thể tải danh sách đơn hàng. Vui lòng thử lại.')
     } finally {
       setIsLoadingOrders(false)
     }
   }, [isAuthenticated])
+
+  const handleRetryMomo = async (orderId: string) => {
+    setRetryingOrderId(orderId)
+    try {
+      const { redirected, order: retried } = await retryMomoAndRedirect(orderId)
+      if (redirected) return
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? retried : o)))
+      toastError('Chưa thể chuyển đến cổng MoMo', 'Vui lòng thử lại sau ít phút.')
+    } catch (err: unknown) {
+      toastError(
+        'Thanh toán lại thất bại',
+        err instanceof ApiError ? err.message : 'Không thể tạo liên kết thanh toán MoMo mới.'
+      )
+    } finally {
+      setRetryingOrderId(null)
+    }
+  }
 
   const handleReviewSuccess = (savedReview: Review) => {
     if (!reviewDialogState.item) return
@@ -498,6 +529,11 @@ export function OrderHistoryPage() {
                 icon: Package,
               }
               const StatusIcon = statusInfo.icon
+              const paymentBadge = getPaymentStatusBadge(order.paymentStatus)
+              const isMomo = order.paymentMethod === 'momo'
+              const showMomoCountdown =
+                isMomo && order.status === 'pending_confirmation' && order.paymentStatus !== 'paid'
+              const retryAllowed = canRetryMomoPayment(order, nowMs)
 
               return (
                 <div
@@ -516,6 +552,18 @@ export function OrderHistoryPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-semibold px-2.5 py-1 bg-zinc-50 text-zinc-800 border-zinc-200"
+                      >
+                        {getPaymentMethodShortLabel(order.paymentMethod)}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs font-semibold px-2.5 py-1 ${paymentBadge.className}`}
+                      >
+                        {paymentBadge.label}
+                      </Badge>
                       <Badge
                         variant="outline"
                         className={`text-xs font-semibold px-2.5 py-1 ${statusInfo.badgeClass}`}
@@ -671,20 +719,54 @@ export function OrderHistoryPage() {
 
                   {/* Order Card Footer */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-zinc-100 pt-4 mt-1">
-                    <div className="text-xs text-zinc-500">
-                      <span>Người nhận: </span>
-                      <strong className="text-zinc-900">{order.recipientName}</strong>
-                      <span className="mx-1">•</span>
-                      <span>{order.provinceName}</span>
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-zinc-500">
+                        <span>Người nhận: </span>
+                        <strong className="text-zinc-900">{order.recipientName}</strong>
+                        <span className="mx-1">•</span>
+                        <span>{order.provinceName}</span>
+                      </div>
+                      {isMomo && order.paymentTransactionId && (
+                        <div className="text-xs text-zinc-600">
+                          <span>Mã GD MoMo: </span>
+                          <span className="font-mono font-semibold text-zinc-900">
+                            {order.paymentTransactionId}
+                          </span>
+                        </div>
+                      )}
+                      {showMomoCountdown && (
+                        <MomoCountdown
+                          deadlineMs={getMomoPaymentDeadlineMs(order)}
+                          label="Hết hạn sau:"
+                          expiredLabel="Đã hết hạn thanh toán MoMo"
+                          onExpire={() => setNowMs(Date.now())}
+                        />
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
+                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 sm:gap-4">
                       <div className="text-left sm:text-right">
                         <span className="text-xs text-zinc-500 block">Tổng thanh toán</span>
                         <span className="font-mono text-base sm:text-lg font-bold text-zinc-950 tabular-nums">
                           {formatVND(order.totalVnd)}
                         </span>
                       </div>
+
+                      {retryAllowed && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleRetryMomo(order.id)}
+                          disabled={retryingOrderId === order.id}
+                          className="rounded-xl font-semibold gap-1.5 px-3.5 bg-[#ae2070] text-white hover:bg-[#931a5e]"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          <span>
+                            {retryingOrderId === order.id
+                              ? 'Đang chuyển...'
+                              : 'Thanh toán lại qua MoMo'}
+                          </span>
+                        </Button>
+                      )}
 
                       <Link to={`/orders/${order.id}`}>
                         <Button

@@ -46,15 +46,16 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	orderRepository := provideOrderRepository(pool)
 	returnRepository := provideReturnRepository(pool)
 	reviewRepository := provideReviewRepository(pool)
+	client := provideMomoClient(cfg, log)
 	liveRepository := provideLiveRepository(pool)
-	client := provideMediaServer(cfg)
+	mediamtxClient := provideMediaServer(cfg)
 	hub := provideLiveHub(liveRepository, log)
 	notificationRepository := provideNotificationRepository(pool)
 	chatRepository := provideChatRepository(pool)
 	wsHub := provideWSHub(chatRepository, log)
 	service := provideNotificationService(notificationRepository, wsHub, log)
-	liveUseCase := provideLiveUseCase(liveRepository, client, hub, service, cfg, log)
-	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, liveUseCase, service, cfg)
+	liveUseCase := provideLiveUseCase(liveRepository, mediamtxClient, hub, service, cfg, log)
+	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, client, liveUseCase, service, cfg)
 	returnsUseCase := provideReturnUseCase(returnRepository, service)
 	reviewmediaStore, err := provideReviewMediaStore(cfg)
 	if err != nil {
@@ -95,6 +96,7 @@ var appProviderSet = wire.NewSet(
 	provideReviewRepository,
 	provideReviewMediaStore,
 	provideFavoriteRepository,
+	provideMomoClient,
 	provideJWTManager,
 	provideAuthUseCase,
 	provideAccountUseCase,

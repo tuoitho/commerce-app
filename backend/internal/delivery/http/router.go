@@ -219,6 +219,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 
 	orderHandler := newOrderHandler(deps.Order)
 	returnHandler := newReturnHandler(deps.Return)
+	paymentHandler := newPaymentHandler(deps.Order)
 	orders := api.Group("/orders")
 	orders.Use(guard.AuthRequired)
 	{
@@ -226,12 +227,19 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.GET("/stats", orderHandler.Stats)
 		orders.GET("", orderHandler.List)
 		orders.GET("/:id", orderHandler.GetByID)
+		orders.POST("/:id/momo/retry", orderHandler.RetryMomo)
 		orders.POST("/:id/cancel", orderHandler.Cancel)
 		orders.POST("/:id/cancel/undo", orderHandler.UndoCancel)
 		orders.POST("/:id/returns", returnHandler.Create)
 		orders.POST("/:id/returns/:returnId/cancel", returnHandler.Cancel)
 		orders.POST("/:id/items/:itemId/review", reviewHandler.createReview)
 		orders.PUT("/:id/items/:itemId/review", reviewHandler.updateReview)
+	}
+
+	payments := api.Group("/payments")
+	{
+		payments.POST("/momo/return", guard.AuthRequired, paymentHandler.HandleMomoReturn)
+		payments.POST("/momo/ipn", paymentHandler.HandleMomoIPN)
 	}
 
 	adminCatalogHandler := newAdminCatalogHandler(deps.Catalog)

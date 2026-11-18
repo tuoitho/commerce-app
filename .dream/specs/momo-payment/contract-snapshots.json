@@ -1,0 +1,854 @@
+{
+  "feature": "momo-payment",
+  "snapshots": {
+    "admin_list_orders_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/admin/orders",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "buyerEmail": "momo-pending@example.com",
+            "createdAt": "2026-11-16T10:00:00Z",
+            "detailAddress": "1 Tràng Tiền",
+            "id": "44444444-4444-4444-4444-444444444444",
+            "items": [
+              {
+                "brandName": "Apple",
+                "id": "item-1",
+                "imageUrl": "",
+                "lineTotalVnd": "100000",
+                "model": "",
+                "options": null,
+                "productId": "44444444-4444-4444-4444-444444444444",
+                "productName": "iPhone 15",
+                "quantity": 1,
+                "review": null,
+                "reviewStatus": "ineligible",
+                "unitPriceVnd": "100000",
+                "variantId": "33333333-3333-3333-3333-333333333333"
+              }
+            ],
+            "paymentMethod": "momo",
+            "paymentStatus": "pending",
+            "phone": "0987654321",
+            "provinceName": "Hà Nội",
+            "recipientName": "Nguyen Van A",
+            "shippingFeeVnd": "30000",
+            "status": "pending_confirmation",
+            "subtotalVnd": "100000",
+            "totalVnd": "130000",
+            "updatedAt": "2026-11-16T10:00:00Z",
+            "userId": "11111111-1111-1111-1111-111111111111",
+            "wardName": "Ba Đình"
+          },
+          {
+            "buyerEmail": "momo-paid@example.com",
+            "confirmedAt": "2026-11-16T10:02:00Z",
+            "createdAt": "2026-11-16T10:00:00Z",
+            "detailAddress": "1 Tràng Tiền",
+            "id": "55555555-5555-5555-5555-555555555555",
+            "items": [
+              {
+                "brandName": "Apple",
+                "id": "item-1",
+                "imageUrl": "",
+                "lineTotalVnd": "100000",
+                "model": "",
+                "options": null,
+                "productId": "44444444-4444-4444-4444-444444444444",
+                "productName": "iPhone 15",
+                "quantity": 1,
+                "review": null,
+                "reviewStatus": "ineligible",
+                "unitPriceVnd": "100000",
+                "variantId": "33333333-3333-3333-3333-333333333333"
+              }
+            ],
+            "paidAt": "2026-11-16T10:02:00Z",
+            "paymentMethod": "momo",
+            "paymentStatus": "paid",
+            "paymentTransactionId": "4088812345",
+            "phone": "0987654321",
+            "provinceName": "Hà Nội",
+            "recipientName": "Nguyen Van A",
+            "shippingFeeVnd": "30000",
+            "status": "confirmed",
+            "subtotalVnd": "100000",
+            "totalVnd": "130000",
+            "updatedAt": "2026-11-16T10:02:00Z",
+            "userId": "11111111-1111-1111-1111-111111111111",
+            "wardName": "Ba Đình"
+          }
+        ],
+        "error": null,
+        "message": "Thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 20,
+            "page": 1,
+            "total": 2,
+            "totalPages": 1
+          },
+          "timestamp": "2026-11-16T13:16:44.2500198Z"
+        },
+        "success": true
+      }
+    },
+    "admin_order_detail_momo_paid_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/admin/orders/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "buyerEmail": "momo-paid@example.com",
+          "confirmedAt": "2026-11-16T10:02:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "1 Tràng Tiền",
+          "id": "55555555-5555-5555-5555-555555555555",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "item-1",
+              "imageUrl": "",
+              "lineTotalVnd": "100000",
+              "model": "",
+              "options": null,
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "iPhone 15",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "100000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "paidAt": "2026-11-16T10:02:00Z",
+          "paymentMethod": "momo",
+          "paymentStatus": "paid",
+          "paymentTransactionId": "4088812345",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "30000",
+          "status": "confirmed",
+          "subtotalVnd": "100000",
+          "totalVnd": "130000",
+          "updatedAt": "2026-11-16T10:02:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Ba Đình"
+        },
+        "error": null,
+        "message": "Thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.2676925Z"
+        },
+        "success": true
+      }
+    },
+    "admin_order_detail_momo_pending_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/admin/orders/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "buyerEmail": "momo-pending@example.com",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "1 Tràng Tiền",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "item-1",
+              "imageUrl": "",
+              "lineTotalVnd": "100000",
+              "model": "",
+              "options": null,
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "iPhone 15",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "100000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "paymentMethod": "momo",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "30000",
+          "status": "pending_confirmation",
+          "subtotalVnd": "100000",
+          "totalVnd": "130000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Ba Đình"
+        },
+        "error": null,
+        "message": "Thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.2518276Z"
+        },
+        "success": true
+      }
+    },
+    "create_order_momo_201": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 201,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "lines": [
+          {
+            "productName": "iPhone 15 Pro",
+            "quantity": 1,
+            "unitPriceVnd": "3190000",
+            "variantId": "33333333-3333-3333-3333-333333333333"
+          }
+        ],
+        "paymentMethod": "momo"
+      },
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-16T10:30:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "payUrl": "https://test-payment.momo.vn/v2/gateway/pay?t=123",
+          "paymentMethod": "momo",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "0",
+          "status": "pending_confirmation",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Tạo đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.305285Z"
+        },
+        "success": true
+      }
+    },
+    "create_order_momo_gateway_failed_201": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 201,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "lines": [
+          {
+            "productName": "iPhone 15 Pro",
+            "quantity": 1,
+            "unitPriceVnd": "3190000",
+            "variantId": "33333333-3333-3333-3333-333333333333"
+          }
+        ],
+        "paymentMethod": "momo"
+      },
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-16T10:30:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paymentMethod": "momo",
+          "paymentStatus": "failed",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "0",
+          "status": "pending_confirmation",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Tạo đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3204448Z"
+        },
+        "success": true
+      }
+    },
+    "create_order_momo_limit_409": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "lines": [
+          {
+            "productName": "iPhone 15 Pro",
+            "quantity": 1,
+            "unitPriceVnd": "3190000",
+            "variantId": "33333333-3333-3333-3333-333333333333"
+          }
+        ],
+        "paymentMethod": "momo"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "momo_amount_out_of_range",
+          "message": "Cổng thanh toán MoMo chỉ hỗ trợ đơn hàng từ 1.000 ₫ đến 50.000.000 ₫"
+        },
+        "message": "Cổng thanh toán MoMo chỉ hỗ trợ đơn hàng từ 1.000 ₫ đến 50.000.000 ₫",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3322893Z"
+        },
+        "success": false
+      }
+    },
+    "get_order_momo_paid_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/orders/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "confirmedAt": "2026-11-16T10:02:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "55555555-5555-5555-5555-555555555555",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777772",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paidAt": "2026-11-16T10:02:00Z",
+          "paymentMethod": "momo",
+          "paymentStatus": "paid",
+          "paymentTransactionId": "4088812345",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "returnEligibility": {
+            "deadline": null,
+            "eligible": false
+          },
+          "shippingFeeVnd": "0",
+          "status": "confirmed",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:02:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Lấy chi tiết đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.4441671Z"
+        },
+        "success": true
+      }
+    },
+    "get_order_momo_pending_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/orders/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-16T10:30:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paymentMethod": "momo",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "returnEligibility": {
+            "deadline": null,
+            "eligible": false
+          },
+          "shippingFeeVnd": "0",
+          "status": "pending_confirmation",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Lấy chi tiết đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.4299114Z"
+        },
+        "success": true
+      }
+    },
+    "list_orders_200": {
+      "contractId": "TYPE-ORDER-PAYMENT@1",
+      "endpoint": "GET /api/v1/orders",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "cancellableUntil": "2026-11-16T10:30:00Z",
+            "createdAt": "2026-11-16T10:00:00Z",
+            "detailAddress": "123 Cầu Giấy",
+            "id": "44444444-4444-4444-4444-444444444444",
+            "items": [
+              {
+                "brandName": "Apple",
+                "id": "77777777-7777-7777-7777-777777777771",
+                "imageUrl": "/media/iphone.jpg",
+                "lineTotalVnd": "3190000",
+                "model": "A3101",
+                "options": [
+                  {
+                    "groupLabel": "Màu sắc",
+                    "valueLabel": "Titan"
+                  }
+                ],
+                "productId": "66666666-6666-6666-6666-666666666666",
+                "productName": "iPhone 15 Pro",
+                "quantity": 1,
+                "review": null,
+                "reviewStatus": "ineligible",
+                "unitPriceVnd": "3190000",
+                "variantId": "33333333-3333-3333-3333-333333333333"
+              }
+            ],
+            "latestReturnRequest": null,
+            "paymentMethod": "momo",
+            "paymentStatus": "pending",
+            "phone": "0987654321",
+            "provinceName": "Hà Nội",
+            "recipientName": "Nguyen Van A",
+            "returnEligibility": {
+              "deadline": null,
+              "eligible": false
+            },
+            "shippingFeeVnd": "0",
+            "status": "pending_confirmation",
+            "subtotalVnd": "3190000",
+            "totalVnd": "3190000",
+            "updatedAt": "2026-11-16T10:00:00Z",
+            "userId": "11111111-1111-1111-1111-111111111111",
+            "wardName": "Phúc Xá"
+          },
+          {
+            "confirmedAt": "2026-11-16T10:02:00Z",
+            "createdAt": "2026-11-16T10:00:00Z",
+            "detailAddress": "123 Cầu Giấy",
+            "id": "55555555-5555-5555-5555-555555555555",
+            "items": [
+              {
+                "brandName": "Apple",
+                "id": "77777777-7777-7777-7777-777777777772",
+                "imageUrl": "/media/iphone.jpg",
+                "lineTotalVnd": "3190000",
+                "model": "A3101",
+                "options": [
+                  {
+                    "groupLabel": "Màu sắc",
+                    "valueLabel": "Titan"
+                  }
+                ],
+                "productId": "66666666-6666-6666-6666-666666666666",
+                "productName": "iPhone 15 Pro",
+                "quantity": 1,
+                "review": null,
+                "reviewStatus": "ineligible",
+                "unitPriceVnd": "3190000",
+                "variantId": "33333333-3333-3333-3333-333333333333"
+              }
+            ],
+            "latestReturnRequest": null,
+            "paidAt": "2026-11-16T10:02:00Z",
+            "paymentMethod": "momo",
+            "paymentStatus": "paid",
+            "paymentTransactionId": "4088812345",
+            "phone": "0987654321",
+            "provinceName": "Hà Nội",
+            "recipientName": "Nguyen Van A",
+            "returnEligibility": {
+              "deadline": null,
+              "eligible": false
+            },
+            "shippingFeeVnd": "0",
+            "status": "confirmed",
+            "subtotalVnd": "3190000",
+            "totalVnd": "3190000",
+            "updatedAt": "2026-11-16T10:02:00Z",
+            "userId": "11111111-1111-1111-1111-111111111111",
+            "wardName": "Phúc Xá"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.4567281Z"
+        },
+        "success": true
+      }
+    },
+    "momo_ipn_204": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/payments/momo/ipn",
+      "status": 204,
+      "requestBody": {
+        "amount": 3190000,
+        "extraData": "",
+        "message": "Thành công.",
+        "orderId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "orderInfo": "Thanh toan don hang",
+        "orderType": "momo_wallet",
+        "partnerCode": "MOMO",
+        "payType": "qr",
+        "requestId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "responseTime": 1763281800000,
+        "resultCode": 0,
+        "signature": "8503eaa24739cd53e628bc3f49fbf21d1a2c84404efcd4d6ced93fcea0dcde6e",
+        "transId": 4088812345
+      },
+      "responseBody": null
+    },
+    "momo_return_failed_200": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/payments/momo/return",
+      "status": 200,
+      "requestBody": {
+        "amount": "3190000",
+        "extraData": "",
+        "message": "Giao dịch bị từ chối.",
+        "orderId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "orderInfo": "Thanh toan don hang",
+        "orderType": "momo_wallet",
+        "partnerCode": "MOMO",
+        "payType": "qr",
+        "requestId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "responseTime": "1763281800000",
+        "resultCode": 1006,
+        "signature": "c01ff4a9d779f9a8f0eb92c78507eae41ab7c6196c0149ac23e301dff2869117",
+        "transId": "0"
+      },
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-16T10:30:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paymentMethod": "momo",
+          "paymentStatus": "failed",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "0",
+          "status": "pending_confirmation",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Xác thực thanh toán MoMo thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3883784Z"
+        },
+        "success": true
+      }
+    },
+    "momo_return_invalid_sig_400": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/payments/momo/return",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_momo_callback",
+          "message": "Dữ liệu xác thực thanh toán MoMo không hợp lệ"
+        },
+        "message": "Dữ liệu xác thực thanh toán MoMo không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.4011085Z"
+        },
+        "success": false
+      }
+    },
+    "momo_return_paid_200": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/payments/momo/return",
+      "status": 200,
+      "requestBody": {
+        "amount": "3190000",
+        "extraData": "",
+        "message": "Thành công.",
+        "orderId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "orderInfo": "Thanh toan don hang",
+        "orderType": "momo_wallet",
+        "partnerCode": "MOMO",
+        "payType": "qr",
+        "requestId": "44444444-4444-4444-4444-444444444444_1763281800000",
+        "responseTime": "1763281800000",
+        "resultCode": 0,
+        "signature": "8503eaa24739cd53e628bc3f49fbf21d1a2c84404efcd4d6ced93fcea0dcde6e",
+        "transId": "4088812345"
+      },
+      "responseBody": {
+        "data": {
+          "confirmedAt": "2026-11-16T10:02:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777772",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paidAt": "2026-11-16T10:02:00Z",
+          "paymentMethod": "momo",
+          "paymentStatus": "paid",
+          "paymentTransactionId": "4088812345",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "0",
+          "status": "confirmed",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:02:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Xác thực thanh toán MoMo thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3778169Z"
+        },
+        "success": true
+      }
+    },
+    "retry_momo_200": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders/:id/momo/retry",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-16T10:30:00Z",
+          "createdAt": "2026-11-16T10:00:00Z",
+          "detailAddress": "123 Cầu Giấy",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/iphone.jpg",
+              "lineTotalVnd": "3190000",
+              "model": "A3101",
+              "options": [
+                {
+                  "groupLabel": "Màu sắc",
+                  "valueLabel": "Titan"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 15 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "3190000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "payUrl": "https://test-payment.momo.vn/v2/gateway/pay?t=retry",
+          "paymentMethod": "momo",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "0",
+          "status": "pending_confirmation",
+          "subtotalVnd": "3190000",
+          "totalVnd": "3190000",
+          "updatedAt": "2026-11-16T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "wardName": "Phúc Xá"
+        },
+        "error": null,
+        "message": "Khởi tạo thanh toán MoMo thành công",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3475644Z"
+        },
+        "success": true
+      }
+    },
+    "retry_momo_not_allowed_409": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders/:id/momo/retry",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "payment_retry_not_allowed",
+          "message": "Đơn hàng không đủ điều kiện để thanh toán lại qua MoMo"
+        },
+        "message": "Đơn hàng không đủ điều kiện để thanh toán lại qua MoMo",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.3577868Z"
+        },
+        "success": false
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-ORDER-MOMO@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-16T13:16:44.2920658Z"
+        },
+        "success": false
+      }
+    }
+  }
+}

@@ -80,6 +80,14 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "order_not_cancel_request", "Đơn hàng không có yêu cầu hủy đang chờ", nil)
 	case errors.Is(err, domain.ErrOrderActionNotAllowed):
 		respondError(c, 409, "order_action_not_allowed", "Không thể thực hiện thao tác này trên đơn hàng ở trạng thái hiện tại", nil)
+	case errors.Is(err, domain.ErrMomoInvalidCallback):
+		respondError(c, 400, "invalid_momo_callback", "Dữ liệu xác thực thanh toán MoMo không hợp lệ", nil)
+	case errors.Is(err, domain.ErrMomoAmountOutOfRange):
+		respondError(c, 409, "momo_amount_out_of_range", "Cổng thanh toán MoMo chỉ hỗ trợ đơn hàng từ 1.000 ₫ đến 50.000.000 ₫", nil)
+	case errors.Is(err, domain.ErrPaymentRetryNotAllowed):
+		respondError(c, 409, "payment_retry_not_allowed", "Đơn hàng không đủ điều kiện để thanh toán lại qua MoMo", nil)
+	case errors.Is(err, domain.ErrMomoGateway):
+		respondError(c, 502, "momo_gateway_error", "Không thể kết nối cổng thanh toán MoMo. Vui lòng thử lại sau.", nil)
 	case errors.Is(err, domain.ErrReturnRequestNotFound):
 		respondError(c, 404, "return_request_not_found", "Không tìm thấy yêu cầu trả hàng", nil)
 	case errors.Is(err, domain.ErrReturnNotEligible):

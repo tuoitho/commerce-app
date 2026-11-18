@@ -33,6 +33,7 @@ type NotificationType = PostNotificationType
 
 const (
 	NotificationTypeOrderConfirmed      NotificationType = "order_confirmed"
+	NotificationTypeOrderPaymentExpired NotificationType = "order_payment_expired"
 	NotificationTypeOrderPreparing      NotificationType = "order_preparing"
 	NotificationTypeOrderShipped        NotificationType = "order_shipped"
 	NotificationTypeOrderDelivered      NotificationType = "order_delivered"
@@ -117,4 +118,10 @@ type NotificationPublisher interface {
 	NotifyReturnStatusChanged(ctx context.Context, ret *ReturnRequest)
 	NotifyReviewReplied(ctx context.Context, review *Review, replyText string)
 	NotifyLivestreamStarted(ctx context.Context, session *AdminLiveSession)
+}
+
+// MomoNotificationPublisher extends NotificationPublisher with MoMo payment lifecycle notifications.
+type MomoNotificationPublisher interface {
+	NotifyOrderMomoPaid(ctx context.Context, order *Order)
+	NotifyOrderPaymentExpired(ctx context.Context, orders []AutoConfirmedOrder)
 }

@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatVND, formatDateTime } from '@/lib/utils'
+import { getPaymentMethodShortLabel, getPaymentStatusBadge } from '@/lib/payment'
 
 const statusBadgeClasses: Record<OrderStatus, string> = {
   pending_confirmation: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -165,16 +166,17 @@ export function OrdersPage() {
       ) : (
         <Card>
           <div className="rounded-2xl overflow-hidden border-0">
-            <Table>
+            <Table className="[&_th]:px-2.5 [&_td]:px-2.5 [&_td]:py-3">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-28">Mã đơn</TableHead>
-                  <TableHead className="w-36">Trạng thái</TableHead>
+                  <TableHead className="w-24">Mã đơn</TableHead>
+                  <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
                   <TableHead>Email người mua</TableHead>
                   <TableHead>Người nhận</TableHead>
-                  <TableHead>Số điện thoại</TableHead>
-                  <TableHead className="min-w-[200px]">Địa chỉ giao hàng</TableHead>
+                  <TableHead className="whitespace-nowrap">Số điện thoại</TableHead>
+                  <TableHead>Địa chỉ giao hàng</TableHead>
                   <TableHead className="text-right whitespace-nowrap">Tổng thanh toán</TableHead>
+                  <TableHead className="whitespace-nowrap">Thanh toán</TableHead>
                   <TableHead className="text-center whitespace-nowrap">Số dòng SP</TableHead>
                   <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
                 </TableRow>
@@ -182,14 +184,14 @@ export function OrdersPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="p-10 text-center text-sm text-slate-500">
+                    <TableCell colSpan={10} className="p-10 text-center text-sm text-slate-500">
                       <RefreshCw className="h-5 w-5 animate-spin text-blue-600 mx-auto mb-2" />
                       Đang tải danh sách đơn hàng...
                     </TableCell>
                   </TableRow>
                 ) : orders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-64 text-center">
+                    <TableCell colSpan={10} className="h-64 text-center">
                       <div className="flex flex-col items-center justify-center text-slate-500 py-6">
                         <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
                           <ShoppingBag className="h-6 w-6" />
@@ -223,22 +225,22 @@ export function OrdersPage() {
                       onClick={() => navigate(`/orders/${order.id}`)}
                     >
                       {/* Order ID */}
-                      <TableCell className="font-mono text-xs font-semibold text-blue-600">
+                      <TableCell className="font-mono text-xs font-semibold text-blue-600 max-w-[110px] break-all">
                         #{order.id}
                       </TableCell>
 
                       {/* Status */}
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge
                           variant="secondary"
-                          className={statusBadgeClasses[order.status] || 'bg-slate-100 text-slate-800'}
+                          className={`whitespace-nowrap ${statusBadgeClasses[order.status] || 'bg-slate-100 text-slate-800'}`}
                         >
                           {ORDER_STATUS_LABELS[order.status] || order.status}
                         </Badge>
                       </TableCell>
 
                       {/* Buyer Email */}
-                      <TableCell className="text-sm text-slate-700">
+                      <TableCell className="text-xs text-slate-700 max-w-[150px] break-words">
                         {order.buyerEmail || '—'}
                       </TableCell>
 
@@ -260,6 +262,38 @@ export function OrdersPage() {
                       {/* Total VND */}
                       <TableCell className="text-right font-semibold text-slate-900 whitespace-nowrap">
                         {formatVND(order.totalVnd)}
+                      </TableCell>
+
+                      {/* Payment Method & Status */}
+                      <TableCell className="whitespace-nowrap">
+                        {(() => {
+                          const paymentBadge = getPaymentStatusBadge(order.paymentStatus)
+                          const isMomo = order.paymentMethod === 'momo'
+                          return (
+                            <div className="flex flex-col items-start gap-1">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className={`px-2 py-0.5 text-[11px] ${
+                                    isMomo
+                                      ? 'border-pink-200 bg-pink-50 text-[#891657]'
+                                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  {getPaymentMethodShortLabel(order.paymentMethod)}
+                                </Badge>
+                                <Badge variant="outline" className={`px-2 py-0.5 text-[11px] ${paymentBadge.className}`}>
+                                  {paymentBadge.label}
+                                </Badge>
+                              </div>
+                              {isMomo && order.paymentTransactionId && (
+                                <span className="font-mono text-[11px] text-slate-500">
+                                  GD: {order.paymentTransactionId}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
 
                       {/* Items Count */}

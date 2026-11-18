@@ -32,6 +32,15 @@ func clearEnv() func() {
 		"MEDIAMTX_HLS_PUBLIC_URL",
 		"LIVE_SIGNAL_POLL_INTERVAL",
 		"LIVE_SIGNAL_TIMEOUT",
+		"MOMO_PARTNER_CODE",
+		"MOMO_ACCESS_KEY",
+		"MOMO_SECRET_KEY",
+		"MOMO_ENDPOINT",
+		"MOMO_REDIRECT_URL",
+		"MOMO_IPN_URL",
+		"MOMO_REQUEST_TYPE",
+		"MOMO_PARTNER_NAME",
+		"MOMO_STORE_ID",
 	}
 
 	saved := make(map[string]string)
@@ -587,6 +596,132 @@ func TestConfig_LiveValidationFailures(t *testing.T) {
 		{"LIVE_SIGNAL_POLL_INTERVAL", "61s", "LIVE_SIGNAL_POLL_INTERVAL"},
 		{"LIVE_SIGNAL_TIMEOUT", "0s", "LIVE_SIGNAL_TIMEOUT"},
 		{"LIVE_SIGNAL_TIMEOUT", "-1m", "LIVE_SIGNAL_TIMEOUT"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
+			restore := clearEnv()
+			defer restore()
+			setRequiredLiveTestEnv()
+			os.Setenv(tc.key, tc.value)
+
+			_, err := LoadWithFile("")
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want mention of %s", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestConfig_MomoDefaults(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+	setRequiredLiveTestEnv()
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MomoPartnerCode != "MOMO" {
+		t.Errorf("MomoPartnerCode = %q, want MOMO", cfg.MomoPartnerCode)
+	}
+	if cfg.MomoAccessKey != "" {
+		t.Errorf("MomoAccessKey = %q, want empty", cfg.MomoAccessKey)
+	}
+	if cfg.MomoSecretKey != "" {
+		t.Errorf("MomoSecretKey = %q, want empty", cfg.MomoSecretKey)
+	}
+	if cfg.MomoEndpoint != "https://test-payment.momo.vn/v2/gateway/api/create" {
+		t.Errorf("MomoEndpoint = %q", cfg.MomoEndpoint)
+	}
+	if cfg.MomoRedirectURL != "http://localhost:15173/momo-return" {
+		t.Errorf("MomoRedirectURL = %q", cfg.MomoRedirectURL)
+	}
+	if cfg.MomoIPNURL != "http://localhost:18080/api/v1/payments/momo/ipn" {
+		t.Errorf("MomoIPNURL = %q", cfg.MomoIPNURL)
+	}
+	if cfg.MomoRequestType != "payWithMethod" {
+		t.Errorf("MomoRequestType = %q", cfg.MomoRequestType)
+	}
+	if cfg.MomoPartnerName != "Test" {
+		t.Errorf("MomoPartnerName = %q", cfg.MomoPartnerName)
+	}
+	if cfg.MomoStoreID != "MomoTestStore" {
+		t.Errorf("MomoStoreID = %q", cfg.MomoStoreID)
+	}
+}
+
+func TestConfig_MomoDotEnvAndEnvPrecedence(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+
+	tempDir := t.TempDir()
+	envPath := filepath.Join(tempDir, ".env")
+	envContent := `
+DB_URL=postgres://localhost:5432/commerce
+JWT_ACCESS_SECRET=file-secret-key-that-is-at-least-32-chars-long
+MINIO_ENDPOINT=localhost:19000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=miniopassword
+MOMO_PARTNER_CODE=FILE_PARTNER
+MOMO_ACCESS_KEY=FILE_ACCESS
+MOMO_SECRET_KEY=FILE_SECRET
+MOMO_ENDPOINT=https://file.momo.example/v2/create/
+MOMO_REDIRECT_URL=http://localhost:15173/momo-return/
+MOMO_IPN_URL=https://file.ipn.example/api/v1/payments/momo/ipn
+MOMO_REQUEST_TYPE=captureWallet
+MOMO_PARTNER_NAME=FileStore
+MOMO_STORE_ID=StoreFile
+`
+	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+		t.Fatalf("failed to write temp env: %v", err)
+	}
+
+	os.Setenv("MOMO_PARTNER_CODE", "  ENV_PARTNER  ")
+	os.Setenv("MOMO_SECRET_KEY", "  ENV_SECRET  ")
+	os.Setenv("MOMO_IPN_URL", "https://env.ipn.example/callback/")
+
+	cfg, err := LoadWithFile(envPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.MomoPartnerCode != "ENV_PARTNER" {
+		t.Errorf("MomoPartnerCode = %q, want ENV_PARTNER", cfg.MomoPartnerCode)
+	}
+	if cfg.MomoAccessKey != "FILE_ACCESS" {
+		t.Errorf("MomoAccessKey = %q, want FILE_ACCESS", cfg.MomoAccessKey)
+	}
+	if cfg.MomoSecretKey != "ENV_SECRET" {
+		t.Errorf("MomoSecretKey = %q, want ENV_SECRET", cfg.MomoSecretKey)
+	}
+	if cfg.MomoEndpoint != "https://file.momo.example/v2/create" {
+		t.Errorf("MomoEndpoint = %q", cfg.MomoEndpoint)
+	}
+	if cfg.MomoRedirectURL != "http://localhost:15173/momo-return" {
+		t.Errorf("MomoRedirectURL = %q", cfg.MomoRedirectURL)
+	}
+	if cfg.MomoIPNURL != "https://env.ipn.example/callback" {
+		t.Errorf("MomoIPNURL = %q", cfg.MomoIPNURL)
+	}
+	if cfg.MomoRequestType != "captureWallet" {
+		t.Errorf("MomoRequestType = %q", cfg.MomoRequestType)
+	}
+	if cfg.MomoPartnerName != "FileStore" {
+		t.Errorf("MomoPartnerName = %q", cfg.MomoPartnerName)
+	}
+	if cfg.MomoStoreID != "StoreFile" {
+		t.Errorf("MomoStoreID = %q", cfg.MomoStoreID)
+	}
+}
+
+func TestConfig_MomoValidationFailures(t *testing.T) {
+	cases := []struct {
+		key, value, wantErr string
+	}{
+		{"MOMO_ENDPOINT", "test-payment.momo.vn/create", "MOMO_ENDPOINT"},
+		{"MOMO_ENDPOINT", "ftp://test-payment.momo.vn/create", "MOMO_ENDPOINT"},
+		{"MOMO_REDIRECT_URL", "/momo-return", "MOMO_REDIRECT_URL"},
+		{"MOMO_IPN_URL", "not a url", "MOMO_IPN_URL"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {

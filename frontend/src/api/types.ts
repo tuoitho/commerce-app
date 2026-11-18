@@ -454,11 +454,19 @@ export interface OrderItem {
   review?: Review | null
 }
 
+export type PaymentMethod = 'cod' | 'momo'
+
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
+
 export interface Order {
   id: string
   userId: string
   status: OrderStatus
-  paymentMethod: string
+  paymentMethod: PaymentMethod | string
+  paymentStatus?: PaymentStatus
+  paymentTransactionId?: string | null
+  paidAt?: string | null
+  payUrl?: string
   recipientName: string
   phone: string
   provinceName: string
@@ -494,7 +502,24 @@ export interface OrderLineInput {
 
 export interface CreateOrderInput {
   addressId: string
+  paymentMethod?: PaymentMethod
   lines: OrderLineInput[]
+}
+
+export interface MomoReturnPayload {
+  partnerCode: string
+  orderId: string
+  requestId: string
+  amount: string | number
+  orderInfo: string
+  orderType: string
+  transId: string | number
+  resultCode: number
+  message: string
+  payType: string
+  responseTime: string | number
+  extraData: string
+  signature: string
 }
 
 // Favorites

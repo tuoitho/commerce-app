@@ -146,23 +146,26 @@ type Notification struct {
 }
 
 type Order struct {
-	ID             string
-	UserID         string
-	Status         string
-	PaymentMethod  string
-	SubtotalVnd    pgtype.Numeric
-	ShippingFeeVnd pgtype.Numeric
-	TotalVnd       pgtype.Numeric
-	RecipientName  string
-	Phone          string
-	ProvinceName   string
-	WardName       string
-	DetailAddress  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ConfirmedAt    pgtype.Timestamptz
-	CancelledAt    pgtype.Timestamptz
-	DeliveredAt    pgtype.Timestamptz
+	ID                   string
+	UserID               string
+	Status               string
+	PaymentMethod        string
+	SubtotalVnd          pgtype.Numeric
+	ShippingFeeVnd       pgtype.Numeric
+	TotalVnd             pgtype.Numeric
+	RecipientName        string
+	Phone                string
+	ProvinceName         string
+	WardName             string
+	DetailAddress        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ConfirmedAt          pgtype.Timestamptz
+	CancelledAt          pgtype.Timestamptz
+	DeliveredAt          pgtype.Timestamptz
+	PaymentStatus        string
+	PaymentTransactionID pgtype.Text
+	PaidAt               pgtype.Timestamptz
 }
 
 type OrderItem struct {

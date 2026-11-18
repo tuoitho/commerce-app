@@ -20,6 +20,7 @@ type Service struct {
 
 var _ domain.NotificationUseCase = (*Service)(nil)
 var _ domain.NotificationPublisher = (*Service)(nil)
+var _ domain.MomoNotificationPublisher = (*Service)(nil)
 
 func NewService(
 	repo domain.NotificationRepository,
@@ -271,7 +272,13 @@ func (s *Service) NotifyOrderTransition(ctx context.Context, order *domain.Order
 	})
 }
 
-func (s *Service) NotifyOrderAutoConfirmed(ctx context.Context, orders []domain.AutoConfirmedOrder) {
+func (s *Service) emitOrderBatchNotifications(
+	ctx context.Context,
+	orders []domain.AutoConfirmedOrder,
+	status domain.OrderStatus,
+	notifType domain.NotificationType,
+	buildExcerpt func(code string) string,
+) {
 	for _, o := range orders {
 		if o.ID == "" || o.UserID == "" {
 			continue
@@ -280,7 +287,7 @@ func (s *Service) NotifyOrderAutoConfirmed(ctx context.Context, orders []domain.
 		meta := map[string]interface{}{
 			"orderId":        o.ID,
 			"orderShortCode": code,
-			"status":         string(domain.OrderStatusConfirmed),
+			"status":         string(status),
 			"targetPath":     "/orders/" + o.ID,
 		}
 		if o.TotalVND != "" {
@@ -290,11 +297,47 @@ func (s *Service) NotifyOrderAutoConfirmed(ctx context.Context, orders []domain.
 			RecipientID:      o.UserID,
 			ActorID:          nil,
 			Category:         domain.NotificationCategoryOrder,
-			NotificationType: domain.NotificationTypeOrderConfirmed,
-			Excerpt:          fmt.Sprintf("Đơn hàng %s đã được xác nhận tự động.", code),
+			NotificationType: notifType,
+			Excerpt:          buildExcerpt(code),
 			Metadata:         meta,
 		})
 	}
+}
+
+func (s *Service) NotifyOrderAutoConfirmed(ctx context.Context, orders []domain.AutoConfirmedOrder) {
+	s.emitOrderBatchNotifications(ctx, orders, domain.OrderStatusConfirmed, domain.NotificationTypeOrderConfirmed, func(code string) string {
+		return fmt.Sprintf("Đơn hàng %s đã được xác nhận tự động.", code)
+	})
+}
+
+func (s *Service) NotifyOrderMomoPaid(ctx context.Context, order *domain.Order) {
+	if order == nil || order.ID == "" || order.UserID == "" {
+		return
+	}
+	code := domain.OrderShortCode(order.ID)
+	meta := map[string]interface{}{
+		"orderId":        order.ID,
+		"orderShortCode": code,
+		"status":         string(order.Status),
+		"targetPath":     "/orders/" + order.ID,
+	}
+	if order.TotalVND != "" {
+		meta["totalVnd"] = string(order.TotalVND)
+	}
+	s.emitSingle(ctx, domain.CreateNotificationInput{
+		RecipientID:      order.UserID,
+		ActorID:          nil,
+		Category:         domain.NotificationCategoryOrder,
+		NotificationType: domain.NotificationTypeOrderConfirmed,
+		Excerpt:          fmt.Sprintf("Thanh toán MoMo thành công. Đơn hàng %s đã được xác nhận.", code),
+		Metadata:         meta,
+	})
+}
+
+func (s *Service) NotifyOrderPaymentExpired(ctx context.Context, orders []domain.AutoConfirmedOrder) {
+	s.emitOrderBatchNotifications(ctx, orders, domain.OrderStatusCancelled, domain.NotificationTypeOrderPaymentExpired, func(code string) string {
+		return fmt.Sprintf("Đơn hàng %s đã tự động hủy do quá thời hạn thanh toán MoMo.", code)
+	})
 }
 
 func (s *Service) NotifyReturnCreated(ctx context.Context, ret *domain.ReturnRequest) {

@@ -2,6 +2,9 @@ package order
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,8 +16,10 @@ type Dependencies struct {
 	Order               domain.OrderRepository
 	Return              domain.ReturnRepository
 	Review              domain.ReviewRepository
+	MomoGateway         domain.MomoGateway
 	ShippingFeeVND      domain.MoneyVND
 	OrderConfirmTimeout time.Duration
+	Now                 func() time.Time
 	// LiveQuota, when set, learns about orders that may change live-price quota.
 	LiveQuota domain.LiveQuotaObserver
 	// Notifications, when set, publishes order lifecycle notifications post-commit.
@@ -25,8 +30,10 @@ type UseCase struct {
 	order               domain.OrderRepository
 	returnRepo          domain.ReturnRepository
 	reviewRepo          domain.ReviewRepository
+	momo                domain.MomoGateway
 	shippingFeeVND      domain.MoneyVND
 	orderConfirmTimeout time.Duration
+	now                 func() time.Time
 	liveQuota           domain.LiveQuotaObserver
 	notifications       domain.NotificationPublisher
 }
@@ -40,12 +47,18 @@ func New(deps Dependencies) *UseCase {
 	if timeout <= 0 {
 		timeout = 30 * time.Minute
 	}
+	nowFn := deps.Now
+	if nowFn == nil {
+		nowFn = time.Now
+	}
 	return &UseCase{
 		order:               deps.Order,
 		returnRepo:          deps.Return,
 		reviewRepo:          deps.Review,
+		momo:                deps.MomoGateway,
 		shippingFeeVND:      shippingFee,
 		orderConfirmTimeout: timeout,
+		now:                 nowFn,
 		liveQuota:           deps.LiveQuota,
 		notifications:       deps.Notifications,
 	}
@@ -114,6 +127,18 @@ func (uc *UseCase) hydrateOrderReviewStates(ctx context.Context, orders ...*doma
 }
 
 func (uc *UseCase) Create(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput) (*domain.Order, error) {
+	return uc.CreateWithMethod(ctx, userID, addressID, lines, domain.PaymentMethodCOD)
+}
+
+func (uc *UseCase) CreateWithMethod(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput, paymentMethod string) (*domain.Order, error) {
+	method := strings.TrimSpace(paymentMethod)
+	if method == "" {
+		method = domain.PaymentMethodCOD
+	}
+	if method != domain.PaymentMethodCOD && method != domain.PaymentMethodMomo {
+		return nil, domain.NewValidationError(map[string]string{"paymentMethod": "Phương thức thanh toán không hợp lệ"})
+	}
+
 	if len(lines) == 0 {
 		return nil, domain.ErrCartEmpty
 	}
@@ -131,23 +156,158 @@ func (uc *UseCase) Create(ctx context.Context, userID, addressID string, lines [
 		}
 	}
 
-	order, err := uc.order.Create(ctx, userID, addressID, lines, uc.shippingFeeVND)
+	momoRepo, hasMomoRepo := uc.order.(domain.MomoOrderRepository)
+	var order *domain.Order
+	var err error
+	if hasMomoRepo {
+		order, err = momoRepo.CreateWithPaymentMethod(ctx, userID, addressID, lines, uc.shippingFeeVND, method)
+	} else if method == domain.PaymentMethodCOD {
+		order, err = uc.order.Create(ctx, userID, addressID, lines, uc.shippingFeeVND)
+	} else {
+		return nil, domain.ErrMomoGateway
+	}
 	if err != nil {
 		return nil, err
 	}
 	uc.notifyLiveQuota(ctx)
 
 	if order != nil {
-		if order.Status == domain.OrderStatusPendingConfirmation {
-			cancellableUntil := order.CreatedAt.Add(uc.orderConfirmTimeout)
-			order.CancellableUntil = &cancellableUntil
+		if method == domain.PaymentMethodMomo {
+			payURL, gwErr := uc.requestMomoPayURL(ctx, order)
+			if gwErr != nil || payURL == "" {
+				if hasMomoRepo {
+					if setErr := momoRepo.SetPaymentFailed(ctx, order.ID); setErr == nil {
+						order.PaymentStatus = domain.PaymentStatusFailed
+					}
+				}
+			} else {
+				order.PayURL = payURL
+			}
 		}
+
+		uc.hydrateCancellableUntil(order)
 		uc.hydrateOrderReviewStates(ctx, order)
 		if uc.notifications != nil {
 			uc.notifications.NotifyOrderCreated(ctx, order)
 		}
 	}
 
+	return order, nil
+}
+
+func (uc *UseCase) requestMomoPayURL(ctx context.Context, order *domain.Order) (string, error) {
+	if uc.momo == nil || order == nil {
+		return "", domain.ErrMomoGateway
+	}
+	amountVND, err := strconv.ParseInt(string(order.TotalVND), 10, 64)
+	if err != nil || amountVND < domain.MomoMinAmountVND || amountVND > domain.MomoMaxAmountVND {
+		return "", domain.ErrMomoGateway
+	}
+	payURL, err := uc.momo.CreatePaymentURL(ctx, domain.MomoCreateInput{
+		OrderID:   order.ID,
+		AmountVND: amountVND,
+		OrderInfo: fmt.Sprintf("Thanh toan don hang %s", domain.OrderShortCode(order.ID)),
+	})
+	if err != nil || strings.TrimSpace(payURL) == "" {
+		return "", domain.ErrMomoGateway
+	}
+	return strings.TrimSpace(payURL), nil
+}
+
+func (uc *UseCase) hydrateCancellableUntil(order *domain.Order) {
+	if order != nil && order.Status == domain.OrderStatusPendingConfirmation {
+		cancellableUntil := order.CreatedAt.Add(uc.orderConfirmTimeout)
+		order.CancellableUntil = &cancellableUntil
+	}
+}
+
+func (uc *UseCase) RetryMomoPayment(ctx context.Context, userID, orderID string) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+
+	order, err := uc.order.GetByID(ctx, userID, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	if order.PaymentMethod != domain.PaymentMethodMomo ||
+		order.Status != domain.OrderStatusPendingConfirmation ||
+		(order.PaymentStatus != domain.PaymentStatusPending && order.PaymentStatus != domain.PaymentStatusFailed) ||
+		uc.now().UTC().After(order.CreatedAt.Add(uc.orderConfirmTimeout)) {
+		return nil, domain.ErrPaymentRetryNotAllowed
+	}
+
+	momoRepo, ok := uc.order.(domain.MomoOrderRepository)
+	if !ok || uc.momo == nil {
+		return nil, domain.ErrMomoGateway
+	}
+
+	payURL, err := uc.requestMomoPayURL(ctx, order)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := momoRepo.ResetPaymentPending(ctx, userID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if updated != nil {
+		updated.PayURL = payURL
+		uc.hydrateCancellableUntil(updated)
+		uc.hydrateOrderReviewStates(ctx, updated)
+	}
+	return updated, nil
+}
+
+func (uc *UseCase) HandleMomoReturn(ctx context.Context, userID string, payload domain.MomoCallbackPayload) (*domain.Order, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+	return uc.processMomoCallback(ctx, userID, payload)
+}
+
+func (uc *UseCase) HandleMomoIPN(ctx context.Context, payload domain.MomoCallbackPayload) error {
+	_, err := uc.processMomoCallback(ctx, "", payload)
+	return err
+}
+
+func (uc *UseCase) processMomoCallback(ctx context.Context, userID string, payload domain.MomoCallbackPayload) (*domain.Order, error) {
+	if uc.momo == nil {
+		return nil, domain.ErrMomoGateway
+	}
+	if !uc.momo.VerifyCallbackSignature(payload) {
+		return nil, domain.ErrMomoInvalidCallback
+	}
+	orderID, ok := domain.ParseMomoOrderID(payload.OrderID)
+	if !ok {
+		return nil, domain.ErrMomoInvalidCallback
+	}
+	amount := strings.TrimSpace(payload.Amount)
+	if !domain.MoneyVND(amount).IsCanonical() {
+		return nil, domain.ErrMomoInvalidCallback
+	}
+	momoRepo, ok := uc.order.(domain.MomoOrderRepository)
+	if !ok {
+		return nil, domain.ErrMomoGateway
+	}
+
+	order, justPaid, err := momoRepo.ApplyMomoCallback(ctx, orderID, userID, amount, payload.TransID, payload.ResultCode)
+	if err != nil {
+		return nil, err
+	}
+	if justPaid && uc.notifications != nil {
+		if momoNotif, ok := uc.notifications.(domain.MomoNotificationPublisher); ok {
+			momoNotif.NotifyOrderMomoPaid(ctx, order)
+		}
+	}
+	if order != nil {
+		uc.hydrateCancellableUntil(order)
+		uc.hydrateOrderReviewStates(ctx, order)
+	}
 	return order, nil
 }
 
@@ -298,9 +458,28 @@ func (uc *UseCase) AutoConfirmDue(ctx context.Context, cutoff time.Time) error {
 		if uc.notifications != nil && len(confirmed) > 0 {
 			uc.notifications.NotifyOrderAutoConfirmed(ctx, confirmed)
 		}
-		return nil
+	} else {
+		if err := uc.order.AutoConfirmDue(ctx, cutoff); err != nil {
+			return err
+		}
 	}
-	return uc.order.AutoConfirmDue(ctx, cutoff)
+
+	if momoRepo, ok := uc.order.(domain.MomoOrderRepository); ok {
+		expired, err := momoRepo.AutoCancelExpiredMomoOrders(ctx, cutoff)
+		if err != nil {
+			return err
+		}
+		if len(expired) > 0 {
+			uc.notifyLiveQuota(ctx)
+			if uc.notifications != nil {
+				if momoNotif, ok := uc.notifications.(domain.MomoNotificationPublisher); ok {
+					momoNotif.NotifyOrderPaymentExpired(ctx, expired)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (uc *UseCase) AdminList(ctx context.Context, status string) ([]domain.Order, error) {

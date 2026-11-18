@@ -770,4 +770,44 @@ describe('NotificationBell Component', () => {
       expect(screen.getByRole('button', { name: 'Thử lại' })).toBeInTheDocument()
     })
   })
+
+  it('renders order_payment_expired store notification with Vietnamese copy', async () => {
+    const expiredItem: NotificationItem = {
+      id: 'n-momo-exp',
+      recipientId: 'user-1',
+      actorId: null,
+      actorName: 'Hệ thống',
+      actorRole: null,
+      category: 'order',
+      notificationType: 'order_payment_expired',
+      postId: null,
+      commentId: null,
+      reactionType: null,
+      excerpt: 'Đơn hàng quá hạn thanh toán MoMo',
+      metadata: { orderId: 'ord-999', productName: 'iPhone 15 Pro' },
+      isRead: false,
+      createdAt: '2026-11-16T10:15:00Z',
+    }
+    vi.mocked(postsApi.listNotifications).mockResolvedValue({
+      items: [expiredItem],
+      unreadCount: 1,
+    })
+
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-bell-button')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('notification-bell-button'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-item-n-momo-exp')).toHaveTextContent(
+        /đã hủy đơn do quá hạn thanh toán MoMo:/i
+      )
+    })
+  })
 })

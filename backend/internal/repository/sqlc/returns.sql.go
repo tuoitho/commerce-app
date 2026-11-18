@@ -47,7 +47,7 @@ VALUES (
 )
 RETURNING id, order_id, user_id, status, reason_code, description, reject_reason,
           expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-          refund_amount_vnd::text AS refund_amount_vnd,
+          COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
           refunded_by_user_id, created_at, updated_at,
           approved_at, rejected_at, received_at, refunded_at, cancelled_at
 `
@@ -116,7 +116,7 @@ func (q *Queries) CreateReturnRequest(ctx context.Context, arg CreateReturnReque
 const getLatestReturnRequestByOrderID = `-- name: GetLatestReturnRequestByOrderID :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -173,7 +173,7 @@ func (q *Queries) GetLatestReturnRequestByOrderID(ctx context.Context, orderID s
 const getReturnRequestAdminByID = `-- name: GetReturnRequestAdminByID :one
 SELECT rr.id, rr.order_id, rr.user_id, rr.status, rr.reason_code, rr.description, rr.reject_reason,
        rr.expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       rr.refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(rr.refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        rr.refunded_by_user_id, rr.created_at, rr.updated_at,
        rr.approved_at, rr.rejected_at, rr.received_at, rr.refunded_at, rr.cancelled_at,
        u.email AS buyer_email
@@ -297,7 +297,7 @@ const listLatestReturnRequestsByOrderIDs = `-- name: ListLatestReturnRequestsByO
 SELECT DISTINCT ON (order_id)
        id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -521,7 +521,7 @@ func (q *Queries) ListReturnRequestItemsByRequestIDs(ctx context.Context, return
 const listReturnRequestsAdmin = `-- name: ListReturnRequestsAdmin :many
 SELECT rr.id, rr.order_id, rr.user_id, rr.status, rr.reason_code, rr.description, rr.reject_reason,
        rr.expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       rr.refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(rr.refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        rr.refunded_by_user_id, rr.created_at, rr.updated_at,
        rr.approved_at, rr.rejected_at, rr.received_at, rr.refunded_at, rr.cancelled_at,
        u.email AS buyer_email,
@@ -604,7 +604,7 @@ func (q *Queries) ListReturnRequestsAdmin(ctx context.Context, arg ListReturnReq
 const lockReturnRequestByOrderAndUser = `-- name: LockReturnRequestByOrderAndUser :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests
@@ -666,7 +666,7 @@ func (q *Queries) LockReturnRequestByOrderAndUser(ctx context.Context, arg LockR
 const lockReturnRequestForUpdate = `-- name: LockReturnRequestForUpdate :one
 SELECT id, order_id, user_id, status, reason_code, description, reject_reason,
        expected_refund_amount_vnd::text AS expected_refund_amount_vnd,
-       refund_amount_vnd::text AS refund_amount_vnd,
+       COALESCE(refund_amount_vnd::text, '')::text AS refund_amount_vnd,
        refunded_by_user_id, created_at, updated_at,
        approved_at, rejected_at, received_at, refunded_at, cancelled_at
 FROM return_requests

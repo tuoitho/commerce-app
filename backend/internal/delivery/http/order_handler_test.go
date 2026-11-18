@@ -2,17 +2,24 @@ package http
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"commerce-backend/internal/config"
 	"commerce-backend/internal/domain"
+	"commerce-backend/internal/payment/momo"
 	"commerce-backend/internal/security/jwt"
 	orderuc "commerce-backend/internal/usecase/order"
 )
@@ -1023,6 +1030,454 @@ func TestOrderHTTP_UndoCancel(t *testing.T) {
 		if resp.Message != "Đơn hàng không có yêu cầu hủy đang chờ" {
 			t.Errorf("expected Vietnamese message, got %q", resp.Message)
 		}
+	})
+}
+
+type fakeHTTPMomoOrderRepo struct {
+	*fakeOrderUsecaseRepo
+	createMethodErr  error
+	createMethodRes  *domain.Order
+	lastMethod       string
+	failedMarkedIDs  []string
+	resetPendingRes  *domain.Order
+	resetPendingErr  error
+	callbackRes      *domain.Order
+	callbackJustPaid bool
+	callbackErr      error
+}
+
+func (f *fakeHTTPMomoOrderRepo) CreateWithPaymentMethod(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput, shippingFeeVND domain.MoneyVND, paymentMethod string) (*domain.Order, error) {
+	f.lastMethod = paymentMethod
+	if f.createMethodErr != nil {
+		return nil, f.createMethodErr
+	}
+	if f.createMethodRes != nil {
+		return f.createMethodRes, nil
+	}
+	return f.Create(ctx, userID, addressID, lines, shippingFeeVND)
+}
+
+func (f *fakeHTTPMomoOrderRepo) SetPaymentFailed(_ context.Context, orderID string) error {
+	f.failedMarkedIDs = append(f.failedMarkedIDs, orderID)
+	if f.createMethodRes != nil && f.createMethodRes.ID == orderID {
+		f.createMethodRes.PaymentStatus = domain.PaymentStatusFailed
+	}
+	return nil
+}
+
+func (f *fakeHTTPMomoOrderRepo) ResetPaymentPending(_ context.Context, _, _ string) (*domain.Order, error) {
+	if f.resetPendingErr != nil {
+		return nil, f.resetPendingErr
+	}
+	return f.resetPendingRes, nil
+}
+
+func (f *fakeHTTPMomoOrderRepo) ApplyMomoCallback(_ context.Context, _, _, _, _ string, _ int) (*domain.Order, bool, error) {
+	return f.callbackRes, f.callbackJustPaid, f.callbackErr
+}
+
+func (f *fakeHTTPMomoOrderRepo) AutoCancelExpiredMomoOrders(_ context.Context, _ time.Time) ([]domain.AutoConfirmedOrder, error) {
+	return nil, nil
+}
+
+func signMomoCallbackForHTTPTest(secret, accessKey, partnerCode, orderID, requestID, amount, orderInfo, orderType, transID string, resultCode int, message, payType, responseTime, extraData string) string {
+	raw := fmt.Sprintf(
+		"accessKey=%s&amount=%s&extraData=%s&message=%s&orderId=%s&orderInfo=%s&orderType=%s&partnerCode=%s&payType=%s&requestId=%s&responseTime=%s&resultCode=%d&transId=%s",
+		accessKey, amount, extraData, message, orderID, orderInfo, orderType, partnerCode, payType, requestID, responseTime, resultCode, transID,
+	)
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(raw))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func TestOrderHTTP_MomoContractAndFlows(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const (
+		validOrderID = "44444444-4444-4444-4444-444444444444"
+		paidOrderID  = "55555555-5555-5555-5555-555555555555"
+		addrID       = "22222222-2222-2222-2222-222222222222"
+		variantID    = "33333333-3333-3333-3333-333333333333"
+		productID    = "66666666-6666-6666-6666-666666666666"
+		itemID1      = "77777777-7777-7777-7777-777777777771"
+		itemID2      = "77777777-7777-7777-7777-777777777772"
+		accessKey    = "F8BBA842ECF85"
+		secretKey    = "K951B6PE1waDMi640xX08PD3vg6EkVlz"
+		partnerCode  = "MOMO"
+	)
+
+	snapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "momo-payment", "contract-snapshots.json")
+	fixedNow := time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)
+	confirmedTime := fixedNow.Add(2 * time.Minute)
+	transID := "4088812345"
+
+	makeOrder := func(id string, status domain.OrderStatus, payStatus domain.PaymentStatus, paid bool) domain.Order {
+		o := domain.Order{
+			ID:             id,
+			UserID:         orderTestUser,
+			Status:         status,
+			PaymentMethod:  domain.PaymentMethodMomo,
+			PaymentStatus:  payStatus,
+			SubtotalVND:    "3190000",
+			ShippingFeeVND: "0",
+			TotalVND:       "3190000",
+			ShippingInfo: domain.ShippingInfo{
+				RecipientName: "Nguyen Van A",
+				Phone:         "0987654321",
+				ProvinceName:  "Hà Nội",
+				WardName:      "Phúc Xá",
+				DetailAddress: "123 Cầu Giấy",
+			},
+			Items: []domain.OrderItem{
+				{
+					ID:           itemID1,
+					OrderID:      id,
+					VariantID:    variantID,
+					ProductID:    productID,
+					BrandName:    "Apple",
+					ProductName:  "iPhone 15 Pro",
+					Model:        "A3101",
+					ImageURL:     "/media/iphone.jpg",
+					Options:      []domain.CartOption{{GroupLabel: "Màu sắc", ValueLabel: "Titan"}},
+					UnitPriceVND: "3190000",
+					Quantity:     1,
+					LineTotalVND: "3190000",
+				},
+			},
+			CreatedAt: fixedNow,
+			UpdatedAt: fixedNow,
+		}
+		if paid {
+			o.Items[0].ID = itemID2
+			o.PaymentTransactionID = &transID
+			o.PaidAt = &confirmedTime
+			o.ConfirmedAt = &confirmedTime
+			o.UpdatedAt = confirmedTime
+		}
+		return o
+	}
+
+	buildRouter := func(repo *fakeHTTPMomoOrderRepo, gwResp string, gwStatus int) (*gin.Engine, string, *httptest.Server) {
+		gwSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(gwStatus)
+			_, _ = w.Write([]byte(gwResp))
+		}))
+		cfg := &config.Config{
+			MomoPartnerCode: partnerCode,
+			MomoAccessKey:   accessKey,
+			MomoSecretKey:   secretKey,
+			MomoEndpoint:    gwSrv.URL,
+			MomoRedirectURL: "http://localhost:15173/momo-return",
+			MomoIPNURL:      "http://localhost:18080/api/v1/payments/momo/ipn",
+			MomoRequestType: "payWithMethod",
+			MomoPartnerName: "Test",
+			MomoStoreID:     "MomoTestStore",
+		}
+		momoClient := momo.NewClient(cfg, nil)
+		manager := jwt.NewManager(testSecret, "commerce-backend")
+		token, _ := manager.GenerateAccessToken(orderTestUser, domain.RoleCustomer, 15*time.Minute)
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			Return:              &fakeReturnUsecaseRepo{},
+			Review:              &fakeReviewRepoForHandler{},
+			MomoGateway:         momoClient,
+			ShippingFeeVND:      "0",
+			OrderConfirmTimeout: 30 * time.Minute,
+			Now:                 func() time.Time { return fixedNow.Add(5 * time.Minute) },
+		})
+		r := gin.New()
+		NewRouter(r, Dependencies{
+			Order: uc,
+			JWT:   manager,
+		})
+		return r, token, gwSrv
+	}
+
+	createReqObj := map[string]any{
+		"addressId":     addrID,
+		"paymentMethod": "momo",
+		"lines": []map[string]any{
+			{
+				"variantId":    variantID,
+				"quantity":     1,
+				"productName":  "iPhone 15 Pro",
+				"unitPriceVnd": "3190000",
+			},
+		},
+	}
+	createReqBytes, _ := json.Marshal(createReqObj)
+
+	t.Run("unauthenticated_401", func(t *testing.T) {
+		repo := &fakeHTTPMomoOrderRepo{fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{}}
+		r, _, srv := buildRouter(repo, `{}`, http.StatusOK)
+		defer srv.Close()
+
+		w := execOrderRequest(r, "", http.MethodPost, "/api/v1/orders", string(createReqBytes))
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d", w.Code)
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "unauthenticated_401", "API-ORDER-MOMO@1", "POST /api/v1/orders", nil, w)
+	})
+
+	t.Run("invalid paymentMethod returns 400 validation_error", func(t *testing.T) {
+		repo := &fakeHTTPMomoOrderRepo{fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{}}
+		r, token, srv := buildRouter(repo, `{}`, http.StatusOK)
+		defer srv.Close()
+
+		badReq := fmt.Sprintf(`{"addressId":%q,"paymentMethod":"crypto","lines":[{"variantId":%q,"quantity":1,"productName":"Phone","unitPriceVnd":"3190000"}]}`, addrID, variantID)
+		w := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders", badReq)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+		var env ResponseEnvelope
+		_ = json.Unmarshal(w.Body.Bytes(), &env)
+		if env.Error == nil || env.Error.Code != "validation_error" || env.Error.Fields["paymentMethod"] == "" {
+			t.Fatalf("expected validation_error with fields.paymentMethod, got %+v", env.Error)
+		}
+	})
+
+	t.Run("create_order_momo_201", func(t *testing.T) {
+		pendingOrder := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusPending, false)
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{},
+			createMethodRes:      &pendingOrder,
+		}
+		r, token, srv := buildRouter(repo, `{"resultCode":0,"message":"Successful.","payUrl":"https://test-payment.momo.vn/v2/gateway/pay?t=123"}`, http.StatusOK)
+		defer srv.Close()
+
+		w := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders", string(createReqBytes))
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "create_order_momo_201", "API-ORDER-MOMO@1", "POST /api/v1/orders", createReqObj, w)
+	})
+
+	t.Run("create_order_momo_gateway_failed_201", func(t *testing.T) {
+		pendingOrder := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusPending, false)
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{},
+			createMethodRes:      &pendingOrder,
+		}
+		r, token, srv := buildRouter(repo, `{"resultCode":1005,"message":"Rejected"}`, http.StatusBadGateway)
+		defer srv.Close()
+
+		w := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders", string(createReqBytes))
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201 on gateway fallback, got %d: %s", w.Code, w.Body.String())
+		}
+		var env struct {
+			Data orderResponse `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &env)
+		if env.Data.PaymentStatus != "failed" || env.Data.PayURL != "" {
+			t.Fatalf("expected failed status without payUrl, got %+v", env.Data)
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "create_order_momo_gateway_failed_201", "API-ORDER-MOMO@1", "POST /api/v1/orders", createReqObj, w)
+	})
+
+	t.Run("create_order_momo_limit_409", func(t *testing.T) {
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{},
+			createMethodErr:      domain.ErrMomoAmountOutOfRange,
+		}
+		r, token, srv := buildRouter(repo, `{}`, http.StatusOK)
+		defer srv.Close()
+
+		w := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders", string(createReqBytes))
+		if w.Code != http.StatusConflict {
+			t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "create_order_momo_limit_409", "API-ORDER-MOMO@1", "POST /api/v1/orders", createReqObj, w)
+	})
+
+	t.Run("retry_momo_200 and errors", func(t *testing.T) {
+		failedOrder := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusFailed, false)
+		pendingReset := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusPending, false)
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{getByIDOrder: &failedOrder},
+			resetPendingRes:      &pendingReset,
+		}
+		r, token, srv := buildRouter(repo, `{"resultCode":0,"message":"Successful.","payUrl":"https://test-payment.momo.vn/v2/gateway/pay?t=retry"}`, http.StatusOK)
+		defer srv.Close()
+
+		w := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/momo/retry", "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "retry_momo_200", "API-ORDER-MOMO@1", "POST /api/v1/orders/:id/momo/retry", nil, w)
+
+		// 409 not allowed
+		paidOrder := makeOrder(validOrderID, domain.OrderStatusConfirmed, domain.PaymentStatusPaid, true)
+		repo.getByIDOrder = &paidOrder
+		w409 := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/momo/retry", "")
+		if w409.Code != http.StatusConflict {
+			t.Fatalf("expected 409, got %d: %s", w409.Code, w409.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "retry_momo_not_allowed_409", "API-ORDER-MOMO@1", "POST /api/v1/orders/:id/momo/retry", nil, w409)
+
+		// 404 not found
+		repo.getByIDOrder = nil
+		repo.getByIDErr = domain.ErrOrderNotFound
+		w404 := execOrderRequest(r, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/momo/retry", "")
+		if w404.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", w404.Code)
+		}
+
+		// 502 gateway error
+		repo.getByIDErr = nil
+		repo.getByIDOrder = &failedOrder
+		r502, token502, srv502 := buildRouter(repo, `{"resultCode":1005}`, http.StatusBadGateway)
+		defer srv502.Close()
+		w502 := execOrderRequest(r502, token502, http.MethodPost, "/api/v1/orders/"+validOrderID+"/momo/retry", "")
+		if w502.Code != http.StatusBadGateway {
+			t.Fatalf("expected 502, got %d: %s", w502.Code, w502.Body.String())
+		}
+	})
+
+	t.Run("momo_return_paid_200, momo_return_failed_200, momo_return_invalid_sig_400, momo_ipn_204", func(t *testing.T) {
+		momoOrderID := validOrderID + "_1763281800000"
+		paidSig := signMomoCallbackForHTTPTest(secretKey, accessKey, partnerCode, momoOrderID, momoOrderID, "3190000", "Thanh toan don hang", "momo_wallet", transID, 0, "Thành công.", "qr", "1763281800000", "")
+		paidReqObj := map[string]any{
+			"partnerCode":  partnerCode,
+			"orderId":      momoOrderID,
+			"requestId":    momoOrderID,
+			"amount":       "3190000",
+			"orderInfo":    "Thanh toan don hang",
+			"orderType":    "momo_wallet",
+			"transId":      transID,
+			"resultCode":   0,
+			"message":      "Thành công.",
+			"payType":      "qr",
+			"responseTime": "1763281800000",
+			"extraData":    "",
+			"signature":    paidSig,
+		}
+		paidReqBytes, _ := json.Marshal(paidReqObj)
+
+		paidOrder := makeOrder(validOrderID, domain.OrderStatusConfirmed, domain.PaymentStatusPaid, true)
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{},
+			callbackRes:          &paidOrder,
+			callbackJustPaid:     true,
+		}
+		r, token, srv := buildRouter(repo, `{}`, http.StatusOK)
+		defer srv.Close()
+
+		wPaid := execOrderRequest(r, token, http.MethodPost, "/api/v1/payments/momo/return", string(paidReqBytes))
+		if wPaid.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wPaid.Code, wPaid.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "momo_return_paid_200", "API-ORDER-MOMO@1", "POST /api/v1/payments/momo/return", paidReqObj, wPaid)
+
+		// Failed return
+		failSig := signMomoCallbackForHTTPTest(secretKey, accessKey, partnerCode, momoOrderID, momoOrderID, "3190000", "Thanh toan don hang", "momo_wallet", "0", 1006, "Giao dịch bị từ chối.", "qr", "1763281800000", "")
+		failReqObj := map[string]any{
+			"partnerCode":  partnerCode,
+			"orderId":      momoOrderID,
+			"requestId":    momoOrderID,
+			"amount":       "3190000",
+			"orderInfo":    "Thanh toan don hang",
+			"orderType":    "momo_wallet",
+			"transId":      "0",
+			"resultCode":   1006,
+			"message":      "Giao dịch bị từ chối.",
+			"payType":      "qr",
+			"responseTime": "1763281800000",
+			"extraData":    "",
+			"signature":    failSig,
+		}
+		failReqBytes, _ := json.Marshal(failReqObj)
+		failedOrder := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusFailed, false)
+		repo.callbackRes = &failedOrder
+		repo.callbackJustPaid = false
+
+		wFail := execOrderRequest(r, token, http.MethodPost, "/api/v1/payments/momo/return", string(failReqBytes))
+		if wFail.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wFail.Code, wFail.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "momo_return_failed_200", "API-ORDER-MOMO@1", "POST /api/v1/payments/momo/return", failReqObj, wFail)
+
+		// Invalid signature -> 400
+		badSigObj := map[string]any{
+			"partnerCode":  partnerCode,
+			"orderId":      momoOrderID,
+			"requestId":    momoOrderID,
+			"amount":       "3190000",
+			"orderInfo":    "Thanh toan don hang",
+			"orderType":    "momo_wallet",
+			"transId":      transID,
+			"resultCode":   0,
+			"message":      "Thành công.",
+			"payType":      "qr",
+			"responseTime": "1763281800000",
+			"extraData":    "",
+			"signature":    "0000invalid",
+		}
+		badSigBytes, _ := json.Marshal(badSigObj)
+		wBad := execOrderRequest(r, token, http.MethodPost, "/api/v1/payments/momo/return", string(badSigBytes))
+		if wBad.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d: %s", wBad.Code, wBad.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "momo_return_invalid_sig_400", "API-ORDER-MOMO@1", "POST /api/v1/payments/momo/return", nil, wBad)
+
+		// IPN numeric JSON types without auth -> 204
+		ipnReqObj := map[string]any{
+			"partnerCode":  partnerCode,
+			"orderId":      momoOrderID,
+			"requestId":    momoOrderID,
+			"amount":       3190000,
+			"orderInfo":    "Thanh toan don hang",
+			"orderType":    "momo_wallet",
+			"transId":      4088812345,
+			"resultCode":   0,
+			"message":      "Thành công.",
+			"payType":      "qr",
+			"responseTime": 1763281800000,
+			"extraData":    "",
+			"signature":    paidSig,
+		}
+		ipnReqBytes, _ := json.Marshal(ipnReqObj)
+		repo.callbackRes = &paidOrder
+		repo.callbackJustPaid = true
+
+		wIPN := execOrderRequest(r, "", http.MethodPost, "/api/v1/payments/momo/ipn", string(ipnReqBytes))
+		if wIPN.Code != http.StatusNoContent || wIPN.Body.Len() != 0 {
+			t.Fatalf("expected 204 empty body, got %d body=%q", wIPN.Code, wIPN.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "momo_ipn_204", "API-ORDER-MOMO@1", "POST /api/v1/payments/momo/ipn", ipnReqObj, wIPN)
+	})
+
+	t.Run("get_order_momo_pending_200, get_order_momo_paid_200, list_orders_200", func(t *testing.T) {
+		pendingOrder := makeOrder(validOrderID, domain.OrderStatusPendingConfirmation, domain.PaymentStatusPending, false)
+		paidOrder := makeOrder(paidOrderID, domain.OrderStatusConfirmed, domain.PaymentStatusPaid, true)
+
+		repo := &fakeHTTPMomoOrderRepo{
+			fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{
+				getByIDOrder: &pendingOrder,
+				listOrders:   []domain.Order{pendingOrder, paidOrder},
+			},
+		}
+		r, token, srv := buildRouter(repo, `{}`, http.StatusOK)
+		defer srv.Close()
+
+		wGetPending := execOrderRequest(r, token, http.MethodGet, "/api/v1/orders/"+validOrderID, "")
+		if wGetPending.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", wGetPending.Code)
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "get_order_momo_pending_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/orders/:id", nil, wGetPending)
+
+		repo.getByIDOrder = &paidOrder
+		wGetPaid := execOrderRequest(r, token, http.MethodGet, "/api/v1/orders/"+paidOrderID, "")
+		if wGetPaid.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", wGetPaid.Code)
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "get_order_momo_paid_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/orders/:id", nil, wGetPaid)
+
+		wList := execOrderRequest(r, token, http.MethodGet, "/api/v1/orders", "")
+		if wList.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", wList.Code)
+		}
+		assertOrRecordContractSnapshot(t, snapshotPath, "momo-payment", "list_orders_200", "TYPE-ORDER-PAYMENT@1", "GET /api/v1/orders", nil, wList)
 	})
 }
 
