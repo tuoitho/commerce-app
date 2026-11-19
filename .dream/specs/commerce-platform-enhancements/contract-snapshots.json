@@ -1,0 +1,2148 @@
+{
+  "feature": "commerce-platform-enhancements",
+  "snapshots": {
+    "admin_flash_sale_create_201": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "POST /api/v1/admin/flash-sales",
+      "status": 201,
+      "requestBody": {
+        "active": true,
+        "endsAt": "2026-11-18T08:00:00Z",
+        "items": [
+          {
+            "flashPriceVnd": "25990000",
+            "quota": 20,
+            "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+          }
+        ],
+        "name": "Deal Chớp Nhoáng 12H",
+        "startsAt": "2026-11-18T05:00:00Z"
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "createdAt": "2026-11-18T06:00:00Z",
+          "endsAt": "2026-11-18T08:00:00Z",
+          "id": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+          "items": [
+            {
+              "brand": "Apple",
+              "flashPriceVnd": "25990000",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "model": "A3294",
+              "optionLabel": "256GB / Titan Tự Nhiên",
+              "position": 0,
+              "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+              "productName": "iPhone 16 Pro",
+              "quota": 20,
+              "regularPriceVnd": "28990000",
+              "soldQuantity": 0,
+              "variantActive": true,
+              "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+            }
+          ],
+          "name": "Deal Chớp Nhoáng 12H",
+          "startsAt": "2026-11-18T05:00:00Z",
+          "status": "running",
+          "updatedAt": "2026-11-18T06:00:00Z"
+        },
+        "error": null,
+        "message": "Tạo chiến dịch Flash Sale thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.3859686Z"
+        },
+        "success": true
+      }
+    },
+    "admin_flash_sale_delete_204": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "DELETE /api/v1/admin/flash-sales/:id",
+      "status": 204,
+      "responseBody": null
+    },
+    "admin_flash_sale_delete_has_orders_409": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "DELETE /api/v1/admin/flash-sales/:id",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "flash_sale_has_orders",
+          "message": "Không thể xóa chiến dịch Flash Sale đã phát sinh lượt mua"
+        },
+        "message": "Không thể xóa chiến dịch Flash Sale đã phát sinh lượt mua",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.4671292Z"
+        },
+        "success": false
+      }
+    },
+    "admin_flash_sale_detail_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/admin/flash-sales/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "active": true,
+          "createdAt": "2026-11-18T06:00:00Z",
+          "endsAt": "2026-11-18T08:00:00Z",
+          "id": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+          "items": [
+            {
+              "brand": "Apple",
+              "flashPriceVnd": "25990000",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "model": "A3294",
+              "optionLabel": "256GB / Titan Tự Nhiên",
+              "position": 0,
+              "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+              "productName": "iPhone 16 Pro",
+              "quota": 20,
+              "regularPriceVnd": "28990000",
+              "soldQuantity": 12,
+              "variantActive": true,
+              "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+            }
+          ],
+          "name": "Deal Chớp Nhoáng 12H",
+          "startsAt": "2026-11-18T05:00:00Z",
+          "status": "running",
+          "updatedAt": "2026-11-18T06:00:00Z"
+        },
+        "error": null,
+        "message": "Lấy chi tiết chiến dịch Flash Sale thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.4298501Z"
+        },
+        "success": true
+      }
+    },
+    "admin_flash_sale_not_found_404": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/admin/flash-sales/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "flash_sale_not_found",
+          "message": "Không tìm thấy chiến dịch Flash Sale"
+        },
+        "message": "Không tìm thấy chiến dịch Flash Sale",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.4427141Z"
+        },
+        "success": false
+      }
+    },
+    "admin_flash_sale_overlap_409": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "POST /api/v1/admin/flash-sales",
+      "status": 409,
+      "requestBody": {
+        "active": true,
+        "endsAt": "2026-11-18T09:00:00Z",
+        "items": [
+          {
+            "flashPriceVnd": "30990000",
+            "quota": 10,
+            "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"
+          }
+        ],
+        "name": "Deal Chồng Lấn",
+        "startsAt": "2026-11-18T06:00:00Z"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "flash_sale_time_overlap",
+          "message": "Khung giờ chiến dịch bị trùng với một chiến dịch Flash Sale đang bật khác"
+        },
+        "message": "Khung giờ chiến dịch bị trùng với một chiến dịch Flash Sale đang bật khác",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.4071171Z"
+        },
+        "success": false
+      }
+    },
+    "admin_flash_sale_update_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "PUT /api/v1/admin/flash-sales/:id",
+      "status": 200,
+      "requestBody": {
+        "active": true,
+        "endsAt": "2026-11-18T09:00:00Z",
+        "items": [
+          {
+            "flashPriceVnd": "25490000",
+            "quota": 30,
+            "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+          },
+          {
+            "flashPriceVnd": "31990000",
+            "quota": 15,
+            "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"
+          }
+        ],
+        "name": "Deal Chớp Nhoáng 12H (Mở rộng)",
+        "startsAt": "2026-11-18T05:00:00Z"
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "createdAt": "2026-11-18T06:00:00Z",
+          "endsAt": "2026-11-18T09:00:00Z",
+          "id": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+          "items": [
+            {
+              "brand": "Apple",
+              "flashPriceVnd": "25490000",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "model": "A3294",
+              "optionLabel": "256GB / Titan Tự Nhiên",
+              "position": 0,
+              "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+              "productName": "iPhone 16 Pro",
+              "quota": 30,
+              "regularPriceVnd": "28990000",
+              "soldQuantity": 12,
+              "variantActive": true,
+              "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+            },
+            {
+              "brand": "Apple",
+              "flashPriceVnd": "31990000",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "model": "A3294",
+              "optionLabel": "512GB / Titan Đen",
+              "position": 1,
+              "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+              "productName": "iPhone 16 Pro",
+              "quota": 15,
+              "regularPriceVnd": "34990000",
+              "soldQuantity": 0,
+              "variantActive": true,
+              "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"
+            }
+          ],
+          "name": "Deal Chớp Nhoáng 12H (Mở rộng)",
+          "startsAt": "2026-11-18T05:00:00Z",
+          "status": "running",
+          "updatedAt": "2026-11-18T06:05:00Z"
+        },
+        "error": null,
+        "message": "Cập nhật chiến dịch Flash Sale thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.4535623Z"
+        },
+        "success": true
+      }
+    },
+    "admin_flash_sales_list_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/admin/flash-sales",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "active": true,
+            "createdAt": "2026-11-18T06:00:00Z",
+            "endsAt": "2026-11-18T08:00:00Z",
+            "id": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+            "name": "Deal Chớp Nhoáng 12H",
+            "startsAt": "2026-11-18T05:00:00Z",
+            "status": "running",
+            "totalQuota": 20,
+            "totalSold": 12,
+            "updatedAt": "2026-11-18T06:00:00Z",
+            "variantCount": 1
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách chiến dịch Flash Sale thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 20,
+            "page": 1,
+            "total": 1,
+            "totalPages": 1
+          },
+          "timestamp": "2026-11-18T14:53:06.4190199Z"
+        },
+        "success": true
+      }
+    },
+    "admin_order_ship_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/admin/orders/:id/ship",
+      "status": 200,
+      "requestBody": {
+        "carrier": "Giao Hàng Nhanh",
+        "trackingCode": "GHN-123456"
+      },
+      "responseBody": {
+        "data": {
+          "buyerEmail": "buyer@example.com",
+          "carrier": "Giao Hàng Nhanh",
+          "confirmedAt": "2026-11-18T10:15:00Z",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "deliveryMethod": "express_2h",
+          "detailAddress": "1 Tràng Tiền",
+          "discountVnd": "500000",
+          "id": "22222222-2222-2222-2222-222222222222",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "item-1",
+              "imageUrl": "",
+              "lineTotalVnd": "100000",
+              "model": "",
+              "options": null,
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "iPhone 15",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "100000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "paymentMethod": "cod",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "preparingAt": "2026-11-18T10:30:00Z",
+          "provinceName": "Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippedAt": "2026-11-18T11:00:00Z",
+          "shippingFeeVnd": "60000",
+          "status": "shipped",
+          "subtotalVnd": "28990000",
+          "timeline": [
+            {
+              "actorType": "customer",
+              "createdAt": "2026-11-18T10:00:00Z",
+              "id": "evt-1",
+              "note": "Đơn hàng được tạo",
+              "status": "pending_confirmation"
+            },
+            {
+              "actorType": "admin",
+              "createdAt": "2026-11-18T10:30:00Z",
+              "id": "evt-2",
+              "note": "Đơn hàng đang được chuẩn bị",
+              "status": "preparing"
+            },
+            {
+              "actorType": "admin",
+              "createdAt": "2026-11-18T11:00:00Z",
+              "id": "evt-3",
+              "note": "Đã bàn giao vận chuyển (Giao Hàng Nhanh - GHN-123456)",
+              "status": "shipped"
+            }
+          ],
+          "totalVnd": "28550000",
+          "trackingCode": "GHN-123456",
+          "updatedAt": "2026-11-18T11:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "voucherCode": "AURA500K",
+          "voucherType": "fixed_amount",
+          "wardName": "Ba Đình"
+        },
+        "error": null,
+        "message": "Thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:09.4974028Z"
+        },
+        "success": true
+      }
+    },
+    "admin_order_ship_validation_400": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/admin/orders/:id/ship",
+      "status": 400,
+      "requestBody": {
+        "carrier": "   ",
+        "trackingCode": "BAD CODE!"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "carrier": "Đơn vị vận chuyển phải từ 1 đến 80 ký tự",
+            "trackingCode": "Mã vận đơn phải từ 3 đến 64 ký tự (chữ, số, -, _)"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:09.4957629Z"
+        },
+        "success": false
+      }
+    },
+    "admin_product_create_201": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "POST /api/v1/admin/products",
+      "status": 201,
+      "requestBody": {
+        "brand": "Apple",
+        "categoryId": "11111111-1111-1111-1111-111111111111",
+        "currency": "VND",
+        "description": "Flagship titanium",
+        "featured": true,
+        "hasVariants": true,
+        "imageUrls": [
+          "/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp",
+          "https://example.com/ip16pm.jpg"
+        ],
+        "model": "A3297",
+        "name": "iPhone 16 Pro Max",
+        "optionGroups": [
+          {
+            "id": "grp-storage",
+            "label": "Dung lượng",
+            "position": 0,
+            "values": [
+              {
+                "id": "val-256",
+                "label": "256GB",
+                "position": 0
+              }
+            ]
+          }
+        ],
+        "price": "34990000",
+        "specs": [
+          {
+            "group": "Màn hình",
+            "items": [
+              {
+                "label": "Kích thước \u0026 Tấm nền",
+                "value": "6.9 inch Super Retina XDR OLED"
+              }
+            ]
+          }
+        ],
+        "stockQuantity": 20,
+        "variants": [
+          {
+            "active": true,
+            "id": "var-256",
+            "optionValueIds": {
+              "grp-storage": "val-256"
+            },
+            "priceVnd": "34990000",
+            "stockQuantity": 20
+          }
+        ]
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "brand": "Apple",
+          "category": {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Điện thoại"
+          },
+          "createdAt": "2026-11-18T21:37:55.1526226+07:00",
+          "currency": "VND",
+          "description": "Flagship titanium",
+          "featured": true,
+          "id": "7dfa6002-5129-430c-94c4-7ee7efcef656",
+          "imageUrls": [
+            "/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp",
+            "https://example.com/ip16pm.jpg"
+          ],
+          "inStock": true,
+          "maxPriceVnd": "34990000",
+          "minPriceVnd": "34990000",
+          "model": "A3297",
+          "name": "iPhone 16 Pro Max",
+          "optionGroups": [
+            {
+              "id": "grp-storage",
+              "label": "Dung lượng",
+              "position": 0,
+              "values": [
+                {
+                  "id": "val-256",
+                  "label": "256GB"
+                }
+              ]
+            }
+          ],
+          "price": "34990000",
+          "specs": [
+            {
+              "group": "Màn hình",
+              "items": [
+                {
+                  "label": "Kích thước \u0026 Tấm nền",
+                  "value": "6.9 inch Super Retina XDR OLED"
+                }
+              ]
+            }
+          ],
+          "stockQuantity": 20,
+          "updatedAt": "2026-11-18T21:37:55.1526226+07:00",
+          "variants": [
+            {
+              "active": true,
+              "id": "var-256",
+              "optionValueIds": {
+                "grp-storage": "val-256"
+              },
+              "priceVnd": "34990000",
+              "stockQuantity": 20
+            }
+          ]
+        },
+        "error": null,
+        "message": "Tạo sản phẩm thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.1532428Z"
+        },
+        "success": true
+      }
+    },
+    "admin_product_detail_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/admin/products/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "active": true,
+          "brand": "Apple",
+          "category": {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Điện thoại"
+          },
+          "createdAt": "2026-11-01T10:00:00Z",
+          "currency": "",
+          "description": "Titanium design",
+          "featured": true,
+          "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+          "imageUrls": [
+            "/media/products/550e8400-e29b-41d4-a716-446655440000.webp"
+          ],
+          "inStock": true,
+          "maxPriceVnd": "34990000",
+          "minPriceVnd": "28990000",
+          "model": "A3294",
+          "name": "iPhone 16 Pro",
+          "optionGroups": [
+            {
+              "id": "grp-storage-1",
+              "label": "Dung lượng",
+              "position": 0,
+              "values": [
+                {
+                  "id": "val-256",
+                  "label": "256GB"
+                },
+                {
+                  "id": "val-512",
+                  "label": "512GB"
+                }
+              ]
+            }
+          ],
+          "price": "28990000",
+          "specs": [
+            {
+              "group": "Màn hình",
+              "items": [
+                {
+                  "label": "Kích thước \u0026 Tấm nền",
+                  "value": "6.3 inch, LTPO Super Retina XDR OLED, 120Hz"
+                }
+              ]
+            },
+            {
+              "group": "Hiệu năng \u0026 Chipset",
+              "items": [
+                {
+                  "label": "Chipset",
+                  "value": "Apple A18 Pro"
+                }
+              ]
+            }
+          ],
+          "stockQuantity": 15,
+          "updatedAt": "2026-11-01T10:00:00Z",
+          "variants": [
+            {
+              "active": true,
+              "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1",
+              "optionValueIds": {
+                "grp-storage-1": "val-256"
+              },
+              "priceVnd": "28990000",
+              "stockQuantity": 10
+            },
+            {
+              "active": true,
+              "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2",
+              "optionValueIds": {
+                "grp-storage-1": "val-512"
+              },
+              "priceVnd": "34990000",
+              "stockQuantity": 5
+            }
+          ]
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.1414455Z"
+        },
+        "success": true
+      }
+    },
+    "admin_product_image_upload_201": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "POST /api/v1/admin/products/images",
+      "status": 201,
+      "responseBody": {
+        "data": {
+          "key": "97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp",
+          "mimeType": "image/webp",
+          "sizeBytes": 40,
+          "url": "/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp"
+        },
+        "error": null,
+        "message": "Tải ảnh sản phẩm thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.1179734Z"
+        },
+        "success": true
+      }
+    },
+    "admin_product_image_upload_validation_400": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "POST /api/v1/admin/products/images",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "file": "Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.1088333Z"
+        },
+        "success": false
+      }
+    },
+    "admin_product_update_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "PUT /api/v1/admin/products/:id",
+      "status": 200,
+      "requestBody": {
+        "brand": "Apple",
+        "categoryId": "11111111-1111-1111-1111-111111111111",
+        "currency": "VND",
+        "description": "Flagship titanium",
+        "featured": true,
+        "hasVariants": true,
+        "imageUrls": [
+          "/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp",
+          "https://example.com/ip16pm.jpg"
+        ],
+        "model": "A3297",
+        "name": "iPhone 16 Pro Max (Updated)",
+        "optionGroups": [
+          {
+            "id": "grp-storage",
+            "label": "Dung lượng",
+            "position": 0,
+            "values": [
+              {
+                "id": "val-256",
+                "label": "256GB",
+                "position": 0
+              }
+            ]
+          }
+        ],
+        "price": "34990000",
+        "specs": [
+          {
+            "group": "Hiệu năng \u0026 Chipset",
+            "items": [
+              {
+                "label": "Chipset",
+                "value": "Apple A18 Pro"
+              }
+            ]
+          }
+        ],
+        "stockQuantity": 20,
+        "variants": [
+          {
+            "active": true,
+            "id": "var-256",
+            "optionValueIds": {
+              "grp-storage": "val-256"
+            },
+            "priceVnd": "34990000",
+            "stockQuantity": 20
+          }
+        ]
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "brand": "Apple",
+          "category": {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Điện thoại"
+          },
+          "createdAt": "2026-11-18T21:37:55.1526226+07:00",
+          "currency": "VND",
+          "description": "Flagship titanium",
+          "featured": true,
+          "id": "7dfa6002-5129-430c-94c4-7ee7efcef656",
+          "imageUrls": [
+            "/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp",
+            "https://example.com/ip16pm.jpg"
+          ],
+          "inStock": true,
+          "maxPriceVnd": "34990000",
+          "minPriceVnd": "34990000",
+          "model": "A3297",
+          "name": "iPhone 16 Pro Max (Updated)",
+          "optionGroups": [
+            {
+              "id": "grp-storage",
+              "label": "Dung lượng",
+              "position": 0,
+              "values": [
+                {
+                  "id": "val-256",
+                  "label": "256GB"
+                }
+              ]
+            }
+          ],
+          "price": "34990000",
+          "specs": [
+            {
+              "group": "Hiệu năng \u0026 Chipset",
+              "items": [
+                {
+                  "label": "Chipset",
+                  "value": "Apple A18 Pro"
+                }
+              ]
+            }
+          ],
+          "stockQuantity": 20,
+          "updatedAt": "2026-11-18T21:37:55.1649861+07:00",
+          "variants": [
+            {
+              "active": true,
+              "id": "var-256",
+              "optionValueIds": {
+                "grp-storage": "val-256"
+              },
+              "priceVnd": "34990000",
+              "stockQuantity": 20
+            }
+          ]
+        },
+        "error": null,
+        "message": "Cập nhật sản phẩm thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.1649861Z"
+        },
+        "success": true
+      }
+    },
+    "admin_products_list_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/admin/products",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "averageRating": 4.9,
+            "brand": "Samsung",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+            "inStock": true,
+            "maxPriceVnd": "21990000",
+            "minPriceVnd": "21990000",
+            "model": "SM-S931B",
+            "name": "Samsung Galaxy S25 Đặc Biệt",
+            "price": "21990000",
+            "primaryImageUrl": "https://example.com/s25.jpg",
+            "reviewCount": 18,
+            "soldCount": 210
+          },
+          {
+            "averageRating": 0,
+            "brand": "Xiaomi",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3",
+            "inStock": true,
+            "maxPriceVnd": "18990000",
+            "minPriceVnd": "18990000",
+            "model": "24129PN74G",
+            "name": "Xiaomi 15",
+            "price": "18990000",
+            "primaryImageUrl": "https://example.com/xm15.jpg",
+            "reviewCount": 0,
+            "soldCount": 15
+          },
+          {
+            "averageRating": 4.8,
+            "brand": "Apple",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+            "inStock": true,
+            "maxPriceVnd": "34990000",
+            "minPriceVnd": "28990000",
+            "model": "A3294",
+            "name": "iPhone 16 Pro",
+            "price": "28990000",
+            "primaryImageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+            "reviewCount": 34,
+            "soldCount": 120
+          }
+        ],
+        "error": null,
+        "message": "",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 10,
+            "page": 1,
+            "total": 3,
+            "totalPages": 1
+          },
+          "timestamp": "2026-11-18T14:37:55.1284725Z"
+        },
+        "success": true
+      }
+    },
+    "admin_voucher_create_201": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/admin/vouchers",
+      "status": 201,
+      "requestBody": {
+        "active": true,
+        "code": "aura10",
+        "description": "Áp dụng toàn bộ điện thoại chính hãng",
+        "discountValue": "10",
+        "endsAt": "2026-12-31T23:59:59Z",
+        "maxDiscountVnd": "1000000",
+        "minOrderVnd": "5000000",
+        "perUserLimit": 2,
+        "startsAt": "2026-11-01T00:00:00Z",
+        "title": "Giảm 10% tối đa 1 triệu",
+        "usageLimit": 100,
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "code": "AURA10",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "description": "Áp dụng toàn bộ điện thoại chính hãng",
+          "discountValue": "10",
+          "effectiveStatus": "active",
+          "endsAt": "2026-12-31T23:59:59Z",
+          "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+          "maxDiscountVnd": "1000000",
+          "minOrderVnd": "5000000",
+          "perUserLimit": 2,
+          "startsAt": "2026-11-01T00:00:00Z",
+          "title": "Giảm 10% tối đa 1 triệu",
+          "updatedAt": "2026-11-18T10:00:00Z",
+          "usageLimit": 100,
+          "usedCount": 0,
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Tạo mã giảm giá thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.6764877Z"
+        },
+        "success": true
+      }
+    },
+    "admin_voucher_create_duplicate_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/admin/vouchers",
+      "status": 409,
+      "requestBody": {
+        "active": true,
+        "code": "aura10",
+        "description": "Áp dụng toàn bộ điện thoại chính hãng",
+        "discountValue": "10",
+        "endsAt": "2026-12-31T23:59:59Z",
+        "maxDiscountVnd": "1000000",
+        "minOrderVnd": "5000000",
+        "perUserLimit": 2,
+        "startsAt": "2026-11-01T00:00:00Z",
+        "title": "Giảm 10% tối đa 1 triệu",
+        "usageLimit": 100,
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_code_in_use",
+          "message": "Mã giảm giá này đã tồn tại"
+        },
+        "message": "Mã giảm giá này đã tồn tại",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.687137Z"
+        },
+        "success": false
+      }
+    },
+    "admin_voucher_create_validation_400": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/admin/vouchers",
+      "status": 400,
+      "requestBody": {
+        "active": true,
+        "code": "x",
+        "description": "",
+        "discountValue": "0",
+        "endsAt": "2026-11-18T10:00:00Z",
+        "maxDiscountVnd": "100000",
+        "minOrderVnd": "0",
+        "perUserLimit": 0,
+        "startsAt": "2026-11-18T12:00:00Z",
+        "title": "",
+        "usageLimit": 0,
+        "voucherType": "fixed_amount"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "code": "Mã giảm giá phải gồm 3–32 ký tự chữ hoa, số, dấu gạch dưới hoặc gạch ngang",
+            "discountValue": "Số tiền giảm phải là số nguyên dương",
+            "endsAt": "Thời gian kết thúc phải sau thời gian bắt đầu",
+            "maxDiscountVnd": "Mã giảm tiền mặt không được đặt mức giảm tối đa",
+            "perUserLimit": "Giới hạn lượt dùng mỗi khách phải từ 1 trở lên",
+            "title": "Tiêu đề phải từ 1 đến 120 ký tự",
+            "usageLimit": "Giới hạn tổng lượt dùng phải từ 1 trở lên"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.6741553Z"
+        },
+        "success": false
+      }
+    },
+    "admin_voucher_delete_204": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "DELETE /api/v1/admin/vouchers/:id",
+      "status": 204,
+      "responseBody": null
+    },
+    "admin_voucher_delete_in_use_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "DELETE /api/v1/admin/vouchers/:id",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_in_use",
+          "message": "Không thể xóa mã giảm giá đã có đơn hàng sử dụng"
+        },
+        "message": "Không thể xóa mã giảm giá đã có đơn hàng sử dụng",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:54.4407476Z"
+        },
+        "success": false
+      }
+    },
+    "admin_voucher_detail_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "GET /api/v1/admin/vouchers/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "active": true,
+          "code": "AURA10",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "description": "Áp dụng toàn bộ điện thoại chính hãng",
+          "discountValue": "10",
+          "effectiveStatus": "active",
+          "endsAt": "2026-12-31T23:59:59Z",
+          "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+          "maxDiscountVnd": "1000000",
+          "minOrderVnd": "5000000",
+          "perUserLimit": 2,
+          "startsAt": "2026-11-01T00:00:00Z",
+          "title": "Giảm 10% tối đa 1 triệu",
+          "updatedAt": "2026-11-18T10:00:00Z",
+          "usageLimit": 100,
+          "usedCount": 0,
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Lấy chi tiết mã giảm giá thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.7082949Z"
+        },
+        "success": true
+      }
+    },
+    "admin_voucher_not_found_404": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "GET /api/v1/admin/vouchers/:id",
+      "status": 404,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_not_found",
+          "message": "Mã giảm giá không tồn tại"
+        },
+        "message": "Mã giảm giá không tồn tại",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.7211974Z"
+        },
+        "success": false
+      }
+    },
+    "admin_voucher_update_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "PUT /api/v1/admin/vouchers/:id",
+      "status": 200,
+      "requestBody": {
+        "active": true,
+        "code": "AURA10",
+        "description": "Đã cập nhật trần giảm",
+        "discountValue": "10",
+        "endsAt": "2026-12-31T23:59:59Z",
+        "maxDiscountVnd": "1500000",
+        "minOrderVnd": "5000000",
+        "perUserLimit": 2,
+        "startsAt": "2026-11-01T00:00:00Z",
+        "title": "Giảm 10% tối đa 1.5 triệu",
+        "usageLimit": 150,
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "code": "AURA10",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "description": "Đã cập nhật trần giảm",
+          "discountValue": "10",
+          "effectiveStatus": "active",
+          "endsAt": "2026-12-31T23:59:59Z",
+          "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+          "maxDiscountVnd": "1500000",
+          "minOrderVnd": "5000000",
+          "perUserLimit": 2,
+          "startsAt": "2026-11-01T00:00:00Z",
+          "title": "Giảm 10% tối đa 1.5 triệu",
+          "updatedAt": "2026-11-18T10:05:00Z",
+          "usageLimit": 150,
+          "usedCount": 0,
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Cập nhật mã giảm giá thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:54.4043782Z"
+        },
+        "success": true
+      }
+    },
+    "admin_voucher_update_immutable_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "PUT /api/v1/admin/vouchers/:id",
+      "status": 409,
+      "requestBody": {
+        "active": true,
+        "code": "NEWCODE",
+        "description": "",
+        "discountValue": "10",
+        "endsAt": "2026-12-31T23:59:59Z",
+        "maxDiscountVnd": "1500000",
+        "minOrderVnd": "5000000",
+        "perUserLimit": 2,
+        "startsAt": "2026-11-01T00:00:00Z",
+        "title": "Giảm 10%",
+        "usageLimit": 150,
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_immutable_fields",
+          "message": "Không thể thay đổi mã hoặc loại giảm giá sau khi đã có lượt sử dụng"
+        },
+        "message": "Không thể thay đổi mã hoặc loại giảm giá sau khi đã có lượt sử dụng",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:54.4157522Z"
+        },
+        "success": false
+      }
+    },
+    "admin_voucher_update_limit_low_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "PUT /api/v1/admin/vouchers/:id",
+      "status": 409,
+      "requestBody": {
+        "active": true,
+        "code": "AURA10",
+        "description": "",
+        "discountValue": "10",
+        "endsAt": "2026-12-31T23:59:59Z",
+        "maxDiscountVnd": "1500000",
+        "minOrderVnd": "5000000",
+        "perUserLimit": 2,
+        "startsAt": "2026-11-01T00:00:00Z",
+        "title": "Giảm 10%",
+        "usageLimit": 3,
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_usage_limit_too_low",
+          "message": "Giới hạn tổng lượt dùng không được nhỏ hơn số lượt đã sử dụng"
+        },
+        "message": "Giới hạn tổng lượt dùng không được nhỏ hơn số lượt đã sử dụng",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:54.4297242Z"
+        },
+        "success": false
+      }
+    },
+    "admin_vouchers_list_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "GET /api/v1/admin/vouchers",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "active": true,
+            "code": "AURA10",
+            "createdAt": "2026-11-18T10:00:00Z",
+            "description": "Áp dụng toàn bộ điện thoại chính hãng",
+            "discountValue": "10",
+            "effectiveStatus": "active",
+            "endsAt": "2026-12-31T23:59:59Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": "1000000",
+            "minOrderVnd": "5000000",
+            "perUserLimit": 2,
+            "startsAt": "2026-11-01T00:00:00Z",
+            "title": "Giảm 10% tối đa 1 triệu",
+            "updatedAt": "2026-11-18T10:00:00Z",
+            "usageLimit": 100,
+            "usedCount": 0,
+            "voucherType": "percent"
+          },
+          {
+            "active": true,
+            "code": "AURA500K",
+            "createdAt": "2026-11-18T10:00:00Z",
+            "description": "Giảm tiền mặt trực tiếp",
+            "discountValue": "500000",
+            "effectiveStatus": "active",
+            "endsAt": "2026-12-15T23:59:59Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd2",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "10000000",
+            "perUserLimit": 1,
+            "startsAt": "2026-11-01T00:00:00Z",
+            "title": "Giảm 500K đơn từ 10 triệu",
+            "updatedAt": "2026-11-18T10:00:00Z",
+            "usageLimit": null,
+            "usedCount": 0,
+            "voucherType": "fixed_amount"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách mã giảm giá thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 20,
+            "page": 1,
+            "total": 2,
+            "totalPages": 1
+          },
+          "timestamp": "2026-11-18T15:57:11.6971473Z"
+        },
+        "success": true
+      }
+    },
+    "auth_forgot_password_200": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/forgot-password",
+      "status": 200,
+      "requestBody": {
+        "email": "recovery@example.com"
+      },
+      "responseBody": {
+        "data": {
+          "cooldownSeconds": 60
+        },
+        "error": null,
+        "message": "Nếu email tồn tại trong hệ thống, mã xác thực đặt lại mật khẩu đã được gửi.",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.6552737Z"
+        },
+        "success": true
+      }
+    },
+    "auth_forgot_password_rate_limited_429": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/forgot-password",
+      "status": 429,
+      "requestBody": {
+        "email": "ratelimit@example.com"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "otp_rate_limited",
+          "message": "Bạn đã yêu cầu mã xác thực quá nhiều lần. Vui lòng thử lại sau 15 phút."
+        },
+        "message": "Bạn đã yêu cầu mã xác thực quá nhiều lần. Vui lòng thử lại sau 15 phút.",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.7161564Z"
+        },
+        "success": false
+      }
+    },
+    "auth_forgot_password_smtp_error_502": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/forgot-password",
+      "status": 502,
+      "requestBody": {
+        "email": "recovery@example.com"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "email_delivery_failed",
+          "message": "Không thể gửi email xác thực lúc này. Vui lòng thử lại sau."
+        },
+        "message": "Không thể gửi email xác thực lúc này. Vui lòng thử lại sau.",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.7181658Z"
+        },
+        "success": false
+      }
+    },
+    "auth_forgot_password_validation_400": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/forgot-password",
+      "status": 400,
+      "requestBody": {
+        "email": "invalid-email"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "email": "Địa chỉ email không hợp lệ"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.6542742Z"
+        },
+        "success": false
+      }
+    },
+    "auth_reset_password_200": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/reset-password",
+      "status": 200,
+      "requestBody": {
+        "email": "recovery@example.com",
+        "newPassword": "NewPassword123@",
+        "otp": "025431"
+      },
+      "responseBody": {
+        "data": {
+          "reset": true
+        },
+        "error": null,
+        "message": "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:09.1007323Z"
+        },
+        "success": true
+      }
+    },
+    "auth_reset_password_invalid_otp_400": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/reset-password",
+      "status": 400,
+      "requestBody": {
+        "email": "recovery@example.com",
+        "newPassword": "NewPassword123@",
+        "otp": "000000"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_or_expired_otp",
+          "message": "Mã xác thực không chính xác hoặc đã hết hạn"
+        },
+        "message": "Mã xác thực không chính xác hoặc đã hết hạn",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.7923937Z"
+        },
+        "success": false
+      }
+    },
+    "auth_reset_password_validation_400": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "POST /api/v1/auth/reset-password",
+      "status": 400,
+      "requestBody": {
+        "email": "bad",
+        "newPassword": "short",
+        "otp": "12"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "validation_error",
+          "fields": {
+            "email": "Địa chỉ email không hợp lệ",
+            "newPassword": "Mật khẩu mới phải từ 8 đến 72 ký tự",
+            "otp": "Mã OTP phải gồm đúng 6 chữ số"
+          },
+          "message": "Dữ liệu không hợp lệ"
+        },
+        "message": "Dữ liệu không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.7307502Z"
+        },
+        "success": false
+      }
+    },
+    "cart_flash_sale_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/cart",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "items": [
+            {
+              "availability": "available",
+              "brandName": "Brand",
+              "id": "33333333-3333-3333-3333-333333333333",
+              "imageUrl": "/phone.jpg",
+              "isFlashSalePrice": true,
+              "isLivePrice": false,
+              "lineTotalVnd": "51980000",
+              "model": "X",
+              "options": [
+                {
+                  "groupLabel": "Color",
+                  "valueLabel": "Black"
+                }
+              ],
+              "productId": "44444444-4444-4444-4444-444444444444",
+              "productName": "Phone",
+              "quantity": 2,
+              "selected": true,
+              "stockQuantity": 5,
+              "unitPriceVnd": "25990000",
+              "variantId": "22222222-2222-2222-2222-222222222222"
+            }
+          ],
+          "selectedLineCount": 1,
+          "selectedTotalVnd": "51980000",
+          "shippingFeeVnd": "",
+          "totalUnits": 2
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.490003Z"
+        },
+        "success": true
+      }
+    },
+    "checkout_order_create_201": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/orders",
+      "status": 201,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "lines": [
+          {
+            "productName": "iPhone 16 Pro",
+            "quantity": 1,
+            "unitPriceVnd": "28990000",
+            "variantId": "33333333-3333-3333-3333-333333333333"
+          }
+        ],
+        "paymentMethod": "cod",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": {
+          "cancellableUntil": "2026-11-18T10:30:00Z",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "deliveryMethod": "express_2h",
+          "detailAddress": "123 Cầu Giấy",
+          "discountVnd": "1000000",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "lineTotalVnd": "28990000",
+              "model": "A3294",
+              "options": [
+                {
+                  "groupLabel": "Dung lượng",
+                  "valueLabel": "256GB"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 16 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "28990000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paymentMethod": "cod",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "provinceName": "Thành phố Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "shippingFeeVnd": "60000",
+          "status": "pending_confirmation",
+          "subtotalVnd": "28990000",
+          "timeline": [
+            {
+              "actorType": "customer",
+              "createdAt": "2026-11-18T10:00:00Z",
+              "id": "evt-1",
+              "note": "Đơn hàng được tạo",
+              "status": "pending_confirmation"
+            }
+          ],
+          "totalVnd": "28050000",
+          "updatedAt": "2026-11-18T10:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "voucherCode": "AURA10",
+          "voucherType": "percent",
+          "wardName": "Phường Phúc Xá"
+        },
+        "error": null,
+        "message": "Tạo đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5867231Z"
+        },
+        "success": true
+      }
+    },
+    "checkout_quote_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 200,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": {
+          "deliveryMethod": "express_2h",
+          "discountVnd": "1000000",
+          "expressAvailable": true,
+          "expressShippingFeeVnd": "60000",
+          "freeShippingThresholdVnd": "5000000",
+          "shippingFeeVnd": "60000",
+          "standardShippingFeeVnd": "0",
+          "subtotalVnd": "28990000",
+          "totalVnd": "28050000",
+          "voucherCode": "AURA10",
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Báo giá đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5283002Z"
+        },
+        "success": true
+      }
+    },
+    "checkout_quote_express_unavailable_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "express_delivery_unavailable",
+          "message": "Giao hàng hỏa tốc 2 giờ hiện chỉ áp dụng tại Hà Nội và TP. Hồ Chí Minh"
+        },
+        "message": "Giao hàng hỏa tốc 2 giờ hiện chỉ áp dụng tại Hà Nội và TP. Hồ Chí Minh",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5434308Z"
+        },
+        "success": false
+      }
+    },
+    "checkout_quote_no_voucher_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 200,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "standard"
+      },
+      "responseBody": {
+        "data": {
+          "deliveryMethod": "standard",
+          "discountVnd": "0",
+          "expressAvailable": true,
+          "expressShippingFeeVnd": "60000",
+          "freeShippingThresholdVnd": "5000000",
+          "shippingFeeVnd": "0",
+          "standardShippingFeeVnd": "0",
+          "subtotalVnd": "28990000",
+          "totalVnd": "28990000",
+          "voucherCode": null,
+          "voucherType": null
+        },
+        "error": null,
+        "message": "Báo giá đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5306082Z"
+        },
+        "success": true
+      }
+    },
+    "checkout_quote_voucher_expired_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_expired",
+          "message": "Mã giảm giá đã hết hạn sử dụng"
+        },
+        "message": "Mã giảm giá đã hết hạn sử dụng",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5659325Z"
+        },
+        "success": false
+      }
+    },
+    "checkout_quote_voucher_min_order_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_min_order_not_met",
+          "message": "Đơn hàng chưa đạt giá trị tối thiểu 10.000.000 ₫ để áp dụng mã này"
+        },
+        "message": "Đơn hàng chưa đạt giá trị tối thiểu 10.000.000 ₫ để áp dụng mã này",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5553532Z"
+        },
+        "success": false
+      }
+    },
+    "checkout_quote_voucher_not_found_404": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 404,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_not_found",
+          "message": "Mã giảm giá không tồn tại"
+        },
+        "message": "Mã giảm giá không tồn tại",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5757788Z"
+        },
+        "success": false
+      }
+    },
+    "flash_sales_current_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/flash-sales/current",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "endsAt": "2026-11-18T08:00:00Z",
+          "id": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+          "items": [
+            {
+              "brand": "Apple",
+              "discountPercent": 10,
+              "flashPriceVnd": "25990000",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "inStock": true,
+              "model": "A3294",
+              "optionLabel": "256GB / Titan Tự Nhiên",
+              "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+              "productName": "iPhone 16 Pro",
+              "quota": 20,
+              "regularPriceVnd": "28990000",
+              "soldQuantity": 12,
+              "variantId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+            }
+          ],
+          "name": "Deal Chớp Nhoáng 12H",
+          "startsAt": "2026-11-18T05:00:00Z"
+        },
+        "error": null,
+        "message": "Lấy thông tin Flash Sale thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.3971514Z"
+        },
+        "success": true
+      }
+    },
+    "flash_sales_current_null_200": {
+      "contractId": "API-FLASH-SALES@1",
+      "endpoint": "GET /api/v1/flash-sales/current",
+      "status": 200,
+      "responseBody": {
+        "data": null,
+        "error": null,
+        "message": "Lấy thông tin Flash Sale thành công",
+        "meta": {
+          "timestamp": "2026-11-18T14:53:06.3833328Z"
+        },
+        "success": true
+      }
+    },
+    "order_buy_again_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/orders/:id/buy-again",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "addedCount": 1,
+          "adjustedItems": [
+            {
+              "addedQuantity": 2,
+              "productName": "iPhone 16 Pro",
+              "requestedQuantity": 3,
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "cart": {
+            "items": [
+              {
+                "availability": "available",
+                "brandName": "Apple",
+                "id": "cart-item-1",
+                "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+                "isFlashSalePrice": true,
+                "isLivePrice": false,
+                "lineTotalVnd": "51980000",
+                "model": "A3294",
+                "options": [
+                  {
+                    "groupLabel": "Dung lượng",
+                    "valueLabel": "256GB"
+                  }
+                ],
+                "productId": "66666666-6666-6666-6666-666666666666",
+                "productName": "iPhone 16 Pro",
+                "quantity": 2,
+                "selected": true,
+                "stockQuantity": 2,
+                "unitPriceVnd": "25990000",
+                "variantId": "33333333-3333-3333-3333-333333333333"
+              }
+            ],
+            "selectedLineCount": 1,
+            "selectedTotalVnd": "51980000",
+            "shippingFeeVnd": "0",
+            "totalUnits": 2
+          },
+          "skippedItems": [
+            {
+              "productName": "Samsung Galaxy S25",
+              "reason": "out_of_stock",
+              "variantId": "33333333-3333-3333-3333-333333333334"
+            }
+          ]
+        },
+        "error": null,
+        "message": "Đã thêm sản phẩm vào giỏ hàng",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.6082559Z"
+        },
+        "success": true
+      }
+    },
+    "order_buy_again_all_unavailable_409": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "POST /api/v1/orders/:id/buy-again",
+      "status": 409,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "buy_again_all_unavailable",
+          "message": "Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh"
+        },
+        "message": "Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.6186028Z"
+        },
+        "success": false
+      }
+    },
+    "order_detail_timeline_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "GET /api/v1/orders/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "carrier": "Ahamove 2h",
+          "confirmedAt": "2026-11-18T10:15:00Z",
+          "createdAt": "2026-11-18T10:00:00Z",
+          "deliveryMethod": "express_2h",
+          "detailAddress": "123 Cầu Giấy",
+          "discountVnd": "1000000",
+          "id": "44444444-4444-4444-4444-444444444444",
+          "items": [
+            {
+              "brandName": "Apple",
+              "id": "77777777-7777-7777-7777-777777777771",
+              "imageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+              "lineTotalVnd": "28990000",
+              "model": "A3294",
+              "options": [
+                {
+                  "groupLabel": "Dung lượng",
+                  "valueLabel": "256GB"
+                }
+              ],
+              "productId": "66666666-6666-6666-6666-666666666666",
+              "productName": "iPhone 16 Pro",
+              "quantity": 1,
+              "review": null,
+              "reviewStatus": "ineligible",
+              "unitPriceVnd": "28990000",
+              "variantId": "33333333-3333-3333-3333-333333333333"
+            }
+          ],
+          "latestReturnRequest": null,
+          "paymentMethod": "cod",
+          "paymentStatus": "pending",
+          "phone": "0987654321",
+          "preparingAt": "2026-11-18T10:30:00Z",
+          "provinceName": "Thành phố Hà Nội",
+          "recipientName": "Nguyen Van A",
+          "returnEligibility": {
+            "deadline": null,
+            "eligible": false
+          },
+          "shippedAt": "2026-11-18T11:00:00Z",
+          "shippingFeeVnd": "60000",
+          "status": "shipped",
+          "subtotalVnd": "28990000",
+          "timeline": [
+            {
+              "actorType": "customer",
+              "createdAt": "2026-11-18T10:00:00Z",
+              "id": "evt-1",
+              "note": "Đơn hàng được tạo",
+              "status": "pending_confirmation"
+            },
+            {
+              "actorType": "system",
+              "createdAt": "2026-11-18T10:15:00Z",
+              "id": "evt-2",
+              "note": "Đơn hàng đã được xác nhận",
+              "status": "confirmed"
+            },
+            {
+              "actorType": "admin",
+              "createdAt": "2026-11-18T10:30:00Z",
+              "id": "evt-3",
+              "note": "Đơn hàng đang được chuẩn bị",
+              "status": "preparing"
+            },
+            {
+              "actorType": "admin",
+              "createdAt": "2026-11-18T11:00:00Z",
+              "id": "evt-4",
+              "note": "Đã bàn giao vận chuyển (Ahamove 2h - AHA-20261118)",
+              "status": "shipped"
+            }
+          ],
+          "totalVnd": "28050000",
+          "trackingCode": "AHA-20261118",
+          "updatedAt": "2026-11-18T11:00:00Z",
+          "userId": "11111111-1111-1111-1111-111111111111",
+          "voucherCode": "AURA10",
+          "voucherType": "percent",
+          "wardName": "Phường Phúc Xá"
+        },
+        "error": null,
+        "message": "Lấy chi tiết đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:11.5978687Z"
+        },
+        "success": true
+      }
+    },
+    "product_detail_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/products/:id",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "active": true,
+          "averageRating": 4.8,
+          "brand": "Apple",
+          "category": {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Điện thoại"
+          },
+          "createdAt": "2026-11-01T10:00:00Z",
+          "currency": "",
+          "description": "Titanium design",
+          "featured": true,
+          "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+          "imageUrls": [
+            "/media/products/550e8400-e29b-41d4-a716-446655440000.webp"
+          ],
+          "inStock": true,
+          "maxPriceVnd": "",
+          "minPriceVnd": "",
+          "model": "A3294",
+          "name": "iPhone 16 Pro",
+          "optionGroups": [
+            {
+              "id": "grp-storage-1",
+              "label": "Dung lượng",
+              "position": 0,
+              "values": [
+                {
+                  "id": "val-256",
+                  "label": "256GB"
+                },
+                {
+                  "id": "val-512",
+                  "label": "512GB"
+                }
+              ]
+            }
+          ],
+          "price": "",
+          "reviewCount": 34,
+          "soldCount": 120,
+          "specs": [
+            {
+              "group": "Màn hình",
+              "items": [
+                {
+                  "label": "Kích thước \u0026 Tấm nền",
+                  "value": "6.3 inch, LTPO Super Retina XDR OLED, 120Hz"
+                }
+              ]
+            },
+            {
+              "group": "Hiệu năng \u0026 Chipset",
+              "items": [
+                {
+                  "label": "Chipset",
+                  "value": "Apple A18 Pro"
+                }
+              ]
+            }
+          ],
+          "stockQuantity": 0,
+          "updatedAt": "2026-11-01T10:00:00Z",
+          "variants": [
+            {
+              "active": true,
+              "flashSale": {
+                "campaignName": "Flash Sale Giờ Vàng",
+                "endsAt": "2026-12-01T15:00:00Z",
+                "flashPriceVnd": "25990000",
+                "flashSaleId": "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+                "quota": 20,
+                "soldQuantity": 7
+              },
+              "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1",
+              "livePriceVnd": null,
+              "liveRemaining": null,
+              "optionValueIds": {
+                "grp-storage-1": "val-256"
+              },
+              "priceVnd": "28990000",
+              "stockQuantity": 10
+            },
+            {
+              "active": true,
+              "flashSale": null,
+              "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2",
+              "livePriceVnd": null,
+              "liveRemaining": null,
+              "optionValueIds": {
+                "grp-storage-1": "val-512"
+              },
+              "priceVnd": "34990000",
+              "stockQuantity": 5
+            }
+          ]
+        },
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.0968549Z"
+        },
+        "success": true
+      }
+    },
+    "products_featured_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/products/featured",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "averageRating": 4.8,
+            "brand": "Apple",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+            "inStock": true,
+            "maxPriceVnd": "",
+            "minPriceVnd": "",
+            "model": "A3294",
+            "name": "iPhone 16 Pro",
+            "price": "",
+            "primaryImageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+            "reviewCount": 34,
+            "soldCount": 120
+          }
+        ],
+        "error": null,
+        "message": "",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.0835359Z"
+        },
+        "success": true
+      }
+    },
+    "products_filter_invalid_400": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/products",
+      "status": 400,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "invalid_filter",
+          "fields": {
+            "min_rating": "must be a number between 1 and 5",
+            "sort": "must be one of bestselling, newest, price_asc, price_desc, rating_desc"
+          },
+          "message": "Tiêu chí lọc sản phẩm không hợp lệ"
+        },
+        "message": "Tiêu chí lọc sản phẩm không hợp lệ",
+        "meta": {
+          "timestamp": "2026-11-18T14:37:55.0711205Z"
+        },
+        "success": false
+      }
+    },
+    "products_list_200": {
+      "contractId": "API-CATALOG-MEDIA-SPECS@1",
+      "endpoint": "GET /api/v1/products",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "averageRating": 4.9,
+            "brand": "Samsung",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+            "inStock": true,
+            "maxPriceVnd": "",
+            "minPriceVnd": "",
+            "model": "SM-S931B",
+            "name": "Samsung Galaxy S25 Đặc Biệt",
+            "price": "",
+            "primaryImageUrl": "https://example.com/s25.jpg",
+            "reviewCount": 18,
+            "soldCount": 210
+          },
+          {
+            "averageRating": 4.8,
+            "brand": "Apple",
+            "category": {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Điện thoại"
+            },
+            "currency": "",
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+            "inStock": true,
+            "maxPriceVnd": "",
+            "minPriceVnd": "",
+            "model": "A3294",
+            "name": "iPhone 16 Pro",
+            "price": "",
+            "primaryImageUrl": "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+            "reviewCount": 34,
+            "soldCount": 120
+          }
+        ],
+        "error": null,
+        "message": "",
+        "meta": {
+          "pagination": {
+            "hasNext": true,
+            "hasPrev": false,
+            "limit": 2,
+            "page": 1,
+            "total": 3,
+            "totalPages": 2
+          },
+          "timestamp": "2026-11-18T14:37:55.0679942Z"
+        },
+        "success": true
+      }
+    },
+    "unauthenticated_401": {
+      "contractId": "API-AUTH-RECOVERY@1",
+      "endpoint": "GET /api/v1/auth/me",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-18T14:15:08.5987354Z"
+        },
+        "success": false
+      }
+    },
+    "vouchers_available_200": {
+      "contractId": "API-VOUCHERS-CHECKOUT-FULFILLMENT@1",
+      "endpoint": "GET /api/v1/vouchers/available",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "code": "AURA500K",
+            "description": "Giảm tiền mặt trực tiếp",
+            "discountValue": "500000",
+            "endsAt": "2026-12-15T23:59:59Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd2",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "10000000",
+            "perUserLimit": 1,
+            "startsAt": "2026-11-01T00:00:00Z",
+            "title": "Giảm 500K đơn từ 10 triệu",
+            "usageLimit": null,
+            "usedCount": 0,
+            "userRemainingUses": 1,
+            "voucherType": "fixed_amount"
+          },
+          {
+            "code": "AURA10",
+            "description": "Áp dụng toàn bộ điện thoại chính hãng",
+            "discountValue": "10",
+            "endsAt": "2026-12-31T23:59:59Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": "1000000",
+            "minOrderVnd": "5000000",
+            "perUserLimit": 2,
+            "startsAt": "2026-11-01T00:00:00Z",
+            "title": "Giảm 10% tối đa 1 triệu",
+            "usageLimit": 100,
+            "usedCount": 0,
+            "userRemainingUses": 2,
+            "voucherType": "percent"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách mã giảm giá khả dụng thành công",
+        "meta": {
+          "timestamp": "2026-11-18T15:57:54.4016153Z"
+        },
+        "success": true
+      }
+    }
+  }
+}

@@ -169,6 +169,7 @@
               "brandName": "Brand",
               "id": "33333333-3333-3333-3333-333333333333",
               "imageUrl": "/phone.jpg",
+              "isFlashSalePrice": false,
               "isLivePrice": true,
               "lineTotalVnd": "51980000",
               "model": "X",
@@ -195,7 +196,7 @@
         "error": null,
         "message": "Đã thêm sản phẩm vào giỏ hàng",
         "meta": {
-          "timestamp": "2026-11-12T19:55:54.0183184Z"
+          "timestamp": "2026-11-18T14:52:41.2310892Z"
         },
         "success": true
       }
@@ -212,6 +213,7 @@
               "brandName": "Brand",
               "id": "33333333-3333-3333-3333-333333333333",
               "imageUrl": "/phone.jpg",
+              "isFlashSalePrice": false,
               "isLivePrice": true,
               "lineTotalVnd": "51980000",
               "model": "X",
@@ -238,7 +240,7 @@
         "error": null,
         "message": "",
         "meta": {
-          "timestamp": "2026-11-12T19:55:54.0060743Z"
+          "timestamp": "2026-11-18T14:52:41.2291291Z"
         },
         "success": true
       }
@@ -438,12 +440,13 @@
       "responseBody": {
         "data": {
           "active": true,
+          "averageRating": 0,
           "brand": "Apple",
           "category": {
             "id": "11111111-1111-1111-1111-111111111111",
             "name": "Apple"
           },
-          "createdAt": "2026-11-13T02:55:54.0269222+07:00",
+          "createdAt": "2026-11-18T21:37:55.1778236+07:00",
           "currency": "",
           "description": "",
           "featured": false,
@@ -470,11 +473,15 @@
             }
           ],
           "price": "",
+          "reviewCount": 0,
+          "soldCount": 0,
+          "specs": [],
           "stockQuantity": 0,
-          "updatedAt": "2026-11-13T02:55:54.0269222+07:00",
+          "updatedAt": "2026-11-18T21:37:55.1778236+07:00",
           "variants": [
             {
               "active": true,
+              "flashSale": null,
               "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
               "livePriceVnd": "25990000",
               "liveRemaining": 7,
@@ -489,7 +496,7 @@
         "error": null,
         "message": "",
         "meta": {
-          "timestamp": "2026-11-12T19:55:54.0269222Z"
+          "timestamp": "2026-11-18T14:37:55.1778236Z"
         },
         "success": true
       }
