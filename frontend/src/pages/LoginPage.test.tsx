@@ -178,4 +178,32 @@ describe('LoginPage', () => {
     })
     expect(screen.getByRole('button', { name: /Đăng nhập/i })).toBeInTheDocument()
   })
+
+  it('renders Quên mật khẩu? link navigating to /forgot-password', () => {
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const forgotLink = screen.getByRole('link', { name: 'Quên mật khẩu?' })
+    expect(forgotLink).toBeInTheDocument()
+    expect(forgotLink).toHaveAttribute('href', '/forgot-password')
+  })
+
+  it('displays password reset success banner when navigated with passwordResetSuccess state', () => {
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/login', state: { passwordResetSuccess: true } }]}>
+          <LoginPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(
+      screen.getByText(/Đặt lại mật khẩu thành công\. Vui lòng đăng nhập bằng mật khẩu mới\./i)
+    ).toBeInTheDocument()
+  })
 })

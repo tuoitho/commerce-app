@@ -1,42 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Star } from 'lucide-react'
 import type { ProductSummary } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { FavoriteToggleButton } from './FavoriteToggleButton'
+import { CompareToggleButton } from './CompareToggleButton'
 
 interface ProductCardProps {
   product: ProductSummary
-}
-
-function getPhoneSpecs(name: string): string[] {
-  const lower = name.toLowerCase()
-  if (lower.includes('16 pro') || lower.includes('15 pro')) {
-    return ['OLED 120Hz', 'A-Series Pro', '48MP ProRAW']
-  }
-  if (lower.includes('16e') || lower.includes('15') || lower.includes('iphone')) {
-    return ['Super Retina XDR', 'Apple Silicon', '48MP Fusion']
-  }
-  if (lower.includes('xiaomi 15') || lower.includes('xiaomi 14')) {
-    return ['AMOLED 120Hz', 'Snapdragon 8', 'Leica Optics']
-  }
-  if (lower.includes('redmi')) {
-    return ['120Hz Display', '5000mAh', '50MP OIS']
-  }
-  return ['Chính hãng VNA', 'Hỗ trợ 5G', 'Bảo hành 12T']
-}
-
-function getPhoneColors(name: string): string[] {
-  const lower = name.toLowerCase()
-  if (lower.includes('pro')) {
-    return ['#9b9893', '#2a2928', '#dfdfd9', '#bfae98']
-  }
-  if (lower.includes('xiaomi')) {
-    return ['#1f2022', '#f2f2f2', '#8fae9b']
-  }
-  return ['#1c1c1e', '#f4f4f6', '#7fa0b8']
 }
 
 export function ProductCard({ product }: ProductCardProps) {
@@ -52,8 +25,9 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const numPrice = Number(minPrice || 0)
   const installmentEstimate = numPrice > 0 ? Math.round(numPrice / 12) : 0
-  const specs = getPhoneSpecs(product.name)
-  const colors = getPhoneColors(product.name)
+  const reviewCount = product.reviewCount ?? 0
+  const averageRating = product.averageRating ?? 0
+  const soldCount = product.soldCount ?? 0
   const imageAlt = `${product.brand || ''} ${product.name} ${product.model ?? ''}`.trim()
 
   return (
@@ -118,7 +92,7 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        {/* Lineage & Color Finish Indicators (Below image, never overlaid) */}
+        {/* Lineage Row */}
         <div className="mt-3 flex items-center justify-between gap-2">
           {product.model ? (
             <span className="font-mono text-[11px] font-medium text-zinc-500 tracking-tight">
@@ -129,16 +103,6 @@ export function ProductCard({ product }: ProductCardProps) {
               VNA EDITION
             </span>
           )}
-
-          <div className="flex items-center gap-1" aria-label="Bảng màu hoàn thiện">
-            {colors.map((c, i) => (
-              <span
-                key={i}
-                className="h-2.5 w-2.5 rounded-full border border-zinc-300"
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
         </div>
 
         {/* Product Title */}
@@ -146,21 +110,34 @@ export function ProductCard({ product }: ProductCardProps) {
           <Link to={`/products/${product.id}`}>{product.name}</Link>
         </h3>
 
-        {/* Concise Technical Spec Ledger */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {specs.map((spec, i) => (
-            <span
-              key={i}
-              className="rounded-md bg-zinc-100/90 border border-zinc-200/60 px-2 py-0.5 text-[10px] font-medium text-zinc-600"
-            >
-              {spec}
+        {/* Rating & Sold Count */}
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            {reviewCount > 0 ? (
+              <>
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                <span className="font-mono font-bold text-zinc-900 tabular-nums">
+                  {Number(averageRating).toFixed(1)}
+                </span>
+                <span className="text-zinc-500 font-medium">
+                  ({reviewCount})
+                </span>
+              </>
+            ) : (
+              <span className="text-zinc-400 font-medium">Chưa có đánh giá</span>
+            )}
+          </div>
+
+          {soldCount > 0 && (
+            <span className="text-zinc-500 font-medium tabular-nums">
+              Đã bán {soldCount}
             </span>
-          ))}
+          )}
         </div>
       </div>
 
       {/* Pricing & Action Footer */}
-      <div className="mt-4 pt-3.5 border-t border-zinc-100 flex items-end justify-between gap-2">
+      <div className="mt-4 pt-3.5 border-t border-zinc-100 space-y-3">
         <div>
           <span className="font-mono font-bold text-zinc-950 text-base sm:text-lg tracking-tight tabular-nums block">
             {formattedPrice}
@@ -171,16 +148,19 @@ export function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
-        <Link to={`/products/${product.id}`}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl px-3 py-1.5 text-xs font-semibold border-zinc-200 text-zinc-900 group-hover:bg-zinc-950 group-hover:text-white group-hover:border-zinc-950 transition-colors gap-1"
-          >
-            <span>Chi tiết</span>
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <CompareToggleButton product={product} className="flex-1 h-9 rounded-xl" />
+          <Link to={`/products/${product.id}`} className="flex-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-9 rounded-xl px-3 text-xs font-semibold border-zinc-200 text-zinc-900 group-hover:bg-zinc-950 group-hover:text-white group-hover:border-zinc-950 transition-colors gap-1"
+            >
+              <span>Chi tiết</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
       </div>
     </article>
   )

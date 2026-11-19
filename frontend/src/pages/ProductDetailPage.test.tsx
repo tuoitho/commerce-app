@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ProductDetailPage } from './ProductDetailPage'
 import { catalogApi } from '@/api/catalog'
@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useFavorites } from '@/context/FavoritesContext'
 import { useCart } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
+import { CompareProvider, COMPARE_STORAGE_KEY } from '@/context/CompareContext'
 
 vi.mock('@/api/catalog', () => ({
   catalogApi: {
@@ -508,6 +509,315 @@ describe('ProductDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'iPhone 16 Pro' })).toBeInTheDocument()
       expect(screen.getByRole('region', { name: 'Đánh giá từ khách hàng' })).toBeInTheDocument()
+    })
+  })
+
+  describe('Flash Sale display and PD-4 effective price rule (Req 2.5)', () => {
+    it('shows Flash Sale countdown box, sold progress, flash price, and struck regular price for selected variant', async () => {
+      const endsAt = new Date(Date.now() + 3600 * 1000).toISOString()
+      vi.mocked(catalogApi.getProduct).mockResolvedValue({
+        ...mockMultiVariantProduct,
+        variants: mockMultiVariantProduct.variants.map((v) =>
+          v.id === 'var-128-black'
+            ? {
+                ...v,
+                flashSale: {
+                  flashSaleId: 'fs-1',
+                  campaignName: 'Flash Sale Giờ Vàng',
+                  flashPriceVnd: '22990000',
+                  quota: 20,
+                  soldQuantity: 7,
+                  endsAt,
+                },
+              }
+            : { ...v, flashSale: null }
+        ),
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/products/p-multi']}>
+            <Routes>
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      expect(await screen.findByText('Flash Sale Giờ Vàng')).toBeInTheDocument()
+      expect(screen.getByTestId('pdp-flash-sale-box')).toBeInTheDocument()
+      expect(screen.getByTestId('pdp-flash-sale-countdown')).toBeInTheDocument()
+      expect(screen.getByText('Đã bán 7/20')).toBeInTheDocument()
+      expect(screen.getAllByText(/22\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByTestId('pdp-regular-price')).toHaveTextContent('25.990.000')
+      expect(screen.getByTestId('pdp-regular-price')).toHaveClass('line-through')
+
+      // Switch to 256GB (no flashSale) -> box disappears and regular price 28.990.000 shows
+      fireEvent.click(screen.getByRole('button', { name: '256GB' }))
+      await waitFor(() => {
+        expect(screen.queryByTestId('pdp-flash-sale-box')).not.toBeInTheDocument()
+        expect(screen.getAllByText(/28\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+      })
+    })
+
+    it('shows "Đã hết suất" and falls back to regular price when flashSale soldQuantity >= quota', async () => {
+      const endsAt = new Date(Date.now() + 3600 * 1000).toISOString()
+      vi.mocked(catalogApi.getProduct).mockResolvedValue({
+        ...mockMultiVariantProduct,
+        variants: mockMultiVariantProduct.variants.map((v) =>
+          v.id === 'var-128-black'
+            ? {
+                ...v,
+                flashSale: {
+                  flashSaleId: 'fs-1',
+                  campaignName: 'Flash Sale Giờ Vàng',
+                  flashPriceVnd: '22990000',
+                  quota: 20,
+                  soldQuantity: 20,
+                  endsAt,
+                },
+              }
+            : { ...v, flashSale: null }
+        ),
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/products/p-multi']}>
+            <Routes>
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      expect(await screen.findByText('Đã hết suất')).toBeInTheDocument()
+      expect(screen.getByText('GIÁ NIÊM YẾT CHÍNH HÃNG')).toBeInTheDocument()
+      expect(screen.getAllByText(/25\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText(/22\.990\.000\s*₫/)).not.toBeInTheDocument()
+    })
+
+    it('applies PD-4 rule: shows lower price between livePriceVnd and flashSale, and prefers live on ties', async () => {
+      const endsAt = new Date(Date.now() + 3600 * 1000).toISOString()
+      // Variant 128GB: flash (21.99M) < live (23.99M) -> Flash Sale wins
+      // Variant 256GB: flash (24.99M) == live (24.99M) -> Live wins (tie goes to live)
+      vi.mocked(catalogApi.getProduct).mockResolvedValue({
+        ...mockMultiVariantProduct,
+        variants: mockMultiVariantProduct.variants.map((v) => {
+          if (v.id === 'var-128-black') {
+            return {
+              ...v,
+              livePriceVnd: '23990000',
+              liveRemaining: 5,
+              flashSale: {
+                flashSaleId: 'fs-1',
+                campaignName: 'Flash Sale Giờ Vàng',
+                flashPriceVnd: '21990000',
+                quota: 20,
+                soldQuantity: 5,
+                endsAt,
+              },
+            }
+          }
+          if (v.id === 'var-256-black') {
+            return {
+              ...v,
+              livePriceVnd: '24990000',
+              liveRemaining: 3,
+              flashSale: {
+                flashSaleId: 'fs-1',
+                campaignName: 'Flash Sale Giờ Vàng',
+                flashPriceVnd: '24990000',
+                quota: 20,
+                soldQuantity: 5,
+                endsAt,
+              },
+            }
+          }
+          return v
+        }),
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/products/p-multi']}>
+            <Routes>
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      // 128GB: Flash Sale wins (21.990.000)
+      expect(await screen.findByTestId('pdp-flash-sale-box')).toBeInTheDocument()
+      expect(screen.getAllByText(/21\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText('Giá live')).not.toBeInTheDocument()
+
+      // Switch to 256GB: tie at 24.990.000 -> Live wins
+      fireEvent.click(screen.getByRole('button', { name: '256GB' }))
+      await waitFor(() => {
+        expect(screen.getByText('Giá live')).toBeInTheDocument()
+        expect(screen.getAllByText(/24\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+      })
+    })
+
+    it('falls back to live pricing when Flash Sale expires mid-view', async () => {
+      vi.useFakeTimers()
+      try {
+        const baseTime = new Date('2026-11-19T10:00:00.000Z')
+        vi.setSystemTime(baseTime)
+        const endsAt = new Date(baseTime.getTime() + 2500).toISOString()
+
+        vi.mocked(catalogApi.getProduct).mockResolvedValue({
+          ...mockMultiVariantProduct,
+          variants: mockMultiVariantProduct.variants.map((v) =>
+            v.id === 'var-128-black'
+              ? {
+                  ...v,
+                  livePriceVnd: '23990000',
+                  liveRemaining: 5,
+                  flashSale: {
+                    flashSaleId: 'fs-1',
+                    campaignName: 'Flash Sale Sắp Hết',
+                    flashPriceVnd: '21990000',
+                    quota: 20,
+                    soldQuantity: 5,
+                    endsAt,
+                  },
+                }
+              : v
+          ),
+        })
+
+        render(
+          <ToastProvider>
+            <MemoryRouter initialEntries={['/products/p-multi']}>
+              <Routes>
+                <Route path="/products/:id" element={<ProductDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </ToastProvider>
+        )
+
+        await act(async () => {
+          await Promise.resolve()
+          await Promise.resolve()
+        })
+
+        // Initially Flash Sale (21.990.000) wins over Live (23.990.000)
+        expect(screen.getByTestId('pdp-flash-sale-box')).toBeInTheDocument()
+        expect(screen.getAllByText(/21\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+        expect(screen.queryByText('Giá live')).not.toBeInTheDocument()
+
+        // Advance past endsAt so Flash Sale expires mid-view
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000)
+        })
+
+        // Flash sale box disappears and pricing falls back to Giá live (23.990.000), not regular (25.990.000)
+        expect(screen.queryByTestId('pdp-flash-sale-box')).not.toBeInTheDocument()
+        expect(screen.getByText('Giá live')).toBeInTheDocument()
+        expect(screen.getAllByText(/23\.990\.000\s*₫/).length).toBeGreaterThanOrEqual(1)
+        expect(screen.getByText('Còn 5 suất giá live')).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('Structured technical specs tab (Req 5.3)', () => {
+    it('renders actual product.specs groups and rows in order without simulated fallback specs', async () => {
+      vi.mocked(catalogApi.getProduct).mockResolvedValue({
+        ...mockMultiVariantProduct,
+        specs: [
+          {
+            group: 'Màn hình',
+            items: [
+              { label: 'Kích thước & Tấm nền', value: '6.3 inch, LTPO Super Retina XDR OLED' },
+              { label: 'Tần số quét', value: 'ProMotion 1–120Hz' },
+            ],
+          },
+          {
+            group: 'Hiệu năng & Chipset',
+            items: [{ label: 'Chipset', value: 'Apple A18 Pro (3nm)' }],
+          },
+        ],
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/products/p-multi']}>
+            <Routes>
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      expect(await screen.findByText('Màn hình')).toBeInTheDocument()
+      expect(screen.getByText('Kích thước & Tấm nền')).toBeInTheDocument()
+      expect(screen.getByText('6.3 inch, LTPO Super Retina XDR OLED')).toBeInTheDocument()
+      expect(screen.getByText('Tần số quét')).toBeInTheDocument()
+      expect(screen.getByText('ProMotion 1–120Hz')).toBeInTheDocument()
+      expect(screen.getByText('Hiệu năng & Chipset')).toBeInTheDocument()
+      expect(screen.getByText('Chipset')).toBeInTheDocument()
+      expect(screen.getByText('Apple A18 Pro (3nm)')).toBeInTheDocument()
+
+      // Simulated hardcoded strings from old getPhoneTechSpecs must NOT appear
+      expect(screen.queryByText(/Apple A18 Pro \(3nm thế hệ 2\) hiệu năng cao/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/6\.3" Super Retina XDR OLED 120Hz ProMotion/)).not.toBeInTheDocument()
+    })
+
+    it('renders clear Vietnamese empty state when product.specs is empty or undefined', async () => {
+      vi.mocked(catalogApi.getProduct).mockResolvedValue({
+        ...mockMultiVariantProduct,
+        specs: [],
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/products/p-multi']}>
+            <Routes>
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      expect(await screen.findByText(/chưa có thông số kỹ thuật/i)).toBeInTheDocument()
+      expect(screen.queryByText(/Apple A18 Pro \(3nm thế hệ 2\)/)).not.toBeInTheDocument()
+    })
+
+    it('toggles product in CompareContext when clicking So sánh button on ProductDetailPage (Req 5.4)', async () => {
+      window.sessionStorage.clear()
+      vi.mocked(catalogApi.getProduct).mockResolvedValue(mockMultiVariantProduct)
+
+      render(
+        <ToastProvider>
+          <CompareProvider>
+            <MemoryRouter initialEntries={['/products/p-multi']}>
+              <Routes>
+                <Route path="/products/:id" element={<ProductDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </CompareProvider>
+        </ToastProvider>
+      )
+
+      const compareBtn = await screen.findByRole('button', {
+        name: /Thêm iPhone 16 Pro vào so sánh/i,
+      })
+      expect(compareBtn).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(compareBtn)
+
+      await waitFor(() => {
+        const activeBtn = screen.getByRole('button', {
+          name: /Bỏ iPhone 16 Pro khỏi so sánh/i,
+        })
+        expect(activeBtn).toHaveAttribute('aria-pressed', 'true')
+        expect(JSON.parse(window.sessionStorage.getItem(COMPARE_STORAGE_KEY) || '[]')).toHaveLength(1)
+      })
     })
   })
 })

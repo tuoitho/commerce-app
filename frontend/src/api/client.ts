@@ -87,7 +87,9 @@ export async function fetchEnvelope<T>(path: string, options: RequestOptions = {
   // Handle 401 one-time refresh retry if unauthenticated
   const isAuthRoute = formattedPath.startsWith('/auth/login') ||
                       formattedPath.startsWith('/auth/register') ||
-                      formattedPath.startsWith('/auth/refresh')
+                      formattedPath.startsWith('/auth/refresh') ||
+                      formattedPath.startsWith('/auth/forgot-password') ||
+                      formattedPath.startsWith('/auth/reset-password')
 
   if (response.status === 401 && !skipAuthRefresh && !isAuthRoute) {
     const newToken = await refreshAccessToken()

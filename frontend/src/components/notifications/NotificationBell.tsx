@@ -496,7 +496,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
         type="button"
         data-testid="notification-bell-button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-900 transition-colors cursor-pointer"
+        className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-900 transition-colors cursor-pointer"
         aria-label="Thông báo"
         aria-expanded={isOpen}
       >

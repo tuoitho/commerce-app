@@ -81,12 +81,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast: addToast, success, error, info }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full px-4 sm:px-0 pointer-events-none">
+      <div className="fixed top-20 md:top-28 xl:top-40 right-4 left-4 sm:left-auto z-[60] flex flex-col gap-2 sm:max-w-md sm:w-full pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
+            data-testid="app-toast"
             className={cn(
-              'pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-lg border backdrop-blur-md bg-white/95 animate-fade-in transition-all',
+              'pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-lg border bg-white animate-fade-in transition-all',
               t.type === 'success' && 'border-emerald-200 text-emerald-950',
               t.type === 'error' && 'border-rose-200 text-rose-950',
               t.type === 'info' && 'border-blue-200 text-blue-950'
@@ -102,8 +103,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </div>
 
             <button
+              type="button"
               onClick={() => removeToast(t.id)}
-              className="text-slate-400 hover:text-slate-600 transition-colors p-1 -mr-1 -mt-1 rounded-lg"
+              aria-label="Đóng thông báo"
+              className="text-slate-400 hover:text-slate-600 transition-colors p-1 -mr-1 -mt-1 rounded-lg cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>

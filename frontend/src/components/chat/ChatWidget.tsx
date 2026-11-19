@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { MessageCircle, X, ShieldCheck, LogIn } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useCompare } from '@/context/CompareContext'
 import { useChatSocket } from '@/hooks/useChatSocket'
+import { isCompareTrayVisible } from '@/lib/compare'
 import {
   getConversation,
   markConversationRead,
@@ -16,8 +18,12 @@ import { ChatWindow } from './ChatWindow'
 
 export function ChatWidget() {
   const { isAuthenticated, accessToken } = useAuth()
+  const { items: compareItems, limitWarning: compareLimitWarning } = useCompare()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const compareTrayVisible = isCompareTrayVisible(location.pathname, compareItems.length)
+  const hasCompareWarning = Boolean(compareTrayVisible && compareLimitWarning)
 
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -125,7 +131,14 @@ export function ChatWidget() {
         <div
           role="dialog"
           aria-label="Cửa sổ trò chuyện hỗ trợ"
-          className="fixed bottom-24 right-6 z-50 flex h-[540px] max-h-[calc(100vh-8rem)] w-[380px] max-w-[calc(100vw-2rem)] sm:w-[400px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className={cn(
+            'fixed right-6 z-50 flex h-[540px] w-[380px] max-w-[calc(100vw-2rem)] sm:w-[400px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-4 duration-200',
+            compareTrayVisible
+              ? hasCompareWarning
+                ? 'bottom-64 lg:bottom-56 max-h-[calc(100vh-17rem)] lg:max-h-[calc(100vh-15rem)]'
+                : 'bottom-48 lg:bottom-44 max-h-[calc(100vh-13rem)] lg:max-h-[calc(100vh-12rem)]'
+              : 'bottom-24 max-h-[calc(100vh-8rem)]'
+          )}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3.5 shadow-xs">
@@ -207,7 +220,12 @@ export function ChatWidget() {
         aria-label={isOpen ? 'Đóng khung trò chuyện' : 'Mở khung trò chuyện hỗ trợ'}
         aria-expanded={isOpen}
         className={cn(
-          'fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2'
+          'fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2',
+          compareTrayVisible
+            ? hasCompareWarning
+              ? 'bottom-48 lg:bottom-40'
+              : 'bottom-32 lg:bottom-28'
+            : 'bottom-6'
         )}
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}

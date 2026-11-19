@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Lock, Mail, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ApiError } from '@/api/types'
@@ -8,8 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 
+interface LoginLocationState {
+  passwordResetSuccess?: boolean
+}
+
 export function LoginPage() {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const locationState = (location.state as LoginLocationState | null) ?? null
   const redirect = searchParams.get('redirect') || '/'
   const navigate = useNavigate()
   const { login } = useAuth()
@@ -78,6 +84,16 @@ export function LoginPage() {
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {locationState?.passwordResetSuccess && !errorMessage && (
+                <div
+                  role="status"
+                  className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium animate-fade-in"
+                >
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
+                  <span>Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.</span>
+                </div>
+              )}
+
               {errorMessage && (
                 <div className="flex items-center gap-2.5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium animate-fade-in">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -101,7 +117,15 @@ export function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-700">Mật khẩu</label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-zinc-700">Mật khẩu</label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-semibold text-emerald-700 hover:underline"
+                  >
+                    Quên mật khẩu?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                   <Input

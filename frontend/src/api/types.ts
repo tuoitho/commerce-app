@@ -67,6 +67,20 @@ export interface AuthMeResponse {
   user: User
 }
 
+export interface ForgotPasswordResponse {
+  cooldownSeconds: number
+}
+
+export interface ResetPasswordInput {
+  email: string
+  otp: string
+  newPassword: string
+}
+
+export interface ResetPasswordResponse {
+  reset: boolean
+}
+
 // Catalog
 export interface Category {
   id: string
@@ -75,6 +89,25 @@ export interface Category {
 
 export interface CategoriesResponse {
   categories: Category[]
+}
+
+export interface SpecItem {
+  label: string
+  value: string
+}
+
+export interface SpecGroup {
+  group: string
+  items: SpecItem[]
+}
+
+export interface VariantFlashSale {
+  flashSaleId: string
+  campaignName: string
+  flashPriceVnd: string
+  quota: number
+  soldQuantity: number
+  endsAt: string
 }
 
 export interface ProductSummary {
@@ -89,6 +122,9 @@ export interface ProductSummary {
   currency: string
   primaryImageUrl: string
   inStock: boolean
+  averageRating?: number
+  reviewCount?: number
+  soldCount?: number
 }
 
 export interface ProductsResponse {
@@ -117,6 +153,7 @@ export interface ProductVariant {
   livePriceVnd?: string | null
   /** Live-price quota left; null when unlimited or no live price. */
   liveRemaining?: number | null
+  flashSale?: VariantFlashSale | null
 }
 
 export interface ProductDetail {
@@ -136,11 +173,17 @@ export interface ProductDetail {
   featured: boolean
   optionGroups: OptionGroup[]
   variants: ProductVariant[]
+  specs?: SpecGroup[]
+  averageRating?: number
+  reviewCount?: number
+  soldCount?: number
   createdAt: string
   updatedAt: string
   adminReply?: string
   adminRepliedAt?: string
 }
+
+export type ProductSort = 'bestselling' | 'newest' | 'price_asc' | 'price_desc' | 'rating_desc'
 
 export interface ProductFilterParams {
   q?: string
@@ -149,8 +192,37 @@ export interface ProductFilterParams {
   min_price?: string
   max_price?: string
   in_stock?: 'true' | 'false' | boolean
+  sort?: ProductSort | '' | string
+  min_rating?: number | string
   page?: number
   limit?: number
+}
+
+// Flash Sales
+export type FlashSaleStatus = 'scheduled' | 'running' | 'ended' | 'inactive'
+
+export interface FlashSaleItem {
+  productId: string
+  variantId: string
+  productName: string
+  brand: string
+  model: string
+  imageUrl: string
+  optionLabel: string
+  regularPriceVnd: string
+  flashPriceVnd: string
+  discountPercent: number
+  quota: number
+  soldQuantity: number
+  inStock: boolean
+}
+
+export interface FlashSaleCampaign {
+  id: string
+  name: string
+  startsAt: string
+  endsAt: string
+  items: FlashSaleItem[]
 }
 
 // Cart
@@ -178,6 +250,8 @@ export interface CartItem {
   availability: CartAvailability
   /** unitPriceVnd is a live-session price. */
   isLivePrice?: boolean
+  /** unitPriceVnd is a flash-sale price. */
+  isFlashSalePrice?: boolean
 }
 
 export interface Cart {
@@ -458,6 +532,66 @@ export type PaymentMethod = 'cod' | 'momo'
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
+// Vouchers & Shipping
+export type VoucherType = 'percent' | 'fixed_amount' | 'freeship'
+
+export type VoucherEffectiveStatus = 'scheduled' | 'active' | 'exhausted' | 'expired' | 'inactive'
+
+export interface Voucher {
+  id: string
+  code: string
+  title: string
+  description: string
+  voucherType: VoucherType
+  discountValue: string
+  maxDiscountVnd: string | null
+  minOrderVnd: string
+  usageLimit: number | null
+  usedCount: number
+  perUserLimit: number
+  userRemainingUses?: number
+  startsAt: string
+  endsAt: string
+  active?: boolean
+  effectiveStatus?: VoucherEffectiveStatus
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type AvailableVoucher = Voucher & { userRemainingUses: number }
+
+export type DeliveryMethod = 'standard' | 'express_2h'
+
+export interface CheckoutQuoteInput {
+  addressId: string
+  deliveryMethod?: DeliveryMethod
+  voucherCode?: string
+}
+
+export interface CheckoutQuote {
+  subtotalVnd: string
+  deliveryMethod: DeliveryMethod
+  expressAvailable: boolean
+  standardShippingFeeVnd: string
+  expressShippingFeeVnd: string
+  freeShippingThresholdVnd: string
+  shippingFeeVnd: string
+  voucherCode: string | null
+  voucherType: VoucherType | null
+  discountVnd: string
+  totalVnd: string
+}
+
+export type OrderTimelineActorType = 'customer' | 'admin' | 'system'
+
+export interface OrderTimelineEvent {
+  id: string
+  status: OrderStatus
+  actorType: OrderTimelineActorType
+  note: string
+  createdAt: string
+}
+
 export interface Order {
   id: string
   userId: string
@@ -474,16 +608,29 @@ export interface Order {
   detailAddress: string
   subtotalVnd: string
   shippingFeeVnd: string
+  discountVnd?: string
+  voucherCode?: string | null
+  voucherType?: VoucherType | null
+  deliveryMethod?: DeliveryMethod
+  carrier?: string | null
+  trackingCode?: string | null
   totalVnd: string
   items: OrderItem[]
+  timeline?: OrderTimelineEvent[]
   createdAt: string
   updatedAt: string
   confirmedAt?: string | null
+  preparingAt?: string | null
+  shippedAt?: string | null
   cancelledAt?: string | null
   deliveredAt?: string | null
   cancellableUntil?: string | null
   returnEligibility?: ReturnEligibility | null
   latestReturnRequest?: ReturnRequest | null
+}
+
+export interface AdminOrder extends Order {
+  buyerEmail: string
 }
 
 export interface OrderStats {
@@ -503,7 +650,36 @@ export interface OrderLineInput {
 export interface CreateOrderInput {
   addressId: string
   paymentMethod?: PaymentMethod
+  deliveryMethod?: DeliveryMethod
+  voucherCode?: string
   lines: OrderLineInput[]
+}
+
+export interface ShipOrderInput {
+  carrier: string
+  trackingCode: string
+}
+
+export interface BuyAgainAdjustedItem {
+  variantId: string
+  productName: string
+  requestedQuantity: number
+  addedQuantity: number
+}
+
+export type BuyAgainSkipReason = 'out_of_stock' | 'unavailable'
+
+export interface BuyAgainSkippedItem {
+  variantId: string
+  productName: string
+  reason: BuyAgainSkipReason
+}
+
+export interface BuyAgainResult {
+  cart: Cart
+  addedCount: number
+  adjustedItems: BuyAgainAdjustedItem[]
+  skippedItems: BuyAgainSkippedItem[]
 }
 
 export interface MomoReturnPayload {

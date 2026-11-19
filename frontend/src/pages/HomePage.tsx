@@ -7,15 +7,19 @@ import {
   Clock,
   Smartphone,
   CheckCircle2,
+  Zap,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
-import type { ProductSummary, Category } from '@/api/types'
+import { flashSalesApi } from '@/api/flashSales'
+import type { ProductSummary, Category, FlashSaleCampaign } from '@/api/types'
+import { formatVND } from '@/lib/utils'
 import { ProductCard } from '@/components/ProductCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
 import { LiveBanner } from '@/components/live/LiveBanner'
 import { useCurrentLive } from '@/hooks/useCurrentLive'
+import { useCountdown } from '@/hooks/useCountdown'
 
 export function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<ProductSummary[]>([])
@@ -23,7 +27,9 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedBrandTab, setSelectedBrandTab] = useState<string>('all')
+  const [flashSale, setFlashSale] = useState<FlashSaleCampaign | null>(null)
   const currentLive = useCurrentLive()
+  const flashCountdown = useCountdown(flashSale?.endsAt)
 
   // Privilege allocation countdown timer
   const [timeLeft, setTimeLeft] = useState({ hours: 4, minutes: 35, seconds: 28 })
@@ -64,6 +70,28 @@ export function HomePage() {
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    if (typeof flashSalesApi.getCurrentFlashSale !== 'function') {
+      return
+    }
+    flashSalesApi
+      .getCurrentFlashSale()
+      .then((campaign) => {
+        if (active) {
+          setFlashSale(campaign)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFlashSale(null)
+        }
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
   const filteredProducts = useMemo(() => {
@@ -226,6 +254,117 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Category Index Bar */}
+      {flashSale && flashSale.items.length > 0 && !flashCountdown.isExpired && (
+        <section aria-label="Flash Sale" className="border-b border-zinc-200 bg-white py-10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-zinc-900 bg-zinc-950 p-5 sm:p-7 text-white space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-0.5 text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-950">
+                    <Zap className="h-3.5 w-3.5 fill-zinc-950" />
+                    <span>FLASH SALE</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+                    {flashSale.name}
+                  </h2>
+                </div>
+
+                <div
+                  data-testid="flash-sale-countdown"
+                  className="flex items-center gap-2.5 self-start sm:self-auto"
+                >
+                  <span className="text-xs font-medium text-zinc-400">Kết thúc sau</span>
+                  <div className="flex items-center gap-1.5 font-mono text-sm sm:text-base font-bold tabular-nums">
+                    <span className="rounded-lg bg-zinc-800 px-2.5 py-1.5 text-white border border-zinc-700">
+                      {String(flashCountdown.hours).padStart(2, '0')}
+                    </span>
+                    <span className="text-zinc-500">:</span>
+                    <span className="rounded-lg bg-zinc-800 px-2.5 py-1.5 text-white border border-zinc-700">
+                      {String(flashCountdown.minutes).padStart(2, '0')}
+                    </span>
+                    <span className="text-zinc-500">:</span>
+                    <span className="rounded-lg bg-zinc-800 px-2.5 py-1.5 text-amber-400 border border-zinc-700">
+                      {String(flashCountdown.seconds).padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {flashSale.items.map((item) => {
+                  const isSoldOut = item.soldQuantity >= item.quota
+                  const progressPct =
+                    item.quota > 0
+                      ? Math.min(100, Math.round((item.soldQuantity / item.quota) * 100))
+                      : 100
+                  return (
+                    <Link
+                      key={item.variantId}
+                      to={`/products/${item.productId}`}
+                      className="group flex flex-col justify-between rounded-xl bg-white p-4 text-zinc-950 border border-zinc-800/40 transition-all hover:border-amber-400"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                            {item.brand}
+                          </span>
+                          <span className="rounded-md bg-rose-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
+                            -{item.discountPercent}%
+                          </span>
+                        </div>
+
+                        <div className="flex h-40 w-full items-center justify-center rounded-lg bg-[#f7f7f5] p-3 overflow-hidden">
+                          <img
+                            src={item.imageUrl || '/iphone-16-pro.jpg'}
+                            alt={item.productName}
+                            className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </div>
+
+                        <h3 className="mt-3 text-sm font-bold text-zinc-950 line-clamp-1 group-hover:text-emerald-700 transition-colors">
+                          {item.productName}
+                        </h3>
+                        <p className="text-[11px] text-zinc-500 line-clamp-1 mt-0.5">
+                          {item.optionLabel}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-zinc-100 space-y-2.5">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span className="font-mono text-base font-bold text-rose-600 tabular-nums">
+                            {formatVND(item.flashPriceVnd)}
+                          </span>
+                          <span className="font-mono text-xs text-zinc-400 line-through tabular-nums">
+                            {formatVND(item.regularPriceVnd)}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                isSoldOut ? 'bg-zinc-400' : 'bg-rose-600'
+                              }`}
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-semibold">
+                            <span className={isSoldOut ? 'text-zinc-500' : 'text-rose-700'}>
+                              {isSoldOut ? 'Đã hết suất' : `Đã bán ${item.soldQuantity}/${item.quota}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Category Index Bar */}
       {categories.length > 0 && (

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { CatalogPage } from './CatalogPage'
 import { catalogApi } from '@/api/catalog'
 import type { ProductSummary, ProductFilterParams } from '@/api/types'
@@ -497,6 +497,163 @@ describe('CatalogPage', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Apple')).toBeInTheDocument()
       expect(screen.getByLabelText('Samsung')).toBeInTheDocument()
+    })
+  })
+
+  it('deep linking with sort and min_rating initializes desktop/mobile sort selects and requests server-side filtered/sorted products (Req 6.5)', async () => {
+    vi.mocked(catalogApi.listProductsWithMeta).mockResolvedValue({
+      data: [],
+      meta: {
+        timestamp: '2026-08-16T00:00:00.000Z',
+        pagination: { page: 1, limit: 6, total: 0, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: '',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/products?sort=bestselling&min_rating=4']}>
+        <CatalogPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(catalogApi.listProductsWithMeta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sort: 'bestselling',
+          min_rating: '4',
+        })
+      )
+    })
+
+    expect(screen.getByTestId('desktop-sort-select')).toHaveValue('bestselling')
+    expect(screen.getByTestId('mobile-sort-select')).toHaveValue('bestselling')
+    expect(screen.getByRole('button', { name: /Từ 4 sao/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('changing desktop and mobile sort controls syncs URL, resets page to 1, and preserves server order without client-side sorting (Req 6.5)', async () => {
+    function LocationReader() {
+      const loc = useLocation()
+      return <div data-testid="catalog-url">{loc.pathname + loc.search}</div>
+    }
+
+    vi.mocked(catalogApi.listProductsWithMeta).mockResolvedValue({
+      data: [
+        {
+          id: 'p-expensive',
+          name: 'Expensive First From Server',
+          model: 'M1',
+          brand: 'Apple',
+          category: { id: 'cat-phone', name: 'Điện thoại' },
+          minPriceVnd: '39990000',
+          maxPriceVnd: '39990000',
+          price: '39990000',
+          currency: 'VND',
+          primaryImageUrl: '',
+          inStock: true,
+        },
+        {
+          id: 'p-cheap',
+          name: 'Cheap Second From Server',
+          model: 'M2',
+          brand: 'Apple',
+          category: { id: 'cat-phone', name: 'Điện thoại' },
+          minPriceVnd: '10990000',
+          maxPriceVnd: '10990000',
+          price: '10990000',
+          currency: 'VND',
+          primaryImageUrl: '',
+          inStock: true,
+        },
+      ],
+      meta: {
+        timestamp: '2026-08-16T00:00:00.000Z',
+        pagination: { page: 1, limit: 6, total: 2, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: '',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/products?page=2']}>
+        <CatalogPage />
+        <LocationReader />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Expensive First From Server')).toBeInTheDocument()
+    })
+
+    // Desktop sort change to price_asc -> resets page=1 and updates URL & mobile select
+    fireEvent.change(screen.getByTestId('desktop-sort-select'), { target: { value: 'price_asc' } })
+
+    await waitFor(() => {
+      expect(catalogApi.listProductsWithMeta).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sort: 'price_asc',
+          page: 1,
+        })
+      )
+      expect(screen.getByTestId('catalog-url')).toHaveTextContent('/products?sort=price_asc')
+      expect(screen.getByTestId('mobile-sort-select')).toHaveValue('price_asc')
+    })
+
+    // Must preserve server order (no local client-side sorting of the page slice)
+    const productHeadings = within(screen.getByRole('main'))
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent)
+    expect(productHeadings).toEqual(['Expensive First From Server', 'Cheap Second From Server'])
+
+    // Mobile sort change to rating_desc -> syncs URL and desktop select
+    fireEvent.change(screen.getByTestId('mobile-sort-select'), { target: { value: 'rating_desc' } })
+
+    await waitFor(() => {
+      expect(catalogApi.listProductsWithMeta).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sort: 'rating_desc',
+          page: 1,
+        })
+      )
+      expect(screen.getByTestId('catalog-url')).toHaveTextContent('/products?sort=rating_desc')
+      expect(screen.getByTestId('desktop-sort-select')).toHaveValue('rating_desc')
+    })
+  })
+
+  it('selecting min_rating filter syncs URL searchParams and resets page to 1 (Req 6.5)', async () => {
+    function LocationReader() {
+      const loc = useLocation()
+      return <div data-testid="catalog-url">{loc.pathname + loc.search}</div>
+    }
+
+    vi.mocked(catalogApi.listProductsWithMeta).mockResolvedValue({
+      data: [],
+      meta: {
+        timestamp: '2026-08-16T00:00:00.000Z',
+        pagination: { page: 1, limit: 6, total: 0, totalPages: 1, hasNext: false, hasPrev: false },
+      },
+      message: '',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/products?page=3']}>
+        <CatalogPage />
+        <LocationReader />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Từ 4 sao/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Từ 4 sao/i }))
+
+    await waitFor(() => {
+      expect(catalogApi.listProductsWithMeta).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          min_rating: '4',
+          page: 1,
+        })
+      )
+      expect(screen.getByTestId('catalog-url')).toHaveTextContent('/products?min_rating=4')
     })
   })
 })

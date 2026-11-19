@@ -94,4 +94,44 @@ describe('catalogApi', () => {
     expect(result.data).toEqual([])
     expect(result.meta.pagination?.limit).toBe(6)
   })
+
+  it('listProductsWithMeta forwards sort and min_rating query parameters', async () => {
+    const mockResponse = {
+      success: true,
+      message: '',
+      data: [],
+      error: null,
+      meta: {
+        timestamp: '2026-08-18T00:00:00.000Z',
+        pagination: {
+          page: 1,
+          limit: 6,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await catalogApi.listProductsWithMeta({
+      q: 'iphone',
+      sort: 'bestselling',
+      min_rating: 4,
+      page: 1,
+      limit: 6,
+    })
+
+    const calledUrl = fetchMock.mock.calls[0][0] as string
+    expect(calledUrl).toContain('q=iphone')
+    expect(calledUrl).toContain('sort=bestselling')
+    expect(calledUrl).toContain('min_rating=4')
+  })
 })

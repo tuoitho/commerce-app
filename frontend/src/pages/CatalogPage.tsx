@@ -8,9 +8,10 @@ import {
   PackageSearch,
   ChevronRight,
   ChevronLeft,
+  Star,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
-import type { ProductSummary, Category, PaginationMeta } from '@/api/types'
+import type { ProductSummary, Category, PaginationMeta, ProductSort } from '@/api/types'
 import { ProductCard } from '@/components/ProductCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,24 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from '@/components/EmptyState'
 
 const PAGE_SIZE = 6
+
+const SORT_OPTIONS: { value: '' | ProductSort; label: string }[] = [
+  { value: '', label: 'Mặc định (A-Z)' },
+  { value: 'bestselling', label: 'Bán chạy nhất' },
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'price_asc', label: 'Giá: Thấp đến Cao' },
+  { value: 'price_desc', label: 'Giá: Cao đến Thấp' },
+  { value: 'rating_desc', label: 'Đánh giá cao nhất' },
+]
+
+const VALID_SORTS = new Set<string>(['bestselling', 'newest', 'price_asc', 'price_desc', 'rating_desc'])
+
+const RATING_PRESETS = [
+  { value: '4', label: 'Từ 4 sao' },
+  { value: '3', label: 'Từ 3 sao' },
+  { value: '2', label: 'Từ 2 sao' },
+  { value: '1', label: 'Từ 1 sao' },
+]
 
 const PRICE_PRESETS = [
   { label: 'Dưới 5 triệu', min: '', max: '5000000' },
@@ -66,7 +85,6 @@ export function CatalogPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc'>('default')
 
   const querySearch = searchParams.get('q') || ''
   const selectedCategoryIds = useMemo(() => searchParams.getAll('category_id'), [searchParams])
@@ -77,6 +95,14 @@ export function CatalogPage() {
   const queryMinPrice = searchParams.get('min_price') || ''
   const queryMaxPrice = searchParams.get('max_price') || ''
   const queryInStock = searchParams.get('in_stock') === 'true'
+  const rawSort = searchParams.get('sort') || ''
+  const querySort = VALID_SORTS.has(rawSort) ? rawSort : ''
+  const rawMinRating = searchParams.get('min_rating') || ''
+  const parsedRating = Number(rawMinRating)
+  const queryMinRating =
+    rawMinRating !== '' && Number.isFinite(parsedRating) && parsedRating >= 1 && parsedRating <= 5
+      ? rawMinRating
+      : ''
 
   const pageParam = parseInt(searchParams.get('page') || '1', 10)
   const currentPage = Number.isInteger(pageParam) && pageParam >= 1 ? pageParam : 1
@@ -133,6 +159,8 @@ export function CatalogPage() {
         min_price: queryMinPrice || undefined,
         max_price: queryMaxPrice || undefined,
         in_stock: queryInStock ? 'true' : undefined,
+        sort: querySort || undefined,
+        min_rating: queryMinRating || undefined,
         page: currentPage,
         limit: PAGE_SIZE,
       })
@@ -156,7 +184,7 @@ export function CatalogPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [querySearch, selectedCategoryIds, selectedBrands, queryMinPrice, queryMaxPrice, queryInStock, currentPage])
+  }, [querySearch, selectedCategoryIds, selectedBrands, queryMinPrice, queryMaxPrice, queryInStock, querySort, queryMinRating, currentPage])
 
   useEffect(() => {
     fetchProducts()
@@ -252,6 +280,33 @@ export function CatalogPage() {
     setSearchParams(newParams)
   }
 
+  const handleSortChange = (nextSort: string) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev)
+      newParams.delete('page')
+      if (nextSort && VALID_SORTS.has(nextSort)) {
+        newParams.set('sort', nextSort)
+      } else {
+        newParams.delete('sort')
+      }
+      return newParams
+    })
+  }
+
+  const handleMinRatingToggle = (ratingValue: string) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev)
+      newParams.delete('page')
+      const current = newParams.get('min_rating') || ''
+      if (current === ratingValue) {
+        newParams.delete('min_rating')
+      } else {
+        newParams.set('min_rating', ratingValue)
+      }
+      return newParams
+    })
+  }
+
   const handleClearFilters = () => {
     setSearchInput('')
     setMinPriceInput('')
@@ -277,17 +332,9 @@ export function CatalogPage() {
     selectedBrands.length > 0 ||
     Boolean(queryMinPrice) ||
     Boolean(queryMaxPrice) ||
-    queryInStock
-
-  const sortedProducts = useMemo(() => {
-    const list = [...products]
-    if (sortBy === 'price-asc') {
-      list.sort((a, b) => Number(a.minPriceVnd || a.price || 0) - Number(b.minPriceVnd || b.price || 0))
-    } else if (sortBy === 'price-desc') {
-      list.sort((a, b) => Number(b.minPriceVnd || b.price || 0) - Number(a.minPriceVnd || a.price || 0))
-    }
-    return list
-  }, [products, sortBy])
+    queryInStock ||
+    Boolean(queryMinRating) ||
+    Boolean(querySort)
 
   return (
     <div className="min-h-screen bg-[#f7f7f5] pb-20">
@@ -353,20 +400,35 @@ export function CatalogPage() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Mobile Filter Toggle & Results Count */}
-        <div className="lg:hidden flex items-center justify-between gap-4 mb-6">
+        {/* Mobile Filter Toggle, Sort & Results Count */}
+        <div className="lg:hidden flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="text-sm font-bold text-zinc-800">
             {isLoading ? 'Đang tải...' : `${pagination.total} sản phẩm`}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="gap-2 rounded-xl font-semibold"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>Bộ lọc {hasActiveFilters ? '(Đang lọc)' : ''}</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <select
+              data-testid="mobile-sort-select"
+              value={querySort}
+              onChange={(e) => handleSortChange(e.target.value)}
+              aria-label="Sắp xếp trên di động"
+              className="h-9 px-2.5 text-xs font-semibold rounded-xl border border-zinc-200 bg-white text-zinc-800 outline-none focus:border-zinc-900"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value || 'default'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="gap-2 rounded-xl font-semibold h-9"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Bộ lọc {hasActiveFilters ? '(Đang lọc)' : ''}</span>
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -599,6 +661,53 @@ export function CatalogPage() {
               </form>
             </div>
 
+            {/* Filter Section: Minimum Rating */}
+            <div className="rounded-2xl border border-zinc-200 bg-white p-5 space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 block">
+                    05 / RATING
+                  </span>
+                  <h3 className="font-bold text-sm text-zinc-950">Đánh giá tối thiểu</h3>
+                </div>
+                {queryMinRating && (
+                  <button
+                    type="button"
+                    onClick={() => handleMinRatingToggle(queryMinRating)}
+                    className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {RATING_PRESETS.map((preset) => {
+                  const isSelected = queryMinRating === preset.value
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => handleMinRatingToggle(preset.value)}
+                      className={`flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-zinc-950 text-white border-zinc-950'
+                          : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-zinc-400'
+                      }`}
+                    >
+                      <Star
+                        className={`h-3.5 w-3.5 ${
+                          isSelected ? 'fill-amber-400 text-amber-400' : 'fill-amber-400 text-amber-400'
+                        }`}
+                      />
+                      <span>{preset.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -639,14 +748,17 @@ export function CatalogPage() {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-500 font-medium">Sắp xếp:</span>
                 <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  data-testid="desktop-sort-select"
+                  value={querySort}
+                  onChange={(e) => handleSortChange(e.target.value)}
                   aria-label="Sắp xếp theo"
                   className="h-9 px-3 text-xs font-semibold rounded-xl border border-zinc-200 bg-white text-zinc-800 outline-none focus:border-zinc-900"
                 >
-                  <option value="default">Nổi bật nhất</option>
-                  <option value="price-asc">Giá: Thấp đến Cao</option>
-                  <option value="price-desc">Giá: Cao đến Thấp</option>
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value || 'default'} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
                 {hasActiveFilters && (
                   <button
@@ -693,7 +805,7 @@ export function CatalogPage() {
             )}
 
             {/* Empty State */}
-            {!isLoading && !error && sortedProducts.length === 0 && (
+            {!isLoading && !error && products.length === 0 && (
               <EmptyState
                 icon={<PackageSearch className="h-7 w-7 text-zinc-500" />}
                 title="Không tìm thấy sản phẩm"
@@ -704,10 +816,10 @@ export function CatalogPage() {
             )}
 
             {/* Products List & Pagination */}
-            {!isLoading && !error && sortedProducts.length > 0 && (
+            {!isLoading && !error && products.length > 0 && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {sortedProducts.map((p) => (
+                  {products.map((p) => (
                     <ProductCard key={p.id} product={p} />
                   ))}
                 </div>

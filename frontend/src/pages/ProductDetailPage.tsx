@@ -10,17 +10,13 @@ import {
   Smartphone,
   ChevronRight,
   CreditCard,
-  Layers,
-  Cpu,
-  Camera,
-  BatteryCharging,
-  Wifi,
   Sparkles,
   Share2,
   CheckCircle2,
   PhoneCall,
   Clock,
   Star,
+  Zap,
 } from 'lucide-react'
 import { catalogApi } from '@/api/catalog'
 import { ApiError } from '@/api/types'
@@ -32,10 +28,13 @@ import type {
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
+import { useCountdown } from '@/hooks/useCountdown'
+import { getVariantEffectivePricing } from '@/lib/pricing'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FavoriteToggleButton } from '@/components/FavoriteToggleButton'
+import { CompareToggleButton } from '@/components/CompareToggleButton'
 import { ProductReviewsSection } from '@/components/ProductReviewsSection'
 
 function formatVND(value: string | number): string {
@@ -59,42 +58,6 @@ function getColorCode(label: string): string {
   if (l.includes('hồng') || l.includes('pink') || l.includes('rose')) return '#f43f5e'
   if (l.includes('cam') || l.includes('orange')) return '#f97316'
   return '#71717a'
-}
-
-function getPhoneTechSpecs(name: string = '', model: string = '') {
-  const isIPhone = name.toLowerCase().includes('iphone') || model.toLowerCase().includes('a3')
-  const isXiaomi = name.toLowerCase().includes('xiaomi') || name.toLowerCase().includes('redmi')
-
-  if (isIPhone) {
-    return [
-      { icon: Smartphone, label: 'Màn hình', value: '6.3" Super Retina XDR OLED 120Hz ProMotion' },
-      { icon: Cpu, label: 'Vi xử lý', value: 'Apple A18 Pro (3nm thế hệ 2) hiệu năng cao' },
-      { icon: Camera, label: 'Camera sau', value: 'Bộ 3 camera 48MP Fusion + 48MP Ultra Wide + 12MP Tele 5x' },
-      { icon: BatteryCharging, label: 'Pin & Sạc', value: 'Thời lượng pin lên đến 27h, Sạc nhanh MagSafe 25W' },
-      { icon: Layers, label: 'Chất liệu khung', value: 'Titanium cấp 5 hàng không vũ trụ siêu nhẹ & bền' },
-      { icon: Wifi, label: 'Kết nối mạng', value: '5G tốc độ cao, Wi-Fi 7 MIMO, Bluetooth 5.3' },
-    ]
-  }
-
-  if (isXiaomi) {
-    return [
-      { icon: Smartphone, label: 'Màn hình', value: '6.36" LTPO OLED 1.5K 120Hz, độ sáng 3000 nits' },
-      { icon: Cpu, label: 'Vi xử lý', value: 'Snapdragon 8 Elite (3nm) đồ họa Adreno cực đại' },
-      { icon: Camera, label: 'Camera sau', value: 'Ống kính quang học Leica Summilux 50MP + 50MP Tele' },
-      { icon: BatteryCharging, label: 'Pin & Sạc', value: '5400mAh Silicon-Carbon, Sạc nhanh HyperCharge 90W' },
-      { icon: Layers, label: 'Kháng nước', value: 'Chuẩn chống nước và bụi cao cấp IP68' },
-      { icon: Wifi, label: 'Kết nối mạng', value: '5G Kép, Wi-Fi 7 tốc độ cao, NFC đa năng' },
-    ]
-  }
-
-  return [
-    { icon: Smartphone, label: 'Màn hình', value: 'OLED Full HD+ 120Hz mượt mà' },
-    { icon: Cpu, label: 'Vi xử lý', value: 'Chip 8 nhân hiệu năng cao tối ưu đa nhiệm' },
-    { icon: Camera, label: 'Camera', value: 'Cảm biến chính AI 50MP chống rung quang học OIS' },
-    { icon: BatteryCharging, label: 'Pin & Sạc', value: '5000mAh hỗ trợ sạc nhanh thông minh' },
-    { icon: Layers, label: 'Thiết kế', value: 'Khung viền kim loại cao cấp, kính cường lực' },
-    { icon: Wifi, label: 'Kết nối', value: 'Hỗ trợ 5G tốc độ cao & Wi-Fi băng tần kép' },
-  ]
 }
 
 export function ProductDetailPage() {
@@ -160,10 +123,35 @@ export function ProductDetailPage() {
   }, [product, selectedOptions])
 
   const livePriceVnd = selectedVariant?.livePriceVnd ?? null
+  const flashSale = selectedVariant?.flashSale ?? null
+  const flashCountdown = useCountdown(flashSale?.endsAt)
+  const variantPricing = useMemo(() => {
+    const endMs = flashSale?.endsAt ? new Date(flashSale.endsAt).getTime() : NaN
+    const nowMs =
+      flashCountdown.isExpired && !Number.isNaN(endMs)
+        ? Math.max(Date.now(), endMs)
+        : Date.now()
+    return getVariantEffectivePricing(selectedVariant, nowMs)
+  }, [selectedVariant, flashSale?.endsAt, flashCountdown.isExpired])
+  const isFlashSaleRunning = Boolean(flashSale && !flashCountdown.isExpired)
+  const isFlashSaleSoldOut = variantPricing.isFlashSaleSoldOut
+  const activePromoSource = variantPricing.source
+
+  const numericPrice = useMemo(() => {
+    if (activePromoSource === 'live' && livePriceVnd) return Number(livePriceVnd)
+    if (activePromoSource === 'flash_sale' && flashSale) return Number(flashSale.flashPriceVnd)
+    if (selectedVariant && selectedVariant.priceVnd) return Number(selectedVariant.priceVnd)
+    if (product?.price) return Number(product.price)
+    if (product?.minPriceVnd) return Number(product.minPriceVnd)
+    return 0
+  }, [activePromoSource, livePriceVnd, flashSale, selectedVariant, product])
 
   const displayedPrice = useMemo(() => {
-    if (selectedVariant?.livePriceVnd) {
-      return formatVND(selectedVariant.livePriceVnd)
+    if (activePromoSource === 'live' && livePriceVnd) {
+      return formatVND(livePriceVnd)
+    }
+    if (activePromoSource === 'flash_sale' && flashSale) {
+      return formatVND(flashSale.flashPriceVnd)
     }
     if (selectedVariant && selectedVariant.priceVnd) {
       return formatVND(selectedVariant.priceVnd)
@@ -175,15 +163,7 @@ export function ProductDetailPage() {
       return formatVND(product.minPriceVnd)
     }
     return '0 ₫'
-  }, [selectedVariant, product])
-
-  const numericPrice = useMemo(() => {
-    if (selectedVariant?.livePriceVnd) return Number(selectedVariant.livePriceVnd)
-    if (selectedVariant && selectedVariant.priceVnd) return Number(selectedVariant.priceVnd)
-    if (product?.price) return Number(product.price)
-    if (product?.minPriceVnd) return Number(product.minPriceVnd)
-    return 0
-  }, [selectedVariant, product])
+  }, [activePromoSource, livePriceVnd, flashSale, selectedVariant, product])
 
   const monthlyInstallment = useMemo(() => {
     if (!numericPrice || numericPrice <= 0) return 0
@@ -315,7 +295,7 @@ export function ProductDetailPage() {
   }
 
   const images = product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : []
-  const techSpecs = getPhoneTechSpecs(product.name, product.model)
+  const specs = product.specs ?? []
 
   return (
     <div className="min-h-screen bg-[#f7f7f5] pb-28">
@@ -497,7 +477,7 @@ export function ProductDetailPage() {
             {/* Editorial Price Ledger Card */}
             <div className="p-5 rounded-2xl bg-white border border-zinc-200 space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                {livePriceVnd && selectedVariant ? (
+                {activePromoSource === 'live' && selectedVariant ? (
                   <div>
                     <span className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                       <span className="live-pulse-dot h-1.5 w-1.5 rounded-full bg-white" />
@@ -516,6 +496,21 @@ export function ProductDetailPage() {
                         Còn {selectedVariant.liveRemaining} suất giá live
                       </span>
                     )}
+                  </div>
+                ) : activePromoSource === 'flash_sale' && selectedVariant && flashSale ? (
+                  <div>
+                    <span className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-950">
+                      <Zap className="h-3 w-3 fill-zinc-950" />
+                      Flash Sale
+                    </span>
+                    <div className="flex flex-wrap items-baseline gap-x-3">
+                      <span className="font-mono text-3xl sm:text-4xl font-bold text-rose-600 tracking-tight tabular-nums">
+                        {displayedPrice}
+                      </span>
+                      <span data-testid="pdp-regular-price" className="font-mono text-base text-zinc-400 line-through tabular-nums">
+                        {formatVND(selectedVariant.priceVnd)}
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -541,6 +536,56 @@ export function ProductDetailPage() {
                   </span>
                 )}
               </div>
+
+              {isFlashSaleRunning && flashSale && (
+                <div
+                  data-testid="pdp-flash-sale-box"
+                  className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 space-y-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-950">
+                      <Zap className="h-3.5 w-3.5 text-amber-600 fill-amber-500 shrink-0" />
+                      <span>{flashSale.campaignName}</span>
+                    </div>
+                    <div
+                      data-testid="pdp-flash-sale-countdown"
+                      className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-zinc-950 tabular-nums"
+                    >
+                      <span className="font-sans text-[11px] font-medium text-zinc-600">Kết thúc sau</span>
+                      <span className="rounded-md bg-zinc-950 px-2 py-0.5 text-amber-400">
+                        {flashCountdown.formatted}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-amber-200/70">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          isFlashSaleSoldOut ? 'bg-zinc-400' : 'bg-rose-600'
+                        }`}
+                        style={{
+                          width: `${
+                            flashSale.quota > 0
+                              ? Math.min(100, Math.round((flashSale.soldQuantity / flashSale.quota) * 100))
+                              : 100
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className={isFlashSaleSoldOut ? 'text-zinc-600' : 'text-rose-700'}>
+                        {isFlashSaleSoldOut
+                          ? 'Đã hết suất'
+                          : `Đã bán ${flashSale.soldQuantity}/${flashSale.quota}`}
+                      </span>
+                      {activePromoSource === 'live' && (
+                        <span className="text-rose-600">Đang áp dụng Giá live tốt hơn</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {monthlyInstallment > 0 && (
                 <div className="flex items-center justify-between text-xs text-zinc-600 pt-2.5 border-t border-zinc-100">
@@ -683,6 +728,12 @@ export function ProductDetailPage() {
                   showText
                   className="flex-1 h-11 rounded-xl text-xs sm:text-sm font-semibold border-zinc-200 bg-white hover:bg-zinc-50"
                 />
+                <CompareToggleButton
+                  product={product}
+                  showText
+                  size="default"
+                  className="flex-1 h-11 rounded-xl text-xs sm:text-sm font-semibold"
+                />
               </div>
 
               <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 px-1">
@@ -737,28 +788,48 @@ export function ProductDetailPage() {
           </div>
 
           {activeTab === 'specs' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-              {techSpecs.map((spec, i) => {
-                const Icon = spec.icon
-                return (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3.5 p-4 rounded-xl bg-zinc-50 border border-zinc-200/80"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-zinc-900 shrink-0 mt-0.5 border border-zinc-200">
-                      <Icon className="h-4 w-4" />
+            <div className="animate-fade-in">
+              {specs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-[#f7f7f5]/60 px-6 py-10 text-center">
+                  <Smartphone className="h-7 w-7 text-zinc-400 mb-2.5" />
+                  <p className="text-sm font-semibold text-zinc-800">
+                    Sản phẩm này chưa có thông số kỹ thuật chi tiết.
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Thông số cấu hình sẽ được cập nhật sớm từ nhà sản xuất.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {specs.map((specGroup, groupIndex) => (
+                    <div
+                      key={`${specGroup.group}-${groupIndex}`}
+                      className="rounded-xl border border-zinc-200 bg-[#f7f7f5]/50 overflow-hidden"
+                    >
+                      <div className="border-b border-zinc-200 bg-zinc-950 px-4 py-2.5">
+                        <h3 className="font-mono text-[11px] font-bold uppercase tracking-widest text-emerald-400">
+                          {specGroup.group}
+                        </h3>
+                      </div>
+                      <dl className="divide-y divide-zinc-200/80 bg-white">
+                        {specGroup.items.map((item, itemIndex) => (
+                          <div
+                            key={`${item.label}-${itemIndex}`}
+                            className="grid grid-cols-12 gap-3 px-4 py-3 text-xs sm:text-sm"
+                          >
+                            <dt className="col-span-5 font-medium text-zinc-500">
+                              {item.label}
+                            </dt>
+                            <dd className="col-span-7 font-semibold text-zinc-950">
+                              {item.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
                     </div>
-                    <div>
-                      <span className="font-mono text-[10px] font-semibold text-zinc-400 block uppercase tracking-widest">
-                        {spec.label}
-                      </span>
-                      <span className="text-xs sm:text-sm font-semibold text-zinc-900 mt-0.5 block">
-                        {spec.value}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

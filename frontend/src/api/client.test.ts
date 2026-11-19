@@ -279,5 +279,34 @@ describe('apiClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(tokenStore.getToken()).toBeNull()
   })
+
+  it('skips 401 token refresh for /auth/forgot-password and /auth/reset-password', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        success: false,
+        message: 'Unauthorized',
+        data: null,
+        error: { code: 'unauthorized', message: 'Unauthorized' },
+        meta: { timestamp: '2026-11-18T00:00:00Z' },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      apiClient('/auth/forgot-password', { method: 'POST', body: { email: 'a@b.com' } })
+    ).rejects.toThrow(ApiError)
+    await expect(
+      apiClient('/auth/reset-password', {
+        method: 'POST',
+        body: { email: 'a@b.com', otp: '123456', newPassword: 'Password123!' },
+      })
+    ).rejects.toThrow(ApiError)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0][0]).toContain('/auth/forgot-password')
+    expect(fetchMock.mock.calls[1][0]).toContain('/auth/reset-password')
+  })
 })
 

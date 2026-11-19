@@ -4,19 +4,21 @@ import { MemoryRouter } from 'react-router-dom'
 import { ChatWidget } from './ChatWidget'
 import { formatRelativeTime, formatUnreadCount } from '@/lib/chatUtils'
 import * as AuthContextModule from '@/context/AuthContext'
+import { CompareProvider, COMPARE_STORAGE_KEY, useCompare } from '@/context/CompareContext'
 import * as chatApiModule from '@/api/chat'
 
-// Mock useNavigate
+// Mock useNavigate & useLocation
 const mockNavigate = vi.fn()
+let mockLocationState = {
+  pathname: '/products/laptop-1',
+  search: '?color=silver',
+}
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    useLocation: () => ({
-      pathname: '/products/laptop-1',
-      search: '?color=silver',
-    }),
+    useLocation: () => mockLocationState,
   }
 })
 
@@ -115,6 +117,11 @@ describe('ChatWidget', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
+    window.sessionStorage.clear()
+    mockLocationState = {
+      pathname: '/products/laptop-1',
+      search: '?color=silver',
+    }
     MockWebSocket.instances = []
     vi.stubGlobal('WebSocket', MockWebSocket)
     mockNavigate.mockClear()
@@ -478,5 +485,117 @@ describe('ChatWidget', () => {
       expect(screen.getByTestId('attached-order-preview')).toBeInTheDocument()
       expect(screen.getByText(/ord-event-999/i)).toBeInTheDocument()
     })
+  })
+
+  it('lifts launcher and popup dialog above CompareTray when compare items are present', () => {
+    window.sessionStorage.setItem(
+      COMPARE_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: 'prod-1',
+          name: 'iPhone 16 Pro',
+          brand: 'Apple',
+          primaryImageUrl: 'https://example.com/p1.jpg',
+          minPriceVnd: '28990000',
+        },
+      ])
+    )
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: null,
+      role: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    render(
+      <CompareProvider>
+        <MemoryRouter>
+          <ChatWidget />
+        </MemoryRouter>
+      </CompareProvider>
+    )
+
+    const launcher = screen.getByRole('button', { name: /khung trò chuyện/i })
+    expect(launcher.className).not.toContain('bottom-6')
+    expect(launcher.className).toContain('bottom-32')
+    expect(launcher.className).toContain('lg:bottom-28')
+
+    fireEvent.click(launcher)
+    const dialog = screen.getByRole('dialog', { name: /Cửa sổ trò chuyện hỗ trợ/i })
+    expect(dialog.className).not.toContain('bottom-24')
+    expect(dialog.className).toContain('bottom-48')
+    expect(dialog.className).toContain('lg:bottom-44')
+  })
+
+  it('lifts launcher further when CompareTray shows a limitWarning and stays at bottom-6 on /compare', () => {
+    window.sessionStorage.setItem(
+      COMPARE_STORAGE_KEY,
+      JSON.stringify([
+        { id: 'p-1', name: 'Phone 1', brand: 'A', primaryImageUrl: '', minPriceVnd: '10000000' },
+        { id: 'p-2', name: 'Phone 2', brand: 'A', primaryImageUrl: '', minPriceVnd: '10000000' },
+        { id: 'p-3', name: 'Phone 3', brand: 'A', primaryImageUrl: '', minPriceVnd: '10000000' },
+      ])
+    )
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: null,
+      role: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+    })
+
+    function TriggerFourth() {
+      const { addProduct } = useCompare()
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            addProduct({
+              id: 'p-4',
+              name: 'Phone 4',
+              brand: 'A',
+              primaryImageUrl: '',
+              minPriceVnd: '10000000',
+            })
+          }
+        >
+          Add 4th
+        </button>
+      )
+    }
+
+    const { rerender } = render(
+      <CompareProvider>
+        <MemoryRouter>
+          <TriggerFourth />
+          <ChatWidget />
+        </MemoryRouter>
+      </CompareProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 4th' }))
+    const launcher = screen.getByRole('button', { name: /khung trò chuyện/i })
+    expect(launcher.className).toContain('bottom-48')
+    expect(launcher.className).toContain('lg:bottom-40')
+
+    // On /compare, CompareTray is hidden so ChatWidget returns to default bottom-6
+    mockLocationState = { pathname: '/compare', search: '?ids=p-1,p-2' }
+    rerender(
+      <CompareProvider>
+        <MemoryRouter>
+          <TriggerFourth />
+          <ChatWidget />
+        </MemoryRouter>
+      </CompareProvider>
+    )
+
+    expect(screen.getByRole('button', { name: /khung trò chuyện/i }).className).toContain('bottom-6')
   })
 })

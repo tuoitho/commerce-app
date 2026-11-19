@@ -15,6 +15,8 @@ vi.mock('@/api/auth', () => ({
     register: vi.fn(),
     logout: vi.fn(),
     getMe: vi.fn(),
+    forgotPassword: vi.fn(),
+    resetPassword: vi.fn(),
   },
 }))
 
@@ -236,6 +238,41 @@ describe('App navigation', () => {
     await waitFor(() => {
       expect(screen.getByText('Bài viết chi tiết cho route test')).toBeInTheDocument()
     })
+  })
+
+  it('renders forgot-password and reset-password routes', async () => {
+    const { unmount } = render(
+      <ToastProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/forgot-password']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    expect(screen.getByRole('heading', { name: /Quên Mật Khẩu/i })).toBeInTheDocument()
+    unmount()
+
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MemoryRouter initialEntries={['/reset-password']}>
+                <AppContent />
+              </MemoryRouter>
+            </CartProvider>
+          </FavoritesProvider>
+        </AuthProvider>
+      </ToastProvider>
+    )
+
+    expect(screen.getByRole('heading', { name: /Đặt Lại Mật Khẩu/i })).toBeInTheDocument()
   })
 })
 

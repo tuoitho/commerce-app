@@ -3,12 +3,15 @@ import { ToastProvider } from '@/context/ToastContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { FavoritesProvider } from '@/context/FavoritesContext'
 import { CartProvider } from '@/context/CartContext'
+import { CompareProvider } from '@/context/CompareContext'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { ChatWidget } from '@/components/chat/ChatWidget'
+import { CompareTray } from '@/components/CompareTray'
 import { HomePage } from '@/pages/HomePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { ProductDetailPage } from '@/pages/ProductDetailPage'
+import { ComparePage } from '@/pages/ComparePage'
 import { CartPage } from '@/pages/CartPage'
 import { CheckoutPage } from '@/pages/CheckoutPage'
 import { OrderHistoryPage } from '@/pages/OrderHistoryPage'
@@ -21,6 +24,8 @@ import { PostDetailPage } from '@/pages/PostDetailPage'
 import { AccountPage } from '@/pages/AccountPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { LivePage } from '@/pages/LivePage'
 
@@ -35,6 +40,7 @@ export function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/products" element={<CatalogPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/compare" element={<ComparePage />} />
           <Route path="/posts" element={<PostsFeedPage />} />
           <Route path="/posts/:id" element={<PostDetailPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
@@ -48,10 +54,13 @@ export function AppContent() {
           <Route path="/live/:sessionId" element={<LivePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
       <Footer />
+      <CompareTray />
       {!isLivePage && <ChatWidget />}
     </div>
   )
@@ -63,9 +72,11 @@ export function App() {
       <AuthProvider>
         <FavoritesProvider>
           <CartProvider>
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
+            <CompareProvider>
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </CompareProvider>
           </CartProvider>
         </FavoritesProvider>
       </AuthProvider>

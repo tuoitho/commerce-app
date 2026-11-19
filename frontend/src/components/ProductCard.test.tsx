@@ -190,4 +190,38 @@ describe('ProductCard', () => {
 
     expect(mockToggle).toHaveBeenCalledWith('prod-apple-1')
   })
+
+  it('renders averageRating, reviewCount, and "Đã bán X" without hardcoded fake spec bullets (Req 6.4)', () => {
+    const ratedProduct: ProductSummary = {
+      ...dummyProduct,
+      averageRating: 4.8,
+      reviewCount: 15,
+      soldCount: 42,
+    }
+
+    render(
+      <MemoryRouter>
+        <ProductCard product={ratedProduct} />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText('4.8')).toBeInTheDocument()
+    expect(screen.getByText(/\(15\)/)).toBeInTheDocument()
+    expect(screen.getByText('Đã bán 42')).toBeInTheDocument()
+
+    expect(screen.queryByText('OLED 120Hz')).not.toBeInTheDocument()
+    expect(screen.queryByText('A-Series Pro')).not.toBeInTheDocument()
+    expect(screen.queryByText('48MP ProRAW')).not.toBeInTheDocument()
+  })
+
+  it('renders "Chưa có đánh giá" when reviewCount is 0 or omitted and hides soldCount when 0', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={{ ...dummyProduct, averageRating: 0, reviewCount: 0, soldCount: 0 }} />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText('Chưa có đánh giá')).toBeInTheDocument()
+    expect(screen.queryByText(/Đã bán/)).not.toBeInTheDocument()
+  })
 })
