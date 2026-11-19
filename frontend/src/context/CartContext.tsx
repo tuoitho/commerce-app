@@ -113,9 +113,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useCart() {
+export function useCart(): CartContextType
+export function useCart(options: { optional: true }): CartContextType | undefined
+export function useCart(options?: { optional?: boolean }): CartContextType | undefined {
   const context = useContext(CartContext)
-  if (!context) {
+  if (!context && !options?.optional) {
     throw new Error('useCart must be used within a CartProvider')
   }
   return context

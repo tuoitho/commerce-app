@@ -8,7 +8,16 @@ import { ToastProvider } from '@/context/ToastContext'
 import { addressesApi } from '@/api/addresses'
 import { areasApi } from '@/api/areas'
 import { ordersApi } from '@/api/orders'
-import { ApiError, type Address, type Province, type Ward, type Order } from '@/api/types'
+import { vouchersApi } from '@/api/vouchers'
+import {
+  ApiError,
+  type Address,
+  type Province,
+  type Ward,
+  type Order,
+  type AvailableVoucher,
+  type CheckoutQuote,
+} from '@/api/types'
 
 // Mock context hooks
 vi.mock('@/context/AuthContext', () => ({
@@ -40,6 +49,13 @@ vi.mock('@/api/areas', () => ({
 vi.mock('@/api/orders', () => ({
   ordersApi: {
     createOrder: vi.fn(),
+  },
+}))
+
+vi.mock('@/api/vouchers', () => ({
+  vouchersApi: {
+    listAvailable: vi.fn(),
+    quoteCheckout: vi.fn(),
   },
 }))
 
@@ -156,6 +172,8 @@ describe('CheckoutPage', () => {
     vi.mocked(areasApi.listProvinces).mockResolvedValue(mockProvinces)
     vi.mocked(areasApi.listWards).mockResolvedValue(mockWards)
     vi.mocked(addressesApi.listAddresses).mockResolvedValue(mockAddresses)
+    vi.mocked(vouchersApi.listAvailable).mockRejectedValue(new Error('not mocked'))
+    vi.mocked(vouchersApi.quoteCheckout).mockRejectedValue(new Error('not mocked'))
   })
 
   it('redirects to login when unauthenticated', async () => {
@@ -918,6 +936,515 @@ describe('CheckoutPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Order Detail Fallback momo-fallback-123')).toBeInTheDocument()
       expect(screen.getByText(/Chưa thể chuyển đến cổng MoMo/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('Regional shipping, Express 2h, Vouchers & MoMo quote threshold (Req 1.3, 1.4, 7.1, PD-2)', () => {
+    const danangAddress: Address = {
+      id: 'addr-dn',
+      userId: 'user-1',
+      recipientName: 'Lê Đà Nẵng',
+      phone: '0909888777',
+      provinceCode: 48,
+      provinceName: 'Thành phố Đà Nẵng',
+      wardCode: 4801,
+      wardName: 'Phường Hải Châu',
+      detailAddress: '10 Bạch Đằng',
+      isDefault: false,
+      createdAt: '2026-01-03T00:00:00Z',
+      updatedAt: '2026-01-03T00:00:00Z',
+    }
+
+    const availableVouchers: AvailableVoucher[] = [
+      {
+        id: 'vch-1',
+        code: 'AURA10',
+        title: 'Giảm 10% tối đa 1 triệu',
+        description: 'Áp dụng toàn bộ điện thoại',
+        voucherType: 'percent',
+        discountValue: '10',
+        maxDiscountVnd: '1000000',
+        minOrderVnd: '5000000',
+        usageLimit: 100,
+        usedCount: 0,
+        perUserLimit: 2,
+        userRemainingUses: 2,
+        startsAt: '2026-11-01T00:00:00Z',
+        endsAt: '2026-12-31T23:59:59Z',
+      },
+      {
+        id: 'vch-2',
+        code: 'FREESHIP60',
+        title: 'Miễn phí giao hỏa tốc 60K',
+        description: 'Giảm tối đa 60.000đ phí vận chuyển',
+        voucherType: 'freeship',
+        discountValue: '0',
+        maxDiscountVnd: '60000',
+        minOrderVnd: '0',
+        usageLimit: null,
+        usedCount: 0,
+        perUserLimit: 1,
+        userRemainingUses: 1,
+        startsAt: '2026-11-01T00:00:00Z',
+        endsAt: '2026-12-31T23:59:59Z',
+      },
+    ]
+
+    it('enables express_2h for HN/HCM, locks express_2h for other provinces, and resets deliveryMethod to standard on address switch', async () => {
+      vi.mocked(addressesApi.listAddresses).mockResolvedValue([mockAddresses[0], danangAddress])
+      vi.mocked(vouchersApi.listAvailable).mockResolvedValue([])
+      vi.mocked(vouchersApi.quoteCheckout).mockImplementation(async ({ addressId, deliveryMethod }) => {
+        if (addressId === 'addr-dn') {
+          return {
+            subtotalVnd: '3000000',
+            deliveryMethod: 'standard',
+            expressAvailable: false,
+            standardShippingFeeVnd: '30000',
+            expressShippingFeeVnd: '60000',
+            freeShippingThresholdVnd: '5000000',
+            shippingFeeVnd: '30000',
+            voucherCode: null,
+            voucherType: null,
+            discountVnd: '0',
+            totalVnd: '3030000',
+          }
+        }
+        const isExpress = deliveryMethod === 'express_2h'
+        return {
+          subtotalVnd: '3000000',
+          deliveryMethod: isExpress ? 'express_2h' : 'standard',
+          expressAvailable: true,
+          standardShippingFeeVnd: '25000',
+          expressShippingFeeVnd: '60000',
+          freeShippingThresholdVnd: '5000000',
+          shippingFeeVnd: isExpress ? '60000' : '25000',
+          voucherCode: null,
+          voucherType: null,
+          discountVnd: '0',
+          totalVnd: isExpress ? '3060000' : '3025000',
+        }
+      })
+
+      vi.mocked(useCart).mockReturnValue({
+        cart: {
+          ...mockCart,
+          items: [
+            {
+              ...mockCart.items[0],
+              unitPriceVnd: '3000000',
+              lineTotalVnd: '3000000',
+              quantity: 1,
+            },
+          ],
+          totalUnits: 1,
+          selectedLineCount: 1,
+          selectedTotalVnd: '3000000',
+          shippingFeeVnd: '0',
+        },
+        isLoading: false,
+        badgeCount: 1,
+        refreshCart: mockRefreshCart,
+        addItem: vi.fn(),
+        updateQuantity: vi.fn(),
+        toggleSelect: vi.fn(),
+        toggleSelectAll: vi.fn(),
+        removeItem: vi.fn(),
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <CheckoutPage />
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      const expressRadio = await screen.findByLabelText(/Giao hỏa tốc 2 giờ/i)
+      const standardRadio = screen.getByLabelText(/Giao tiêu chuẩn/i)
+
+      await waitFor(() => {
+        expect(standardRadio).toBeChecked()
+        expect(expressRadio).toBeEnabled()
+        expect(screen.getByText('3.025.000 ₫')).toBeInTheDocument()
+      })
+
+      // Switch to express_2h on Hanoi address
+      fireEvent.click(expressRadio)
+      await waitFor(() => {
+        expect(expressRadio).toBeChecked()
+        expect(screen.getByText('3.060.000 ₫')).toBeInTheDocument()
+      })
+
+      // Switch to Da Nang address -> auto reverts to standard and disables express_2h
+      fireEvent.click(screen.getByText('Lê Đà Nẵng'))
+
+      await waitFor(() => {
+        expect(standardRadio).toBeChecked()
+        expect(expressRadio).toBeDisabled()
+        expect(screen.getByText(/Chỉ áp dụng tại Hà Nội & TP\. Hồ Chí Minh/i)).toBeInTheDocument()
+        expect(screen.getByText('3.030.000 ₫')).toBeInTheDocument()
+      })
+    })
+
+    it('ignores stale out-of-order quote responses when switching addresses', async () => {
+      vi.mocked(addressesApi.listAddresses).mockResolvedValue([mockAddresses[0], danangAddress])
+      vi.mocked(vouchersApi.listAvailable).mockResolvedValue([])
+
+      let resolveFirstQuote!: (q: CheckoutQuote) => void
+      let resolveSecondQuote!: (q: CheckoutQuote) => void
+      let callCount = 0
+
+      vi.mocked(vouchersApi.quoteCheckout).mockImplementation(() => {
+        callCount += 1
+        if (callCount === 1) {
+          return new Promise<CheckoutQuote>((resolve) => {
+            resolveFirstQuote = resolve
+          })
+        }
+        return new Promise<CheckoutQuote>((resolve) => {
+          resolveSecondQuote = resolve
+        })
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <CheckoutPage />
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Lê Đà Nẵng')).toBeInTheDocument()
+      })
+
+      // Switch to second address before first quote settles
+      fireEvent.click(screen.getByText('Lê Đà Nẵng'))
+
+      await waitFor(() => {
+        expect(vouchersApi.quoteCheckout).toHaveBeenCalledTimes(2)
+      })
+
+      // Fast response for second address resolves first
+      resolveSecondQuote({
+        subtotalVnd: '60000000',
+        deliveryMethod: 'standard',
+        expressAvailable: false,
+        standardShippingFeeVnd: '40000',
+        expressShippingFeeVnd: '60000',
+        freeShippingThresholdVnd: '5000000',
+        shippingFeeVnd: '40000',
+        voucherCode: null,
+        voucherType: null,
+        discountVnd: '0',
+        totalVnd: '60040000',
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('60.040.000 ₫')).toBeInTheDocument()
+      })
+
+      // Now stale response for first address arrives late -> must be ignored
+      resolveFirstQuote({
+        subtotalVnd: '60000000',
+        deliveryMethod: 'standard',
+        expressAvailable: true,
+        standardShippingFeeVnd: '99000',
+        expressShippingFeeVnd: '60000',
+        freeShippingThresholdVnd: '5000000',
+        shippingFeeVnd: '99000',
+        voucherCode: null,
+        voucherType: null,
+        discountVnd: '0',
+        totalVnd: '60099000',
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('60.040.000 ₫')).toBeInTheDocument()
+        expect(screen.queryByText('60.099.000 ₫')).not.toBeInTheDocument()
+      })
+    })
+
+    it('supports available voucher picker, manual code apply/remove, Vietnamese ApiError display, and order creation payload', async () => {
+      vi.mocked(vouchersApi.listAvailable).mockResolvedValue(availableVouchers)
+      vi.mocked(vouchersApi.quoteCheckout).mockImplementation(async ({ deliveryMethod, voucherCode }) => {
+        if (voucherCode === 'EXPIRED') {
+          throw new ApiError(409, {
+            code: 'voucher_expired',
+            message: 'Mã giảm giá đã hết hạn sử dụng',
+          })
+        }
+        const shipping = deliveryMethod === 'express_2h' ? '60000' : '0'
+        if (voucherCode === 'AURA10') {
+          return {
+            subtotalVnd: '60000000',
+            deliveryMethod: deliveryMethod ?? 'standard',
+            expressAvailable: true,
+            standardShippingFeeVnd: '0',
+            expressShippingFeeVnd: '60000',
+            freeShippingThresholdVnd: '5000000',
+            shippingFeeVnd: shipping,
+            voucherCode: 'AURA10',
+            voucherType: 'percent',
+            discountVnd: '1000000',
+            totalVnd: deliveryMethod === 'express_2h' ? '59060000' : '59000000',
+          }
+        }
+        return {
+          subtotalVnd: '60000000',
+          deliveryMethod: deliveryMethod ?? 'standard',
+          expressAvailable: true,
+          standardShippingFeeVnd: '0',
+          expressShippingFeeVnd: '60000',
+          freeShippingThresholdVnd: '5000000',
+          shippingFeeVnd: shipping,
+          voucherCode: null,
+          voucherType: null,
+          discountVnd: '0',
+          totalVnd: deliveryMethod === 'express_2h' ? '60060000' : '60000000',
+        }
+      })
+
+      vi.mocked(ordersApi.createOrder).mockResolvedValue({
+        id: 'order-vch-1',
+        userId: 'user-1',
+        status: 'pending_confirmation',
+        paymentMethod: 'cod',
+        recipientName: 'Nguyễn Văn A',
+        phone: '0912345678',
+        provinceName: 'Thành phố Hà Nội',
+        wardName: 'Phường Phúc Xá',
+        detailAddress: '123 Đường Cầu Giấy',
+        subtotalVnd: '60000000',
+        shippingFeeVnd: '60000',
+        discountVnd: '1000000',
+        voucherCode: 'AURA10',
+        voucherType: 'percent',
+        deliveryMethod: 'express_2h',
+        totalVnd: '59060000',
+        items: [],
+        createdAt: '2026-11-18T10:00:00Z',
+        updatedAt: '2026-11-18T10:00:00Z',
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <Routes>
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/orders/:id" element={<div>Order Created With Voucher</div>} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      // Available vouchers rendered
+      expect(await screen.findByText('Giảm 10% tối đa 1 triệu')).toBeInTheDocument()
+      expect(screen.getByText('FREESHIP60')).toBeInTheDocument()
+
+      // Try invalid manual code
+      const input = screen.getByPlaceholderText(/Nhập mã giảm giá/i)
+      fireEvent.change(input, { target: { value: 'expired' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Mã giảm giá đã hết hạn sử dụng')).toBeInTheDocument()
+      })
+
+      // Apply valid voucher from picker
+      fireEvent.click(screen.getByTestId('apply-voucher-AURA10'))
+
+      await waitFor(() => {
+        expect(screen.getByText(/-1\.000\.000 ₫/)).toBeInTheDocument()
+        expect(screen.getByText('59.000.000 ₫')).toBeInTheDocument()
+      })
+
+      // Remove voucher then re-apply manually
+      fireEvent.click(screen.getByRole('button', { name: /Gỡ mã/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByText(/-1\.000\.000 ₫/)).not.toBeInTheDocument()
+      })
+
+      fireEvent.change(input, { target: { value: 'aura10' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+      fireEvent.click(screen.getByLabelText(/Giao hỏa tốc 2 giờ/i))
+
+      await waitFor(() => {
+        expect(screen.getByText('59.060.000 ₫')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /Đặt hàng/i }))
+
+      await waitFor(() => {
+        expect(ordersApi.createOrder).toHaveBeenCalledWith(
+          expect.objectContaining({
+            addressId: 'addr-1',
+            deliveryMethod: 'express_2h',
+            voucherCode: 'AURA10',
+          })
+        )
+        expect(screen.getByText('Order Created With Voucher')).toBeInTheDocument()
+      })
+    })
+
+    it('switches paymentMethod back to COD and disables MoMo when applied voucher drops totalVnd below 1.000 ₫', async () => {
+      vi.mocked(useCart).mockReturnValue({
+        cart: {
+          ...mockCart,
+          items: [
+            {
+              ...mockCart.items[0],
+              unitPriceVnd: '1500000',
+              lineTotalVnd: '1500000',
+              quantity: 1,
+            },
+          ],
+          totalUnits: 1,
+          selectedLineCount: 1,
+          selectedTotalVnd: '1500000',
+          shippingFeeVnd: '0',
+        },
+        isLoading: false,
+        badgeCount: 1,
+        refreshCart: mockRefreshCart,
+        addItem: vi.fn(),
+        updateQuantity: vi.fn(),
+        toggleSelect: vi.fn(),
+        toggleSelectAll: vi.fn(),
+        removeItem: vi.fn(),
+      })
+
+      vi.mocked(vouchersApi.listAvailable).mockResolvedValue([])
+      vi.mocked(vouchersApi.quoteCheckout).mockImplementation(async ({ voucherCode }) => {
+        if (voucherCode === 'ZERO') {
+          return {
+            subtotalVnd: '1500000',
+            deliveryMethod: 'standard',
+            expressAvailable: true,
+            standardShippingFeeVnd: '0',
+            expressShippingFeeVnd: '60000',
+            freeShippingThresholdVnd: '5000000',
+            shippingFeeVnd: '0',
+            voucherCode: 'ZERO',
+            voucherType: 'fixed_amount',
+            discountVnd: '1499500',
+            totalVnd: '500',
+          }
+        }
+        return {
+          subtotalVnd: '1500000',
+          deliveryMethod: 'standard',
+          expressAvailable: true,
+          standardShippingFeeVnd: '0',
+          expressShippingFeeVnd: '60000',
+          freeShippingThresholdVnd: '5000000',
+          shippingFeeVnd: '0',
+          voucherCode: null,
+          voucherType: null,
+          discountVnd: '0',
+          totalVnd: '1500000',
+        }
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <CheckoutPage />
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      const momoRadio = await screen.findByLabelText(/Ví điện tử MoMo/i)
+      const codRadio = screen.getByLabelText(/Thanh toán khi nhận hàng \(COD\)/i)
+
+      await waitFor(() => {
+        expect(momoRadio).toBeEnabled()
+      })
+
+      fireEvent.click(momoRadio)
+      expect(momoRadio).toBeChecked()
+
+      // Apply voucher dropping total to 500 VND
+      const input = screen.getByPlaceholderText(/Nhập mã giảm giá/i)
+      fireEvent.change(input, { target: { value: 'ZERO' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('500 ₫')).toBeInTheDocument()
+        expect(momoRadio).toBeDisabled()
+        expect(codRadio).toBeChecked()
+      })
+    })
+
+    it('keeps applied voucher banner visible alongside error alert when replacement voucher fails', async () => {
+      vi.mocked(vouchersApi.listAvailable).mockResolvedValue([])
+      vi.mocked(vouchersApi.quoteCheckout).mockImplementation(async ({ voucherCode }) => {
+        if (voucherCode === 'EXPIRED') {
+          throw new ApiError(409, {
+            code: 'voucher_expired',
+            message: 'Mã giảm giá đã hết hạn sử dụng',
+          })
+        }
+        if (voucherCode === 'AURA10') {
+          return {
+            subtotalVnd: '60000000',
+            deliveryMethod: 'standard',
+            expressAvailable: true,
+            standardShippingFeeVnd: '0',
+            expressShippingFeeVnd: '60000',
+            freeShippingThresholdVnd: '5000000',
+            shippingFeeVnd: '0',
+            voucherCode: 'AURA10',
+            voucherType: 'percent',
+            discountVnd: '1000000',
+            totalVnd: '59000000',
+          }
+        }
+        return {
+          subtotalVnd: '60000000',
+          deliveryMethod: 'standard',
+          expressAvailable: true,
+          standardShippingFeeVnd: '0',
+          expressShippingFeeVnd: '60000',
+          freeShippingThresholdVnd: '5000000',
+          shippingFeeVnd: '0',
+          voucherCode: null,
+          voucherType: null,
+          discountVnd: '0',
+          totalVnd: '60000000',
+        }
+      })
+
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/checkout']}>
+            <CheckoutPage />
+          </MemoryRouter>
+        </ToastProvider>
+      )
+
+      const input = await screen.findByPlaceholderText(/Nhập mã giảm giá/i)
+      fireEvent.change(input, { target: { value: 'AURA10' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Đang áp dụng mã/i)).toBeInTheDocument()
+        expect(screen.getByText(/-1\.000\.000 ₫/)).toBeInTheDocument()
+      })
+
+      // Attempt invalid replacement voucher while AURA10 is active
+      fireEvent.change(input, { target: { value: 'EXPIRED' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Mã giảm giá đã hết hạn sử dụng')
+      })
+
+      // Previously applied AURA10 banner, Gỡ mã button, and discount remain visible
+      expect(screen.getByText(/Đang áp dụng mã/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Gỡ mã/i })).toBeInTheDocument()
+      expect(screen.getByText(/-1\.000\.000 ₫/)).toBeInTheDocument()
     })
   })
 })

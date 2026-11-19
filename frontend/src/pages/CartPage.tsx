@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Info,
   Smartphone,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
@@ -280,6 +281,12 @@ export function CartPage() {
                                   Giá live
                                 </span>
                               )}
+                              {item.isFlashSalePrice && (
+                                <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-amber-400 px-1.5 py-px font-sans text-[10px] font-bold uppercase text-zinc-950">
+                                  <Zap className="h-2.5 w-2.5 fill-zinc-950" />
+                                  Giá Flash Sale
+                                </span>
+                              )}
                               {formatVND(item.unitPriceVnd)} / chiếc
                             </div>
                           )}
@@ -353,12 +360,10 @@ export function CartPage() {
                       {cart?.selectedLineCount || 0} sản phẩm
                     </span>
                   </div>
-                  <div className="flex justify-between text-zinc-600">
-                    <span>Phí vận chuyển:</span>
-                    <span className="font-semibold text-emerald-700">
-                      {!cart?.shippingFeeVnd || cart.shippingFeeVnd === '0'
-                        ? 'Miễn phí'
-                        : formatVND(cart.shippingFeeVnd)}
+                  <div className="flex justify-between items-start gap-3 text-zinc-600">
+                    <span className="shrink-0">Phí vận chuyển:</span>
+                    <span className="text-right text-xs sm:text-sm font-medium text-zinc-700">
+                      Tính ở bước thanh toán (Miễn phí giao tiêu chuẩn từ 5.000.000 ₫)
                     </span>
                   </div>
 

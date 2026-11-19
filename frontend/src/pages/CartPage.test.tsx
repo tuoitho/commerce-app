@@ -68,7 +68,75 @@ describe('CartPage', () => {
     expect(await screen.findAllByText('Giá live')).toHaveLength(1)
   })
 
-  it('renders cart items and summary properly', async () => {
+  it('labels lines sold at Flash Sale price when isFlashSalePrice is true', async () => {
+    vi.mocked(useCart).mockReturnValue({
+      cart: {
+        items: [
+          {
+            id: 'item-flash',
+            variantId: 'v-flash',
+            productId: 'p-1',
+            brandName: 'Apple',
+            productName: 'iPhone 16 Pro',
+            model: 'A3294',
+            imageUrl: '',
+            options: [],
+            unitPriceVnd: '25990000',
+            lineTotalVnd: '25990000',
+            stockQuantity: 5,
+            quantity: 1,
+            selected: true,
+            availability: 'available',
+            isLivePrice: false,
+            isFlashSalePrice: true,
+          },
+          {
+            id: 'item-regular',
+            variantId: 'v-2',
+            productId: 'p-2',
+            brandName: 'Samsung',
+            productName: 'Galaxy S25',
+            model: 'S931',
+            imageUrl: '',
+            options: [],
+            unitPriceVnd: '20990000',
+            lineTotalVnd: '20990000',
+            stockQuantity: 5,
+            quantity: 1,
+            selected: true,
+            availability: 'available',
+            isLivePrice: false,
+            isFlashSalePrice: false,
+          },
+        ],
+        totalUnits: 2,
+        selectedLineCount: 2,
+        selectedTotalVnd: '46980000',
+        shippingFeeVnd: '',
+      },
+      isLoading: false,
+      badgeCount: 2,
+      refreshCart: vi.fn(),
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <CartPage />
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(await screen.findAllByText('Giá Flash Sale')).toHaveLength(1)
+    expect(screen.queryByText('Giá live')).not.toBeInTheDocument()
+  })
+
+  it('renders cart items and summary properly with checkout-calculated shipping note', async () => {
     vi.mocked(useCart).mockReturnValue({
       cart: {
         items: [
@@ -117,11 +185,13 @@ describe('CartPage', () => {
       expect(screen.getByText('Titan Tự Nhiên')).toBeInTheDocument()
       expect(screen.getByText('Tóm tắt đơn hàng')).toBeInTheDocument()
       expect(screen.getByText('Tiến hành mua hàng')).toBeInTheDocument()
-      expect(screen.getByText('Miễn phí')).toBeInTheDocument()
+      expect(
+        screen.getByText('Tính ở bước thanh toán (Miễn phí giao tiêu chuẩn từ 5.000.000 ₫)')
+      ).toBeInTheDocument()
     })
   })
 
-  it('renders non-zero shipping fee properly', async () => {
+  it('displays checkout-calculated shipping note regardless of legacy shippingFeeVnd value', async () => {
     vi.mocked(useCart).mockReturnValue({
       cart: {
         items: [
@@ -166,7 +236,9 @@ describe('CartPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('30.000 ₫')).toBeInTheDocument()
+      expect(
+        screen.getByText('Tính ở bước thanh toán (Miễn phí giao tiêu chuẩn từ 5.000.000 ₫)')
+      ).toBeInTheDocument()
     })
   })
 

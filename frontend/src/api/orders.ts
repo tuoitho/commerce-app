@@ -1,10 +1,25 @@
 import { apiClient } from './client'
-import type { Order, CreateOrderInput, OrderStatusBucket, OrderStats, MomoReturnPayload } from './types'
+import type {
+  Order,
+  CreateOrderInput,
+  OrderStatusBucket,
+  OrderStats,
+  MomoReturnPayload,
+  BuyAgainResult,
+} from './types'
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
+  const trimmedVoucher = input.voucherCode?.trim()
+  const body: CreateOrderInput = {
+    addressId: input.addressId,
+    ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+    ...(input.deliveryMethod ? { deliveryMethod: input.deliveryMethod } : {}),
+    ...(trimmedVoucher ? { voucherCode: trimmedVoucher } : {}),
+    lines: input.lines,
+  }
   return apiClient<Order>('/orders', {
     method: 'POST',
-    body: input,
+    body,
   })
 }
 
@@ -46,6 +61,12 @@ export async function confirmMomoReturn(payload: MomoReturnPayload): Promise<Ord
   })
 }
 
+export async function buyAgain(orderId: string): Promise<BuyAgainResult> {
+  return apiClient<BuyAgainResult>(`/orders/${orderId}/buy-again`, {
+    method: 'POST',
+  })
+}
+
 export const ordersApi = {
   createOrder,
   listOrders,
@@ -55,4 +76,5 @@ export const ordersApi = {
   undoCancelOrder,
   retryMomoPayment,
   confirmMomoReturn,
+  buyAgain,
 }

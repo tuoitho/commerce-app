@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/select'
 import { useToast } from '@/context/ToastContext'
 import { createReturn } from '@/api/returns'
 import { formatVND } from '@/lib/utils'
+import { parseVndBigInt } from '@/lib/payment'
 import { ApiError, type Order, type ReturnReasonCode } from '@/api/types'
 import { Package, AlertCircle } from 'lucide-react'
 
@@ -61,23 +62,68 @@ export const ReturnRequestDialog: React.FC<ReturnRequestDialogProps> = ({
     }
   }
 
-  // Calculate refund preview
+  // Calculate refund preview strictly following PD-2
   const refundPreview = useMemo(() => {
     const selectedItems = order.items.filter((item) => selectedItemIds.includes(item.id))
     const itemsTotal = selectedItems.reduce(
-      (sum, item) => sum + (Number(item.lineTotalVnd) || 0),
-      0
+      (sum, item) => sum + parseVndBigInt(item.lineTotalVnd),
+      0n
     )
     const isFullReturn =
       order.items.length > 0 && selectedItems.length === order.items.length
-    const shippingFee = isFullReturn ? Number(order.shippingFeeVnd) || 0 : 0
-    const totalRefund = itemsTotal + shippingFee
+    const subtotalVnd = parseVndBigInt(order.subtotalVnd)
+    const shippingFeeVnd = parseVndBigInt(order.shippingFeeVnd)
+    const discountVnd = parseVndBigInt(order.discountVnd ?? '0')
+    const totalVnd = parseVndBigInt(order.totalVnd)
+    const safeTotalVnd = totalVnd > 0n ? totalVnd : 0n
+
+    if (selectedItems.length === 0) {
+      return {
+        itemsTotal: '0',
+        isFullReturn: false,
+        shippingFee: '0',
+        discountVnd: discountVnd.toString(),
+        discountDeduction: '0',
+        totalRefund: '0',
+      }
+    }
+
+    if (isFullReturn) {
+      return {
+        itemsTotal: itemsTotal.toString(),
+        isFullReturn: true,
+        shippingFee: shippingFeeVnd.toString(),
+        discountVnd: discountVnd.toString(),
+        discountDeduction: '0',
+        totalRefund: safeTotalVnd.toString(),
+      }
+    }
+
+    let partialRefund: bigint
+    if (discountVnd <= 0n || order.voucherType === 'freeship') {
+      partialRefund = itemsTotal
+    } else if (subtotalVnd <= 0n) {
+      partialRefund = 0n
+    } else {
+      const paidMerchandise = subtotalVnd > discountVnd ? subtotalVnd - discountVnd : 0n
+      partialRefund = (itemsTotal * paidMerchandise) / subtotalVnd
+    }
+
+    if (partialRefund < 0n) {
+      partialRefund = 0n
+    }
+    if (partialRefund > safeTotalVnd) {
+      partialRefund = safeTotalVnd
+    }
+    const discountDeduction = itemsTotal > partialRefund ? itemsTotal - partialRefund : 0n
 
     return {
-      itemsTotal,
-      isFullReturn,
-      shippingFee,
-      totalRefund,
+      itemsTotal: itemsTotal.toString(),
+      isFullReturn: false,
+      shippingFee: '0',
+      discountVnd: discountVnd.toString(),
+      discountDeduction: discountDeduction.toString(),
+      totalRefund: partialRefund.toString(),
     }
   }, [order, selectedItemIds])
 
@@ -241,7 +287,7 @@ export const ReturnRequestDialog: React.FC<ReturnRequestDialogProps> = ({
                 {formatVND(refundPreview.itemsTotal)}
               </span>
             </div>
-            {refundPreview.isFullReturn && refundPreview.shippingFee > 0 && (
+            {refundPreview.isFullReturn && Number(refundPreview.shippingFee) > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>Hoàn phí vận chuyển (trả toàn bộ đơn):</span>
                 <span className="font-medium text-slate-800">
@@ -249,9 +295,34 @@ export const ReturnRequestDialog: React.FC<ReturnRequestDialogProps> = ({
                 </span>
               </div>
             )}
+            {refundPreview.isFullReturn && Number(refundPreview.discountVnd) > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  Giảm giá voucher đã áp dụng
+                  {order.voucherCode ? ` (${order.voucherCode})` : ''}:
+                </span>
+                <span className="font-medium">
+                  -{formatVND(refundPreview.discountVnd)}
+                </span>
+              </div>
+            )}
+            {!refundPreview.isFullReturn && Number(refundPreview.discountDeduction) > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  Khấu trừ theo tỷ lệ voucher
+                  {order.voucherCode ? ` (${order.voucherCode})` : ''}:
+                </span>
+                <span className="font-medium">
+                  -{formatVND(refundPreview.discountDeduction)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-2 border-t border-indigo-200/60 text-sm">
               <span className="font-semibold text-slate-900">Tổng tiền dự kiến hoàn:</span>
-              <span className="font-bold text-indigo-700 text-base">
+              <span
+                data-testid="expected-refund-amount"
+                className="font-bold text-indigo-700 text-base"
+              >
                 {formatVND(refundPreview.totalRefund)}
               </span>
             </div>

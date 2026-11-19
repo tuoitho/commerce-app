@@ -1,15 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { OrderDetailPage } from './OrderDetailPage'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
+import type { NotificationItem } from '@/api/posts'
 import { ApiError, type Order } from '@/api/types'
+
+let mockOnNotification: ((notif: NotificationItem) => void) | undefined
 
 // Mock context hooks
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/CartContext', () => ({
+  useCart: vi.fn(),
+}))
+
+vi.mock('@/hooks/useChatSocket', () => ({
+  useChatSocket: vi.fn((opts: { onNotification?: (notif: NotificationItem) => void }) => {
+    mockOnNotification = opts.onNotification
+    return {
+      isConnected: true,
+      isSupportOnline: false,
+      supportLastActiveAt: null,
+      setSupportOnline: vi.fn(),
+      setSupportLastActiveAt: vi.fn(),
+      sendPing: vi.fn(),
+      reconnect: vi.fn(),
+      disconnect: vi.fn(),
+    }
+  }),
 }))
 
 // Mock API modules
@@ -19,6 +43,7 @@ vi.mock('@/api/orders', () => ({
     cancelOrder: vi.fn(),
     undoCancelOrder: vi.fn(),
     retryMomoPayment: vi.fn(),
+    buyAgain: vi.fn(),
   },
 }))
 
@@ -56,8 +81,11 @@ const baseMockOrder: Order = {
 }
 
 describe('OrderDetailPage', () => {
+  const mockRefreshCart = vi.fn()
+
   beforeEach(() => {
     vi.clearAllMocks()
+    mockOnNotification = undefined
 
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 'user-1', email: 'test@example.com' },
@@ -67,6 +95,18 @@ describe('OrderDetailPage', () => {
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
+    })
+
+    vi.mocked(useCart).mockReturnValue({
+      cart: null,
+      isLoading: false,
+      badgeCount: 0,
+      refreshCart: mockRefreshCart,
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
     })
 
     vi.mocked(ordersApi.getOrder).mockResolvedValue(baseMockOrder)
@@ -688,5 +728,278 @@ describe('OrderDetailPage', () => {
     })
     expect(screen.getByText('4088812345')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Thanh toán lại qua MoMo/i })).not.toBeInTheDocument()
+  })
+
+  it('displays discount row, delivery method, carrier + tracking code with copy button, OrderStepper & OrderTimeline', async () => {
+    const shippedOrder: Order = {
+      ...baseMockOrder,
+      status: 'shipped',
+      deliveryMethod: 'express_2h',
+      voucherCode: 'AURA10',
+      voucherType: 'percent',
+      discountVnd: '1000000',
+      shippingFeeVnd: '60000',
+      totalVnd: '59060000',
+      carrier: 'Ahamove 2h',
+      trackingCode: 'AHA-20261118',
+      confirmedAt: '2026-11-18T10:15:00Z',
+      preparingAt: '2026-11-18T10:30:00Z',
+      shippedAt: '2026-11-18T11:00:00Z',
+      cancellableUntil: null,
+      timeline: [
+        {
+          id: 'evt-1',
+          status: 'pending_confirmation',
+          actorType: 'customer',
+          note: 'Đơn hàng được tạo',
+          createdAt: '2026-11-18T10:00:00Z',
+        },
+        {
+          id: 'evt-2',
+          status: 'preparing',
+          actorType: 'admin',
+          note: 'Đơn hàng đang được chuẩn bị',
+          createdAt: '2026-11-18T10:30:00Z',
+        },
+        {
+          id: 'evt-3',
+          status: 'shipped',
+          actorType: 'admin',
+          note: 'Đã bàn giao vận chuyển (Ahamove 2h - AHA-20261118)',
+          createdAt: '2026-11-18T11:00:00Z',
+        },
+      ],
+    }
+
+    vi.mocked(ordersApi.getOrder).mockResolvedValue(shippedOrder)
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      configurable: true,
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    expect(await screen.findByText('Giao hỏa tốc 2 giờ')).toBeInTheDocument()
+    expect(screen.getByText('Ahamove 2h')).toBeInTheDocument()
+    expect(screen.getByText('AHA-20261118')).toBeInTheDocument()
+    expect(screen.getByText(/-1\.000\.000 ₫/)).toBeInTheDocument()
+    expect(screen.getByText(/AURA10/)).toBeInTheDocument()
+
+    // OrderStepper and OrderTimeline
+    expect(screen.getByRole('region', { name: /Tiến trình đơn hàng/i })).toBeInTheDocument()
+    expect(screen.getByText('Đã bàn giao vận chuyển (Ahamove 2h - AHA-20261118)')).toBeInTheDocument()
+
+    // Copy tracking code
+    fireEvent.click(screen.getByRole('button', { name: /Sao chép mã vận đơn/i }))
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith('AHA-20261118')
+    })
+  })
+
+  it('silently refreshes order detail on matching WebSocket notification without reloading page', async () => {
+    const preparingOrder: Order = {
+      ...baseMockOrder,
+      status: 'preparing',
+      deliveryMethod: 'standard',
+      timeline: [
+        {
+          id: 'evt-1',
+          status: 'pending_confirmation',
+          actorType: 'customer',
+          note: 'Đơn hàng được tạo',
+          createdAt: '2026-11-18T10:00:00Z',
+        },
+      ],
+    }
+    const shippedOrder: Order = {
+      ...preparingOrder,
+      status: 'shipped',
+      carrier: 'Giao Hàng Nhanh',
+      trackingCode: 'GHN-998877',
+      shippedAt: '2026-11-18T11:00:00Z',
+      timeline: [
+        ...preparingOrder.timeline!,
+        {
+          id: 'evt-2',
+          status: 'shipped',
+          actorType: 'admin',
+          note: 'Đã bàn giao vận chuyển (Giao Hàng Nhanh - GHN-998877)',
+          createdAt: '2026-11-18T11:00:00Z',
+        },
+      ],
+    }
+
+    vi.mocked(ordersApi.getOrder)
+      .mockResolvedValueOnce(preparingOrder)
+      .mockResolvedValueOnce(shippedOrder)
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Đang chuẩn bị hàng').length).toBeGreaterThanOrEqual(1)
+    })
+    expect(ordersApi.getOrder).toHaveBeenCalledTimes(1)
+
+    // Unrelated notification should NOT trigger re-fetch
+    await act(async () => {
+      mockOnNotification?.({
+        id: 'notif-other',
+        recipientId: 'user-1',
+        actorId: null,
+        actorName: null,
+        actorRole: null,
+        category: 'order',
+        notificationType: 'order_shipped',
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        excerpt: 'Other order',
+        metadata: { orderId: 'other-order-id' },
+        isRead: false,
+        createdAt: '2026-11-18T11:00:00Z',
+      })
+    })
+    expect(ordersApi.getOrder).toHaveBeenCalledTimes(1)
+
+    // Matching notification triggers silent re-fetch and updates UI
+    await act(async () => {
+      mockOnNotification?.({
+        id: 'notif-match',
+        recipientId: 'user-1',
+        actorId: null,
+        actorName: null,
+        actorRole: null,
+        category: 'order',
+        notificationType: 'order_shipped',
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        excerpt: 'Đơn hàng đã giao vận chuyển',
+        metadata: { orderId: 'ord-123456', trackingCode: 'GHN-998877' },
+        isRead: false,
+        createdAt: '2026-11-18T11:00:00Z',
+      })
+    })
+
+    await waitFor(() => {
+      expect(ordersApi.getOrder).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('GHN-998877')).toBeInTheDocument()
+      expect(screen.getByText('Giao Hàng Nhanh')).toBeInTheDocument()
+      expect(screen.getByText('Đã bàn giao vận chuyển (Giao Hàng Nhanh - GHN-998877)')).toBeInTheDocument()
+    })
+  })
+
+  it('supports "Mua lại" on OrderDetailPage for delivered orders and navigates to /cart', async () => {
+    vi.mocked(ordersApi.getOrder).mockResolvedValue({
+      ...baseMockOrder,
+      status: 'delivered',
+      cancellableUntil: null,
+    })
+    vi.mocked(ordersApi.buyAgain).mockResolvedValue({
+      cart: {
+        items: [],
+        totalUnits: 2,
+        selectedLineCount: 1,
+        selectedTotalVnd: '60000000',
+        shippingFeeVnd: '0',
+      },
+      addedCount: 1,
+      adjustedItems: [],
+      skippedItems: [],
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+            <Route path="/cart" element={<div>Cart Page After Buy Again</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const buyAgainBtn = await screen.findByRole('button', { name: /Mua lại/i })
+    fireEvent.click(buyAgainBtn)
+
+    await waitFor(() => {
+      expect(ordersApi.buyAgain).toHaveBeenCalledWith('ord-123456')
+      expect(mockRefreshCart).toHaveBeenCalled()
+      expect(screen.getByText('Cart Page After Buy Again')).toBeInTheDocument()
+    })
+  })
+
+  it('shows error toast and stays on OrderDetailPage when buyAgain returns 409 buy_again_all_unavailable, and hides Mua lại for non-eligible statuses', async () => {
+    vi.mocked(ordersApi.getOrder).mockResolvedValueOnce({
+      ...baseMockOrder,
+      status: 'shipped',
+      cancellableUntil: null,
+    })
+
+    const { unmount } = render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Đang giao hàng').length).toBeGreaterThanOrEqual(1)
+    })
+    expect(screen.queryByRole('button', { name: /Mua lại/i })).not.toBeInTheDocument()
+    unmount()
+
+    vi.mocked(ordersApi.getOrder).mockResolvedValueOnce({
+      ...baseMockOrder,
+      status: 'cancelled',
+      cancellableUntil: null,
+    })
+    vi.mocked(ordersApi.buyAgain).mockRejectedValueOnce(
+      new ApiError(409, {
+        code: 'buy_again_all_unavailable',
+        message: 'Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh',
+      })
+    )
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders/ord-123456']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+            <Route path="/cart" element={<div>Cart Page After Buy Again</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const buyAgainBtn = await screen.findByRole('button', { name: /Mua lại/i })
+    fireEvent.click(buyAgainBtn)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh')
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Cart Page After Buy Again')).not.toBeInTheDocument()
   })
 })

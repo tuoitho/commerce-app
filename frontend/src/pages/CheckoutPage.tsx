@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   MapPin,
@@ -15,22 +15,30 @@ import {
   RefreshCw,
   AlertTriangle,
   ShoppingCart,
+  Zap,
+  Tag,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
 import { addressesApi } from '@/api/addresses'
 import { ordersApi } from '@/api/orders'
+import { vouchersApi } from '@/api/vouchers'
 import { getMomoIneligibleReason, isMomoAmountEligible } from '@/lib/payment'
 import {
   ApiError,
   type Address,
+  type AvailableVoucher,
+  type CheckoutQuote,
   type CreateOrderInput,
+  type DeliveryMethod,
   type PaymentMethod,
 } from '@/api/types'
 import { formatVND } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { AddressFormDialog } from '@/components/addresses/AddressFormDialog'
@@ -58,6 +66,17 @@ export function CheckoutPage() {
 
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('standard')
+
+  const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([])
+  const [voucherInput, setVoucherInput] = useState('')
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState('')
+  const [voucherError, setVoucherError] = useState<string | null>(null)
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false)
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null)
+  const quoteRequestIdRef = useRef(0)
+  const applyVoucherSeqRef = useRef(0)
+  const skipAutoQuoteKeyRef = useRef<string | null>(null)
 
   const [productChangedDialogOpen, setProductChangedDialogOpen] = useState(false)
   const [productChangedMessage, setProductChangedMessage] = useState('')
@@ -96,6 +115,27 @@ export function CheckoutPage() {
       fetchAddresses()
     }
   }, [isAuthenticated, fetchAddresses])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    let cancelled = false
+    const loadVouchers = async () => {
+      try {
+        const list = await vouchersApi.listAvailable()
+        if (!cancelled && Array.isArray(list)) {
+          setAvailableVouchers(list)
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableVouchers([])
+        }
+      }
+    }
+    void loadVouchers()
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated])
 
   const handleOpenCreateAddress = () => {
     setEditingAddress(null)
@@ -141,11 +181,138 @@ export function CheckoutPage() {
   const selectedItems = cart?.items.filter((item) => item.selected) || []
   const hasSelectedItems = selectedItems.length > 0
 
-  const subtotalVnd = cart?.selectedTotalVnd || '0'
-  const shippingFeeVnd = cart?.shippingFeeVnd || '0'
-  const totalVnd = (
-    BigInt(subtotalVnd || '0') + BigInt(shippingFeeVnd || '0')
-  ).toString()
+  const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null
+  const addressSupportsExpress = selectedAddress
+    ? selectedAddress.provinceCode === 1 || selectedAddress.provinceCode === 79
+    : false
+  const effectiveDeliveryMethod: DeliveryMethod = addressSupportsExpress
+    ? deliveryMethod
+    : 'standard'
+  const expressAvailable =
+    addressSupportsExpress && (quote ? quote.expressAvailable : true)
+
+  useEffect(() => {
+    if (selectedAddress && !addressSupportsExpress && deliveryMethod === 'express_2h') {
+      setDeliveryMethod('standard')
+    }
+  }, [selectedAddress, addressSupportsExpress, deliveryMethod])
+
+  const requestCheckoutQuote = useCallback(
+    async (addressId: string, method: DeliveryMethod, voucherCode: string) => {
+      const reqId = ++quoteRequestIdRef.current
+      try {
+        const res = await vouchersApi.quoteCheckout({
+          addressId,
+          deliveryMethod: method,
+          ...(voucherCode ? { voucherCode } : {}),
+        })
+        if (reqId !== quoteRequestIdRef.current) return
+        if (res && typeof res === 'object' && 'totalVnd' in res) {
+          setQuote(res)
+          if (!res.expressAvailable && method === 'express_2h') {
+            setDeliveryMethod('standard')
+          }
+        }
+      } catch (err: unknown) {
+        if (reqId !== quoteRequestIdRef.current) return
+        if (err instanceof ApiError) {
+          if (err.code === 'express_delivery_unavailable') {
+            setDeliveryMethod('standard')
+          } else if (err.code.startsWith('voucher_') && voucherCode) {
+            setVoucherError(err.message)
+            setAppliedVoucherCode('')
+          }
+        } else {
+          setQuote(null)
+        }
+      }
+    },
+    []
+  )
+
+  const cartSelectedTotalVnd = cart?.selectedTotalVnd || '0'
+
+  useEffect(() => {
+    if (!isAuthenticated || !selectedAddressId || !hasSelectedItems) {
+      setQuote(null)
+      return
+    }
+    const quoteKey = `${selectedAddressId}|${effectiveDeliveryMethod}|${appliedVoucherCode}|${cartSelectedTotalVnd}`
+    if (skipAutoQuoteKeyRef.current === quoteKey) {
+      skipAutoQuoteKeyRef.current = null
+      return
+    }
+    void requestCheckoutQuote(selectedAddressId, effectiveDeliveryMethod, appliedVoucherCode)
+  }, [
+    isAuthenticated,
+    selectedAddressId,
+    effectiveDeliveryMethod,
+    appliedVoucherCode,
+    hasSelectedItems,
+    cartSelectedTotalVnd,
+    requestCheckoutQuote,
+  ])
+
+  const handleApplyVoucher = async (rawCode: string) => {
+    const normalized = rawCode.trim().toUpperCase()
+    if (!normalized) {
+      setVoucherError('Vui lòng nhập mã giảm giá')
+      return
+    }
+    if (!selectedAddressId) {
+      setVoucherError('Vui lòng chọn địa chỉ nhận hàng trước khi áp dụng mã giảm giá')
+      return
+    }
+
+    const reqId = ++quoteRequestIdRef.current
+    const applySeq = ++applyVoucherSeqRef.current
+    setIsApplyingVoucher(true)
+    setVoucherError(null)
+    try {
+      const res = await vouchersApi.quoteCheckout({
+        addressId: selectedAddressId,
+        deliveryMethod: effectiveDeliveryMethod,
+        voucherCode: normalized,
+      })
+      if (applySeq !== applyVoucherSeqRef.current) return
+      if (res && typeof res === 'object' && 'totalVnd' in res) {
+        const confirmedCode = res.voucherCode || normalized
+        if (reqId === quoteRequestIdRef.current) {
+          const nextKey = `${selectedAddressId}|${effectiveDeliveryMethod}|${confirmedCode}|${cartSelectedTotalVnd}`
+          skipAutoQuoteKeyRef.current = nextKey
+          setQuote(res)
+        }
+        setAppliedVoucherCode(confirmedCode)
+        setVoucherInput(confirmedCode)
+        setVoucherError(null)
+      }
+    } catch (err: unknown) {
+      if (applySeq !== applyVoucherSeqRef.current) return
+      if (err instanceof ApiError) {
+        setVoucherError(err.message || 'Không thể áp dụng mã giảm giá')
+      } else {
+        setVoucherError('Không thể kiểm tra mã giảm giá lúc này. Vui lòng thử lại.')
+      }
+    } finally {
+      if (applySeq === applyVoucherSeqRef.current) {
+        setIsApplyingVoucher(false)
+      }
+    }
+  }
+
+  const handleRemoveVoucher = () => {
+    applyVoucherSeqRef.current += 1
+    setAppliedVoucherCode('')
+    setVoucherInput('')
+    setVoucherError(null)
+  }
+
+  const subtotalVnd = quote?.subtotalVnd ?? cartSelectedTotalVnd
+  const shippingFeeVnd = quote?.shippingFeeVnd ?? (cart?.shippingFeeVnd || '0')
+  const discountVnd = quote?.discountVnd ?? '0'
+  const totalVnd =
+    quote?.totalVnd ??
+    (BigInt(subtotalVnd || '0') + BigInt(shippingFeeVnd || '0')).toString()
   const momoEligible = isMomoAmountEligible(totalVnd)
   const momoIneligibleReason = getMomoIneligibleReason(totalVnd)
 
@@ -172,6 +339,8 @@ export function CheckoutPage() {
       const payload: CreateOrderInput = {
         addressId: selectedAddressId,
         ...(effectiveMethod === 'momo' ? { paymentMethod: 'momo' } : {}),
+        ...(effectiveDeliveryMethod === 'express_2h' ? { deliveryMethod: 'express_2h' } : {}),
+        ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
         lines: selectedItems.map((item) => ({
           variantId: item.variantId,
           quantity: item.quantity,
@@ -207,9 +376,19 @@ export function CheckoutPage() {
         } else if (err.code === 'live_quota_exceeded') {
           toastError('Không đủ suất giá live', err.message)
           await refreshCart()
+        } else if (err.code === 'flash_sale_quota_exceeded') {
+          toastError('Không đủ suất Flash Sale', err.message)
+          await refreshCart()
         } else if (err.code === 'out_of_stock' || err.code === 'stock_limit') {
           toastError('Hết hàng hoặc vượt số lượng', err.message || 'Sản phẩm không đủ tồn kho.')
           await refreshCart()
+        } else if (err.code === 'express_delivery_unavailable') {
+          setDeliveryMethod('standard')
+          toastError('Không hỗ trợ giao hỏa tốc', err.message)
+        } else if (err.code.startsWith('voucher_')) {
+          setVoucherError(err.message)
+          setAppliedVoucherCode('')
+          toastError('Mã giảm giá không hợp lệ', err.message)
         } else {
           toastError('Đặt hàng thất bại', err.message || 'Có lỗi xảy ra khi đặt hàng.')
         }
@@ -528,6 +707,226 @@ export function CheckoutPage() {
               </div>
             </div>
 
+            {/* 2.5 Delivery Method */}
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+              <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
+                  <Truck className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-950">Phương thức vận chuyển</h2>
+                  <p className="text-xs text-zinc-500">
+                    Phí giao hàng được tính theo khu vực nhận hàng
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label
+                  htmlFor="delivery-standard"
+                  className={`flex items-start gap-3 p-4 rounded-xl border transition-colors cursor-pointer ${
+                    effectiveDeliveryMethod === 'standard'
+                      ? 'border-zinc-950 bg-zinc-50/70 ring-1 ring-zinc-950'
+                      : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    id="delivery-standard"
+                    name="deliveryMethod"
+                    value="standard"
+                    checked={effectiveDeliveryMethod === 'standard'}
+                    onChange={() => setDeliveryMethod('standard')}
+                    className="mt-1 h-4 w-4 text-zinc-950 border-zinc-300 focus:ring-zinc-950 cursor-pointer"
+                  />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-zinc-950 text-sm">Giao tiêu chuẩn</span>
+                      {quote && (
+                        <span className="font-mono text-xs font-semibold text-emerald-700">
+                          {quote.standardShippingFeeVnd === '0'
+                            ? '0 ₫'
+                            : formatVND(quote.standardShippingFeeVnd)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      Miễn phí đơn từ {formatVND(quote?.freeShippingThresholdVnd || '5000000')}.
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  htmlFor="delivery-express-2h"
+                  className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${
+                    !expressAvailable
+                      ? 'border-zinc-200 bg-zinc-50/60 opacity-75 cursor-not-allowed'
+                      : effectiveDeliveryMethod === 'express_2h'
+                        ? 'border-zinc-950 bg-emerald-50/40 ring-1 ring-zinc-950 cursor-pointer'
+                        : 'border-zinc-200 bg-white hover:border-zinc-300 cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    id="delivery-express-2h"
+                    name="deliveryMethod"
+                    value="express_2h"
+                    checked={effectiveDeliveryMethod === 'express_2h'}
+                    disabled={!expressAvailable}
+                    onChange={() => setDeliveryMethod('express_2h')}
+                    className="mt-1 h-4 w-4 text-zinc-950 border-zinc-300 focus:ring-zinc-950 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1 font-bold text-zinc-950 text-sm">
+                        <Zap className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Giao hỏa tốc 2 giờ</span>
+                      </span>
+                      <span className="font-mono text-xs font-semibold text-zinc-700">
+                        {formatVND(quote?.expressShippingFeeVnd || '60000')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      Giao nhanh nội thành trong 2 giờ.
+                    </p>
+                    {!expressAvailable && (
+                      <p className="text-xs font-medium text-amber-700 pt-0.5">
+                        Chỉ áp dụng tại Hà Nội & TP. Hồ Chí Minh
+                      </p>
+                    )}
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 2.75 Voucher Section */}
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+              <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
+                  <Tag className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-950">Mã giảm giá</h2>
+                  <p className="text-xs text-zinc-500">
+                    Chọn mã ưu đãi sẵn có hoặc nhập mã giảm giá của bạn
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <Input
+                  id="voucher-code-input"
+                  value={voucherInput}
+                  onChange={(e) => {
+                    setVoucherInput(e.target.value)
+                    if (voucherError) setVoucherError(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void handleApplyVoucher(voucherInput)
+                    }
+                  }}
+                  placeholder="Nhập mã giảm giá (VD: AURA10)"
+                  aria-label="Mã giảm giá"
+                  className="font-mono uppercase"
+                />
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => void handleApplyVoucher(voucherInput)}
+                    disabled={isApplyingVoucher || !selectedAddressId}
+                    isLoading={isApplyingVoucher}
+                    className="rounded-xl px-5 font-semibold"
+                  >
+                    Áp dụng
+                  </Button>
+                  {appliedVoucherCode && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRemoveVoucher}
+                      className="rounded-xl gap-1 text-zinc-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Gỡ mã</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {voucherError && (
+                <p role="alert" className="text-xs font-medium text-rose-600">
+                  {voucherError}
+                </p>
+              )}
+
+              {appliedVoucherCode && (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-900">
+                  <span>
+                    Đang áp dụng mã <strong className="font-mono">{appliedVoucherCode}</strong>
+                    {BigInt(discountVnd || '0') > 0n ? ` — Giảm ${formatVND(discountVnd)}` : ''}
+                  </span>
+                </div>
+              )}
+
+              {availableVouchers.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Mã giảm giá khả dụng
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {availableVouchers.map((v) => {
+                      const isApplied = appliedVoucherCode === v.code
+                      return (
+                        <div
+                          key={v.id}
+                          className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
+                            isApplied
+                              ? 'border-emerald-600 bg-emerald-50/50'
+                              : 'border-zinc-200 bg-zinc-50/40 hover:border-zinc-400'
+                          }`}
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-zinc-950 bg-white border border-zinc-200 px-1.5 py-0.5 rounded">
+                                {v.code}
+                              </span>
+                              <span className="text-[11px] text-zinc-500">
+                                Còn {v.userRemainingUses} lượt
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold text-zinc-900 truncate">
+                              {v.title}
+                            </p>
+                            <p className="text-[11px] text-zinc-500">
+                              {Number(v.minOrderVnd) > 0
+                                ? `Đơn tối thiểu ${formatVND(v.minOrderVnd)}`
+                                : 'Áp dụng mọi đơn hàng'}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={isApplied ? 'outline' : 'secondary'}
+                            data-testid={`apply-voucher-${v.code}`}
+                            disabled={isApplyingVoucher || !selectedAddressId}
+                            onClick={() =>
+                              isApplied ? handleRemoveVoucher() : void handleApplyVoucher(v.code)
+                            }
+                            className="rounded-lg text-xs shrink-0"
+                          >
+                            {isApplied ? 'Đã chọn' : 'Chọn mã'}
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 3. Payment Method */}
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
               <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
@@ -651,6 +1050,17 @@ export function CheckoutPage() {
                       : formatVND(shippingFeeVnd)}
                   </span>
                 </div>
+
+                {(BigInt(discountVnd || '0') > 0n || appliedVoucherCode) && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>
+                      Giảm giá{quote?.voucherCode || appliedVoucherCode ? ` (${quote?.voucherCode || appliedVoucherCode})` : ''}:
+                    </span>
+                    <span className="font-mono font-semibold tabular-nums">
+                      -{formatVND(discountVnd)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-zinc-100 flex justify-between items-baseline">
                   <span className="font-bold text-zinc-950 text-base">Tổng thanh toán:</span>

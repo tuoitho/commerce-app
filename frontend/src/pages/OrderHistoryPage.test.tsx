@@ -3,13 +3,18 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { OrderHistoryPage } from './OrderHistoryPage'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { ordersApi } from '@/api/orders'
-import type { Order, OrderStats } from '@/api/types'
+import { ApiError, type Order, type OrderStats } from '@/api/types'
 
 // Mock context hooks
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
+}))
+
+vi.mock('@/context/CartContext', () => ({
+  useCart: vi.fn(),
 }))
 
 // Mock API modules
@@ -18,6 +23,7 @@ vi.mock('@/api/orders', () => ({
     getOrderStats: vi.fn(),
     listOrders: vi.fn(),
     retryMomoPayment: vi.fn(),
+    buyAgain: vi.fn(),
   },
 }))
 
@@ -98,6 +104,8 @@ const mockOrders: Order[] = [
 ]
 
 describe('OrderHistoryPage', () => {
+  const mockRefreshCart = vi.fn()
+
   beforeEach(() => {
     vi.clearAllMocks()
 
@@ -109,6 +117,18 @@ describe('OrderHistoryPage', () => {
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
+    })
+
+    vi.mocked(useCart).mockReturnValue({
+      cart: null,
+      isLoading: false,
+      badgeCount: 0,
+      refreshCart: mockRefreshCart,
+      addItem: vi.fn(),
+      updateQuantity: vi.fn(),
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      removeItem: vi.fn(),
     })
 
     vi.mocked(ordersApi.getOrderStats).mockResolvedValue(mockStats)
@@ -547,5 +567,102 @@ describe('OrderHistoryPage', () => {
         configurable: true,
       })
     }
+  })
+
+  it('shows "Mua lại" only for delivered/partially_returned/returned/cancelled orders, refreshes cart with feedback toast, and navigates to /cart', async () => {
+    const buyAgainOrders: Order[] = [
+      { ...mockOrders[0], id: 'ord-pending', status: 'pending_confirmation' },
+      { ...mockOrders[1], id: 'ord-delivered', status: 'delivered', deliveryMethod: 'express_2h', voucherCode: 'AURA10', discountVnd: '1000000' },
+      { ...mockOrders[1], id: 'ord-cancelled', status: 'cancelled' },
+    ]
+    vi.mocked(ordersApi.listOrders).mockResolvedValue(buyAgainOrders)
+    vi.mocked(ordersApi.buyAgain).mockResolvedValue({
+      cart: {
+        items: [],
+        totalUnits: 2,
+        selectedLineCount: 1,
+        selectedTotalVnd: '51980000',
+        shippingFeeVnd: '0',
+      },
+      addedCount: 1,
+      adjustedItems: [
+        {
+          variantId: 'v-1',
+          productName: 'iPhone 16 Pro',
+          requestedQuantity: 3,
+          addedQuantity: 2,
+        },
+      ],
+      skippedItems: [
+        {
+          variantId: 'v-2',
+          productName: 'Galaxy S25',
+          reason: 'out_of_stock',
+        },
+      ],
+    })
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders']}>
+          <Routes>
+            <Route path="/orders" element={<OrderHistoryPage />} />
+            <Route path="/cart" element={<div>Cart Target Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Mã đơn: ord-delivered/i)).toBeInTheDocument()
+    })
+
+    // Only delivered & cancelled orders show Mua lại (not pending_confirmation)
+    const buyAgainButtons = screen.getAllByRole('button', { name: /Mua lại/i })
+    expect(buyAgainButtons).toHaveLength(2)
+    expect(screen.getByText(/Giao hỏa tốc 2 giờ/i)).toBeInTheDocument()
+
+    fireEvent.click(buyAgainButtons[0])
+
+    await waitFor(() => {
+      expect(ordersApi.buyAgain).toHaveBeenCalledWith('ord-delivered')
+      expect(mockRefreshCart).toHaveBeenCalled()
+      expect(screen.getByText('Cart Target Page')).toBeInTheDocument()
+      expect(screen.getByText(/iPhone 16 Pro/i)).toBeInTheDocument()
+      expect(screen.getByText(/Galaxy S25/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows Vietnamese error toast and stays on /orders when buyAgain returns 409 buy_again_all_unavailable', async () => {
+    vi.mocked(ordersApi.listOrders).mockResolvedValue([
+      { ...mockOrders[1], id: 'ord-returned', status: 'returned' },
+    ])
+    vi.mocked(ordersApi.buyAgain).mockRejectedValue(
+      new ApiError(409, {
+        code: 'buy_again_all_unavailable',
+        message: 'Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh',
+      })
+    )
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/orders']}>
+          <Routes>
+            <Route path="/orders" element={<OrderHistoryPage />} />
+            <Route path="/cart" element={<div>Cart Target Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    )
+
+    const buyAgainBtn = await screen.findByRole('button', { name: /Mua lại/i })
+    fireEvent.click(buyAgainBtn)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh')
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Cart Target Page')).not.toBeInTheDocument()
   })
 })

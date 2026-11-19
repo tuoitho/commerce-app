@@ -18,11 +18,21 @@ import {
   ShieldCheck,
   Star,
   MessageCircle,
+  Copy,
+  Check,
+  ShoppingCart,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
+import { useChatSocket } from '@/hooks/useChatSocket'
 import { ordersApi } from '@/api/orders'
 import { cancelReturn } from '@/api/returns'
+import {
+  canBuyAgainOrder,
+  formatBuyAgainFeedback,
+  getDeliveryMethodLabel,
+} from '@/lib/orders'
 import {
   ApiError,
   type Order,
@@ -40,6 +50,8 @@ import {
 } from '@/lib/payment'
 import { orderToAttachedOrderCard } from '@/lib/chatUtils'
 import { MomoCountdown } from '@/components/orders/MomoCountdown'
+import { OrderStepper } from '@/components/orders/OrderStepper'
+import { OrderTimeline } from '@/components/orders/OrderTimeline'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -196,6 +208,8 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const cartCtx = useCart({ optional: true })
+  const refreshCart = cartCtx?.refreshCart
   const { success, error: toastError } = useToast()
 
   const [order, setOrder] = useState<Order | null>(null)
@@ -206,6 +220,8 @@ export function OrderDetailPage() {
   const [dialogType, setDialogType] = useState<'cancel' | 'request_cancel' | 'undo_cancel' | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
   const [isRetryingMomo, setIsRetryingMomo] = useState(false)
+  const [isBuyingAgain, setIsBuyingAgain] = useState(false)
+  const [copiedTracking, setCopiedTracking] = useState(false)
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
   const [isCancelReturnDialogOpen, setIsCancelReturnDialogOpen] = useState(false)
@@ -274,6 +290,60 @@ export function OrderDetailPage() {
       fetchOrderDetail()
     }
   }, [isAuthenticated, id, fetchOrderDetail])
+
+  const refreshOrderSilently = useCallback(async () => {
+    if (!id || !isAuthenticated) return
+    try {
+      const data = await ordersApi.getOrder(id)
+      setOrder(data)
+      setNowMs(Date.now())
+    } catch {
+      // Silent background refresh on realtime order event
+    }
+  }, [id, isAuthenticated])
+
+  useChatSocket({
+    enabled: Boolean(isAuthenticated && id),
+    onNotification: (notif) => {
+      if (notif.metadata?.orderId === id) {
+        void refreshOrderSilently()
+      }
+    },
+  })
+
+  const handleCopyTrackingCode = async (code: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code)
+      }
+      setCopiedTracking(true)
+      success('Đã sao chép mã vận đơn', `Mã vận đơn ${code} đã được sao chép.`)
+      setTimeout(() => setCopiedTracking(false), 2000)
+    } catch {
+      toastError('Không thể sao chép', 'Trình duyệt không cho phép truy cập bộ nhớ tạm.')
+    }
+  }
+
+  const handleBuyAgain = async () => {
+    if (!order) return
+    setIsBuyingAgain(true)
+    try {
+      const result = await ordersApi.buyAgain(order.id)
+      await refreshCart?.()
+      const feedback = formatBuyAgainFeedback(result)
+      success(feedback.title, feedback.description)
+      navigate('/cart')
+    } catch (err: unknown) {
+      toastError(
+        'Không thể mua lại đơn hàng',
+        err instanceof ApiError
+          ? err.message
+          : 'Không thể thêm sản phẩm vào giỏ hàng lúc này. Vui lòng thử lại.'
+      )
+    } finally {
+      setIsBuyingAgain(false)
+    }
+  }
 
   const handleRetryMomo = async () => {
     if (!order) return
@@ -518,7 +588,7 @@ export function OrderDetailPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Status Notice Banner */}
-        <div className="mb-8 rounded-2xl border border-zinc-200 bg-white p-6">
+        <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5">
               <div
@@ -557,6 +627,11 @@ export function OrderDetailPage() {
                 </div>
               )}
           </div>
+        </div>
+
+        {/* Visual Order Stepper */}
+        <div className="mb-8">
+          <OrderStepper order={order} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -652,7 +727,7 @@ export function OrderDetailPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm text-zinc-700">
+              <div className="space-y-3 text-sm text-zinc-700">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="font-bold text-zinc-950 text-base">{order.recipientName}</span>
                   <span className="font-mono text-zinc-500">({order.phone})</span>
@@ -660,6 +735,63 @@ export function OrderDetailPage() {
                 <p className="text-zinc-600 leading-relaxed">
                   {order.detailAddress}, {order.wardName}, {order.provinceName}
                 </p>
+
+                <div className="pt-3 border-t border-zinc-100 space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-zinc-500">Phương thức vận chuyển:</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs font-semibold ${
+                        order.deliveryMethod === 'express_2h'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-zinc-50 text-zinc-800 border-zinc-200'
+                      }`}
+                    >
+                      {getDeliveryMethodLabel(order.deliveryMethod)}
+                    </Badge>
+                  </div>
+
+                  {(order.carrier || order.trackingCode) && (
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 space-y-1.5">
+                      {order.carrier && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-zinc-500">Đơn vị vận chuyển:</span>
+                          <span className="font-semibold text-zinc-900">{order.carrier}</span>
+                        </div>
+                      )}
+                      {order.trackingCode && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-zinc-500">Mã vận đơn:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-zinc-950">
+                              {order.trackingCode}
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              aria-label="Sao chép mã vận đơn"
+                              onClick={() => void handleCopyTrackingCode(order.trackingCode!)}
+                              className="h-7 px-2 rounded-lg text-[11px] gap-1"
+                            >
+                              {copiedTracking ? (
+                                <>
+                                  <Check className="h-3 w-3 text-emerald-700" />
+                                  <span>Đã chép</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  <span>Sao chép</span>
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -910,6 +1042,17 @@ export function OrderDetailPage() {
                   </span>
                 </div>
 
+                {((order.discountVnd && Number(order.discountVnd) > 0) || order.voucherCode) && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>
+                      Giảm giá{order.voucherCode ? ` (${order.voucherCode})` : ''}:
+                    </span>
+                    <span className="font-mono font-semibold tabular-nums">
+                      -{formatVND(order.discountVnd || '0')}
+                    </span>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-zinc-100 flex justify-between items-baseline">
                   <span className="font-bold text-zinc-950 text-base">Tổng thanh toán:</span>
                   <span className="font-mono font-bold text-xl sm:text-2xl text-zinc-950 tabular-nums">
@@ -1013,6 +1156,20 @@ export function OrderDetailPage() {
                   </div>
                 )}
 
+                {canBuyAgainOrder(order.status) && (
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() => void handleBuyAgain()}
+                    disabled={isBuyingAgain}
+                    isLoading={isBuyingAgain}
+                    className="w-full rounded-xl font-semibold gap-2 bg-emerald-700 hover:bg-emerald-800"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    <span>Mua lại</span>
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="lg"
@@ -1026,40 +1183,8 @@ export function OrderDetailPage() {
               </div>
             </div>
 
-            {/* Timeline / Additional details */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-3 text-xs text-zinc-500">
-              <h4 className="font-bold text-zinc-950 text-sm">Lịch sử thời gian</h4>
-              <div className="space-y-2 divide-y divide-zinc-100">
-                <div className="flex justify-between pt-1">
-                  <span>Thời gian tạo:</span>
-                  <span className="font-mono text-zinc-800">{formatDateTime(order.createdAt)}</span>
-                </div>
-                {order.confirmedAt && (
-                  <div className="flex justify-between pt-2">
-                    <span>Thời gian xác nhận:</span>
-                    <span className="font-mono text-zinc-800">
-                      {formatDateTime(order.confirmedAt)}
-                    </span>
-                  </div>
-                )}
-                {order.deliveredAt && (
-                  <div className="flex justify-between pt-2">
-                    <span>Thời gian giao hàng:</span>
-                    <span className="font-mono text-emerald-700">
-                      {formatDateTime(order.deliveredAt)}
-                    </span>
-                  </div>
-                )}
-                {order.cancelledAt && (
-                  <div className="flex justify-between pt-2">
-                    <span>Thời gian hủy:</span>
-                    <span className="font-mono text-rose-600">
-                      {formatDateTime(order.cancelledAt)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Order Journey Timeline */}
+            <OrderTimeline order={order} />
           </div>
         </div>
       </div>

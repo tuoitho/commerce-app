@@ -7,8 +7,9 @@ import {
   getOrder,
   cancelOrder,
   undoCancelOrder,
+  buyAgain,
 } from './orders'
-import type { Order, CreateOrderInput, OrderStats } from './types'
+import type { Order, CreateOrderInput, OrderStats, BuyAgainResult } from './types'
 
 describe('ordersApi', () => {
   beforeEach(() => {
@@ -339,5 +340,136 @@ describe('ordersApi', () => {
       })
     )
     expect(result).toEqual(paidOrder)
+  })
+
+  it('createOrder forwards deliveryMethod and non-empty voucherCode and omits blank voucherCode', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        success: true,
+        message: 'Tạo đơn hàng thành công',
+        data: mockOrder,
+        error: null,
+        meta: { timestamp: '2026-11-18T10:00:00Z' },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createOrder({
+      addressId: 'addr-1',
+      deliveryMethod: 'express_2h',
+      voucherCode: '  AURA10  ',
+      lines: [
+        {
+          variantId: 'var-1',
+          quantity: 1,
+          productName: 'Product A',
+          unitPriceVnd: '100000',
+        },
+      ],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/orders'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          addressId: 'addr-1',
+          deliveryMethod: 'express_2h',
+          voucherCode: 'AURA10',
+          lines: [
+            {
+              variantId: 'var-1',
+              quantity: 1,
+              productName: 'Product A',
+              unitPriceVnd: '100000',
+            },
+          ],
+        }),
+      })
+    )
+
+    await createOrder({
+      addressId: 'addr-1',
+      voucherCode: '   ',
+      lines: [
+        {
+          variantId: 'var-1',
+          quantity: 1,
+          productName: 'Product A',
+          unitPriceVnd: '100000',
+        },
+      ],
+    })
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/orders'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          addressId: 'addr-1',
+          lines: [
+            {
+              variantId: 'var-1',
+              quantity: 1,
+              productName: 'Product A',
+              unitPriceVnd: '100000',
+            },
+          ],
+        }),
+      })
+    )
+  })
+
+  it('buyAgain calls POST /orders/:id/buy-again and returns BuyAgainResult', async () => {
+    const mockBuyAgain: BuyAgainResult = {
+      cart: {
+        items: [],
+        totalUnits: 2,
+        selectedLineCount: 1,
+        selectedTotalVnd: '51980000',
+        shippingFeeVnd: '0',
+      },
+      addedCount: 1,
+      adjustedItems: [
+        {
+          variantId: 'var-1',
+          productName: 'iPhone 16 Pro',
+          requestedQuantity: 3,
+          addedQuantity: 2,
+        },
+      ],
+      skippedItems: [
+        {
+          variantId: 'var-2',
+          productName: 'Samsung Galaxy S25',
+          reason: 'out_of_stock',
+        },
+      ],
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        message: 'Đã thêm sản phẩm vào giỏ hàng',
+        data: mockBuyAgain,
+        error: null,
+        meta: { timestamp: '2026-11-18T10:00:00Z' },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await buyAgain('ord-123')
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/orders/ord-123/buy-again'),
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(result).toEqual(mockBuyAgain)
+
+    const objResult = await ordersApi.buyAgain('ord-123')
+    expect(objResult).toEqual(mockBuyAgain)
   })
 })

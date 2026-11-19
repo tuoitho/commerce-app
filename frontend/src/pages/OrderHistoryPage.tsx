@@ -13,10 +13,19 @@ import {
   Smartphone,
   ChevronRight,
   Star,
+  ShoppingCart,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { useToast } from '@/context/ToastContext'
+import { useChatSocket } from '@/hooks/useChatSocket'
 import { ordersApi } from '@/api/orders'
+import {
+  canBuyAgainOrder,
+  formatBuyAgainFeedback,
+  getDeliveryMethodLabel,
+} from '@/lib/orders'
 import {
   ApiError,
   type Order,
@@ -115,7 +124,9 @@ export function OrderHistoryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
-  const { error: toastError } = useToast()
+  const cartCtx = useCart({ optional: true })
+  const refreshCart = cartCtx?.refreshCart
+  const { success, error: toastError } = useToast()
 
   const currentTab = (searchParams.get('status') as OrderStatusBucket) || 'all'
   const activeTab: OrderStatusBucket = TABS.some((t) => t.key === currentTab)
@@ -128,6 +139,7 @@ export function OrderHistoryPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [errorOrders, setErrorOrders] = useState<string | null>(null)
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null)
+  const [buyingAgainOrderId, setBuyingAgainOrderId] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
   const [reviewDialogState, setReviewDialogState] = useState<{
@@ -192,6 +204,50 @@ export function OrderHistoryPage() {
       setRetryingOrderId(null)
     }
   }
+
+  const handleBuyAgain = async (orderId: string) => {
+    setBuyingAgainOrderId(orderId)
+    try {
+      const result = await ordersApi.buyAgain(orderId)
+      await refreshCart?.()
+      const feedback = formatBuyAgainFeedback(result)
+      success(feedback.title, feedback.description)
+      navigate('/cart')
+    } catch (err: unknown) {
+      toastError(
+        'Không thể mua lại đơn hàng',
+        err instanceof ApiError
+          ? err.message
+          : 'Không thể thêm sản phẩm vào giỏ hàng lúc này. Vui lòng thử lại.'
+      )
+    } finally {
+      setBuyingAgainOrderId(null)
+    }
+  }
+
+  const refreshSilentlyOnOrderEvent = useCallback(async () => {
+    if (!isAuthenticated) return
+    try {
+      const [latestOrders, latestStats] = await Promise.all([
+        ordersApi.listOrders(activeTab),
+        ordersApi.getOrderStats(),
+      ])
+      setOrders(latestOrders)
+      setStats(latestStats)
+      setNowMs(Date.now())
+    } catch {
+      // Silent background sync on WS order update
+    }
+  }, [isAuthenticated, activeTab])
+
+  useChatSocket({
+    enabled: isAuthenticated,
+    onNotification: (notif) => {
+      if (notif.category === 'order' || Boolean(notif.metadata?.orderId)) {
+        void refreshSilentlyOnOrderEvent()
+      }
+    },
+  })
 
   const handleReviewSuccess = (savedReview: Review) => {
     if (!reviewDialogState.item) return
@@ -558,6 +614,15 @@ export function OrderHistoryPage() {
                       >
                         {getPaymentMethodShortLabel(order.paymentMethod)}
                       </Badge>
+                      {order.deliveryMethod === 'express_2h' && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-800 border-amber-200 gap-1"
+                        >
+                          <Zap className="h-3 w-3" />
+                          <span>{getDeliveryMethodLabel(order.deliveryMethod)}</span>
+                        </Badge>
+                      )}
                       <Badge
                         variant="outline"
                         className={`text-xs font-semibold px-2.5 py-1 ${paymentBadge.className}`}
@@ -726,6 +791,23 @@ export function OrderHistoryPage() {
                         <span className="mx-1">•</span>
                         <span>{order.provinceName}</span>
                       </div>
+                      {order.trackingCode && (
+                        <div className="text-xs text-zinc-600">
+                          <span>Mã vận đơn: </span>
+                          <span className="font-mono font-semibold text-zinc-900">
+                            {order.trackingCode}
+                          </span>
+                          {order.carrier && <span className="text-zinc-500"> ({order.carrier})</span>}
+                        </div>
+                      )}
+                      {order.discountVnd && Number(order.discountVnd) > 0 && (
+                        <div className="text-xs text-emerald-700 font-medium">
+                          <span>
+                            Đã giảm {formatVND(order.discountVnd)}
+                            {order.voucherCode ? ` (${order.voucherCode})` : ''}
+                          </span>
+                        </div>
+                      )}
                       {isMomo && order.paymentTransactionId && (
                         <div className="text-xs text-zinc-600">
                           <span>Mã GD MoMo: </span>
@@ -751,6 +833,20 @@ export function OrderHistoryPage() {
                           {formatVND(order.totalVnd)}
                         </span>
                       </div>
+
+                      {canBuyAgainOrder(order.status) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleBuyAgain(order.id)}
+                          disabled={buyingAgainOrderId === order.id}
+                          isLoading={buyingAgainOrderId === order.id}
+                          className="rounded-xl font-semibold gap-1.5 px-3.5 border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                          <span>Mua lại</span>
+                        </Button>
+                      )}
 
                       {retryAllowed && (
                         <Button
