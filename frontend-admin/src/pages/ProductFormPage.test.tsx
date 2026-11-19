@@ -6,12 +6,13 @@ import { ProductFormPage } from './ProductFormPage'
 import * as productsApi from '@/api/products'
 import * as categoriesApi from '@/api/categories'
 import { ApiError } from '@/api/types'
-import type { Category, ProductDetail } from '@/api/types'
+import type { Category, ProductDetail, ProductImageUploadResult } from '@/api/types'
 
 vi.mock('@/api/products', () => ({
   createAdminProduct: vi.fn(),
   updateAdminProduct: vi.fn(),
   getAdminProductById: vi.fn(),
+  uploadProductImage: vi.fn(),
 }))
 
 vi.mock('@/api/categories', () => ({
@@ -184,7 +185,20 @@ describe('ProductFormPage', () => {
       expect(productsApi.createAdminProduct).not.toHaveBeenCalled()
     })
 
-    it('submits valid simple product, calls createAdminProduct with SaveProductRequest, and redirects', async () => {
+    it('submits valid simple product with uploaded Object Storage images and redirects', async () => {
+      vi.mocked(productsApi.uploadProductImage)
+        .mockResolvedValueOnce({
+          key: '11111111-1111-1111-1111-111111111111.webp',
+          url: '/media/products/11111111-1111-1111-1111-111111111111.webp',
+          mimeType: 'image/webp',
+          sizeBytes: 1200,
+        })
+        .mockResolvedValueOnce({
+          key: '22222222-2222-2222-2222-222222222222.jpg',
+          url: '/media/products/22222222-2222-2222-2222-222222222222.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: 2400,
+        })
       vi.mocked(productsApi.createAdminProduct).mockResolvedValueOnce(mockProductDetail)
 
       renderComponent('/products/new')
@@ -201,9 +215,16 @@ describe('ProductFormPage', () => {
       fireEvent.change(screen.getByLabelText(/tồn kho|số lượng/i), { target: { value: '15' } })
       fireEvent.change(screen.getByLabelText(/mô tả/i), { target: { value: 'Điện thoại chụp ảnh đỉnh cao' } })
       fireEvent.click(screen.getByLabelText(/nổi bật/i))
-      fireEvent.change(screen.getByLabelText(/hình ảnh/i), {
-        target: { value: 'https://example.com/xiaomi1.jpg\nhttps://example.com/xiaomi2.jpg' },
+
+      const file1 = new File(['img1'], 'xiaomi1.webp', { type: 'image/webp' })
+      const file2 = new File(['img2'], 'xiaomi2.jpg', { type: 'image/jpeg' })
+      const fileInput = screen.getByLabelText(/tải lên hình ảnh sản phẩm/i)
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } })
+
+      await waitFor(() => {
+        expect(productsApi.uploadProductImage).toHaveBeenCalledTimes(2)
       })
+      expect(await screen.findByText('Ảnh đại diện')).toBeInTheDocument()
 
       const submitButton = screen.getByRole('button', { name: /^tạo sản phẩm$/i })
       fireEvent.click(submitButton)
@@ -219,10 +240,14 @@ describe('ProductFormPage', () => {
           stockQuantity: 15,
           description: 'Điện thoại chụp ảnh đỉnh cao',
           featured: true,
-          imageUrls: ['https://example.com/xiaomi1.jpg', 'https://example.com/xiaomi2.jpg'],
+          imageUrls: [
+            '/media/products/11111111-1111-1111-1111-111111111111.webp',
+            '/media/products/22222222-2222-2222-2222-222222222222.jpg',
+          ],
           hasVariants: false,
           optionGroups: [],
           variants: [],
+          specs: [],
         })
       })
 
@@ -443,6 +468,289 @@ describe('ProductFormPage', () => {
 
       expect(await screen.findByText('Tên nhóm thuộc tính không hợp lệ')).toBeInTheDocument()
       expect(await screen.findByText('Giá biến thể không hợp lệ')).toBeInTheDocument()
+    })
+  })
+
+  describe('Object Storage Image Uploader & Gallery Controls (Req 4.3)', () => {
+    it('supports drag-and-drop upload, rejects invalid file types/sizes, reorders, sets primary, deletes, and adds external URL', async () => {
+      vi.mocked(productsApi.uploadProductImage)
+        .mockResolvedValueOnce({
+          key: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1.webp',
+          url: '/media/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1.webp',
+          mimeType: 'image/webp',
+          sizeBytes: 500,
+        })
+        .mockResolvedValueOnce({
+          key: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2.png',
+          url: '/media/products/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2.png',
+          mimeType: 'image/png',
+          sizeBytes: 800,
+        })
+      vi.mocked(productsApi.createAdminProduct).mockResolvedValueOnce(mockProductDetail)
+
+      renderComponent('/products/new')
+
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: 'Điện thoại' })).toBeInTheDocument()
+      })
+
+      const dropzone = screen.getByTestId('product-image-dropzone')
+
+      // Invalid MIME type rejected client-side without calling API
+      const invalidFile = new File(['gif'], 'bad.gif', { type: 'image/gif' })
+      fireEvent.drop(dropzone, { dataTransfer: { files: [invalidFile] } })
+      expect(await screen.findByText(/bad\.gif: Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP/i)).toBeInTheDocument()
+      expect(productsApi.uploadProductImage).not.toHaveBeenCalled()
+
+      // Oversized file rejected client-side
+      const hugeFile = new File(['x'], 'huge.jpg', { type: 'image/jpeg' })
+      Object.defineProperty(hugeFile, 'size', { value: 10 * 1024 * 1024 + 5 })
+      fireEvent.drop(dropzone, { dataTransfer: { files: [hugeFile] } })
+      expect(await screen.findByText(/từ 1 byte đến tối đa 10 MB/i)).toBeInTheDocument()
+      expect(productsApi.uploadProductImage).not.toHaveBeenCalled()
+
+      // Valid multi-file drop
+      const valid1 = new File(['1'], 'first.webp', { type: 'image/webp' })
+      const valid2 = new File(['2'], 'second.png', { type: 'image/png' })
+      fireEvent.drop(dropzone, { dataTransfer: { files: [valid1, valid2] } })
+
+      await waitFor(() => {
+        expect(productsApi.uploadProductImage).toHaveBeenCalledTimes(2)
+      })
+      expect(await screen.findByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        '/media/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1.webp'
+      )
+      expect(screen.getByAltText('Ảnh sản phẩm 2')).toHaveAttribute(
+        'src',
+        '/media/products/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2.png'
+      )
+      expect(screen.getByText('Ảnh đại diện')).toBeInTheDocument()
+
+      // Set second image as primary
+      fireEvent.click(screen.getByRole('button', { name: /đặt ảnh 2 làm ảnh đại diện/i }))
+      expect(screen.getByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        '/media/products/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2.png'
+      )
+
+      // Delete first image
+      fireEvent.click(screen.getByRole('button', { name: /xóa ảnh 1/i }))
+      expect(screen.queryByAltText('Ảnh sản phẩm 2')).not.toBeInTheDocument()
+      expect(screen.getByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        '/media/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1.webp'
+      )
+
+      // Add optional external URL for legacy compatibility
+      fireEvent.click(screen.getByRole('button', { name: /thêm url ảnh ngoài/i }))
+      fireEvent.change(screen.getByLabelText(/đường dẫn url ảnh ngoài/i), {
+        target: { value: 'https://example.com/legacy-phone.jpg' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: /^thêm url$/i }))
+
+      expect(screen.getByAltText('Ảnh sản phẩm 2')).toHaveAttribute(
+        'src',
+        'https://example.com/legacy-phone.jpg'
+      )
+
+      // Submit product and verify imageUrls order
+      fireEvent.change(screen.getByLabelText(/tên sản phẩm/i), { target: { value: 'iPhone 16 Pro' } })
+      fireEvent.change(screen.getByLabelText(/thương hiệu/i), { target: { value: 'Apple' } })
+      fireEvent.change(screen.getByLabelText(/danh mục/i), { target: { value: 'cat-phones' } })
+      fireEvent.change(screen.getByLabelText(/giá/i), { target: { value: '28990000' } })
+      fireEvent.click(screen.getByRole('button', { name: /^tạo sản phẩm$/i }))
+
+      await waitFor(() => {
+        expect(productsApi.createAdminProduct).toHaveBeenCalledWith(
+          expect.objectContaining({
+            imageUrls: [
+              '/media/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1.webp',
+              'https://example.com/legacy-phone.jpg',
+            ],
+          })
+        )
+      })
+    })
+
+    it('preserves concurrent gallery edits made while an image upload is in flight', async () => {
+      let resolveUpload!: (val: ProductImageUploadResult) => void
+      const pendingUpload = new Promise<ProductImageUploadResult>((resolve) => {
+        resolveUpload = resolve
+      })
+
+      vi.mocked(productsApi.getAdminProductById).mockResolvedValueOnce(mockProductDetail)
+      vi.mocked(productsApi.uploadProductImage).mockReturnValueOnce(pendingUpload)
+      vi.mocked(productsApi.updateAdminProduct).mockResolvedValueOnce(mockProductDetail)
+
+      renderComponent('/products/prod-123')
+
+      // Wait for existing 2 images to load
+      expect(await screen.findByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone1.jpg'
+      )
+      expect(screen.getByAltText('Ảnh sản phẩm 2')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone2.jpg'
+      )
+
+      // Start an image upload
+      const file = new File(['img3'], 'iphone3.webp', { type: 'image/webp' })
+      fireEvent.change(screen.getByLabelText(/tải lên hình ảnh sản phẩm/i), {
+        target: { files: [file] },
+      })
+      expect(await screen.findByText('Đang tải ảnh lên...')).toBeInTheDocument()
+
+      // While upload is in flight, delete image 1 and add an external URL
+      fireEvent.click(screen.getByRole('button', { name: /xóa ảnh 1/i }))
+      expect(screen.queryByAltText('Ảnh sản phẩm 2')).not.toBeInTheDocument()
+      expect(screen.getByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone2.jpg'
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /thêm url ảnh ngoài/i }))
+      fireEvent.change(screen.getByLabelText(/đường dẫn url ảnh ngoài/i), {
+        target: { value: 'https://example.com/iphone3-ext.jpg' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: /^thêm url$/i }))
+      expect(screen.getByAltText('Ảnh sản phẩm 2')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone3-ext.jpg'
+      )
+
+      // Complete the in-flight upload
+      resolveUpload({
+        key: '33333333-3333-3333-3333-333333333333.webp',
+        url: '/media/products/33333333-3333-3333-3333-333333333333.webp',
+        mimeType: 'image/webp',
+        sizeBytes: 1500,
+      })
+
+      // Gallery must retain iphone2, iphone3-ext, AND append uploaded image without resurrecting iphone1
+      expect(await screen.findByAltText('Ảnh sản phẩm 3')).toHaveAttribute(
+        'src',
+        '/media/products/33333333-3333-3333-3333-333333333333.webp'
+      )
+      expect(screen.getByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone2.jpg'
+      )
+      expect(screen.getByAltText('Ảnh sản phẩm 2')).toHaveAttribute(
+        'src',
+        'https://example.com/iphone3-ext.jpg'
+      )
+    })
+  })
+
+  describe('Structured Specs Editor & Phone Preset (Req 5.2)', () => {
+    it('applies 6-group phone preset without overwriting existing groups/labels/values and submits structured specs', async () => {
+      vi.mocked(productsApi.createAdminProduct).mockResolvedValueOnce(mockProductDetail)
+
+      renderComponent('/products/new')
+
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: 'Điện thoại' })).toBeInTheDocument()
+      })
+
+      // Add a custom group first and fill in an existing label + value in Màn hình
+      fireEvent.click(screen.getByRole('button', { name: /thêm nhóm thông số/i }))
+      fireEvent.change(screen.getByLabelText('Tên nhóm thông số 1'), {
+        target: { value: 'Màn hình' },
+      })
+      fireEvent.change(screen.getByLabelText('Nhãn thông số 1.1'), {
+        target: { value: 'Kích thước & Tấm nền' },
+      })
+      fireEvent.change(screen.getByLabelText('Giá trị thông số 1.1'), {
+        target: { value: '6.9 inch Super Retina XDR' },
+      })
+
+      // Apply Phone Preset
+      fireEvent.click(screen.getByRole('button', { name: /áp dụng mẫu điện thoại/i }))
+
+      // Existing value must be preserved verbatim
+      expect(screen.getByLabelText('Giá trị thông số 1.1')).toHaveValue(
+        '6.9 inch Super Retina XDR'
+      )
+
+      // All 6 standard groups must now be present
+      for (const expectedGroup of [
+        'Màn hình',
+        'Hiệu năng & Chipset',
+        'Camera',
+        'Pin & Sạc',
+        'Kết nối',
+        'Thiết kế & Độ bền',
+      ]) {
+        expect(screen.getByDisplayValue(expectedGroup)).toBeInTheDocument()
+      }
+
+      // Remove groups 2..6 and unfilled preset rows in group 1 so only filled row remains, then add a new row
+      for (let idx = 6; idx >= 2; idx--) {
+        fireEvent.click(screen.getByRole('button', { name: `Xóa nhóm ${idx}` }))
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa dòng 1.3' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa dòng 1.2' }))
+
+      fireEvent.change(screen.getByLabelText(/tên sản phẩm/i), { target: { value: 'iPhone 16 Pro Max' } })
+      fireEvent.change(screen.getByLabelText(/thương hiệu/i), { target: { value: 'Apple' } })
+      fireEvent.change(screen.getByLabelText(/danh mục/i), { target: { value: 'cat-phones' } })
+      fireEvent.change(screen.getByLabelText(/giá bán \(vnd\)/i), { target: { value: '34990000' } })
+      fireEvent.click(screen.getByRole('button', { name: /^tạo sản phẩm$/i }))
+
+      await waitFor(() => {
+        expect(productsApi.createAdminProduct).toHaveBeenCalledWith(
+          expect.objectContaining({
+            specs: [
+              {
+                group: 'Màn hình',
+                items: [
+                  {
+                    label: 'Kích thước & Tấm nền',
+                    value: '6.9 inch Super Retina XDR',
+                  },
+                ],
+              },
+            ],
+          })
+        )
+      })
+    })
+
+    it('populates existing specs and images in edit mode and maps server validation errors', async () => {
+      vi.mocked(productsApi.getAdminProductById).mockResolvedValueOnce({
+        ...mockProductDetail,
+        imageUrls: ['/media/products/550e8400-e29b-41d4-a716-446655440000.webp'],
+        specs: [
+          {
+            group: 'Hiệu năng & Chipset',
+            items: [{ label: 'Chipset', value: 'Apple A18 Pro' }],
+          },
+        ],
+      })
+      vi.mocked(productsApi.updateAdminProduct).mockRejectedValueOnce(
+        new ApiError(400, {
+          code: 'validation_error',
+          message: 'Dữ liệu không hợp lệ',
+          fields: {
+            'specs[0].items[0].value': 'Giá trị thông số không hợp lệ từ server',
+          },
+        })
+      )
+
+      renderComponent('/products/prod-123')
+
+      expect(await screen.findByDisplayValue('Hiệu năng & Chipset')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Chipset')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Apple A18 Pro')).toBeInTheDocument()
+      expect(screen.getByAltText('Ảnh sản phẩm 1')).toHaveAttribute(
+        'src',
+        '/media/products/550e8400-e29b-41d4-a716-446655440000.webp'
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /^cập nhật sản phẩm$/i }))
+      expect(await screen.findByText('Giá trị thông số không hợp lệ từ server')).toBeInTheDocument()
     })
   })
 })

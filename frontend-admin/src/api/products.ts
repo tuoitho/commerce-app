@@ -1,5 +1,10 @@
 import { apiClient, apiClientWithMeta, type ApiResponseWithMeta } from './client'
-import type { ProductDetail, ProductSummary, SaveProductRequest } from './types'
+import type {
+  ProductDetail,
+  ProductImageUploadResult,
+  ProductSummary,
+  SaveProductRequest,
+} from './types'
 
 export interface GetAdminProductsParams {
   q?: string
@@ -48,6 +53,15 @@ export async function updateAdminProduct(id: string, payload: SaveProductRequest
 export async function deleteAdminProduct(id: string): Promise<void> {
   return apiClient<void>(`/admin/products/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+  })
+}
+
+export async function uploadProductImage(file: File): Promise<ProductImageUploadResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient<ProductImageUploadResult>('/admin/products/images', {
+    method: 'POST',
+    body: formData,
   })
 }
 

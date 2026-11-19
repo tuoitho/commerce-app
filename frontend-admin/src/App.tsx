@@ -19,6 +19,8 @@ import { AdminPostDetailPage } from '@/pages/AdminPostDetailPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { UserDetailPage } from '@/pages/UserDetailPage'
 import { LivestreamPage } from '@/pages/LivestreamPage'
+import { VouchersPage } from '@/pages/VouchersPage'
+import { FlashSalesPage } from '@/pages/FlashSalesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +49,8 @@ export function AppRoutes() {
         <Route path="posts/:id" element={<AdminPostDetailPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/:id" element={<AdminOrderDetailPage />} />
+        <Route path="vouchers" element={<VouchersPage />} />
+        <Route path="flash-sales" element={<FlashSalesPage />} />
         <Route path="chat" element={<ChatSupportPage />} />
         <Route path="chat/:conversationId" element={<ChatSupportPage />} />
         <Route path="returns" element={<ReturnsPage />} />

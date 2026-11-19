@@ -15,6 +15,7 @@ import {
   User,
   MapPin,
   CreditCard,
+  Copy,
 } from 'lucide-react'
 import {
   getAdminOrder,
@@ -27,9 +28,15 @@ import {
 import {
   ApiError,
   ORDER_STATUS_LABELS,
+  type DeliveryMethod,
   type OrderStatus,
+  type ShipOrderInput,
 } from '@/api/types'
+import { useAdminChatSocket } from '@/hooks/useAdminChatSocket'
 import { getPaymentMethodFullLabel, getPaymentStatusBadge } from '@/lib/payment'
+import { OrderStepper } from '@/components/orders/OrderStepper'
+import { OrderTimeline } from '@/components/orders/OrderTimeline'
+import { ShipOrderDialog } from '@/components/orders/ShipOrderDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +72,10 @@ const statusBadgeClasses: Record<OrderStatus, string> = {
   returned: 'bg-purple-50 text-purple-800 border-purple-200',
 }
 
+function getDeliveryMethodLabel(method?: DeliveryMethod | string | null): string {
+  return method === 'express_2h' ? 'Giao hỏa tốc 2 giờ' : 'Giao tiêu chuẩn'
+}
+
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.code === 'order_action_not_allowed') {
@@ -91,6 +102,8 @@ export function AdminOrderDetailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isApproveCancelDialogOpen, setIsApproveCancelDialogOpen] = useState(false)
+  const [isShipDialogOpen, setIsShipDialogOpen] = useState(false)
+  const [copiedTracking, setCopiedTracking] = useState(false)
 
   const {
     data: order,
@@ -103,6 +116,18 @@ export function AdminOrderDetailPage() {
     queryKey: ['admin-order', id],
     queryFn: () => getAdminOrder(id!),
     enabled: Boolean(id),
+  })
+
+  useAdminChatSocket({
+    enabled: Boolean(id),
+    onNotification: (notif) => {
+      const notifOrderId =
+        typeof notif.metadata?.orderId === 'string' ? notif.metadata.orderId.trim() : ''
+      if (notifOrderId && notifOrderId === id) {
+        void queryClient.invalidateQueries({ queryKey: ['admin-order', id] })
+        void queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
+      }
+    },
   })
 
   const invalidateOrderQueries = () => {
@@ -123,14 +148,12 @@ export function AdminOrderDetailPage() {
   })
 
   const shipMutation = useMutation({
-    mutationFn: () => adminShip(id!),
+    mutationFn: (input: ShipOrderInput) => adminShip(id!, input),
     onSuccess: () => {
+      setIsShipDialogOpen(false)
       setMessage('Đã bàn giao đơn hàng cho đơn vị vận chuyển thành công.')
       setErrorMessage(null)
       invalidateOrderQueries()
-    },
-    onError: (err) => {
-      setErrorMessage(apiMessage(err, 'Không thể bàn giao vận chuyển. Vui lòng thử lại.'))
     },
   })
 
@@ -171,6 +194,18 @@ export function AdminOrderDetailPage() {
       setErrorMessage(apiMessage(err, 'Không thể từ chối yêu cầu hủy. Vui lòng thử lại.'))
     },
   })
+
+  const handleCopyTrackingCode = async (code: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code)
+      }
+      setCopiedTracking(true)
+      setTimeout(() => setCopiedTracking(false), 2000)
+    } catch {
+      setErrorMessage('Không thể sao chép mã vận đơn vào bộ nhớ tạm.')
+    }
+  }
 
   const isAnyMutationPending =
     confirmPreparingMutation.isPending ||
@@ -234,6 +269,9 @@ export function AdminOrderDetailPage() {
     )
   }
 
+  const discountAmount = Number(order.discountVnd || '0')
+  const hasVoucherDiscount = Boolean(order.voucherCode) || (!isNaN(discountAmount) && discountAmount > 0)
+
   return (
     <div className="space-y-6">
       {/* Top Header & Breadcrumb */}
@@ -284,7 +322,7 @@ export function AdminOrderDetailPage() {
           {order.status === 'preparing' && (
             <Button
               variant="primary"
-              onClick={() => shipMutation.mutate()}
+              onClick={() => setIsShipDialogOpen(true)}
               isLoading={shipMutation.isPending}
               disabled={isAnyMutationPending}
             >
@@ -380,7 +418,10 @@ export function AdminOrderDetailPage() {
         </div>
       )}
 
-      {/* Top Grid: Customer Info & Timeline */}
+      {/* Order Stepper */}
+      <OrderStepper order={order} />
+
+      {/* Top Grid: Customer Info & Delivery & Timestamps */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Buyer & Payment */}
         <Card>
@@ -441,7 +482,7 @@ export function AdminOrderDetailPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
               <MapPin className="h-4 w-4 text-emerald-600" />
-              Thông tin nhận hàng
+              Thông tin nhận hàng & Vận chuyển
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -461,6 +502,46 @@ export function AdminOrderDetailPage() {
                   .join(', ')}
               </span>
             </div>
+            <div>
+              <span className="text-xs text-slate-500 block">Phương thức vận chuyển</span>
+              <span className="font-medium text-slate-800">
+                {getDeliveryMethodLabel(order.deliveryMethod)}
+              </span>
+            </div>
+            {order.carrier && (
+              <div>
+                <span className="text-xs text-slate-500 block">Đơn vị vận chuyển</span>
+                <span className="font-medium text-slate-800">{order.carrier}</span>
+              </div>
+            )}
+            {order.trackingCode && (
+              <div>
+                <span className="text-xs text-slate-500 block">Mã vận đơn</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-mono font-semibold text-slate-900">{order.trackingCode}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleCopyTrackingCode(order.trackingCode!)}
+                    aria-label="Sao chép mã vận đơn"
+                    className="h-7 px-2 text-xs gap-1"
+                  >
+                    {copiedTracking ? (
+                      <>
+                        <Check className="h-3 w-3 text-emerald-600" />
+                        Đã chép
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        Sao chép
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -485,6 +566,24 @@ export function AdminOrderDetailPage() {
               <div>
                 <span className="text-xs text-slate-500 block">Ngày xác nhận</span>
                 <span className="text-slate-700">{formatDateTime(order.confirmedAt)}</span>
+              </div>
+            )}
+            {order.preparingAt && (
+              <div>
+                <span className="text-xs text-slate-500 block">Bắt đầu chuẩn bị</span>
+                <span className="text-slate-700">{formatDateTime(order.preparingAt)}</span>
+              </div>
+            )}
+            {order.shippedAt && (
+              <div>
+                <span className="text-xs text-slate-500 block">Bàn giao vận chuyển</span>
+                <span className="text-slate-700">{formatDateTime(order.shippedAt)}</span>
+              </div>
+            )}
+            {order.deliveredAt && (
+              <div>
+                <span className="text-xs text-slate-500 block">Ngày giao hàng</span>
+                <span className="text-emerald-700 font-medium">{formatDateTime(order.deliveredAt)}</span>
               </div>
             )}
             {order.cancelledAt && (
@@ -566,9 +665,13 @@ export function AdminOrderDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Order Summary & Financials */}
-      <div className="flex justify-end">
-        <Card className="w-full md:w-96">
+      {/* Bottom Grid: Timeline + Financials */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <OrderTimeline order={order} />
+        </div>
+
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-slate-800">
               Tổng kết đơn hàng
@@ -583,6 +686,14 @@ export function AdminOrderDetailPage() {
               <span>Phí vận chuyển</span>
               <span className="font-medium text-slate-800">{formatVND(order.shippingFeeVnd)}</span>
             </div>
+            {hasVoucherDiscount && (
+              <div className="flex items-center justify-between text-emerald-700">
+                <span>
+                  Giảm giá {order.voucherCode ? `(${order.voucherCode})` : 'voucher'}
+                </span>
+                <span className="font-medium">-{formatVND(order.discountVnd || '0')}</span>
+              </div>
+            )}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between font-semibold text-base text-slate-900">
               <span>Tổng thanh toán</span>
               <span className="text-blue-600 font-bold">{formatVND(order.totalVnd)}</span>
@@ -590,6 +701,17 @@ export function AdminOrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Ship Order Modal */}
+      <ShipOrderDialog
+        open={isShipDialogOpen}
+        orderId={order.id}
+        isPending={shipMutation.isPending}
+        onOpenChange={setIsShipDialogOpen}
+        onSubmit={async (input) => {
+          await shipMutation.mutateAsync(input)
+        }}
+      />
 
       {/* Alert Dialog for Approve Cancel Confirmation */}
       <AlertDialog

@@ -6,7 +6,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, Save, Layers, Package } from 'lucide-react'
 import { getAdminCategories } from '@/api/categories'
 import { createAdminProduct, getAdminProductById, updateAdminProduct } from '@/api/products'
-import { ApiError, type SaveProductRequest, type OptionGroupInput, type VariantInput } from '@/api/types'
+import {
+  ApiError,
+  type SaveProductRequest,
+  type OptionGroupInput,
+  type VariantInput,
+  type SpecGroup,
+} from '@/api/types'
 import { productFormSchema, type ProductFormValues, type ProductFormInput } from '@/lib/validations/product'
 import {
   type OptionGroupItem,
@@ -17,6 +23,8 @@ import {
 } from '@/lib/cartesian'
 import { OptionGroupBuilder } from '@/components/products/OptionGroupBuilder'
 import { VariantMatrixTable } from '@/components/products/VariantMatrixTable'
+import { ProductImagesUploader } from '@/components/products/ProductImagesUploader'
+import { ProductSpecsEditor } from '@/components/products/ProductSpecsEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -98,6 +106,68 @@ function buildFlattenedErrors(
     }
   }
 
+  const imageErrors = rhfErrors.imageUrls as unknown
+  if (imageErrors) {
+    if (Array.isArray(imageErrors)) {
+      imageErrors.forEach((imgErr: { message?: string } | undefined, idx: number) => {
+        if (imgErr && typeof imgErr.message === 'string') {
+          result[`imageUrls.${idx}`] = imgErr.message
+          result[`imageUrls[${idx}]`] = imgErr.message
+        }
+      })
+    } else if (typeof (imageErrors as { message?: string }).message === 'string') {
+      result['imageUrls'] = (imageErrors as { message: string }).message
+    } else if (typeof (imageErrors as { root?: { message?: string } }).root?.message === 'string') {
+      result['imageUrls'] = (imageErrors as { root: { message: string } }).root.message
+    }
+  }
+
+  const specsErrors = rhfErrors.specs as Record<string, unknown> | undefined
+  if (specsErrors) {
+    if (Array.isArray(specsErrors)) {
+      specsErrors.forEach((gErr: Record<string, unknown> | undefined, gIdx: number) => {
+        if (!gErr) return
+        if (typeof (gErr.group as { message?: string } | undefined)?.message === 'string') {
+          const msg = (gErr.group as { message: string }).message
+          result[`specs.${gIdx}.group`] = msg
+          result[`specs[${gIdx}].group`] = msg
+        }
+        const itemsErr = gErr.items as Record<string, unknown> | undefined
+        if (itemsErr) {
+          if (Array.isArray(itemsErr)) {
+            itemsErr.forEach((iErr: Record<string, unknown> | undefined, iIdx: number) => {
+              if (!iErr) return
+              if (typeof (iErr.label as { message?: string } | undefined)?.message === 'string') {
+                const msg = (iErr.label as { message: string }).message
+                result[`specs.${gIdx}.items.${iIdx}.label`] = msg
+                result[`specs[${gIdx}].items[${iIdx}].label`] = msg
+              }
+              if (typeof (iErr.value as { message?: string } | undefined)?.message === 'string') {
+                const msg = (iErr.value as { message: string }).message
+                result[`specs.${gIdx}.items.${iIdx}.value`] = msg
+                result[`specs[${gIdx}].items[${iIdx}].value`] = msg
+              }
+            })
+          }
+          if (typeof (itemsErr as { message?: string }).message === 'string') {
+            const msg = (itemsErr as { message: string }).message
+            result[`specs.${gIdx}.items`] = msg
+            result[`specs[${gIdx}].items`] = msg
+          } else if (typeof (itemsErr as { root?: { message?: string } }).root?.message === 'string') {
+            const msg = (itemsErr as { root: { message: string } }).root.message
+            result[`specs.${gIdx}.items`] = msg
+            result[`specs[${gIdx}].items`] = msg
+          }
+        }
+      })
+    }
+    if (typeof (specsErrors as { message?: string }).message === 'string') {
+      result['specs'] = (specsErrors as { message: string }).message
+    } else if (typeof (specsErrors as { root?: { message?: string } }).root?.message === 'string') {
+      result['specs'] = (specsErrors as { root: { message: string } }).root.message
+    }
+  }
+
   return result
 }
 
@@ -109,6 +179,8 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
   const [hasVariants, setHasVariants] = useState(false)
   const [optionGroups, setOptionGroups] = useState<OptionGroupItem[]>([])
   const [variants, setVariants] = useState<VariantMatrixRow[]>([])
+  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [specs, setSpecs] = useState<SpecGroup[]>([])
 
   const isEdit = mode === 'edit' || (Boolean(id) && id !== 'new')
 
@@ -149,10 +221,11 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
       stockQuantity: 0,
       description: '',
       featured: false,
-      imageUrls: '',
+      imageUrls: [],
       hasVariants: false,
       optionGroups: [],
       variants: [],
+      specs: [],
     },
   })
 
@@ -197,9 +270,20 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
         ? generateVariantMatrix(rawOptionGroups, rawVariants)
         : []
 
+      const existingImages = Array.isArray(product.imageUrls) ? product.imageUrls : []
+      const existingSpecs: SpecGroup[] = (product.specs || []).map((g) => ({
+        group: g.group,
+        items: (g.items || []).map((item) => ({
+          label: item.label,
+          value: item.value,
+        })),
+      }))
+
       setHasVariants(hasExistingVariants)
       setOptionGroups(rawOptionGroups)
       setVariants(fullMatrix)
+      setImageUrls(existingImages)
+      setSpecs(existingSpecs)
 
       reset({
         name: product.name || '',
@@ -210,10 +294,11 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
         stockQuantity: product.stockQuantity ?? 0,
         description: product.description || '',
         featured: product.featured ?? false,
-        imageUrls: (product.imageUrls || []).join('\n'),
+        imageUrls: existingImages,
         hasVariants: hasExistingVariants,
         optionGroups: rawOptionGroups,
         variants: fullMatrix,
+        specs: existingSpecs,
       })
     }
   }, [isEdit, product, reset])
@@ -241,13 +326,34 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
     setServerErrors({})
   }
 
+  const handleImagesChange = (newUrls: string[]) => {
+    setImageUrls(newUrls)
+    setValue('imageUrls', newUrls, { shouldValidate: true })
+    setServerErrors({})
+  }
+
+  const handleSpecsChange = (newSpecs: SpecGroup[]) => {
+    setSpecs(newSpecs)
+    setValue('specs', newSpecs, { shouldValidate: true })
+    setServerErrors({})
+  }
+
   const onSubmit = async (values: ProductFormValues) => {
     setServerErrors({})
-    const rawImages = typeof values.imageUrls === 'string' ? values.imageUrls : ''
-    const imageUrls = rawImages
-      .split(/[\n,]+/)
-      .map((u) => u.trim())
-      .filter(Boolean)
+    const normalizedImageUrls = Array.isArray(values.imageUrls)
+      ? values.imageUrls.map((u) => u.trim()).filter(Boolean)
+      : String(values.imageUrls || '')
+          .split(/[\n,]+/)
+          .map((u) => u.trim())
+          .filter(Boolean)
+
+    const normalizedSpecs: SpecGroup[] = (values.specs || []).map((g) => ({
+      group: g.group.trim(),
+      items: g.items.map((item) => ({
+        label: item.label.trim(),
+        value: item.value.trim(),
+      })),
+    }))
 
     let basePrice = (values.price || '').trim()
     let totalStock = Number(values.stockQuantity) || 0
@@ -301,10 +407,11 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
       stockQuantity: totalStock,
       description: (values.description || '').trim(),
       featured: Boolean(values.featured),
-      imageUrls,
+      imageUrls: normalizedImageUrls,
       hasVariants,
       optionGroups: optionGroupsPayload,
       variants: variantsPayload,
+      specs: normalizedSpecs,
     }
 
     try {
@@ -322,7 +429,7 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
           normalizedFields[k] = v
           const dotKey = k.replace(/\[(\d+)\]/g, '.$1')
           normalizedFields[dotKey] = v
-          const bracketKey = k.replace(/\.(\d+)\./g, '[$1].')
+          const bracketKey = k.replace(/\.(\d+)(?=\.|$)/g, '[$1]')
           normalizedFields[bracketKey] = v
         }
         setServerErrors(normalizedFields)
@@ -745,27 +852,13 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
               )}
             </div>
 
-            {/* Image URLs */}
-            <div>
-              <Label htmlFor="product-images">Danh sách URL hình ảnh</Label>
-              <div className="mt-1.5">
-                <Textarea
-                  id="product-images"
-                  rows={3}
-                  placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
-                  error={Boolean(errors.imageUrls)}
-                  {...register('imageUrls')}
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Nhập mỗi đường dẫn hình ảnh trên một dòng hoặc phân cách bởi dấu phẩy. URL đầu tiên sẽ được dùng làm ảnh đại diện chính.
-              </p>
-              {errors.imageUrls && (
-                <p className="text-xs text-rose-600 font-medium mt-1.5" role="alert">
-                  {errors.imageUrls.message}
-                </p>
-              )}
-            </div>
+            {/* Product Images Uploader */}
+            <ProductImagesUploader
+              imageUrls={imageUrls}
+              onChange={handleImagesChange}
+              errors={flattenedErrors}
+              disabled={isSubmitting}
+            />
 
             {/* Featured Switch */}
             <div className="pt-2 border-t border-slate-100">
@@ -777,6 +870,24 @@ export function ProductFormPage({ mode }: ProductFormPageProps) {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Structured Technical Specifications Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Thông số kỹ thuật</CardTitle>
+            <CardDescription>
+              Cấu hình thông số kỹ thuật có cấu trúc theo nhóm để hiển thị trên trang chi tiết và so sánh sản phẩm.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProductSpecsEditor
+              specs={specs}
+              onChange={handleSpecsChange}
+              errors={flattenedErrors}
+              disabled={isSubmitting}
+            />
           </CardContent>
         </Card>
 

@@ -5,9 +5,10 @@ import {
   createAdminProduct,
   updateAdminProduct,
   deleteAdminProduct,
+  uploadProductImage,
 } from './products'
 import * as client from './client'
-import type { ProductDetail, ProductSummary, SaveProductRequest } from './types'
+import type { ProductDetail, ProductImageUploadResult, ProductSummary, SaveProductRequest } from './types'
 
 vi.mock('./client', () => ({
   apiClient: vi.fn(),
@@ -314,6 +315,30 @@ describe('products API service', () => {
       expect(client.apiClient).toHaveBeenCalledWith('/admin/products/prod-123', {
         method: 'DELETE',
       })
+    })
+  })
+
+  describe('uploadProductImage', () => {
+    it('sends FormData with file field via POST /admin/products/images (Req 4.1/4.3)', async () => {
+      const file = new File(['webp-bytes'], 'phone.webp', { type: 'image/webp' })
+      const mockUploadResult: ProductImageUploadResult = {
+        key: '97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp',
+        url: '/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp',
+        mimeType: 'image/webp',
+        sizeBytes: 10,
+      }
+      vi.mocked(client.apiClient).mockResolvedValueOnce(mockUploadResult)
+
+      const res = await uploadProductImage(file)
+
+      expect(client.apiClient).toHaveBeenCalledTimes(1)
+      const [path, opts] = vi.mocked(client.apiClient).mock.calls[0]
+      expect(path).toBe('/admin/products/images')
+      expect(opts?.method).toBe('POST')
+      expect(opts?.body).toBeInstanceOf(FormData)
+      const uploadedFormData = opts?.body as FormData
+      expect(uploadedFormData.get('file')).toBe(file)
+      expect(res).toEqual(mockUploadResult)
     })
   })
 })

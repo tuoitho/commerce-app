@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { productFormSchema } from './product'
+import {
+  productFormSchema,
+  isValidProductImageUrl,
+  validateProductImageFile,
+  applyPhoneSpecsPreset,
+  PHONE_SPEC_PRESET,
+} from './product'
 
 describe('productFormSchema', () => {
   describe('Simple Mode (hasVariants: false)', () => {
@@ -241,6 +247,171 @@ describe('productFormSchema', () => {
           )
         ).toBe(true)
       }
+    })
+  })
+
+  describe('Image URLs & File Validation (Req 4.1, 4.3)', () => {
+    it('accepts /media/products/<uuid>.(jpg|png|webp) and http(s) URLs and rejects invalid URLs', () => {
+      expect(
+        isValidProductImageUrl('/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp')
+      ).toBe(true)
+      expect(
+        isValidProductImageUrl('/media/products/550e8400-e29b-41d4-a716-446655440000.jpg')
+      ).toBe(true)
+      expect(isValidProductImageUrl('https://example.com/phone.png')).toBe(true)
+      expect(isValidProductImageUrl('http://cdn.example.com/phone.jpg')).toBe(true)
+      expect(isValidProductImageUrl('/media/products/not-a-uuid.webp')).toBe(false)
+      expect(isValidProductImageUrl('/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.gif')).toBe(false)
+      expect(isValidProductImageUrl('ftp://example.com/a.jpg')).toBe(false)
+      expect(isValidProductImageUrl('relative/path.jpg')).toBe(false)
+
+      const validRes = productFormSchema.safeParse({
+        name: 'iPhone 16 Pro',
+        brand: 'Apple',
+        categoryId: 'cat-1',
+        price: '28990000',
+        stockQuantity: 10,
+        hasVariants: false,
+        imageUrls: [
+          '/media/products/97b918af-45cb-4d3f-8baa-e1e7ce505a32.webp',
+          'https://example.com/ip16.jpg',
+        ],
+      })
+      expect(validRes.success).toBe(true)
+
+      const invalidRes = productFormSchema.safeParse({
+        name: 'iPhone 16 Pro',
+        brand: 'Apple',
+        categoryId: 'cat-1',
+        price: '28990000',
+        stockQuantity: 10,
+        hasVariants: false,
+        imageUrls: ['ftp://bad-url.com/image.jpg'],
+      })
+      expect(invalidRes.success).toBe(false)
+    })
+
+    it('validates upload image file MIME types (JPEG, PNG, WebP) and <= 10 MB size', () => {
+      expect(
+        validateProductImageFile(new File(['abc'], 'a.webp', { type: 'image/webp' }))
+      ).toBeNull()
+      expect(
+        validateProductImageFile(new File(['abc'], 'a.jpg', { type: 'image/jpeg' }))
+      ).toBeNull()
+      expect(
+        validateProductImageFile(new File(['abc'], 'a.png', { type: 'image/png' }))
+      ).toBeNull()
+      expect(
+        validateProductImageFile(new File(['abc'], 'a.gif', { type: 'image/gif' }))
+      ).toMatch(/JPEG, PNG|WebP/i)
+      expect(
+        validateProductImageFile(new File([], 'empty.png', { type: 'image/png' }))
+      ).toMatch(/10 MB/i)
+
+      const overLimit = new File(['x'], 'big.png', { type: 'image/png' })
+      Object.defineProperty(overLimit, 'size', { value: 10 * 1024 * 1024 + 1 })
+      expect(validateProductImageFile(overLimit)).toMatch(/10 MB/i)
+    })
+  })
+
+  describe('Structured Specs Validation & Phone Preset (Req 5.1, 5.2)', () => {
+    const baseSimple = {
+      name: 'iPhone 16 Pro',
+      brand: 'Apple',
+      categoryId: 'cat-1',
+      price: '28990000',
+      stockQuantity: 10,
+      hasVariants: false,
+    }
+
+    it('validates valid specs and enforces group/item limits and uniqueness', () => {
+      const ok = productFormSchema.safeParse({
+        ...baseSimple,
+        specs: [
+          {
+            group: 'Màn hình',
+            items: [{ label: 'Kích thước', value: '6.3 inch OLED' }],
+          },
+        ],
+      })
+      expect(ok.success).toBe(true)
+
+      const dupGroup = productFormSchema.safeParse({
+        ...baseSimple,
+        specs: [
+          { group: 'Màn hình', items: [{ label: 'A', value: '1' }] },
+          { group: '  màn hình ', items: [{ label: 'B', value: '2' }] },
+        ],
+      })
+      expect(dupGroup.success).toBe(false)
+      if (!dupGroup.success) {
+        expect(dupGroup.error.issues.some((i) => i.message === 'Tên nhóm thông số không được trùng nhau')).toBe(true)
+      }
+
+      const tooManyGroups = productFormSchema.safeParse({
+        ...baseSimple,
+        specs: Array.from({ length: 13 }, (_, i) => ({
+          group: `Nhóm ${i + 1}`,
+          items: [{ label: 'L', value: 'V' }],
+        })),
+      })
+      expect(tooManyGroups.success).toBe(false)
+      if (!tooManyGroups.success) {
+        expect(tooManyGroups.error.issues.some((i) => i.message === 'Tối đa 12 nhóm thông số kỹ thuật')).toBe(true)
+      }
+
+      const emptyItemValue = productFormSchema.safeParse({
+        ...baseSimple,
+        specs: [{ group: 'Camera', items: [{ label: 'Chính', value: '   ' }] }],
+      })
+      expect(emptyItemValue.success).toBe(false)
+    })
+
+    it('applyPhoneSpecsPreset initializes 6 standard phone groups without overwriting existing values', () => {
+      expect(PHONE_SPEC_PRESET).toHaveLength(6)
+      expect(PHONE_SPEC_PRESET.map((g) => g.group)).toEqual([
+        'Màn hình',
+        'Hiệu năng & Chipset',
+        'Camera',
+        'Pin & Sạc',
+        'Kết nối',
+        'Thiết kế & Độ bền',
+      ])
+
+      const existing = [
+        {
+          group: 'Màn hình',
+          items: [
+            { label: 'Kích thước & Tấm nền', value: '6.9 inch OLED' },
+            { label: 'Độ sáng tối đa', value: '2000 nits' },
+          ],
+        },
+        {
+          group: 'Âm thanh',
+          items: [{ label: 'Loa', value: 'Stereo Dolby Atmos' }],
+        },
+      ]
+
+      const merged = applyPhoneSpecsPreset(existing)
+      expect(merged.map((g) => g.group)).toEqual([
+        'Màn hình',
+        'Âm thanh',
+        'Hiệu năng & Chipset',
+        'Camera',
+        'Pin & Sạc',
+        'Kết nối',
+        'Thiết kế & Độ bền',
+      ])
+
+      const screenGroup = merged.find((g) => g.group === 'Màn hình')!
+      expect(screenGroup.items[0]).toEqual({ label: 'Kích thước & Tấm nền', value: '6.9 inch OLED' })
+      expect(screenGroup.items[1]).toEqual({ label: 'Độ sáng tối đa', value: '2000 nits' })
+      expect(screenGroup.items.some((i) => i.label === 'Độ phân giải' && i.value === '')).toBe(true)
+      expect(screenGroup.items.some((i) => i.label === 'Tần số quét' && i.value === '')).toBe(true)
+
+      // Idempotent on second click
+      const second = applyPhoneSpecsPreset(merged)
+      expect(second).toEqual(merged)
     })
   })
 })

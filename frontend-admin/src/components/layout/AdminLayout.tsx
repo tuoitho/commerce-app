@@ -17,6 +17,8 @@ import {
   Menu,
   X,
   Radio,
+  Ticket,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -42,6 +44,8 @@ const NAV_ITEMS: NavItemConfig[] = [
   { to: '/livestream', icon: Radio, label: 'Livestream' },
   { to: '/products', icon: Package, label: 'Sản phẩm' },
   { to: '/orders', icon: ShoppingBag, label: 'Đơn hàng' },
+  { to: '/vouchers', icon: Ticket, label: 'Mã giảm giá' },
+  { to: '/flash-sales', icon: Zap, label: 'Flash Sale' },
   { to: '/chat', icon: MessageSquare, label: 'Tin nhắn hỗ trợ', showBadge: true },
   { to: '/returns', icon: RotateCcw, label: 'Trả hàng' },
   { to: '/reviews', icon: Star, label: 'Đánh giá' },

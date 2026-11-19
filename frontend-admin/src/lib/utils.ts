@@ -39,3 +39,19 @@ export function formatDateTime(dateStr: string | Date | null | undefined): strin
     return ''
   }
 }
+
+export function toDateTimeLocalValue(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function toRFC3339FromLocal(localValue: string): string | null {
+  const trimmed = localValue.trim()
+  if (!trimmed) return null
+  const d = new Date(trimmed)
+  if (isNaN(d.getTime())) return null
+  return d.toISOString()
+}

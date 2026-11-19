@@ -168,14 +168,20 @@ describe('admin orders API service', () => {
   })
 
   describe('adminShip', () => {
-    it('sends POST /admin/orders/:id/ship', async () => {
-      const updatedOrder = { ...mockAdminOrder, status: 'shipped' as const }
+    it('sends POST /admin/orders/:id/ship with carrier and trackingCode', async () => {
+      const updatedOrder = {
+        ...mockAdminOrder,
+        status: 'shipped' as const,
+        carrier: 'GHN',
+        trackingCode: 'GHN-123456',
+      }
       vi.mocked(client.apiClient).mockResolvedValueOnce(updatedOrder)
 
-      const res = await adminShip('ord-123')
+      const res = await adminShip('ord-123', { carrier: 'GHN', trackingCode: 'GHN-123456' })
 
       expect(client.apiClient).toHaveBeenCalledWith('/admin/orders/ord-123/ship', {
         method: 'POST',
+        body: { carrier: 'GHN', trackingCode: 'GHN-123456' },
       })
       expect(res).toEqual(updatedOrder)
     })

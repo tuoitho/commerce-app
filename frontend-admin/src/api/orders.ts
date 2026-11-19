@@ -1,5 +1,5 @@
 import { apiClient, apiClientWithMeta, type ApiResponseWithMeta } from './client'
-import type { AdminOrder } from './types'
+import type { AdminOrder, ShipOrderInput } from './types'
 
 export interface GetAdminOrdersParams {
   status?: string
@@ -37,9 +37,10 @@ export async function adminConfirmPreparing(id: string): Promise<AdminOrder> {
   })
 }
 
-export async function adminShip(id: string): Promise<AdminOrder> {
+export async function adminShip(id: string, input: ShipOrderInput): Promise<AdminOrder> {
   return apiClient<AdminOrder>(`/admin/orders/${encodeURIComponent(id)}/ship`, {
     method: 'POST',
+    body: input,
   })
 }
 

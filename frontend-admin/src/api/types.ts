@@ -82,6 +82,23 @@ export interface UpdateCategoryInput {
   name: string
 }
 
+export interface SpecItem {
+  label: string
+  value: string
+}
+
+export interface SpecGroup {
+  group: string
+  items: SpecItem[]
+}
+
+export interface ProductImageUploadResult {
+  key: string
+  url: string
+  mimeType: string
+  sizeBytes: number
+}
+
 export interface ProductSummary {
   id: string
   name: string
@@ -94,7 +111,12 @@ export interface ProductSummary {
   currency: string
   primaryImageUrl: string
   inStock: boolean
+  averageRating?: number
+  reviewCount?: number
+  soldCount?: number
 }
+
+export type AdminProductSummary = ProductSummary
 
 export interface OptionValueInput {
   id: string
@@ -147,9 +169,12 @@ export interface ProductDetail extends ProductSummary {
   active?: boolean
   optionGroups?: ProductOptionGroup[]
   variants?: ProductVariant[]
+  specs?: SpecGroup[]
   createdAt: string
   updatedAt: string
 }
+
+export type AdminProductDetail = ProductDetail
 
 export interface SaveProductRequest {
   name: string
@@ -165,6 +190,106 @@ export interface SaveProductRequest {
   hasVariants?: boolean
   optionGroups?: OptionGroupInput[]
   variants?: VariantInput[]
+  specs?: SpecGroup[]
+}
+
+// Flash Sales
+export type FlashSaleStatus = 'scheduled' | 'running' | 'ended' | 'inactive'
+
+export interface AdminFlashSaleSummary {
+  id: string
+  name: string
+  startsAt: string
+  endsAt: string
+  active: boolean
+  status: FlashSaleStatus
+  variantCount: number
+  totalQuota: number
+  totalSold: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminFlashSaleItem {
+  productId: string
+  variantId: string
+  productName: string
+  brand: string
+  model: string
+  imageUrl: string
+  optionLabel: string
+  variantActive: boolean
+  regularPriceVnd: string
+  flashPriceVnd: string
+  quota: number
+  soldQuantity: number
+  position: number
+}
+
+export interface AdminFlashSaleDetail {
+  id: string
+  name: string
+  startsAt: string
+  endsAt: string
+  active: boolean
+  status: FlashSaleStatus
+  createdAt: string
+  updatedAt: string
+  items: AdminFlashSaleItem[]
+}
+
+export interface SaveFlashSaleItemInput {
+  variantId: string
+  flashPriceVnd: string
+  quota: number
+}
+
+export interface SaveFlashSaleInput {
+  name: string
+  startsAt: string
+  endsAt: string
+  active: boolean
+  items: SaveFlashSaleItemInput[]
+}
+
+// Vouchers
+export type VoucherType = 'percent' | 'fixed_amount' | 'freeship'
+
+export type VoucherEffectiveStatus = 'scheduled' | 'active' | 'exhausted' | 'expired' | 'inactive'
+
+export interface AdminVoucher {
+  id: string
+  code: string
+  title: string
+  description: string
+  voucherType: VoucherType
+  discountValue: string
+  maxDiscountVnd: string | null
+  minOrderVnd: string
+  usageLimit: number | null
+  usedCount: number
+  perUserLimit: number
+  startsAt: string
+  endsAt: string
+  active: boolean
+  effectiveStatus: VoucherEffectiveStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SaveVoucherInput {
+  code: string
+  title: string
+  description: string
+  voucherType: VoucherType
+  discountValue: string
+  maxDiscountVnd: string | null
+  minOrderVnd: string
+  usageLimit: number | null
+  perUserLimit: number
+  startsAt: string
+  endsAt: string
+  active: boolean
 }
 
 // Orders
@@ -244,6 +369,23 @@ export type PaymentMethod = 'cod' | 'momo'
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
+export type DeliveryMethod = 'standard' | 'express_2h'
+
+export type OrderTimelineActorType = 'customer' | 'admin' | 'system'
+
+export interface OrderTimelineEvent {
+  id: string
+  status: OrderStatus
+  actorType: OrderTimelineActorType
+  note: string
+  createdAt: string
+}
+
+export interface ShipOrderInput {
+  carrier: string
+  trackingCode: string
+}
+
 export interface Order {
   id: string
   userId: string
@@ -259,11 +401,20 @@ export interface Order {
   detailAddress: string
   subtotalVnd: string
   shippingFeeVnd: string
+  discountVnd?: string
+  voucherCode?: string | null
+  voucherType?: VoucherType | null
+  deliveryMethod?: DeliveryMethod
+  carrier?: string | null
+  trackingCode?: string | null
   totalVnd: string
   items: OrderItem[]
+  timeline?: OrderTimelineEvent[]
   createdAt: string
   updatedAt: string
   confirmedAt?: string | null
+  preparingAt?: string | null
+  shippedAt?: string | null
   cancelledAt?: string | null
   deliveredAt?: string | null
 }

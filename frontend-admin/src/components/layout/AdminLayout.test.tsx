@@ -44,6 +44,8 @@ function renderLayout(initialRoute = '/') {
             <Route path="posts" element={<div>Nội dung bài viết</div>} />
             <Route path="products" element={<div>Nội dung sản phẩm</div>} />
             <Route path="orders" element={<div>Nội dung đơn hàng</div>} />
+            <Route path="vouchers" element={<div>Nội dung mã giảm giá</div>} />
+            <Route path="flash-sales" element={<div>Nội dung flash sale</div>} />
             <Route path="chat" element={<div>Nội dung tin nhắn</div>} />
             <Route path="returns" element={<div>Nội dung trả hàng</div>} />
             <Route path="reviews" element={<div>Nội dung đánh giá</div>} />
@@ -110,6 +112,8 @@ describe('AdminLayout responsive behavior', () => {
     expect(drawer.querySelector('a[href="/posts"]')).toHaveTextContent('Bài viết')
     expect(drawer.querySelector('a[href="/products"]')).toHaveTextContent('Sản phẩm')
     expect(drawer.querySelector('a[href="/orders"]')).toHaveTextContent('Đơn hàng')
+    expect(drawer.querySelector('a[href="/vouchers"]')).toHaveTextContent('Mã giảm giá')
+    expect(drawer.querySelector('a[href="/flash-sales"]')).toHaveTextContent('Flash Sale')
     expect(drawer.querySelector('a[href="/chat"]')).toHaveTextContent('Tin nhắn hỗ trợ')
     expect(drawer.querySelector('a[href="/returns"]')).toHaveTextContent('Trả hàng')
     expect(drawer.querySelector('a[href="/reviews"]')).toHaveTextContent('Đánh giá')

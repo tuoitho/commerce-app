@@ -1,10 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AdminOrderDetailPage } from './AdminOrderDetailPage'
 import * as ordersApi from '@/api/orders'
 import { ApiError, type AdminOrder } from '@/api/types'
+import type { UseAdminChatSocketOptions } from '@/hooks/useAdminChatSocket'
+
+let capturedSocketOptions: UseAdminChatSocketOptions | undefined
+
+vi.mock('@/hooks/useAdminChatSocket', () => ({
+  useAdminChatSocket: (opts: UseAdminChatSocketOptions) => {
+    capturedSocketOptions = opts
+    return {
+      isConnected: true,
+      sendPing: vi.fn(),
+      reconnect: vi.fn(),
+      disconnect: vi.fn(),
+    }
+  },
+}))
 
 vi.mock('@/api/orders', () => ({
   getAdminOrders: vi.fn(),
@@ -80,6 +95,7 @@ function renderWithClient(
 describe('AdminOrderDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    capturedSocketOptions = undefined
   })
 
   it('renders loading state initially', () => {
@@ -99,8 +115,8 @@ describe('AdminOrderDetailPage', () => {
       expect(screen.getByRole('heading', { name: /Đơn hàng #ord-999/i })).toBeInTheDocument()
     })
 
-    // Status Badge
-    expect(screen.getByText('Đã xác nhận')).toBeInTheDocument()
+    // Status Badge (also appears in OrderStepper)
+    expect(screen.getAllByText('Đã xác nhận').length).toBeGreaterThanOrEqual(1)
 
     // Customer & Payment
     expect(screen.getByText('customer@auraphone.vn')).toBeInTheDocument()
@@ -177,7 +193,7 @@ describe('AdminOrderDetailPage', () => {
     expect(await screen.findByText('Đã xác nhận chuẩn bị hàng thành công.')).toBeInTheDocument()
   })
 
-  it('renders correct action button for "preparing" status and handles mutation', async () => {
+  it('opens ship modal on "preparing" status, supports quick-select carrier, validates trackingCode, and submits carrier + trackingCode', async () => {
     vi.mocked(ordersApi.getAdminOrder).mockResolvedValueOnce({
       ...mockOrder,
       status: 'preparing',
@@ -185,6 +201,9 @@ describe('AdminOrderDetailPage', () => {
     vi.mocked(ordersApi.adminShip).mockResolvedValueOnce({
       ...mockOrder,
       status: 'shipped',
+      carrier: 'GHN',
+      trackingCode: 'GHN-123456',
+      shippedAt: '2026-08-18T11:00:00Z',
     })
 
     renderWithClient(<AdminOrderDetailPage />)
@@ -195,8 +214,39 @@ describe('AdminOrderDetailPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Bàn giao vận chuyển/i }))
 
+    const dialog = screen.getByRole('dialog', { name: /Xuất kho & Bàn giao vận chuyển/i })
+    expect(dialog).toBeInTheDocument()
+    expect(ordersApi.adminShip).not.toHaveBeenCalled()
+
+    // Quick-select suggestions present
+    expect(screen.getByRole('button', { name: 'GHN' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'GHTK' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Viettel Post' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ahamove 2h' })).toBeInTheDocument()
+
+    // Submitting empty shows validation errors
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận xuất kho/i }))
+    expect(screen.getByText(/Vui lòng nhập đơn vị vận chuyển/i)).toBeInTheDocument()
+    expect(screen.getByText(/Mã vận đơn phải từ 3 đến 64 ký tự/i)).toBeInTheDocument()
+    expect(ordersApi.adminShip).not.toHaveBeenCalled()
+
+    // Select quick carrier and type invalid tracking code
+    fireEvent.click(screen.getByRole('button', { name: 'GHN' }))
+    const trackingInput = screen.getByLabelText(/Mã vận đơn/i)
+    fireEvent.change(trackingInput, { target: { value: 'AB!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận xuất kho/i }))
+    expect(screen.getByText(/Mã vận đơn phải từ 3 đến 64 ký tự/i)).toBeInTheDocument()
+    expect(ordersApi.adminShip).not.toHaveBeenCalled()
+
+    // Valid tracking code -> submits
+    fireEvent.change(trackingInput, { target: { value: 'GHN-123456' } })
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận xuất kho/i }))
+
     await waitFor(() => {
-      expect(ordersApi.adminShip).toHaveBeenCalledWith('ord-999')
+      expect(ordersApi.adminShip).toHaveBeenCalledWith('ord-999', {
+        carrier: 'GHN',
+        trackingCode: 'GHN-123456',
+      })
     })
     expect(await screen.findByText('Đã bàn giao đơn hàng cho đơn vị vận chuyển thành công.')).toBeInTheDocument()
   })
@@ -397,5 +447,144 @@ describe('AdminOrderDetailPage', () => {
     expect(screen.getByText('4088812345')).toBeInTheDocument()
     expect(screen.getByText('Thời điểm thanh toán')).toBeInTheDocument()
     expect(screen.getByText('Mã giao dịch MoMo')).toBeInTheDocument()
+  })
+
+  it('displays delivery method, voucher discount, carrier, copyable tracking code, OrderStepper and OrderTimeline', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText: writeTextMock } })
+
+    vi.mocked(ordersApi.getAdminOrder).mockResolvedValueOnce({
+      ...mockOrder,
+      status: 'shipped',
+      deliveryMethod: 'express_2h',
+      voucherCode: 'AURA500K',
+      voucherType: 'fixed_amount',
+      discountVnd: '500000',
+      shippingFeeVnd: '60000',
+      totalVnd: '31560000',
+      carrier: 'Ahamove 2h',
+      trackingCode: 'AHA-998877',
+      preparingAt: '2026-08-18T10:20:00Z',
+      shippedAt: '2026-08-18T10:45:00Z',
+      timeline: [
+        {
+          id: 'evt-1',
+          status: 'pending_confirmation',
+          actorType: 'customer',
+          note: 'Đơn hàng được tạo',
+          createdAt: '2026-08-18T10:00:00Z',
+        },
+        {
+          id: 'evt-2',
+          status: 'preparing',
+          actorType: 'admin',
+          note: 'Đơn hàng đang được chuẩn bị',
+          createdAt: '2026-08-18T10:20:00Z',
+        },
+        {
+          id: 'evt-3',
+          status: 'shipped',
+          actorType: 'admin',
+          note: 'Đã bàn giao vận chuyển (Ahamove 2h - AHA-998877)',
+          createdAt: '2026-08-18T10:45:00Z',
+        },
+      ],
+    })
+
+    renderWithClient(<AdminOrderDetailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Giao hỏa tốc 2 giờ')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Ahamove 2h')).toBeInTheDocument()
+    expect(screen.getByText('AHA-998877')).toBeInTheDocument()
+    expect(screen.getByText(/Giảm giá \(AURA500K\)/)).toBeInTheDocument()
+    expect(screen.getByText('-500.000 ₫')).toBeInTheDocument()
+
+    // OrderStepper and OrderTimeline
+    expect(screen.getByRole('region', { name: 'Tiến trình đơn hàng' })).toBeInTheDocument()
+    expect(screen.getByText('Hành trình đơn hàng')).toBeInTheDocument()
+    expect(screen.getByText('Đã bàn giao vận chuyển (Ahamove 2h - AHA-998877)')).toBeInTheDocument()
+
+    // Copy tracking code
+    const copyBtn = screen.getByRole('button', { name: /Sao chép mã vận đơn/i })
+    fireEvent.click(copyBtn)
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith('AHA-998877')
+    })
+  })
+
+  it('auto-refreshes order detail when WebSocket notification matches the open orderId', async () => {
+    vi.mocked(ordersApi.getAdminOrder)
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: 'preparing',
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: 'shipped',
+        carrier: 'GHN',
+        trackingCode: 'GHN-777',
+      })
+
+    renderWithClient(<AdminOrderDetailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Đang chuẩn bị hàng')).toBeInTheDocument()
+    })
+    expect(ordersApi.getAdminOrder).toHaveBeenCalledTimes(1)
+
+    // Unrelated orderId should NOT trigger refresh
+    act(() => {
+      capturedSocketOptions?.onNotification?.({
+        id: 'notif-1',
+        recipientId: 'admin-1',
+        actorId: null,
+        actorName: 'Hệ thống',
+        actorRole: null,
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        notificationType: 'admin_order_created',
+        category: 'order',
+        groupKey: 'order:other',
+        actorCount: 1,
+        excerpt: '',
+        metadata: { orderId: 'other-order' },
+        isRead: false,
+        createdAt: '2026-08-18T11:00:00Z',
+        updatedAt: '2026-08-18T11:00:00Z',
+      })
+    })
+    expect(ordersApi.getAdminOrder).toHaveBeenCalledTimes(1)
+
+    // Matching orderId SHOULD trigger refresh
+    act(() => {
+      capturedSocketOptions?.onNotification?.({
+        id: 'notif-2',
+        recipientId: 'admin-1',
+        actorId: null,
+        actorName: 'Khách hàng',
+        actorRole: 'customer',
+        postId: null,
+        commentId: null,
+        reactionType: null,
+        notificationType: 'admin_order_cancel_requested',
+        category: 'order',
+        groupKey: 'order:ord-999',
+        actorCount: 1,
+        excerpt: '',
+        metadata: { orderId: 'ord-999' },
+        isRead: false,
+        createdAt: '2026-08-18T11:01:00Z',
+        updatedAt: '2026-08-18T11:01:00Z',
+      })
+    })
+
+    await waitFor(() => {
+      expect(ordersApi.getAdminOrder).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('GHN-777')).toBeInTheDocument()
+    })
   })
 })

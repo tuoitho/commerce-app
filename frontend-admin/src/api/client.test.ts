@@ -259,4 +259,41 @@ describe('API Client', () => {
     await expect(apiClient('/admin/products')).rejects.toThrow()
     expect(tokenStore.getToken()).toBeNull()
   })
+
+  it('omits Content-Type header for FormData while keeping Authorization and credentials', async () => {
+    tokenStore.setToken('admin-jwt')
+    const formData = new FormData()
+    formData.append('file', new File(['img'], 'photo.png', { type: 'image/png' }))
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Tải ảnh sản phẩm thành công',
+          data: {
+            key: '550e8400-e29b-41d4-a716-446655440000.png',
+            url: '/media/products/550e8400-e29b-41d4-a716-446655440000.png',
+            mimeType: 'image/png',
+            sizeBytes: 3,
+          },
+          error: null,
+          meta: { timestamp: '2026-11-18T14:37:55Z' },
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      )
+    )
+
+    const result = await apiClient<{ url: string }>('/admin/products/images', {
+      method: 'POST',
+      body: formData,
+    })
+
+    expect(result.url).toBe('/media/products/550e8400-e29b-41d4-a716-446655440000.png')
+    const [, options] = fetchSpy.mock.calls[0]
+    const reqHeaders = options?.headers as Record<string, string>
+    expect(reqHeaders['Content-Type']).toBeUndefined()
+    expect(reqHeaders['Authorization']).toBe('Bearer admin-jwt')
+    expect(options?.credentials).toBe('include')
+    expect(options?.body).toBe(formData)
+  })
 })
