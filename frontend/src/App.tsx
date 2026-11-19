@@ -22,6 +22,7 @@ import { ReviewHistoryPage } from '@/pages/ReviewHistoryPage'
 import { PostsFeedPage } from '@/pages/PostsFeedPage'
 import { PostDetailPage } from '@/pages/PostDetailPage'
 import { AccountPage } from '@/pages/AccountPage'
+import { VouchersPage } from '@/pages/VouchersPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
@@ -50,6 +51,7 @@ export function AppContent() {
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/reviews" element={<ReviewHistoryPage />} />
+          <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/live/:sessionId" element={<LivePage />} />
           <Route path="/login" element={<LoginPage />} />

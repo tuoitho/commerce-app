@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -27,6 +28,7 @@ const (
 
 type httpVoucherRepo struct {
 	vouchers map[string]*domain.Voucher
+	claimed  map[string]map[string]time.Time
 	order    []string
 	now      time.Time
 	seq      int
@@ -35,6 +37,7 @@ type httpVoucherRepo struct {
 func newHTTPVoucherRepo(now time.Time) *httpVoucherRepo {
 	return &httpVoucherRepo{
 		vouchers: map[string]*domain.Voucher{},
+		claimed:  map[string]map[string]time.Time{},
 		now:      now,
 	}
 }
@@ -93,12 +96,27 @@ func (r *httpVoucherRepo) Create(_ context.Context, input domain.SaveVoucherInpu
 	if r.seq > 1 {
 		id = vchTestID2
 	}
+	scopeType := input.ScopeType
+	if scopeType == "" {
+		scopeType = domain.VoucherScopeAll
+	}
+	scopeCats := make([]domain.VoucherScopeTarget, 0, len(input.CategoryIDs))
+	for _, cid := range input.CategoryIDs {
+		scopeCats = append(scopeCats, domain.VoucherScopeTarget{ID: cid, Name: "Category " + cid[:8]})
+	}
+	scopeProds := make([]domain.VoucherScopeTarget, 0, len(input.ProductIDs))
+	for _, pid := range input.ProductIDs {
+		scopeProds = append(scopeProds, domain.VoucherScopeTarget{ID: pid, Name: "Product " + pid[:8]})
+	}
 	v := &domain.Voucher{
 		ID:              id,
 		Code:            code,
 		Title:           input.Title,
 		Description:     input.Description,
 		VoucherType:     input.VoucherType,
+		ScopeType:       scopeType,
+		ScopeCategories: scopeCats,
+		ScopeProducts:   scopeProds,
 		DiscountValue:   input.DiscountValue,
 		MaxDiscountVND:  input.MaxDiscountVND,
 		MinOrderVND:     input.MinOrderVND,
@@ -183,6 +201,9 @@ func (r *httpVoucherRepo) ListAvailableForUser(_ context.Context, _ string, now 
 			Title:             v.Title,
 			Description:       v.Description,
 			VoucherType:       v.VoucherType,
+			ScopeType:         v.ScopeType,
+			ScopeCategories:   v.ScopeCategories,
+			ScopeProducts:     v.ScopeProducts,
 			DiscountValue:     v.DiscountValue,
 			MaxDiscountVND:    v.MaxDiscountVND,
 			MinOrderVND:       v.MinOrderVND,
@@ -192,11 +213,151 @@ func (r *httpVoucherRepo) ListAvailableForUser(_ context.Context, _ string, now 
 			UserRemainingUses: v.PerUserLimit,
 			StartsAt:          v.StartsAt,
 			EndsAt:            v.EndsAt,
+			ClaimedAt:         r.now,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].EndsAt.Before(out[j].EndsAt)
 	})
+	return out, nil
+}
+
+func (r *httpVoucherRepo) ListDiscoverForUser(_ context.Context, userID string, now time.Time) ([]domain.DiscoverVoucher, error) {
+	out := make([]domain.DiscoverVoucher, 0, len(r.vouchers))
+	for _, id := range r.order {
+		v, ok := r.vouchers[id]
+		if !ok {
+			continue
+		}
+		if domain.DeriveVoucherEffectiveStatus(v.Active, v.StartsAt, v.EndsAt, now, v.UsageLimit, v.UsedCount) != domain.VoucherStatusActive {
+			continue
+		}
+		var claimed bool
+		var claimedAt *time.Time
+		if userMap, ok := r.claimed[userID]; ok {
+			if t, ok := userMap[v.ID]; ok {
+				claimed = true
+				tc := t
+				claimedAt = &tc
+			}
+		}
+		out = append(out, domain.DiscoverVoucher{
+			ID:                v.ID,
+			Code:              v.Code,
+			Title:             v.Title,
+			Description:       v.Description,
+			VoucherType:       v.VoucherType,
+			ScopeType:         v.ScopeType,
+			ScopeCategories:   v.ScopeCategories,
+			ScopeProducts:     v.ScopeProducts,
+			DiscountValue:     v.DiscountValue,
+			MaxDiscountVND:    v.MaxDiscountVND,
+			MinOrderVND:       v.MinOrderVND,
+			UsageLimit:        v.UsageLimit,
+			UsedCount:         v.UsedCount,
+			PerUserLimit:      v.PerUserLimit,
+			UserRemainingUses: v.PerUserLimit,
+			StartsAt:          v.StartsAt,
+			EndsAt:            v.EndsAt,
+			Claimed:           claimed,
+			ClaimedAt:         claimedAt,
+		})
+	}
+	return out, nil
+}
+
+func (r *httpVoucherRepo) ClaimForUser(_ context.Context, userID, voucherID string, now time.Time) (*domain.UserVoucher, error) {
+	v, ok := r.vouchers[voucherID]
+	if !ok {
+		return nil, domain.ErrVoucherNotFound
+	}
+	if !v.Active {
+		return nil, domain.ErrVoucherInactive
+	}
+	if now.Before(v.StartsAt) {
+		return nil, domain.ErrVoucherNotStarted
+	}
+	if now.After(v.EndsAt) {
+		return nil, domain.ErrVoucherExpired
+	}
+	if v.UsageLimit != nil && v.UsedCount >= *v.UsageLimit {
+		return nil, domain.ErrVoucherExhausted
+	}
+	if r.claimed[userID] == nil {
+		r.claimed[userID] = map[string]time.Time{}
+	}
+	claimedAt, exists := r.claimed[userID][voucherID]
+	if !exists {
+		claimedAt = now
+		r.claimed[userID][voucherID] = claimedAt
+	}
+	return &domain.UserVoucher{
+		ID:                v.ID,
+		Code:              v.Code,
+		Title:             v.Title,
+		Description:       v.Description,
+		VoucherType:       v.VoucherType,
+		ScopeType:         v.ScopeType,
+		ScopeCategories:   v.ScopeCategories,
+		ScopeProducts:     v.ScopeProducts,
+		DiscountValue:     v.DiscountValue,
+		MaxDiscountVND:    v.MaxDiscountVND,
+		MinOrderVND:       v.MinOrderVND,
+		UsageLimit:        v.UsageLimit,
+		UsedCount:         v.UsedCount,
+		PerUserLimit:      v.PerUserLimit,
+		UserRemainingUses: v.PerUserLimit,
+		StartsAt:          v.StartsAt,
+		EndsAt:            v.EndsAt,
+		ClaimedAt:         claimedAt,
+		WalletStatus:      domain.DeriveVoucherWalletStatus(v.Active, v.StartsAt, v.EndsAt, now, v.UsageLimit, v.UsedCount, v.PerUserLimit),
+	}, nil
+}
+
+func (r *httpVoucherRepo) ListWalletForUser(_ context.Context, userID string, statusFilter string, now time.Time) ([]domain.UserVoucher, error) {
+	userMap := r.claimed[userID]
+	out := make([]domain.UserVoucher, 0, len(userMap))
+	for _, id := range r.order {
+		claimedAt, ok := userMap[id]
+		if !ok {
+			continue
+		}
+		v, ok := r.vouchers[id]
+		if !ok {
+			continue
+		}
+		ws := domain.DeriveVoucherWalletStatus(v.Active, v.StartsAt, v.EndsAt, now, v.UsageLimit, v.UsedCount, v.PerUserLimit)
+		if statusFilter == "available" && ws != domain.VoucherWalletAvailable {
+			continue
+		}
+		if statusFilter == "used_up" && ws != domain.VoucherWalletUsedUp {
+			continue
+		}
+		if statusFilter == "unavailable" && (ws == domain.VoucherWalletAvailable || ws == domain.VoucherWalletUsedUp) {
+			continue
+		}
+		out = append(out, domain.UserVoucher{
+			ID:                v.ID,
+			Code:              v.Code,
+			Title:             v.Title,
+			Description:       v.Description,
+			VoucherType:       v.VoucherType,
+			ScopeType:         v.ScopeType,
+			ScopeCategories:   v.ScopeCategories,
+			ScopeProducts:     v.ScopeProducts,
+			DiscountValue:     v.DiscountValue,
+			MaxDiscountVND:    v.MaxDiscountVND,
+			MinOrderVND:       v.MinOrderVND,
+			UsageLimit:        v.UsageLimit,
+			UsedCount:         v.UsedCount,
+			PerUserLimit:      v.PerUserLimit,
+			UserRemainingUses: v.PerUserLimit,
+			StartsAt:          v.StartsAt,
+			EndsAt:            v.EndsAt,
+			ClaimedAt:         claimedAt,
+			WalletStatus:      ws,
+		})
+	}
 	return out, nil
 }
 
@@ -451,4 +612,104 @@ func TestVoucherHandler_EndpointsAndSnapshots(t *testing.T) {
 	router.ServeHTTP(wDelOK, reqDelOK)
 	require.Equal(t, http.StatusNoContent, wDelOK.Code)
 	assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "admin_voucher_delete_204", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "DELETE /api/v1/admin/vouchers/:id", nil, wDelOK)
+}
+
+func TestVoucherHandler_DiscoverClaimAndWallet(t *testing.T) {
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	router, jwtMgr, repo := setupVoucherRouter(t, now)
+	walletSnapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "voucher-wallet-and-scope", "contract-snapshots.json")
+	const walletFeature = "voucher-wallet-and-scope"
+
+	customerToken, err := jwtMgr.GenerateAccessToken("11111111-1111-1111-1111-111111111111", domain.RoleCustomer, time.Hour)
+	require.NoError(t, err)
+	adminToken, err := jwtMgr.GenerateAccessToken("00000000-0000-0000-0000-000000000001", domain.RoleAdmin, time.Hour)
+	require.NoError(t, err)
+
+	catID := "22222222-2222-2222-2222-222222222221"
+	createBody := map[string]any{
+		"code":          "CAT15",
+		"title":         "Giảm 15% theo danh mục",
+		"description":   "Áp dụng cho danh mục chọn lọc",
+		"voucherType":   "percent",
+		"scopeType":     "categories",
+		"categoryIds":   []string{catID},
+		"discountValue": "15",
+		"minOrderVnd":   "500000",
+		"perUserLimit":  2,
+		"startsAt":      now.Add(-time.Hour).Format(time.RFC3339),
+		"endsAt":        now.Add(48 * time.Hour).Format(time.RFC3339),
+		"active":        true,
+	}
+	raw, _ := json.Marshal(createBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/vouchers", bytes.NewReader(raw))
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "admin_voucher_create_categories_201", "API-VOUCHER-ADMIN@1", "POST /api/v1/admin/vouchers", createBody, w)
+
+	// Admin list snapshot
+	lReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/vouchers?page=1&limit=20", nil)
+	lReq.Header.Set("Authorization", "Bearer "+adminToken)
+	lW := httptest.NewRecorder()
+	router.ServeHTTP(lW, lReq)
+	require.Equal(t, http.StatusOK, lW.Code)
+	assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "admin_voucher_list_200", "API-VOUCHER-ADMIN@1", "GET /api/v1/admin/vouchers", nil, lW)
+
+	// Unauthenticated discover/wallet/claim return 401
+	for idx, ep := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/vouchers/discover"},
+		{http.MethodGet, "/api/v1/vouchers/wallet"},
+		{http.MethodPost, "/api/v1/vouchers/" + vchTestID1 + "/claim"},
+	} {
+		uReq := httptest.NewRequest(ep.method, ep.path, nil)
+		uW := httptest.NewRecorder()
+		router.ServeHTTP(uW, uReq)
+		assert.Equal(t, http.StatusUnauthorized, uW.Code, "%s %s", ep.method, ep.path)
+		if idx == 0 {
+			assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "vouchers_unauth_401", "API-VOUCHER-CUSTOMER@1", "GET /api/v1/vouchers/discover", nil, uW)
+		}
+	}
+
+	// Discover shows claimed=false initially and scopeCategories populated
+	dReq := httptest.NewRequest(http.MethodGet, "/api/v1/vouchers/discover", nil)
+	dReq.Header.Set("Authorization", "Bearer "+customerToken)
+	dW := httptest.NewRecorder()
+	router.ServeHTTP(dW, dReq)
+	require.Equal(t, http.StatusOK, dW.Code)
+	assert.Contains(t, dW.Body.String(), `"claimed":false`)
+	assert.Contains(t, dW.Body.String(), `"scopeType":"categories"`)
+	assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "vouchers_discover_200", "API-VOUCHER-CUSTOMER@1", "GET /api/v1/vouchers/discover", nil, dW)
+
+	// Claim twice is idempotent and does not increment usedCount
+	for i := 0; i < 2; i++ {
+		cReq := httptest.NewRequest(http.MethodPost, "/api/v1/vouchers/"+vchTestID1+"/claim", nil)
+		cReq.Header.Set("Authorization", "Bearer "+customerToken)
+		cW := httptest.NewRecorder()
+		router.ServeHTTP(cW, cReq)
+		require.Equal(t, http.StatusOK, cW.Code)
+		assert.Contains(t, cW.Body.String(), `"walletStatus":"available"`)
+		if i == 0 {
+			assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "vouchers_claim_200", "API-VOUCHER-CUSTOMER@1", "POST /api/v1/vouchers/:id/claim", nil, cW)
+		}
+	}
+	assert.Equal(t, 0, repo.vouchers[vchTestID1].UsedCount)
+
+	// Wallet returns claimed voucher
+	wReq := httptest.NewRequest(http.MethodGet, "/api/v1/vouchers/wallet?status=available", nil)
+	wReq.Header.Set("Authorization", "Bearer "+customerToken)
+	wW := httptest.NewRecorder()
+	router.ServeHTTP(wW, wReq)
+	require.Equal(t, http.StatusOK, wW.Code)
+	assert.Contains(t, wW.Body.String(), `"code":"CAT15"`)
+	assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "vouchers_wallet_200", "API-VOUCHER-CUSTOMER@1", "GET /api/v1/vouchers/wallet", nil, wW)
+
+	// Available returns claimed available vouchers for checkout
+	aReq := httptest.NewRequest(http.MethodGet, "/api/v1/vouchers/available", nil)
+	aReq.Header.Set("Authorization", "Bearer "+customerToken)
+	aW := httptest.NewRecorder()
+	router.ServeHTTP(aW, aReq)
+	require.Equal(t, http.StatusOK, aW.Code)
+	assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "vouchers_available_200", "API-VOUCHER-CUSTOMER@1", "GET /api/v1/vouchers/available", nil, aW)
 }

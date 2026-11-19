@@ -75,7 +75,7 @@
         "error": null,
         "message": "Đã bắt đầu phiên live",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4357361Z"
+          "timestamp": "2026-11-19T05:02:53.4362454Z"
         },
         "success": true
       }
@@ -149,7 +149,7 @@
         "error": null,
         "message": "Live session retrieved successfully",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4498855Z"
+          "timestamp": "2026-11-19T05:02:53.4441283Z"
         },
         "success": true
       }
@@ -167,6 +167,7 @@
             {
               "availability": "available",
               "brandName": "Brand",
+              "categoryId": "",
               "id": "33333333-3333-3333-3333-333333333333",
               "imageUrl": "/phone.jpg",
               "isFlashSalePrice": false,
@@ -196,7 +197,7 @@
         "error": null,
         "message": "Đã thêm sản phẩm vào giỏ hàng",
         "meta": {
-          "timestamp": "2026-11-18T14:52:41.2310892Z"
+          "timestamp": "2026-11-19T05:02:53.479066Z"
         },
         "success": true
       }
@@ -211,6 +212,7 @@
             {
               "availability": "available",
               "brandName": "Brand",
+              "categoryId": "",
               "id": "33333333-3333-3333-3333-333333333333",
               "imageUrl": "/phone.jpg",
               "isFlashSalePrice": false,
@@ -240,7 +242,7 @@
         "error": null,
         "message": "",
         "meta": {
-          "timestamp": "2026-11-18T14:52:41.2291291Z"
+          "timestamp": "2026-11-19T05:02:53.4708928Z"
         },
         "success": true
       }
@@ -265,7 +267,7 @@
         "error": null,
         "message": "Đã gửi bình luận",
         "meta": {
-          "timestamp": "2026-11-12T19:48:22.7311652Z"
+          "timestamp": "2026-11-19T05:02:53.4526388Z"
         },
         "success": true
       }
@@ -285,7 +287,7 @@
         },
         "message": "Bạn bình luận quá nhanh, vui lòng thử lại sau giây lát",
         "meta": {
-          "timestamp": "2026-11-12T19:48:22.7356861Z"
+          "timestamp": "2026-11-19T05:02:53.4591306Z"
         },
         "success": false
       }
@@ -303,7 +305,7 @@
         "error": null,
         "message": "Live session retrieved successfully",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4059059Z"
+          "timestamp": "2026-11-19T05:02:53.3989332Z"
         },
         "success": true
       }
@@ -317,7 +319,7 @@
         "error": null,
         "message": "Live session retrieved successfully",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4048235Z"
+          "timestamp": "2026-11-19T05:02:53.3989332Z"
         },
         "success": true
       }
@@ -383,7 +385,7 @@
         "error": null,
         "message": "Live session retrieved successfully",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4223572Z"
+          "timestamp": "2026-11-19T05:02:53.4177675Z"
         },
         "success": true
       }
@@ -400,7 +402,7 @@
         },
         "message": "Không tìm thấy phiên live",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4295308Z"
+          "timestamp": "2026-11-19T05:02:53.4261878Z"
         },
         "success": false
       }
@@ -428,7 +430,7 @@
         },
         "message": "Chỉ còn 2 suất giá live cho iPhone 16 Pro. Vui lòng giảm số lượng.",
         "meta": {
-          "timestamp": "2026-11-12T20:05:18.0344779Z"
+          "timestamp": "2026-11-19T05:02:53.4968875Z"
         },
         "success": false
       }
@@ -446,7 +448,7 @@
             "id": "11111111-1111-1111-1111-111111111111",
             "name": "Apple"
           },
-          "createdAt": "2026-11-18T21:37:55.1778236+07:00",
+          "createdAt": "2026-11-19T12:02:53.4874236+07:00",
           "currency": "",
           "description": "",
           "featured": false,
@@ -477,7 +479,7 @@
           "soldCount": 0,
           "specs": [],
           "stockQuantity": 0,
-          "updatedAt": "2026-11-18T21:37:55.1778236+07:00",
+          "updatedAt": "2026-11-19T12:02:53.4874236+07:00",
           "variants": [
             {
               "active": true,
@@ -496,7 +498,7 @@
         "error": null,
         "message": "",
         "meta": {
-          "timestamp": "2026-11-18T14:37:55.1778236Z"
+          "timestamp": "2026-11-19T05:02:53.4874236Z"
         },
         "success": true
       }
@@ -513,7 +515,7 @@
         },
         "message": "missing or malformed authorization header",
         "meta": {
-          "timestamp": "2026-11-12T19:37:52.4155136Z"
+          "timestamp": "2026-11-19T05:02:53.4088282Z"
         },
         "success": false
       }

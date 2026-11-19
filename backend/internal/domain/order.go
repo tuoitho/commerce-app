@@ -315,6 +315,7 @@ type CheckoutQuoteInput struct {
 
 type CheckoutQuote struct {
 	SubtotalVND              MoneyVND       `json:"subtotalVnd"`
+	EligibleSubtotalVND      MoneyVND       `json:"eligibleSubtotalVnd"`
 	DeliveryMethod           DeliveryMethod `json:"deliveryMethod"`
 	ExpressAvailable         bool           `json:"expressAvailable"`
 	StandardShippingFeeVND   MoneyVND       `json:"standardShippingFeeVnd"`

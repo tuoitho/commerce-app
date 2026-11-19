@@ -464,6 +464,13 @@ type User struct {
 	AvatarKey    pgtype.Text
 }
 
+type UserVoucher struct {
+	ID        string
+	UserID    string
+	VoucherID string
+	ClaimedAt time.Time
+}
+
 type VariantOptionValue struct {
 	VariantID     string
 	ProductID     string
@@ -488,6 +495,17 @@ type Voucher struct {
 	Active         bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	ScopeType      string
+}
+
+type VoucherCategory struct {
+	VoucherID  string
+	CategoryID string
+}
+
+type VoucherProduct struct {
+	VoucherID string
+	ProductID string
 }
 
 type VoucherUsage struct {

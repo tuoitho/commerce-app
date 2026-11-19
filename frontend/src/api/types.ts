@@ -237,6 +237,7 @@ export interface CartItem {
   id: string
   variantId: string
   productId: string
+  categoryId?: string
   brandName: string
   productName: string
   model: string
@@ -535,7 +536,16 @@ export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 // Vouchers & Shipping
 export type VoucherType = 'percent' | 'fixed_amount' | 'freeship'
 
+export type VoucherScopeType = 'all' | 'categories' | 'products'
+
+export interface VoucherScopeTarget {
+  id: string
+  name: string
+}
+
 export type VoucherEffectiveStatus = 'scheduled' | 'active' | 'exhausted' | 'expired' | 'inactive'
+
+export type VoucherWalletStatus = 'available' | 'used_up' | 'expired' | 'exhausted' | 'inactive' | 'scheduled'
 
 export interface Voucher {
   id: string
@@ -543,6 +553,9 @@ export interface Voucher {
   title: string
   description: string
   voucherType: VoucherType
+  scopeType?: VoucherScopeType
+  scopeCategories?: VoucherScopeTarget[]
+  scopeProducts?: VoucherScopeTarget[]
   discountValue: string
   maxDiscountVnd: string | null
   minOrderVnd: string
@@ -558,7 +571,22 @@ export interface Voucher {
   updatedAt?: string
 }
 
-export type AvailableVoucher = Voucher & { userRemainingUses: number }
+export type AvailableVoucher = Voucher & {
+  userRemainingUses: number
+  claimedAt?: string
+}
+
+export type DiscoverVoucher = Voucher & {
+  userRemainingUses: number
+  claimed: boolean
+  claimedAt: string | null
+}
+
+export type UserVoucher = Voucher & {
+  userRemainingUses: number
+  claimedAt: string
+  walletStatus: VoucherWalletStatus
+}
 
 export type DeliveryMethod = 'standard' | 'express_2h'
 
@@ -570,6 +598,7 @@ export interface CheckoutQuoteInput {
 
 export interface CheckoutQuote {
   subtotalVnd: string
+  eligibleSubtotalVnd?: string
   deliveryMethod: DeliveryMethod
   expressAvailable: boolean
   standardShippingFeeVnd: string

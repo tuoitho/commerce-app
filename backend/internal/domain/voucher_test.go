@@ -305,3 +305,57 @@ func TestFormatVNDAndErrors(t *testing.T) {
 		t.Errorf("FlashSaleQuotaExceededError = %q", fsErr.Error())
 	}
 }
+
+func TestEvaluateVoucherScope(t *testing.T) {
+	lines := []VoucherScopeLine{
+		{ProductID: "p1", CategoryID: "c1", LineTotalVND: "1000000"},
+		{ProductID: "p2", CategoryID: "c2", LineTotalVND: "2000000"},
+		{ProductID: "p3", CategoryID: "c1", LineTotalVND: "500000"},
+	}
+
+	gotAll, countAll, err := EvaluateVoucherScope(VoucherScopeAll, nil, nil, lines)
+	if err != nil || gotAll != "3500000" || countAll != 3 {
+		t.Fatalf("all scope = (%q, %d, %v), want (3500000, 3, nil)", gotAll, countAll, err)
+	}
+
+	gotCat, countCat, err := EvaluateVoucherScope(VoucherScopeCategories, []string{"c1"}, nil, lines)
+	if err != nil || gotCat != "1500000" || countCat != 2 {
+		t.Fatalf("categories scope = (%q, %d, %v), want (1500000, 2, nil)", gotCat, countCat, err)
+	}
+
+	gotProd, countProd, err := EvaluateVoucherScope(VoucherScopeProducts, nil, []string{"p2"}, lines)
+	if err != nil || gotProd != "2000000" || countProd != 1 {
+		t.Fatalf("products scope = (%q, %d, %v), want (2000000, 1, nil)", gotProd, countProd, err)
+	}
+
+	gotNone, countNone, err := EvaluateVoucherScope(VoucherScopeProducts, nil, []string{"p999"}, lines)
+	if err != nil || gotNone != "0" || countNone != 0 {
+		t.Fatalf("unmatched scope = (%q, %d, %v), want (0, 0, nil)", gotNone, countNone, err)
+	}
+}
+
+func TestDeriveVoucherWalletStatus(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	start := now.Add(-time.Hour)
+	end := now.Add(time.Hour)
+	limit5 := 5
+
+	if got := DeriveVoucherWalletStatus(false, start, end, now, &limit5, 0, 1); got != VoucherWalletInactive {
+		t.Errorf("inactive = %q", got)
+	}
+	if got := DeriveVoucherWalletStatus(true, start, now.Add(-time.Minute), now, &limit5, 0, 1); got != VoucherWalletExpired {
+		t.Errorf("expired = %q", got)
+	}
+	if got := DeriveVoucherWalletStatus(true, now.Add(time.Minute), end, now, &limit5, 0, 1); got != VoucherWalletScheduled {
+		t.Errorf("scheduled = %q", got)
+	}
+	if got := DeriveVoucherWalletStatus(true, start, end, now, &limit5, 1, 0); got != VoucherWalletUsedUp {
+		t.Errorf("used_up = %q", got)
+	}
+	if got := DeriveVoucherWalletStatus(true, start, end, now, &limit5, 5, 1); got != VoucherWalletExhausted {
+		t.Errorf("exhausted = %q", got)
+	}
+	if got := DeriveVoucherWalletStatus(true, start, end, now, &limit5, 2, 1); got != VoucherWalletAvailable {
+		t.Errorf("available = %q", got)
+	}
+}

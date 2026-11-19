@@ -684,6 +684,17 @@ export function Header() {
               >
                 Lịch sử đánh giá
               </Link>
+              <Link
+                to="/vouchers"
+                data-testid="header-vouchers-link"
+                className={`shrink-0 px-3 py-1.5 rounded-lg transition-colors ${
+                  location.pathname.startsWith('/vouchers')
+                    ? 'text-zinc-950 bg-zinc-100 font-bold'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
+                }`}
+              >
+                Kho & Ví Voucher
+              </Link>
             </>
           )}
         </nav>
@@ -789,6 +800,18 @@ export function Header() {
                 >
                   <Star className="h-4 w-4 text-zinc-600" />
                   <span>Lịch sử đánh giá</span>
+                </Link>
+                <Link
+                  to="/vouchers"
+                  data-testid="mobile-vouchers-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3.5 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 ${
+                    location.pathname.startsWith('/vouchers')
+                      ? 'text-zinc-950 bg-zinc-100 font-bold'
+                      : 'text-zinc-700 hover:bg-zinc-50'
+                  }`}
+                >
+                  <span>Kho & Ví Voucher</span>
                 </Link>
               </>
             )}

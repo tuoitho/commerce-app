@@ -23,6 +23,7 @@ type CartItem struct {
 	ID            string
 	VariantID     string
 	ProductID     string
+	CategoryID    string
 	BrandName     string
 	ProductName   string
 	Model         string

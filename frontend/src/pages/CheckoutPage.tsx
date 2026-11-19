@@ -25,6 +25,7 @@ import { useToast } from '@/context/ToastContext'
 import { addressesApi } from '@/api/addresses'
 import { ordersApi } from '@/api/orders'
 import { vouchersApi } from '@/api/vouchers'
+import { formatVoucherScopeLabel } from '@/pages/VouchersPage'
 import { getMomoIneligibleReason, isMomoAmountEligible } from '@/lib/payment'
 import {
   ApiError,
@@ -801,16 +802,24 @@ export function CheckoutPage() {
 
             {/* 2.75 Voucher Section */}
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
-              <div className="flex items-center gap-3 border-b border-zinc-100 pb-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
-                  <Tag className="h-4 w-4" />
+              <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900">
+                    <Tag className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-zinc-950">Mã giảm giá</h2>
+                    <p className="text-xs text-zinc-500">
+                      Chọn mã đã lưu trong ví của bạn hoặc nhập mã đã lưu
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-zinc-950">Mã giảm giá</h2>
-                  <p className="text-xs text-zinc-500">
-                    Chọn mã ưu đãi sẵn có hoặc nhập mã giảm giá của bạn
-                  </p>
-                </div>
+                <Link
+                  to="/vouchers"
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0"
+                >
+                  Kho & Ví Voucher
+                </Link>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2.5">
@@ -863,29 +872,82 @@ export function CheckoutPage() {
               )}
 
               {appliedVoucherCode && (
-                <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-900">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-900">
                   <span>
                     Đang áp dụng mã <strong className="font-mono">{appliedVoucherCode}</strong>
                     {BigInt(discountVnd || '0') > 0n ? ` — Giảm ${formatVND(discountVnd)}` : ''}
                   </span>
+                  {quote?.eligibleSubtotalVnd && quote.eligibleSubtotalVnd !== quote.subtotalVnd && (
+                    <span className="text-[11px] text-emerald-800">
+                      Tính trên {formatVND(quote.eligibleSubtotalVnd)} sản phẩm hợp lệ
+                    </span>
+                  )}
                 </div>
               )}
 
-              {availableVouchers.length > 0 && (
+              {availableVouchers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3 text-xs text-zinc-600 flex items-center justify-between gap-3">
+                  <span>Ví của bạn chưa có mã giảm giá khả dụng.</span>
+                  <Link
+                    to="/vouchers"
+                    className="font-semibold text-emerald-700 hover:underline shrink-0"
+                  >
+                    Lưu mã ngay
+                  </Link>
+                </div>
+              ) : (
                 <div className="space-y-2 pt-1">
                   <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    Mã giảm giá khả dụng
+                    Mã giảm giá trong ví của bạn
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {availableVouchers.map((v) => {
                       const isApplied = appliedVoucherCode === v.code
+                      const scopeType = v.scopeType || 'all'
+                      let ineligibleReason: string | null = null
+
+                      if (scopeType === 'categories' && (v.scopeCategories?.length ?? 0) > 0) {
+                        const allowedCats = new Set(v.scopeCategories!.map((c) => c.id))
+                        const itemsWithCat = selectedItems.filter((it) => Boolean(it.categoryId))
+                        if (itemsWithCat.length > 0) {
+                          const matching = itemsWithCat.filter((it) => allowedCats.has(it.categoryId!))
+                          if (matching.length === 0) {
+                            ineligibleReason = 'Không có sản phẩm thuộc danh mục áp dụng'
+                          } else {
+                            const eligibleSum = matching.reduce(
+                              (acc, it) => acc + BigInt(it.lineTotalVnd || '0'),
+                              0n
+                            )
+                            if (eligibleSum < BigInt(v.minOrderVnd || '0')) {
+                              ineligibleReason = `Cần tối thiểu ${formatVND(v.minOrderVnd)} sản phẩm hợp lệ`
+                            }
+                          }
+                        }
+                      } else if (scopeType === 'products' && (v.scopeProducts?.length ?? 0) > 0) {
+                        const allowedProds = new Set(v.scopeProducts!.map((p) => p.id))
+                        const matching = selectedItems.filter((it) => allowedProds.has(it.productId))
+                        if (matching.length === 0) {
+                          ineligibleReason = 'Không có sản phẩm áp dụng trong giỏ'
+                        } else {
+                          const eligibleSum = matching.reduce(
+                            (acc, it) => acc + BigInt(it.lineTotalVnd || '0'),
+                            0n
+                          )
+                          if (eligibleSum < BigInt(v.minOrderVnd || '0')) {
+                            ineligibleReason = `Cần tối thiểu ${formatVND(v.minOrderVnd)} sản phẩm hợp lệ`
+                          }
+                        }
+                      }
+
                       return (
                         <div
                           key={v.id}
                           className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
                             isApplied
                               ? 'border-emerald-600 bg-emerald-50/50'
-                              : 'border-zinc-200 bg-zinc-50/40 hover:border-zinc-400'
+                              : ineligibleReason
+                                ? 'border-zinc-200 bg-zinc-50/80 opacity-70'
+                                : 'border-zinc-200 bg-zinc-50/40 hover:border-zinc-400'
                           }`}
                         >
                           <div className="min-w-0 space-y-0.5">
@@ -900,18 +962,30 @@ export function CheckoutPage() {
                             <p className="text-xs font-semibold text-zinc-900 truncate">
                               {v.title}
                             </p>
+                            <p className="text-[11px] text-zinc-600 truncate">
+                              {formatVoucherScopeLabel(v)}
+                            </p>
                             <p className="text-[11px] text-zinc-500">
                               {Number(v.minOrderVnd) > 0
                                 ? `Đơn tối thiểu ${formatVND(v.minOrderVnd)}`
                                 : 'Áp dụng mọi đơn hàng'}
                             </p>
+                            {ineligibleReason && (
+                              <p className="text-[11px] font-medium text-amber-700">
+                                {ineligibleReason}
+                              </p>
+                            )}
                           </div>
                           <Button
                             type="button"
                             size="sm"
                             variant={isApplied ? 'outline' : 'secondary'}
                             data-testid={`apply-voucher-${v.code}`}
-                            disabled={isApplyingVoucher || !selectedAddressId}
+                            disabled={
+                              isApplyingVoucher ||
+                              !selectedAddressId ||
+                              (!isApplied && Boolean(ineligibleReason))
+                            }
                             onClick={() =>
                               isApplied ? handleRemoveVoucher() : void handleApplyVoucher(v.code)
                             }

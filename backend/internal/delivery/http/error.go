@@ -176,6 +176,10 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 409, "voucher_exhausted", "Mã giảm giá đã hết lượt sử dụng", nil)
 	case errors.Is(err, domain.ErrVoucherUserLimitReached):
 		respondError(c, 409, "voucher_user_limit_reached", "Bạn đã sử dụng hết số lượt cho phép của mã giảm giá này", nil)
+	case errors.Is(err, domain.ErrVoucherNotClaimed):
+		respondError(c, 409, "voucher_not_claimed", "Bạn cần lưu mã giảm giá vào ví trước khi sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherScopeMismatch):
+		respondError(c, 409, "voucher_scope_mismatch", "Mã giảm giá không áp dụng cho sản phẩm nào trong đơn hàng", nil)
 	case errors.Is(err, domain.ErrBuyAgainAllUnavailable):
 		respondError(c, 409, "buy_again_all_unavailable", "Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh", nil)
 	case errors.Is(err, domain.ErrExpressDeliveryUnavailable):

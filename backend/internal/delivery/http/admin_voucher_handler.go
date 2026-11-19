@@ -25,18 +25,21 @@ func newAdminVoucherHandler(uc *voucheruc.UseCase) *adminVoucherHandler {
 }
 
 type saveVoucherRequest struct {
-	Code           string  `json:"code"`
-	Title          string  `json:"title"`
-	Description    string  `json:"description"`
-	VoucherType    string  `json:"voucherType"`
-	DiscountValue  string  `json:"discountValue"`
-	MaxDiscountVND *string `json:"maxDiscountVnd"`
-	MinOrderVND    string  `json:"minOrderVnd"`
-	UsageLimit     *int    `json:"usageLimit"`
-	PerUserLimit   int     `json:"perUserLimit"`
-	StartsAt       string  `json:"startsAt"`
-	EndsAt         string  `json:"endsAt"`
-	Active         bool    `json:"active"`
+	Code           string   `json:"code"`
+	Title          string   `json:"title"`
+	Description    string   `json:"description"`
+	VoucherType    string   `json:"voucherType"`
+	ScopeType      string   `json:"scopeType"`
+	CategoryIDs    []string `json:"categoryIds"`
+	ProductIDs     []string `json:"productIds"`
+	DiscountValue  string   `json:"discountValue"`
+	MaxDiscountVND *string  `json:"maxDiscountVnd"`
+	MinOrderVND    string   `json:"minOrderVnd"`
+	UsageLimit     *int     `json:"usageLimit"`
+	PerUserLimit   int      `json:"perUserLimit"`
+	StartsAt       string   `json:"startsAt"`
+	EndsAt         string   `json:"endsAt"`
+	Active         bool     `json:"active"`
 }
 
 func (r saveVoucherRequest) toDomain() (domain.SaveVoucherInput, error) {
@@ -74,6 +77,9 @@ func (r saveVoucherRequest) toDomain() (domain.SaveVoucherInput, error) {
 		Title:          r.Title,
 		Description:    r.Description,
 		VoucherType:    domain.VoucherType(r.VoucherType),
+		ScopeType:      domain.VoucherScopeType(r.ScopeType),
+		CategoryIDs:    r.CategoryIDs,
+		ProductIDs:     r.ProductIDs,
 		DiscountValue:  domain.MoneyVND(r.DiscountValue),
 		MaxDiscountVND: maxDiscount,
 		MinOrderVND:    domain.MoneyVND(r.MinOrderVND),

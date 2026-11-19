@@ -35,6 +35,117 @@ const (
 	VoucherStatusInactive  VoucherEffectiveStatus = "inactive"
 )
 
+type VoucherScopeType string
+
+const (
+	VoucherScopeAll        VoucherScopeType = "all"
+	VoucherScopeCategories VoucherScopeType = "categories"
+	VoucherScopeProducts   VoucherScopeType = "products"
+)
+
+func (s VoucherScopeType) IsValid() bool {
+	switch s {
+	case VoucherScopeAll, VoucherScopeCategories, VoucherScopeProducts:
+		return true
+	default:
+		return false
+	}
+}
+
+type VoucherScopeTarget struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type VoucherWalletStatus string
+
+const (
+	VoucherWalletAvailable VoucherWalletStatus = "available"
+	VoucherWalletUsedUp    VoucherWalletStatus = "used_up"
+	VoucherWalletExpired   VoucherWalletStatus = "expired"
+	VoucherWalletExhausted VoucherWalletStatus = "exhausted"
+	VoucherWalletInactive  VoucherWalletStatus = "inactive"
+	VoucherWalletScheduled VoucherWalletStatus = "scheduled"
+)
+
+// DeriveVoucherWalletStatus computes the wallet status of a claimed voucher at now.
+func DeriveVoucherWalletStatus(
+	active bool,
+	startsAt, endsAt, now time.Time,
+	usageLimit *int,
+	usedCount int,
+	userRemainingUses int,
+) VoucherWalletStatus {
+	if !active {
+		return VoucherWalletInactive
+	}
+	if now.After(endsAt) {
+		return VoucherWalletExpired
+	}
+	if now.Before(startsAt) {
+		return VoucherWalletScheduled
+	}
+	if userRemainingUses <= 0 {
+		return VoucherWalletUsedUp
+	}
+	if usageLimit != nil && usedCount >= *usageLimit {
+		return VoucherWalletExhausted
+	}
+	return VoucherWalletAvailable
+}
+
+type VoucherScopeLine struct {
+	ProductID    string
+	CategoryID   string
+	LineTotalVND MoneyVND
+}
+
+// EvaluateVoucherScope computes the eligible subtotal and item count for a voucher scope.
+func EvaluateVoucherScope(
+	scopeType VoucherScopeType,
+	categoryIDs []string,
+	productIDs []string,
+	lines []VoucherScopeLine,
+) (MoneyVND, int, error) {
+	if scopeType == "" {
+		scopeType = VoucherScopeAll
+	}
+	catSet := make(map[string]struct{}, len(categoryIDs))
+	for _, id := range categoryIDs {
+		catSet[id] = struct{}{}
+	}
+	prodSet := make(map[string]struct{}, len(productIDs))
+	for _, id := range productIDs {
+		prodSet[id] = struct{}{}
+	}
+
+	var eligible MoneyVND = "0"
+	count := 0
+	for _, line := range lines {
+		var matched bool
+		switch scopeType {
+		case VoucherScopeAll:
+			matched = true
+		case VoucherScopeCategories:
+			_, matched = catSet[line.CategoryID]
+		case VoucherScopeProducts:
+			_, matched = prodSet[line.ProductID]
+		default:
+			matched = false
+		}
+		if !matched {
+			continue
+		}
+		var err error
+		eligible, err = AddMoneyVND(eligible, line.LineTotalVND)
+		if err != nil {
+			return "", 0, err
+		}
+		count++
+	}
+	return eligible, count, nil
+}
+
 var voucherCodePattern = regexp.MustCompile(`^[A-Z0-9_-]{3,32}$`)
 
 // NormalizeVoucherCode trims surrounding whitespace and converts to uppercase.
@@ -271,6 +382,9 @@ type Voucher struct {
 	Title           string                 `json:"title"`
 	Description     string                 `json:"description"`
 	VoucherType     VoucherType            `json:"voucherType"`
+	ScopeType       VoucherScopeType       `json:"scopeType"`
+	ScopeCategories []VoucherScopeTarget   `json:"scopeCategories"`
+	ScopeProducts   []VoucherScopeTarget   `json:"scopeProducts"`
 	DiscountValue   MoneyVND               `json:"discountValue"`
 	MaxDiscountVND  *MoneyVND              `json:"maxDiscountVnd"`
 	MinOrderVND     MoneyVND               `json:"minOrderVnd"`
@@ -286,20 +400,68 @@ type Voucher struct {
 }
 
 type AvailableVoucher struct {
-	ID                string      `json:"id"`
-	Code              string      `json:"code"`
-	Title             string      `json:"title"`
-	Description       string      `json:"description"`
-	VoucherType       VoucherType `json:"voucherType"`
-	DiscountValue     MoneyVND    `json:"discountValue"`
-	MaxDiscountVND    *MoneyVND   `json:"maxDiscountVnd"`
-	MinOrderVND       MoneyVND    `json:"minOrderVnd"`
-	UsageLimit        *int        `json:"usageLimit"`
-	UsedCount         int         `json:"usedCount"`
-	PerUserLimit      int         `json:"perUserLimit"`
-	UserRemainingUses int         `json:"userRemainingUses"`
-	StartsAt          time.Time   `json:"startsAt"`
-	EndsAt            time.Time   `json:"endsAt"`
+	ID                string               `json:"id"`
+	Code              string               `json:"code"`
+	Title             string               `json:"title"`
+	Description       string               `json:"description"`
+	VoucherType       VoucherType          `json:"voucherType"`
+	ScopeType         VoucherScopeType     `json:"scopeType"`
+	ScopeCategories   []VoucherScopeTarget `json:"scopeCategories"`
+	ScopeProducts     []VoucherScopeTarget `json:"scopeProducts"`
+	DiscountValue     MoneyVND             `json:"discountValue"`
+	MaxDiscountVND    *MoneyVND            `json:"maxDiscountVnd"`
+	MinOrderVND       MoneyVND             `json:"minOrderVnd"`
+	UsageLimit        *int                 `json:"usageLimit"`
+	UsedCount         int                  `json:"usedCount"`
+	PerUserLimit      int                  `json:"perUserLimit"`
+	UserRemainingUses int                  `json:"userRemainingUses"`
+	StartsAt          time.Time            `json:"startsAt"`
+	EndsAt            time.Time            `json:"endsAt"`
+	ClaimedAt         time.Time            `json:"claimedAt"`
+}
+
+type DiscoverVoucher struct {
+	ID                string               `json:"id"`
+	Code              string               `json:"code"`
+	Title             string               `json:"title"`
+	Description       string               `json:"description"`
+	VoucherType       VoucherType          `json:"voucherType"`
+	ScopeType         VoucherScopeType     `json:"scopeType"`
+	ScopeCategories   []VoucherScopeTarget `json:"scopeCategories"`
+	ScopeProducts     []VoucherScopeTarget `json:"scopeProducts"`
+	DiscountValue     MoneyVND             `json:"discountValue"`
+	MaxDiscountVND    *MoneyVND            `json:"maxDiscountVnd"`
+	MinOrderVND       MoneyVND             `json:"minOrderVnd"`
+	UsageLimit        *int                 `json:"usageLimit"`
+	UsedCount         int                  `json:"usedCount"`
+	PerUserLimit      int                  `json:"perUserLimit"`
+	UserRemainingUses int                  `json:"userRemainingUses"`
+	StartsAt          time.Time            `json:"startsAt"`
+	EndsAt            time.Time            `json:"endsAt"`
+	Claimed           bool                 `json:"claimed"`
+	ClaimedAt         *time.Time           `json:"claimedAt"`
+}
+
+type UserVoucher struct {
+	ID                string               `json:"id"`
+	Code              string               `json:"code"`
+	Title             string               `json:"title"`
+	Description       string               `json:"description"`
+	VoucherType       VoucherType          `json:"voucherType"`
+	ScopeType         VoucherScopeType     `json:"scopeType"`
+	ScopeCategories   []VoucherScopeTarget `json:"scopeCategories"`
+	ScopeProducts     []VoucherScopeTarget `json:"scopeProducts"`
+	DiscountValue     MoneyVND             `json:"discountValue"`
+	MaxDiscountVND    *MoneyVND            `json:"maxDiscountVnd"`
+	MinOrderVND       MoneyVND             `json:"minOrderVnd"`
+	UsageLimit        *int                 `json:"usageLimit"`
+	UsedCount         int                  `json:"usedCount"`
+	PerUserLimit      int                  `json:"perUserLimit"`
+	UserRemainingUses int                  `json:"userRemainingUses"`
+	StartsAt          time.Time            `json:"startsAt"`
+	EndsAt            time.Time            `json:"endsAt"`
+	ClaimedAt         time.Time            `json:"claimedAt"`
+	WalletStatus      VoucherWalletStatus  `json:"walletStatus"`
 }
 
 type SaveVoucherInput struct {
@@ -307,6 +469,9 @@ type SaveVoucherInput struct {
 	Title          string
 	Description    string
 	VoucherType    VoucherType
+	ScopeType      VoucherScopeType
+	CategoryIDs    []string
+	ProductIDs     []string
 	DiscountValue  MoneyVND
 	MaxDiscountVND *MoneyVND
 	MinOrderVND    MoneyVND
@@ -331,4 +496,7 @@ type VoucherRepository interface {
 	Update(ctx context.Context, id string, input SaveVoucherInput) (*Voucher, error)
 	Delete(ctx context.Context, id string) error
 	ListAvailableForUser(ctx context.Context, userID string, now time.Time) ([]AvailableVoucher, error)
+	ListDiscoverForUser(ctx context.Context, userID string, now time.Time) ([]DiscoverVoucher, error)
+	ClaimForUser(ctx context.Context, userID, voucherID string, now time.Time) (*UserVoucher, error)
+	ListWalletForUser(ctx context.Context, userID string, statusFilter string, now time.Time) ([]UserVoucher, error)
 }

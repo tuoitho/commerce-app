@@ -88,6 +88,9 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		vouchers.Use(guard.AuthRequired)
 		{
 			vouchers.GET("/available", voucherHandler.ListAvailable)
+			vouchers.GET("/discover", voucherHandler.ListDiscover)
+			vouchers.GET("/wallet", voucherHandler.ListWallet)
+			vouchers.POST("/:id/claim", voucherHandler.Claim)
 		}
 	}
 

@@ -78,6 +78,8 @@ var (
 	ErrVoucherExpired             = errors.New("voucher expired")
 	ErrVoucherExhausted           = errors.New("voucher exhausted")
 	ErrVoucherUserLimitReached    = errors.New("voucher user limit reached")
+	ErrVoucherNotClaimed          = errors.New("voucher not claimed")
+	ErrVoucherScopeMismatch       = errors.New("voucher scope mismatch")
 	ErrBuyAgainAllUnavailable     = errors.New("buy again all unavailable")
 	ErrExpressDeliveryUnavailable = errors.New("express delivery unavailable")
 )

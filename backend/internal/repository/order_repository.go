@@ -221,15 +221,21 @@ func (r *OrderRepository) QuoteCheckout(ctx context.Context, input domain.Checko
 		return nil, err
 	}
 	var subtotalVND domain.MoneyVND = "0"
+	scopeLines := make([]domain.VoucherScopeLine, 0, len(cartRows))
 	for _, row := range cartRows {
 		if !row.Selected || !row.ProductActive || !row.VariantActive || row.StockQuantity <= 0 || row.Quantity > row.StockQuantity {
 			continue
 		}
-		lineTotal := new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(row.Quantity)).String()
-		subtotalVND, err = domain.AddMoneyVND(subtotalVND, domain.MoneyVND(lineTotal))
+		lineTotal := domain.MoneyVND(new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(row.Quantity)).String())
+		subtotalVND, err = domain.AddMoneyVND(subtotalVND, lineTotal)
 		if err != nil {
 			return nil, err
 		}
+		scopeLines = append(scopeLines, domain.VoucherScopeLine{
+			ProductID:    row.ProductID,
+			CategoryID:   row.CategoryID,
+			LineTotalVND: lineTotal,
+		})
 	}
 
 	shipQuote, err := domain.CalculateShippingQuote(addr.ProvinceCode, subtotalVND, deliveryMethod, input.Shipping)
@@ -240,6 +246,7 @@ func (r *OrderRepository) QuoteCheckout(ctx context.Context, input domain.Checko
 	var voucherCodePtr *string
 	var voucherTypePtr *domain.VoucherType
 	var discountVND domain.MoneyVND = "0"
+	eligibleSubtotalVND := subtotalVND
 
 	if strings.TrimSpace(input.VoucherCode) != "" {
 		normalizedCode := domain.NormalizeVoucherCode(input.VoucherCode)
@@ -247,39 +254,23 @@ func (r *OrderRepository) QuoteCheckout(ctx context.Context, input domain.Checko
 		if err != nil {
 			return nil, mapNotFound(err, domain.ErrVoucherNotFound)
 		}
-		userUsed, err := q.CountUserActiveVoucherUsages(ctx, sqlc.CountUserActiveVoucherUsagesParams{
-			VoucherID: vRow.ID,
-			UserID:    input.UserID,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if err := validateVoucherEligibility(
-			vRow.Active,
-			vRow.StartsAt,
-			vRow.EndsAt,
-			vRow.UsageLimit,
-			vRow.UsedCount,
-			vRow.PerUserLimit,
-			userUsed,
+		eligibleSubtotalVND, discountVND, err = evaluateVoucherForCheckout(
+			ctx, q, input.UserID,
+			vRow.ID, domain.VoucherScopeType(vRow.ScopeType),
+			vRow.Active, vRow.StartsAt, vRow.EndsAt,
+			vRow.UsageLimit, vRow.UsedCount, vRow.PerUserLimit,
 			domain.MoneyVND(vRow.MinOrderVnd),
-			subtotalVND,
-			time.Now().UTC(),
-		); err != nil {
-			return nil, err
-		}
-
-		vt := domain.VoucherType(vRow.VoucherType)
-		discountVND, err = domain.CalculateVoucherDiscount(
-			vt,
+			domain.VoucherType(vRow.VoucherType),
 			domain.MoneyVND(vRow.DiscountValue),
 			moneyPtrFromString(vRow.MaxDiscountVnd),
-			subtotalVND,
 			shipQuote.ShippingFeeVND,
+			scopeLines,
+			time.Now().UTC(),
 		)
 		if err != nil {
 			return nil, err
 		}
+		vt := domain.VoucherType(vRow.VoucherType)
 		codeCopy := vRow.Code
 		voucherCodePtr = &codeCopy
 		voucherTypePtr = &vt
@@ -292,6 +283,7 @@ func (r *OrderRepository) QuoteCheckout(ctx context.Context, input domain.Checko
 
 	return &domain.CheckoutQuote{
 		SubtotalVND:              subtotalVND,
+		EligibleSubtotalVND:      eligibleSubtotalVND,
 		DeliveryMethod:           shipQuote.DeliveryMethod,
 		ExpressAvailable:         shipQuote.ExpressAvailable,
 		StandardShippingFeeVND:   shipQuote.StandardShippingFeeVND,
@@ -455,13 +447,19 @@ func (r *OrderRepository) createOrderInternal(ctx context.Context, p createOrder
 
 	// 5. Calculate subtotal
 	var subtotal domain.MoneyVND = "0"
+	scopeLines := make([]domain.VoucherScopeLine, 0, len(p.lines))
 	for _, line := range p.lines {
 		row := lockedMap[line.VariantID]
-		lineTotal := new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(line.Quantity)).String()
-		subtotal, err = domain.AddMoneyVND(subtotal, domain.MoneyVND(lineTotal))
+		lineTotal := domain.MoneyVND(new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(line.Quantity)).String())
+		subtotal, err = domain.AddMoneyVND(subtotal, lineTotal)
 		if err != nil {
 			return nil, err
 		}
+		scopeLines = append(scopeLines, domain.VoucherScopeLine{
+			ProductID:    row.ProductID,
+			CategoryID:   row.CategoryID,
+			LineTotalVND: lineTotal,
+		})
 	}
 
 	// 6. Get address snapshot & calculate shipping fee
@@ -497,35 +495,18 @@ func (r *OrderRepository) createOrderInternal(ctx context.Context, p createOrder
 		if err != nil {
 			return nil, mapNotFound(err, domain.ErrVoucherNotFound)
 		}
-		userUsed, err := q.CountUserActiveVoucherUsages(ctx, sqlc.CountUserActiveVoucherUsagesParams{
-			VoucherID: vRow.ID,
-			UserID:    p.userID,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if err := validateVoucherEligibility(
-			vRow.Active,
-			vRow.StartsAt,
-			vRow.EndsAt,
-			vRow.UsageLimit,
-			vRow.UsedCount,
-			vRow.PerUserLimit,
-			userUsed,
+		_, discountVND, err = evaluateVoucherForCheckout(
+			ctx, q, p.userID,
+			vRow.ID, domain.VoucherScopeType(vRow.ScopeType),
+			vRow.Active, vRow.StartsAt, vRow.EndsAt,
+			vRow.UsageLimit, vRow.UsedCount, vRow.PerUserLimit,
 			domain.MoneyVND(vRow.MinOrderVnd),
-			subtotal,
-			time.Now().UTC(),
-		); err != nil {
-			return nil, err
-		}
-
-		vt := domain.VoucherType(vRow.VoucherType)
-		discountVND, err = domain.CalculateVoucherDiscount(
-			vt,
+			domain.VoucherType(vRow.VoucherType),
 			domain.MoneyVND(vRow.DiscountValue),
 			moneyPtrFromString(vRow.MaxDiscountVnd),
-			subtotal,
 			shippingFeeVND,
+			scopeLines,
+			time.Now().UTC(),
 		)
 		if err != nil {
 			return nil, err
@@ -747,13 +728,95 @@ func (r *OrderRepository) createOrderInternal(ctx context.Context, p createOrder
 	}, orderItems, mapOrderTimelineEvents(eventRows)), nil
 }
 
-func validateVoucherEligibility(
+func evaluateVoucherForCheckout(
+	ctx context.Context,
+	q *sqlc.Queries,
+	userID string,
+	voucherID string,
+	scopeType domain.VoucherScopeType,
+	active bool,
+	startsAt, endsAt time.Time,
+	usageLimit pgtype.Int4,
+	usedCount, perUserLimit int32,
+	minOrderVND domain.MoneyVND,
+	voucherType domain.VoucherType,
+	discountValue domain.MoneyVND,
+	maxDiscountVND *domain.MoneyVND,
+	shippingFeeVND domain.MoneyVND,
+	scopeLines []domain.VoucherScopeLine,
+	now time.Time,
+) (domain.MoneyVND, domain.MoneyVND, error) {
+	claimed, err := q.HasUserClaimedVoucher(ctx, sqlc.HasUserClaimedVoucherParams{
+		UserID:    userID,
+		VoucherID: voucherID,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	if !claimed {
+		return "", "", domain.ErrVoucherNotClaimed
+	}
+
+	userUsed, err := q.CountUserActiveVoucherUsages(ctx, sqlc.CountUserActiveVoucherUsagesParams{
+		VoucherID: voucherID,
+		UserID:    userID,
+	})
+	if err != nil {
+		return "", "", err
+	}
+
+	if err := validateVoucherStatusAndLimits(active, startsAt, endsAt, usageLimit, usedCount, perUserLimit, userUsed, now); err != nil {
+		return "", "", err
+	}
+
+	if scopeType == "" {
+		scopeType = domain.VoucherScopeAll
+	}
+	var categoryIDs []string
+	var productIDs []string
+	switch scopeType {
+	case domain.VoucherScopeCategories:
+		categoryIDs, err = q.ListVoucherCategoryIDs(ctx, voucherID)
+		if err != nil {
+			return "", "", err
+		}
+	case domain.VoucherScopeProducts:
+		productIDs, err = q.ListVoucherProductIDs(ctx, voucherID)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	eligibleSubtotal, eligibleCount, err := domain.EvaluateVoucherScope(scopeType, categoryIDs, productIDs, scopeLines)
+	if err != nil {
+		return "", "", err
+	}
+	if scopeType != domain.VoucherScopeAll && eligibleCount == 0 {
+		return "", "", domain.ErrVoucherScopeMismatch
+	}
+	if domain.CompareMoneyVND(eligibleSubtotal, minOrderVND) < 0 {
+		return "", "", &domain.VoucherMinOrderError{MinOrderVND: minOrderVND}
+	}
+
+	discountVND, err := domain.CalculateVoucherDiscount(
+		voucherType,
+		discountValue,
+		maxDiscountVND,
+		eligibleSubtotal,
+		shippingFeeVND,
+	)
+	if err != nil {
+		return "", "", err
+	}
+	return eligibleSubtotal, discountVND, nil
+}
+
+func validateVoucherStatusAndLimits(
 	active bool,
 	startsAt, endsAt time.Time,
 	usageLimit pgtype.Int4,
 	usedCount, perUserLimit int32,
 	userUsed int64,
-	minOrderVND, subtotalVND domain.MoneyVND,
 	now time.Time,
 ) error {
 	if !active {
@@ -770,6 +833,21 @@ func validateVoucherEligibility(
 	}
 	if userUsed >= int64(perUserLimit) {
 		return domain.ErrVoucherUserLimitReached
+	}
+	return nil
+}
+
+func validateVoucherEligibility(
+	active bool,
+	startsAt, endsAt time.Time,
+	usageLimit pgtype.Int4,
+	usedCount, perUserLimit int32,
+	userUsed int64,
+	minOrderVND, subtotalVND domain.MoneyVND,
+	now time.Time,
+) error {
+	if err := validateVoucherStatusAndLimits(active, startsAt, endsAt, usageLimit, usedCount, perUserLimit, userUsed, now); err != nil {
+		return err
 	}
 	if domain.CompareMoneyVND(subtotalVND, minOrderVND) < 0 {
 		return &domain.VoucherMinOrderError{MinOrderVND: minOrderVND}

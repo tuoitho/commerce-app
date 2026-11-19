@@ -257,12 +257,22 @@ export type VoucherType = 'percent' | 'fixed_amount' | 'freeship'
 
 export type VoucherEffectiveStatus = 'scheduled' | 'active' | 'exhausted' | 'expired' | 'inactive'
 
+export type VoucherScopeType = 'all' | 'categories' | 'products'
+
+export interface VoucherScopeTarget {
+  id: string
+  name: string
+}
+
 export interface AdminVoucher {
   id: string
   code: string
   title: string
   description: string
   voucherType: VoucherType
+  scopeType?: VoucherScopeType
+  scopeCategories?: VoucherScopeTarget[]
+  scopeProducts?: VoucherScopeTarget[]
   discountValue: string
   maxDiscountVnd: string | null
   minOrderVnd: string
@@ -282,6 +292,9 @@ export interface SaveVoucherInput {
   title: string
   description: string
   voucherType: VoucherType
+  scopeType?: VoucherScopeType
+  categoryIds?: string[]
+  productIds?: string[]
   discountValue: string
   maxDiscountVnd: string | null
   minOrderVnd: string

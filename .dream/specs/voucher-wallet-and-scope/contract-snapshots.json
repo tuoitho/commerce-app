@@ -1,0 +1,365 @@
+{
+  "feature": "voucher-wallet-and-scope",
+  "snapshots": {
+    "admin_voucher_create_categories_201": {
+      "contractId": "API-VOUCHER-ADMIN@1",
+      "endpoint": "POST /api/v1/admin/vouchers",
+      "status": 201,
+      "requestBody": {
+        "active": true,
+        "categoryIds": [
+          "22222222-2222-2222-2222-222222222221"
+        ],
+        "code": "CAT15",
+        "description": "Áp dụng cho danh mục chọn lọc",
+        "discountValue": "15",
+        "endsAt": "2026-11-20T12:00:00Z",
+        "minOrderVnd": "500000",
+        "perUserLimit": 2,
+        "scopeType": "categories",
+        "startsAt": "2026-11-18T11:00:00Z",
+        "title": "Giảm 15% theo danh mục",
+        "voucherType": "percent"
+      },
+      "responseBody": {
+        "data": {
+          "active": true,
+          "code": "CAT15",
+          "createdAt": "2026-11-18T12:00:00Z",
+          "description": "Áp dụng cho danh mục chọn lọc",
+          "discountValue": "15",
+          "effectiveStatus": "active",
+          "endsAt": "2026-11-20T12:00:00Z",
+          "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+          "maxDiscountVnd": null,
+          "minOrderVnd": "500000",
+          "perUserLimit": 2,
+          "scopeCategories": [
+            {
+              "id": "22222222-2222-2222-2222-222222222221",
+              "name": "Category 22222222"
+            }
+          ],
+          "scopeProducts": [],
+          "scopeType": "categories",
+          "startsAt": "2026-11-18T11:00:00Z",
+          "title": "Giảm 15% theo danh mục",
+          "updatedAt": "2026-11-18T12:00:00Z",
+          "usageLimit": null,
+          "usedCount": 0,
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Tạo mã giảm giá thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.241668Z"
+        },
+        "success": true
+      }
+    },
+    "admin_voucher_list_200": {
+      "contractId": "API-VOUCHER-ADMIN@1",
+      "endpoint": "GET /api/v1/admin/vouchers",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "active": true,
+            "code": "CAT15",
+            "createdAt": "2026-11-18T12:00:00Z",
+            "description": "Áp dụng cho danh mục chọn lọc",
+            "discountValue": "15",
+            "effectiveStatus": "active",
+            "endsAt": "2026-11-20T12:00:00Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "500000",
+            "perUserLimit": 2,
+            "scopeCategories": [
+              {
+                "id": "22222222-2222-2222-2222-222222222221",
+                "name": "Category 22222222"
+              }
+            ],
+            "scopeProducts": [],
+            "scopeType": "categories",
+            "startsAt": "2026-11-18T11:00:00Z",
+            "title": "Giảm 15% theo danh mục",
+            "updatedAt": "2026-11-18T12:00:00Z",
+            "usageLimit": null,
+            "usedCount": 0,
+            "voucherType": "percent"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách mã giảm giá thành công",
+        "meta": {
+          "pagination": {
+            "hasNext": false,
+            "hasPrev": false,
+            "limit": 20,
+            "page": 1,
+            "total": 1,
+            "totalPages": 1
+          },
+          "timestamp": "2026-11-19T05:18:45.2421766Z"
+        },
+        "success": true
+      }
+    },
+    "checkout_quote_not_claimed_409": {
+      "contractId": "API-CHECKOUT-QUOTE-ORDER@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_not_claimed",
+          "message": "Bạn cần lưu mã giảm giá vào ví trước khi sử dụng"
+        },
+        "message": "Bạn cần lưu mã giảm giá vào ví trước khi sử dụng",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2226113Z"
+        },
+        "success": false
+      }
+    },
+    "checkout_quote_scope_mismatch_409": {
+      "contractId": "API-CHECKOUT-QUOTE-ORDER@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 409,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "voucher_scope_mismatch",
+          "message": "Mã giảm giá không áp dụng cho sản phẩm nào trong đơn hàng"
+        },
+        "message": "Mã giảm giá không áp dụng cho sản phẩm nào trong đơn hàng",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.225706Z"
+        },
+        "success": false
+      }
+    },
+    "checkout_quote_scoped_200": {
+      "contractId": "API-CHECKOUT-QUOTE-ORDER@1",
+      "endpoint": "POST /api/v1/checkout/quote",
+      "status": 200,
+      "requestBody": {
+        "addressId": "22222222-2222-2222-2222-222222222222",
+        "deliveryMethod": "express_2h",
+        "voucherCode": "AURA10"
+      },
+      "responseBody": {
+        "data": {
+          "deliveryMethod": "standard",
+          "discountVnd": "1500000",
+          "eligibleSubtotalVnd": "10000000",
+          "expressAvailable": true,
+          "expressShippingFeeVnd": "60000",
+          "freeShippingThresholdVnd": "5000000",
+          "shippingFeeVnd": "0",
+          "standardShippingFeeVnd": "0",
+          "subtotalVnd": "30000000",
+          "totalVnd": "28500000",
+          "voucherCode": "CAT15",
+          "voucherType": "percent"
+        },
+        "error": null,
+        "message": "Báo giá đơn hàng thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2167412Z"
+        },
+        "success": true
+      }
+    },
+    "vouchers_available_200": {
+      "contractId": "API-VOUCHER-CUSTOMER@1",
+      "endpoint": "GET /api/v1/vouchers/available",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "claimedAt": "2026-11-18T12:00:00Z",
+            "code": "CAT15",
+            "description": "Áp dụng cho danh mục chọn lọc",
+            "discountValue": "15",
+            "endsAt": "2026-11-20T12:00:00Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "500000",
+            "perUserLimit": 2,
+            "scopeCategories": [
+              {
+                "id": "22222222-2222-2222-2222-222222222221",
+                "name": "Category 22222222"
+              }
+            ],
+            "scopeProducts": [],
+            "scopeType": "categories",
+            "startsAt": "2026-11-18T11:00:00Z",
+            "title": "Giảm 15% theo danh mục",
+            "usageLimit": null,
+            "usedCount": 0,
+            "userRemainingUses": 2,
+            "voucherType": "percent"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách mã giảm giá khả dụng thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2821547Z"
+        },
+        "success": true
+      }
+    },
+    "vouchers_claim_200": {
+      "contractId": "API-VOUCHER-CUSTOMER@1",
+      "endpoint": "POST /api/v1/vouchers/:id/claim",
+      "status": 200,
+      "responseBody": {
+        "data": {
+          "claimedAt": "2026-11-18T12:00:00Z",
+          "code": "CAT15",
+          "description": "Áp dụng cho danh mục chọn lọc",
+          "discountValue": "15",
+          "endsAt": "2026-11-20T12:00:00Z",
+          "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+          "maxDiscountVnd": null,
+          "minOrderVnd": "500000",
+          "perUserLimit": 2,
+          "scopeCategories": [
+            {
+              "id": "22222222-2222-2222-2222-222222222221",
+              "name": "Category 22222222"
+            }
+          ],
+          "scopeProducts": [],
+          "scopeType": "categories",
+          "startsAt": "2026-11-18T11:00:00Z",
+          "title": "Giảm 15% theo danh mục",
+          "usageLimit": null,
+          "usedCount": 0,
+          "userRemainingUses": 2,
+          "voucherType": "percent",
+          "walletStatus": "available"
+        },
+        "error": null,
+        "message": "Lưu mã giảm giá vào ví thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2666211Z"
+        },
+        "success": true
+      }
+    },
+    "vouchers_discover_200": {
+      "contractId": "API-VOUCHER-CUSTOMER@1",
+      "endpoint": "GET /api/v1/vouchers/discover",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "claimed": false,
+            "claimedAt": null,
+            "code": "CAT15",
+            "description": "Áp dụng cho danh mục chọn lọc",
+            "discountValue": "15",
+            "endsAt": "2026-11-20T12:00:00Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "500000",
+            "perUserLimit": 2,
+            "scopeCategories": [
+              {
+                "id": "22222222-2222-2222-2222-222222222221",
+                "name": "Category 22222222"
+              }
+            ],
+            "scopeProducts": [],
+            "scopeType": "categories",
+            "startsAt": "2026-11-18T11:00:00Z",
+            "title": "Giảm 15% theo danh mục",
+            "usageLimit": null,
+            "usedCount": 0,
+            "userRemainingUses": 2,
+            "voucherType": "percent"
+          }
+        ],
+        "error": null,
+        "message": "Lấy danh sách mã giảm giá đang phát hành thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2579911Z"
+        },
+        "success": true
+      }
+    },
+    "vouchers_unauth_401": {
+      "contractId": "API-VOUCHER-CUSTOMER@1",
+      "endpoint": "GET /api/v1/vouchers/discover",
+      "status": 401,
+      "responseBody": {
+        "data": null,
+        "error": {
+          "code": "unauthorized",
+          "message": "missing or malformed authorization header"
+        },
+        "message": "missing or malformed authorization header",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2500402Z"
+        },
+        "success": false
+      }
+    },
+    "vouchers_wallet_200": {
+      "contractId": "API-VOUCHER-CUSTOMER@1",
+      "endpoint": "GET /api/v1/vouchers/wallet",
+      "status": 200,
+      "responseBody": {
+        "data": [
+          {
+            "claimedAt": "2026-11-18T12:00:00Z",
+            "code": "CAT15",
+            "description": "Áp dụng cho danh mục chọn lọc",
+            "discountValue": "15",
+            "endsAt": "2026-11-20T12:00:00Z",
+            "id": "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+            "maxDiscountVnd": null,
+            "minOrderVnd": "500000",
+            "perUserLimit": 2,
+            "scopeCategories": [
+              {
+                "id": "22222222-2222-2222-2222-222222222221",
+                "name": "Category 22222222"
+              }
+            ],
+            "scopeProducts": [],
+            "scopeType": "categories",
+            "startsAt": "2026-11-18T11:00:00Z",
+            "title": "Giảm 15% theo danh mục",
+            "usageLimit": null,
+            "usedCount": 0,
+            "userRemainingUses": 2,
+            "voucherType": "percent",
+            "walletStatus": "available"
+          }
+        ],
+        "error": null,
+        "message": "Lấy ví mã giảm giá thành công",
+        "meta": {
+          "timestamp": "2026-11-19T05:18:45.2746712Z"
+        },
+        "success": true
+      }
+    }
+  }
+}

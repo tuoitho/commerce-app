@@ -1651,14 +1651,48 @@ func TestOrderHTTP_CheckoutQuoteCreateBuyAgainAndSnapshots(t *testing.T) {
 			{"voucher_not_started", domain.ErrVoucherNotStarted, http.StatusConflict, "voucher_not_started", ""},
 			{"voucher_exhausted", domain.ErrVoucherExhausted, http.StatusConflict, "voucher_exhausted", ""},
 			{"voucher_user_limit", domain.ErrVoucherUserLimitReached, http.StatusConflict, "voucher_user_limit_reached", ""},
+			{"voucher_not_claimed", domain.ErrVoucherNotClaimed, http.StatusConflict, "voucher_not_claimed", ""},
+			{"voucher_scope_mismatch", domain.ErrVoucherScopeMismatch, http.StatusConflict, "voucher_scope_mismatch", ""},
 			{"flash_sale_quota", &domain.FlashSaleQuotaExceededError{ProductName: "iPhone 16 Pro", Remaining: 2}, http.StatusConflict, "flash_sale_quota_exceeded", ""},
 		}
+		walletSnapshotPath := filepath.Join("..", "..", "..", "..", ".dream", "specs", "voucher-wallet-and-scope", "contract-snapshots.json")
+		const walletFeature = "voucher-wallet-and-scope"
+
+		scopedCode := "CAT15"
+		scopedType := domain.VoucherTypePercent
+		repo.quoteErr = nil
+		repo.quoteRes = &domain.CheckoutQuote{
+			SubtotalVND:              "30000000",
+			EligibleSubtotalVND:      "10000000",
+			DeliveryMethod:           domain.DeliveryMethodStandard,
+			ExpressAvailable:         true,
+			StandardShippingFeeVND:   "0",
+			ExpressShippingFeeVND:    "60000",
+			FreeShippingThresholdVND: "5000000",
+			ShippingFeeVND:           "0",
+			VoucherCode:              &scopedCode,
+			VoucherType:              &scopedType,
+			DiscountVND:              "1500000",
+			TotalVND:                 "28500000",
+		}
+		wScoped := execOrderRequest(router, token, http.MethodPost, "/api/v1/checkout/quote", string(quoteReqBytes))
+		if wScoped.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wScoped.Code, wScoped.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "checkout_quote_scoped_200", "API-CHECKOUT-QUOTE-ORDER@1", "POST /api/v1/checkout/quote", quoteReq, wScoped)
+
 		for _, tc := range errorCases {
 			repo.quoteErr = tc.err
 			wErr := execOrderRequest(router, token, http.MethodPost, "/api/v1/checkout/quote", string(quoteReqBytes))
 			assertErrorEnvelope(t, wErr, tc.status, tc.code, "")
 			if tc.snapshotKey != "" {
 				assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, tc.snapshotKey, "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/checkout/quote", quoteReq, wErr)
+			}
+			if tc.code == "voucher_not_claimed" {
+				assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "checkout_quote_not_claimed_409", "API-CHECKOUT-QUOTE-ORDER@1", "POST /api/v1/checkout/quote", quoteReq, wErr)
+			}
+			if tc.code == "voucher_scope_mismatch" {
+				assertOrRecordContractSnapshot(t, walletSnapshotPath, walletFeature, "checkout_quote_scope_mismatch_409", "API-CHECKOUT-QUOTE-ORDER@1", "POST /api/v1/checkout/quote", quoteReq, wErr)
 			}
 		}
 	})

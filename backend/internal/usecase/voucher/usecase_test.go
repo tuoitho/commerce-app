@@ -163,6 +163,44 @@ func (r *fakeVoucherRepo) ListAvailableForUser(_ context.Context, _ string, now 
 	return r.available, nil
 }
 
+func (r *fakeVoucherRepo) ListDiscoverForUser(_ context.Context, _ string, now time.Time) ([]domain.DiscoverVoucher, error) {
+	r.lastNow = now
+	return []domain.DiscoverVoucher{}, nil
+}
+
+func (r *fakeVoucherRepo) ClaimForUser(_ context.Context, _, voucherID string, now time.Time) (*domain.UserVoucher, error) {
+	r.lastNow = now
+	v, ok := r.vouchers[voucherID]
+	if !ok {
+		return nil, domain.ErrVoucherNotFound
+	}
+	return &domain.UserVoucher{
+		ID:                v.ID,
+		Code:              v.Code,
+		Title:             v.Title,
+		VoucherType:       v.VoucherType,
+		ScopeType:         v.ScopeType,
+		ScopeCategories:   v.ScopeCategories,
+		ScopeProducts:     v.ScopeProducts,
+		DiscountValue:     v.DiscountValue,
+		MaxDiscountVND:    v.MaxDiscountVND,
+		MinOrderVND:       v.MinOrderVND,
+		UsageLimit:        v.UsageLimit,
+		UsedCount:         v.UsedCount,
+		PerUserLimit:      v.PerUserLimit,
+		UserRemainingUses: v.PerUserLimit,
+		StartsAt:          v.StartsAt,
+		EndsAt:            v.EndsAt,
+		ClaimedAt:         now,
+		WalletStatus:      domain.VoucherWalletAvailable,
+	}, nil
+}
+
+func (r *fakeVoucherRepo) ListWalletForUser(_ context.Context, _ string, _ string, now time.Time) ([]domain.UserVoucher, error) {
+	r.lastNow = now
+	return []domain.UserVoucher{}, nil
+}
+
 func intPtr(v int) *int { return &v }
 
 func moneyPtr(v domain.MoneyVND) *domain.MoneyVND { return &v }
@@ -395,4 +433,73 @@ func TestVoucherUseCase_UpdateDeleteListAndAvailable(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, avail)
 	assert.Equal(t, now, repo.lastNow)
+}
+
+func TestVoucherUseCase_ScopeValidationAndWallet(t *testing.T) {
+	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	uc := New(Dependencies{
+		Repo:  newFakeVoucherRepo(),
+		Clock: func() time.Time { return now },
+	})
+	ctx := context.Background()
+	catID := "22222222-2222-2222-2222-222222222221"
+	prodID := "33333333-3333-3333-3333-333333333331"
+
+	base := domain.SaveVoucherInput{
+		Code:          "SCOPE10",
+		Title:         "Giảm 10%",
+		VoucherType:   domain.VoucherTypePercent,
+		DiscountValue: "10",
+		MinOrderVND:   "0",
+		PerUserLimit:  1,
+		StartsAt:      now.Add(-time.Hour),
+		EndsAt:        now.Add(24 * time.Hour),
+		Active:        true,
+	}
+
+	t.Run("categories scope requires non-empty categoryIds and empty productIds", func(t *testing.T) {
+		in := base
+		in.ScopeType = domain.VoucherScopeCategories
+		_, err := uc.Create(ctx, in)
+		var vErr *domain.ValidationError
+		require.ErrorAs(t, err, &vErr)
+		assert.NotEmpty(t, vErr.Fields["categoryIds"])
+
+		in.CategoryIDs = []string{catID}
+		in.ProductIDs = []string{prodID}
+		_, err = uc.Create(ctx, in)
+		require.ErrorAs(t, err, &vErr)
+		assert.NotEmpty(t, vErr.Fields["productIds"])
+	})
+
+	t.Run("products scope requires non-empty productIds and rejects duplicate/invalid IDs", func(t *testing.T) {
+		in := base
+		in.ScopeType = domain.VoucherScopeProducts
+		in.ProductIDs = []string{"not-a-uuid"}
+		_, err := uc.Create(ctx, in)
+		var vErr *domain.ValidationError
+		require.ErrorAs(t, err, &vErr)
+		assert.NotEmpty(t, vErr.Fields["productIds"])
+
+		in.ProductIDs = []string{prodID, prodID}
+		_, err = uc.Create(ctx, in)
+		require.ErrorAs(t, err, &vErr)
+		assert.NotEmpty(t, vErr.Fields["productIds"])
+	})
+
+	t.Run("all scope rejects categoryIds or productIds", func(t *testing.T) {
+		in := base
+		in.ScopeType = domain.VoucherScopeAll
+		in.CategoryIDs = []string{catID}
+		_, err := uc.Create(ctx, in)
+		var vErr *domain.ValidationError
+		require.ErrorAs(t, err, &vErr)
+		assert.NotEmpty(t, vErr.Fields["categoryIds"])
+	})
+
+	t.Run("wallet rejects invalid status filter", func(t *testing.T) {
+		_, err := uc.ListWallet(ctx, testUserID, "bogus")
+		var fErr *domain.FilterValidationError
+		require.ErrorAs(t, err, &fErr)
+	})
 }

@@ -12,6 +12,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimUserVoucher = `-- name: ClaimUserVoucher :exec
+INSERT INTO user_vouchers (user_id, voucher_id)
+VALUES ($1, $2)
+ON CONFLICT (user_id, voucher_id) DO NOTHING
+`
+
+type ClaimUserVoucherParams struct {
+	UserID    string
+	VoucherID string
+}
+
+func (q *Queries) ClaimUserVoucher(ctx context.Context, arg ClaimUserVoucherParams) error {
+	_, err := q.db.Exec(ctx, claimUserVoucher, arg.UserID, arg.VoucherID)
+	return err
+}
+
 const consumeVoucherUsage = `-- name: ConsumeVoucherUsage :one
 UPDATE vouchers
 SET used_count = used_count + 1,
@@ -58,6 +74,32 @@ func (q *Queries) CountAdminVouchers(ctx context.Context, arg CountAdminVouchers
 	return column_1, err
 }
 
+const countExistingCategoriesByIDs = `-- name: CountExistingCategoriesByIDs :one
+SELECT COUNT(*)::bigint
+FROM categories
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) CountExistingCategoriesByIDs(ctx context.Context, ids []string) (int64, error) {
+	row := q.db.QueryRow(ctx, countExistingCategoriesByIDs, ids)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countExistingProductsByIDs = `-- name: CountExistingProductsByIDs :one
+SELECT COUNT(*)::bigint
+FROM products
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) CountExistingProductsByIDs(ctx context.Context, ids []string) (int64, error) {
+	row := q.db.QueryRow(ctx, countExistingProductsByIDs, ids)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countUserActiveVoucherUsages = `-- name: CountUserActiveVoucherUsages :one
 SELECT COUNT(*)::bigint AS count
 FROM voucher_usages
@@ -80,21 +122,22 @@ func (q *Queries) CountUserActiveVoucherUsages(ctx context.Context, arg CountUse
 
 const createVoucher = `-- name: CreateVoucher :one
 INSERT INTO vouchers (
-    code, title, description, voucher_type, discount_value,
+    code, title, description, voucher_type, scope_type, discount_value,
     max_discount_vnd, min_order_vnd, usage_limit, per_user_limit,
     starts_at, ends_at, active
 )
 VALUES (
-    $1, $2, $3, $4, $5::numeric,
-    $6::numeric, $7::numeric,
-    $8::integer, $9::integer,
-    $10, $11, $12
+    $1, $2, $3, $4, $5, $6::numeric,
+    $7::numeric, $8::numeric,
+    $9::integer, $10::integer,
+    $11, $12, $13
 )
 RETURNING id,
           code,
           title,
           description,
           voucher_type,
+          scope_type,
           discount_value::text AS discount_value,
           COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
           min_order_vnd::text AS min_order_vnd,
@@ -113,6 +156,7 @@ type CreateVoucherParams struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  pgtype.Numeric
 	MaxDiscountVnd pgtype.Numeric
 	MinOrderVnd    pgtype.Numeric
@@ -129,6 +173,7 @@ type CreateVoucherRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -148,6 +193,7 @@ func (q *Queries) CreateVoucher(ctx context.Context, arg CreateVoucherParams) (C
 		arg.Title,
 		arg.Description,
 		arg.VoucherType,
+		arg.ScopeType,
 		arg.DiscountValue,
 		arg.MaxDiscountVnd,
 		arg.MinOrderVnd,
@@ -164,6 +210,7 @@ func (q *Queries) CreateVoucher(ctx context.Context, arg CreateVoucherParams) (C
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,
@@ -221,12 +268,60 @@ func (q *Queries) DeleteVoucher(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const deleteVoucherCategories = `-- name: DeleteVoucherCategories :exec
+DELETE FROM voucher_categories
+WHERE voucher_id = $1
+`
+
+func (q *Queries) DeleteVoucherCategories(ctx context.Context, voucherID string) error {
+	_, err := q.db.Exec(ctx, deleteVoucherCategories, voucherID)
+	return err
+}
+
+const deleteVoucherProducts = `-- name: DeleteVoucherProducts :exec
+DELETE FROM voucher_products
+WHERE voucher_id = $1
+`
+
+func (q *Queries) DeleteVoucherProducts(ctx context.Context, voucherID string) error {
+	_, err := q.db.Exec(ctx, deleteVoucherProducts, voucherID)
+	return err
+}
+
+const getUserVoucher = `-- name: GetUserVoucher :one
+SELECT uv.id,
+       uv.user_id,
+       uv.voucher_id,
+       uv.claimed_at
+FROM user_vouchers uv
+WHERE uv.user_id = $1
+  AND uv.voucher_id = $2
+`
+
+type GetUserVoucherParams struct {
+	UserID    string
+	VoucherID string
+}
+
+func (q *Queries) GetUserVoucher(ctx context.Context, arg GetUserVoucherParams) (UserVoucher, error) {
+	row := q.db.QueryRow(ctx, getUserVoucher, arg.UserID, arg.VoucherID)
+	var i UserVoucher
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.VoucherID,
+		&i.ClaimedAt,
+	)
+	return i, err
+}
+
 const getVoucherByCode = `-- name: GetVoucherByCode :one
 SELECT id,
        code,
        title,
        description,
        voucher_type,
+       scope_type,
        discount_value::text AS discount_value,
        COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
        min_order_vnd::text AS min_order_vnd,
@@ -248,6 +343,7 @@ type GetVoucherByCodeRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -270,6 +366,7 @@ func (q *Queries) GetVoucherByCode(ctx context.Context, code string) (GetVoucher
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,
@@ -291,6 +388,7 @@ SELECT id,
        title,
        description,
        voucher_type,
+       scope_type,
        discount_value::text AS discount_value,
        COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
        min_order_vnd::text AS min_order_vnd,
@@ -312,6 +410,7 @@ type GetVoucherByIDRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -334,6 +433,7 @@ func (q *Queries) GetVoucherByID(ctx context.Context, id string) (GetVoucherByID
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,
@@ -347,6 +447,59 @@ func (q *Queries) GetVoucherByID(ctx context.Context, id string) (GetVoucherByID
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const hasUserClaimedVoucher = `-- name: HasUserClaimedVoucher :one
+SELECT EXISTS (
+    SELECT 1
+    FROM user_vouchers
+    WHERE user_id = $1
+      AND voucher_id = $2
+)::boolean AS claimed
+`
+
+type HasUserClaimedVoucherParams struct {
+	UserID    string
+	VoucherID string
+}
+
+func (q *Queries) HasUserClaimedVoucher(ctx context.Context, arg HasUserClaimedVoucherParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasUserClaimedVoucher, arg.UserID, arg.VoucherID)
+	var claimed bool
+	err := row.Scan(&claimed)
+	return claimed, err
+}
+
+const insertVoucherCategory = `-- name: InsertVoucherCategory :exec
+INSERT INTO voucher_categories (voucher_id, category_id)
+VALUES ($1, $2)
+ON CONFLICT (voucher_id, category_id) DO NOTHING
+`
+
+type InsertVoucherCategoryParams struct {
+	VoucherID  string
+	CategoryID string
+}
+
+func (q *Queries) InsertVoucherCategory(ctx context.Context, arg InsertVoucherCategoryParams) error {
+	_, err := q.db.Exec(ctx, insertVoucherCategory, arg.VoucherID, arg.CategoryID)
+	return err
+}
+
+const insertVoucherProduct = `-- name: InsertVoucherProduct :exec
+INSERT INTO voucher_products (voucher_id, product_id)
+VALUES ($1, $2)
+ON CONFLICT (voucher_id, product_id) DO NOTHING
+`
+
+type InsertVoucherProductParams struct {
+	VoucherID string
+	ProductID string
+}
+
+func (q *Queries) InsertVoucherProduct(ctx context.Context, arg InsertVoucherProductParams) error {
+	_, err := q.db.Exec(ctx, insertVoucherProduct, arg.VoucherID, arg.ProductID)
+	return err
 }
 
 const insertVoucherUsage = `-- name: InsertVoucherUsage :exec
@@ -381,6 +534,7 @@ SELECT v.id,
        v.title,
        v.description,
        v.voucher_type,
+       v.scope_type,
        v.discount_value::text AS discount_value,
        COALESCE(v.max_discount_vnd::text, '')::text AS max_discount_vnd,
        v.min_order_vnd::text AS min_order_vnd,
@@ -423,6 +577,7 @@ type ListAdminVouchersRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -456,6 +611,7 @@ func (q *Queries) ListAdminVouchers(ctx context.Context, arg ListAdminVouchersPa
 			&i.Title,
 			&i.Description,
 			&i.VoucherType,
+			&i.ScopeType,
 			&i.DiscountValue,
 			&i.MaxDiscountVnd,
 			&i.MinOrderVnd,
@@ -484,6 +640,7 @@ SELECT v.id,
        v.title,
        v.description,
        v.voucher_type,
+       v.scope_type,
        v.discount_value::text AS discount_value,
        COALESCE(v.max_discount_vnd::text, '')::text AS max_discount_vnd,
        v.min_order_vnd::text AS min_order_vnd,
@@ -492,21 +649,24 @@ SELECT v.id,
        v.per_user_limit,
        v.starts_at,
        v.ends_at,
-       (v.per_user_limit - COALESCE(u.used_by_user, 0))::integer AS user_remaining_uses
-FROM vouchers v
+       GREATEST(v.per_user_limit - COALESCE(u.used_by_user, 0), 0)::integer AS user_remaining_uses,
+       uv.claimed_at
+FROM user_vouchers uv
+JOIN vouchers v ON v.id = uv.voucher_id
 LEFT JOIN (
-    SELECT voucher_id, COUNT(*)::integer AS used_by_user
-    FROM voucher_usages
-    WHERE user_id = $1
-      AND status = 'applied'
-    GROUP BY voucher_id
+    SELECT vu.voucher_id, COUNT(*)::integer AS used_by_user
+    FROM voucher_usages vu
+    WHERE vu.user_id = $1
+      AND vu.status = 'applied'
+    GROUP BY vu.voucher_id
 ) u ON u.voucher_id = v.id
-WHERE v.active = true
+WHERE uv.user_id = $1
+  AND v.active = true
   AND v.starts_at <= $2::timestamptz
   AND $2::timestamptz <= v.ends_at
   AND (v.usage_limit IS NULL OR v.used_count < v.usage_limit)
   AND COALESCE(u.used_by_user, 0) < v.per_user_limit
-ORDER BY v.ends_at ASC, v.created_at DESC, v.id ASC
+ORDER BY v.ends_at ASC, uv.claimed_at DESC, v.id ASC
 `
 
 type ListAvailableVouchersForUserParams struct {
@@ -520,6 +680,7 @@ type ListAvailableVouchersForUserRow struct {
 	Title             string
 	Description       string
 	VoucherType       string
+	ScopeType         string
 	DiscountValue     string
 	MaxDiscountVnd    string
 	MinOrderVnd       string
@@ -529,6 +690,7 @@ type ListAvailableVouchersForUserRow struct {
 	StartsAt          time.Time
 	EndsAt            time.Time
 	UserRemainingUses int32
+	ClaimedAt         time.Time
 }
 
 func (q *Queries) ListAvailableVouchersForUser(ctx context.Context, arg ListAvailableVouchersForUserParams) ([]ListAvailableVouchersForUserRow, error) {
@@ -546,6 +708,7 @@ func (q *Queries) ListAvailableVouchersForUser(ctx context.Context, arg ListAvai
 			&i.Title,
 			&i.Description,
 			&i.VoucherType,
+			&i.ScopeType,
 			&i.DiscountValue,
 			&i.MaxDiscountVnd,
 			&i.MinOrderVnd,
@@ -555,6 +718,319 @@ func (q *Queries) ListAvailableVouchersForUser(ctx context.Context, arg ListAvai
 			&i.StartsAt,
 			&i.EndsAt,
 			&i.UserRemainingUses,
+			&i.ClaimedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDiscoverVouchersForUser = `-- name: ListDiscoverVouchersForUser :many
+SELECT v.id,
+       v.code,
+       v.title,
+       v.description,
+       v.voucher_type,
+       v.scope_type,
+       v.discount_value::text AS discount_value,
+       COALESCE(v.max_discount_vnd::text, '')::text AS max_discount_vnd,
+       v.min_order_vnd::text AS min_order_vnd,
+       v.usage_limit,
+       v.used_count,
+       v.per_user_limit,
+       v.starts_at,
+       v.ends_at,
+       GREATEST(v.per_user_limit - COALESCE(u.used_by_user, 0), 0)::integer AS user_remaining_uses,
+       (uv.id IS NOT NULL)::boolean AS claimed,
+       uv.claimed_at
+FROM vouchers v
+LEFT JOIN user_vouchers uv
+       ON uv.voucher_id = v.id
+      AND uv.user_id = $1
+LEFT JOIN (
+    SELECT vu.voucher_id, COUNT(*)::integer AS used_by_user
+    FROM voucher_usages vu
+    WHERE vu.user_id = $1
+      AND vu.status = 'applied'
+    GROUP BY vu.voucher_id
+) u ON u.voucher_id = v.id
+WHERE v.active = true
+  AND v.starts_at <= $2::timestamptz
+  AND $2::timestamptz <= v.ends_at
+  AND (v.usage_limit IS NULL OR v.used_count < v.usage_limit)
+ORDER BY (uv.id IS NOT NULL) ASC, v.ends_at ASC, v.created_at DESC, v.id ASC
+`
+
+type ListDiscoverVouchersForUserParams struct {
+	UserID string
+	Now    time.Time
+}
+
+type ListDiscoverVouchersForUserRow struct {
+	ID                string
+	Code              string
+	Title             string
+	Description       string
+	VoucherType       string
+	ScopeType         string
+	DiscountValue     string
+	MaxDiscountVnd    string
+	MinOrderVnd       string
+	UsageLimit        pgtype.Int4
+	UsedCount         int32
+	PerUserLimit      int32
+	StartsAt          time.Time
+	EndsAt            time.Time
+	UserRemainingUses int32
+	Claimed           bool
+	ClaimedAt         pgtype.Timestamptz
+}
+
+func (q *Queries) ListDiscoverVouchersForUser(ctx context.Context, arg ListDiscoverVouchersForUserParams) ([]ListDiscoverVouchersForUserRow, error) {
+	rows, err := q.db.Query(ctx, listDiscoverVouchersForUser, arg.UserID, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDiscoverVouchersForUserRow
+	for rows.Next() {
+		var i ListDiscoverVouchersForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Title,
+			&i.Description,
+			&i.VoucherType,
+			&i.ScopeType,
+			&i.DiscountValue,
+			&i.MaxDiscountVnd,
+			&i.MinOrderVnd,
+			&i.UsageLimit,
+			&i.UsedCount,
+			&i.PerUserLimit,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.UserRemainingUses,
+			&i.Claimed,
+			&i.ClaimedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVoucherCategoriesByVoucherIDs = `-- name: ListVoucherCategoriesByVoucherIDs :many
+SELECT vc.voucher_id,
+       c.id AS category_id,
+       c.name AS category_name
+FROM voucher_categories vc
+JOIN categories c ON c.id = vc.category_id
+WHERE vc.voucher_id = ANY($1::uuid[])
+ORDER BY c.name ASC, c.id ASC
+`
+
+type ListVoucherCategoriesByVoucherIDsRow struct {
+	VoucherID    string
+	CategoryID   string
+	CategoryName string
+}
+
+func (q *Queries) ListVoucherCategoriesByVoucherIDs(ctx context.Context, voucherIds []string) ([]ListVoucherCategoriesByVoucherIDsRow, error) {
+	rows, err := q.db.Query(ctx, listVoucherCategoriesByVoucherIDs, voucherIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListVoucherCategoriesByVoucherIDsRow
+	for rows.Next() {
+		var i ListVoucherCategoriesByVoucherIDsRow
+		if err := rows.Scan(&i.VoucherID, &i.CategoryID, &i.CategoryName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVoucherCategoryIDs = `-- name: ListVoucherCategoryIDs :many
+SELECT category_id
+FROM voucher_categories
+WHERE voucher_id = $1
+`
+
+func (q *Queries) ListVoucherCategoryIDs(ctx context.Context, voucherID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVoucherCategoryIDs, voucherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var category_id string
+		if err := rows.Scan(&category_id); err != nil {
+			return nil, err
+		}
+		items = append(items, category_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVoucherProductIDs = `-- name: ListVoucherProductIDs :many
+SELECT product_id
+FROM voucher_products
+WHERE voucher_id = $1
+`
+
+func (q *Queries) ListVoucherProductIDs(ctx context.Context, voucherID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVoucherProductIDs, voucherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var product_id string
+		if err := rows.Scan(&product_id); err != nil {
+			return nil, err
+		}
+		items = append(items, product_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVoucherProductsByVoucherIDs = `-- name: ListVoucherProductsByVoucherIDs :many
+SELECT vp.voucher_id,
+       p.id AS product_id,
+       p.name AS product_name
+FROM voucher_products vp
+JOIN products p ON p.id = vp.product_id
+WHERE vp.voucher_id = ANY($1::uuid[])
+ORDER BY p.name ASC, p.id ASC
+`
+
+type ListVoucherProductsByVoucherIDsRow struct {
+	VoucherID   string
+	ProductID   string
+	ProductName string
+}
+
+func (q *Queries) ListVoucherProductsByVoucherIDs(ctx context.Context, voucherIds []string) ([]ListVoucherProductsByVoucherIDsRow, error) {
+	rows, err := q.db.Query(ctx, listVoucherProductsByVoucherIDs, voucherIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListVoucherProductsByVoucherIDsRow
+	for rows.Next() {
+		var i ListVoucherProductsByVoucherIDsRow
+		if err := rows.Scan(&i.VoucherID, &i.ProductID, &i.ProductName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWalletVouchersForUser = `-- name: ListWalletVouchersForUser :many
+SELECT v.id,
+       v.code,
+       v.title,
+       v.description,
+       v.voucher_type,
+       v.scope_type,
+       v.discount_value::text AS discount_value,
+       COALESCE(v.max_discount_vnd::text, '')::text AS max_discount_vnd,
+       v.min_order_vnd::text AS min_order_vnd,
+       v.usage_limit,
+       v.used_count,
+       v.per_user_limit,
+       v.starts_at,
+       v.ends_at,
+       v.active,
+       GREATEST(v.per_user_limit - COALESCE(u.used_by_user, 0), 0)::integer AS user_remaining_uses,
+       uv.claimed_at
+FROM user_vouchers uv
+JOIN vouchers v ON v.id = uv.voucher_id
+LEFT JOIN (
+    SELECT vu.voucher_id, COUNT(*)::integer AS used_by_user
+    FROM voucher_usages vu
+    WHERE vu.user_id = $1
+      AND vu.status = 'applied'
+    GROUP BY vu.voucher_id
+) u ON u.voucher_id = v.id
+WHERE uv.user_id = $1
+ORDER BY uv.claimed_at DESC, uv.id DESC
+`
+
+type ListWalletVouchersForUserRow struct {
+	ID                string
+	Code              string
+	Title             string
+	Description       string
+	VoucherType       string
+	ScopeType         string
+	DiscountValue     string
+	MaxDiscountVnd    string
+	MinOrderVnd       string
+	UsageLimit        pgtype.Int4
+	UsedCount         int32
+	PerUserLimit      int32
+	StartsAt          time.Time
+	EndsAt            time.Time
+	Active            bool
+	UserRemainingUses int32
+	ClaimedAt         time.Time
+}
+
+func (q *Queries) ListWalletVouchersForUser(ctx context.Context, userID string) ([]ListWalletVouchersForUserRow, error) {
+	rows, err := q.db.Query(ctx, listWalletVouchersForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWalletVouchersForUserRow
+	for rows.Next() {
+		var i ListWalletVouchersForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Title,
+			&i.Description,
+			&i.VoucherType,
+			&i.ScopeType,
+			&i.DiscountValue,
+			&i.MaxDiscountVnd,
+			&i.MinOrderVnd,
+			&i.UsageLimit,
+			&i.UsedCount,
+			&i.PerUserLimit,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.Active,
+			&i.UserRemainingUses,
+			&i.ClaimedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -572,6 +1048,7 @@ SELECT id,
        title,
        description,
        voucher_type,
+       scope_type,
        discount_value::text AS discount_value,
        COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
        min_order_vnd::text AS min_order_vnd,
@@ -594,6 +1071,7 @@ type LockVoucherByCodeRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -616,6 +1094,7 @@ func (q *Queries) LockVoucherByCode(ctx context.Context, code string) (LockVouch
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,
@@ -637,6 +1116,7 @@ SELECT id,
        title,
        description,
        voucher_type,
+       scope_type,
        discount_value::text AS discount_value,
        COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
        min_order_vnd::text AS min_order_vnd,
@@ -659,6 +1139,7 @@ type LockVoucherByIDRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -681,6 +1162,7 @@ func (q *Queries) LockVoucherByID(ctx context.Context, id string) (LockVoucherBy
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,
@@ -718,21 +1200,23 @@ SET code = $1,
     title = $2,
     description = $3,
     voucher_type = $4,
-    discount_value = $5::numeric,
-    max_discount_vnd = $6::numeric,
-    min_order_vnd = $7::numeric,
-    usage_limit = $8::integer,
-    per_user_limit = $9::integer,
-    starts_at = $10,
-    ends_at = $11,
-    active = $12,
+    scope_type = $5,
+    discount_value = $6::numeric,
+    max_discount_vnd = $7::numeric,
+    min_order_vnd = $8::numeric,
+    usage_limit = $9::integer,
+    per_user_limit = $10::integer,
+    starts_at = $11,
+    ends_at = $12,
+    active = $13,
     updated_at = now()
-WHERE id = $13
+WHERE id = $14
 RETURNING id,
           code,
           title,
           description,
           voucher_type,
+          scope_type,
           discount_value::text AS discount_value,
           COALESCE(max_discount_vnd::text, '')::text AS max_discount_vnd,
           min_order_vnd::text AS min_order_vnd,
@@ -751,6 +1235,7 @@ type UpdateVoucherParams struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  pgtype.Numeric
 	MaxDiscountVnd pgtype.Numeric
 	MinOrderVnd    pgtype.Numeric
@@ -768,6 +1253,7 @@ type UpdateVoucherRow struct {
 	Title          string
 	Description    string
 	VoucherType    string
+	ScopeType      string
 	DiscountValue  string
 	MaxDiscountVnd string
 	MinOrderVnd    string
@@ -787,6 +1273,7 @@ func (q *Queries) UpdateVoucher(ctx context.Context, arg UpdateVoucherParams) (U
 		arg.Title,
 		arg.Description,
 		arg.VoucherType,
+		arg.ScopeType,
 		arg.DiscountValue,
 		arg.MaxDiscountVnd,
 		arg.MinOrderVnd,
@@ -804,6 +1291,7 @@ func (q *Queries) UpdateVoucher(ctx context.Context, arg UpdateVoucherParams) (U
 		&i.Title,
 		&i.Description,
 		&i.VoucherType,
+		&i.ScopeType,
 		&i.DiscountValue,
 		&i.MaxDiscountVnd,
 		&i.MinOrderVnd,

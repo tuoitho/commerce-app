@@ -26,6 +26,7 @@ type cartItemResponse struct {
 	ID            string              `json:"id"`
 	VariantID     string              `json:"variantId"`
 	ProductID     string              `json:"productId"`
+	CategoryID    string              `json:"categoryId"`
 	BrandName     string              `json:"brandName"`
 	ProductName   string              `json:"productName"`
 	Model         string              `json:"model"`
@@ -117,7 +118,7 @@ func toCartResponse(cart *domain.Cart) cartResponse {
 	items := make([]cartItemResponse, 0, len(cart.Items))
 	for _, item := range cart.Items {
 		items = append(items, cartItemResponse{
-			ID: item.ID, VariantID: item.VariantID, ProductID: item.ProductID,
+			ID: item.ID, VariantID: item.VariantID, ProductID: item.ProductID, CategoryID: item.CategoryID,
 			BrandName: item.BrandName, ProductName: item.ProductName, Model: item.Model,
 			ImageURL: item.ImageURL, Options: item.Options, UnitPriceVND: moneyPtr(item.UnitPriceVND),
 			LineTotalVND: moneyPtr(item.LineTotalVND), StockQuantity: item.StockQuantity,

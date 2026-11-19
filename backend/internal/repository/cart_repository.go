@@ -168,7 +168,7 @@ func loadCart(ctx context.Context, q *sqlc.Queries, userID string) (*domain.Cart
 }
 
 func mapCartRow(row sqlc.ListCartRowsRow, quantity, stock int64) (domain.CartItem, domain.MoneyVND, bool, error) {
-	item := domain.CartItem{ID: row.ID, VariantID: row.VariantID, ProductID: row.ProductID, BrandName: row.SnapshotBrandName, ProductName: row.SnapshotProductName, Model: row.SnapshotModel, ImageURL: row.SnapshotImageUrl, StockQuantity: stock, Quantity: quantity, Selected: row.Selected}
+	item := domain.CartItem{ID: row.ID, VariantID: row.VariantID, ProductID: row.ProductID, CategoryID: row.CategoryID, BrandName: row.SnapshotBrandName, ProductName: row.SnapshotProductName, Model: row.SnapshotModel, ImageURL: row.SnapshotImageUrl, StockQuantity: stock, Quantity: quantity, Selected: row.Selected}
 	if err := json.Unmarshal([]byte(row.SnapshotOptions), &item.Options); err != nil {
 		return domain.CartItem{}, "", false, err
 	}

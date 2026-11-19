@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { VouchersPage } from './VouchersPage'
 import * as vouchersApi from '@/api/vouchers'
+import * as categoriesApi from '@/api/categories'
+import * as productsApi from '@/api/products'
 import { ApiError, type AdminVoucher } from '@/api/types'
 
 vi.mock('@/api/vouchers', () => ({
@@ -12,6 +14,20 @@ vi.mock('@/api/vouchers', () => ({
   createAdminVoucher: vi.fn(),
   updateAdminVoucher: vi.fn(),
   deleteAdminVoucher: vi.fn(),
+}))
+
+vi.mock('@/api/categories', () => ({
+  getAdminCategories: vi.fn().mockResolvedValue([
+    { id: 'cat-1', name: 'Điện thoại', createdAt: '2026-11-01T00:00:00Z' },
+    { id: 'cat-2', name: 'Laptop', createdAt: '2026-11-01T00:00:00Z' },
+  ]),
+}))
+
+vi.mock('@/api/products', () => ({
+  getAdminProducts: vi.fn().mockResolvedValue({
+    data: [{ id: 'prod-1', name: 'iPhone 16 Pro' }],
+    meta: { timestamp: '2026-11-18T12:00:00Z' },
+  }),
 }))
 
 const mockVouchers: AdminVoucher[] = [
@@ -290,5 +306,58 @@ describe('VouchersPage', () => {
     expect(
       await screen.findByText('Không thể xóa mã giảm giá đã có đơn hàng sử dụng')
     ).toBeInTheDocument()
+  })
+
+  it('validates and submits category-scoped voucher from catalog categories', async () => {
+    vi.mocked(categoriesApi.getAdminCategories).mockResolvedValue([
+      { id: 'cat-1', name: 'Điện thoại' },
+      { id: 'cat-2', name: 'Laptop' },
+    ])
+    vi.mocked(productsApi.getAdminProducts).mockResolvedValue({
+      data: [],
+      message: 'OK',
+      meta: { timestamp: '2026-11-18T12:00:00Z' },
+    })
+    vi.mocked(vouchersApi.createAdminVoucher).mockResolvedValueOnce({
+      ...mockVouchers[0],
+      id: 'v-cat',
+      code: 'PHONE10',
+      scopeType: 'categories',
+      scopeCategories: [{ id: 'cat-1', name: 'Điện thoại' }],
+      scopeProducts: [],
+    })
+
+    renderPage()
+    await screen.findByText('AURA10')
+
+    fireEvent.click(screen.getByRole('button', { name: /Tạo mã giảm giá/i }))
+    fireEvent.change(screen.getByPlaceholderText('VD: AURA500K'), { target: { value: 'PHONE10' } })
+    fireEvent.change(screen.getByLabelText(/Tiêu đề/i), { target: { value: 'Giảm 10% điện thoại' } })
+    fireEvent.change(screen.getByLabelText(/Giá trị giảm/i), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText(/Thời gian bắt đầu/i), { target: { value: '2026-11-18T10:00' } })
+    fireEvent.change(screen.getByLabelText(/Thời gian kết thúc/i), { target: { value: '2026-12-18T10:00' } })
+
+    fireEvent.change(screen.getByLabelText(/Phạm vi áp dụng/i), { target: { value: 'categories' } })
+    const catCheckbox = await screen.findByLabelText('Điện thoại')
+
+    // Submitting without checking any category fails validation
+    fireEvent.click(screen.getByRole('button', { name: /Lưu mã giảm giá/i }))
+    expect(await screen.findByText('Vui lòng chọn ít nhất một danh mục áp dụng')).toBeInTheDocument()
+    expect(vouchersApi.createAdminVoucher).not.toHaveBeenCalled()
+
+    // Check category and submit
+    fireEvent.click(catCheckbox)
+    fireEvent.click(screen.getByRole('button', { name: /Lưu mã giảm giá/i }))
+
+    await waitFor(() => {
+      expect(vouchersApi.createAdminVoucher).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'PHONE10',
+          scopeType: 'categories',
+          categoryIds: ['cat-1'],
+          productIds: [],
+        })
+      )
+    })
   })
 })

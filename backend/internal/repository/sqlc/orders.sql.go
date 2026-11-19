@@ -1449,7 +1449,7 @@ const lockSubmittedCartItems = `-- name: LockSubmittedCartItems :many
 SELECT ci.id, ci.user_id, ci.variant_id, ci.quantity, ci.selected,
        ci.snapshot_brand_name, ci.snapshot_product_name, ci.snapshot_model,
        ci.snapshot_image_url, ci.snapshot_options::text AS snapshot_options,
-       v.product_id, p.active AS product_active, v.active AS variant_active,
+       v.product_id, p.category_id, p.active AS product_active, v.active AS variant_active,
        CASE
            WHEN lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd) THEN lap.live_price_vnd
            WHEN fsap.variant_id IS NOT NULL THEN fsap.flash_price_vnd
@@ -1497,6 +1497,7 @@ type LockSubmittedCartItemsRow struct {
 	SnapshotImageUrl    string
 	SnapshotOptions     string
 	ProductID           string
+	CategoryID          string
 	ProductActive       bool
 	VariantActive       bool
 	PriceVnd            string
@@ -1531,6 +1532,7 @@ func (q *Queries) LockSubmittedCartItems(ctx context.Context, arg LockSubmittedC
 			&i.SnapshotImageUrl,
 			&i.SnapshotOptions,
 			&i.ProductID,
+			&i.CategoryID,
 			&i.ProductActive,
 			&i.VariantActive,
 			&i.PriceVnd,

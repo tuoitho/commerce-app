@@ -20,11 +20,14 @@ import {
   listAdminVouchers,
   updateAdminVoucher,
 } from '@/api/vouchers'
+import { getAdminCategories } from '@/api/categories'
+import { getAdminProducts } from '@/api/products'
 import {
   ApiError,
   type AdminVoucher,
   type SaveVoucherInput,
   type VoucherEffectiveStatus,
+  type VoucherScopeType,
   type VoucherType,
 } from '@/api/types'
 import {
@@ -114,11 +117,33 @@ function formatDiscountSummary(voucher: AdminVoucher): string {
   return `Giảm ${formatVND(voucher.discountValue)}`
 }
 
+function formatScopeSummary(voucher: AdminVoucher): string {
+  const scopeType = voucher.scopeType || 'all'
+  if (scopeType === 'categories') {
+    const names = (voucher.scopeCategories || []).map((c) => c.name)
+    if (names.length === 0) return 'Theo danh mục'
+    return names.length <= 2
+      ? `Danh mục: ${names.join(', ')}`
+      : `Danh mục: ${names.slice(0, 2).join(', ')} (+${names.length - 2})`
+  }
+  if (scopeType === 'products') {
+    const names = (voucher.scopeProducts || []).map((p) => p.name)
+    if (names.length === 0) return 'Theo sản phẩm'
+    return names.length <= 2
+      ? `Sản phẩm: ${names.join(', ')}`
+      : `Sản phẩm: ${names.slice(0, 2).join(', ')} (+${names.length - 2})`
+  }
+  return 'Toàn sàn'
+}
+
 interface VoucherFormState {
   code: string
   title: string
   description: string
   voucherType: VoucherType
+  scopeType: VoucherScopeType
+  categoryIds: string[]
+  productIds: string[]
   discountValue: string
   maxDiscountVnd: string
   minOrderVnd: string
@@ -136,6 +161,9 @@ function buildInitialFormState(voucher: AdminVoucher | null): VoucherFormState {
       title: '',
       description: '',
       voucherType: 'percent',
+      scopeType: 'all',
+      categoryIds: [],
+      productIds: [],
       discountValue: '',
       maxDiscountVnd: '',
       minOrderVnd: '0',
@@ -151,6 +179,9 @@ function buildInitialFormState(voucher: AdminVoucher | null): VoucherFormState {
     title: voucher.title,
     description: voucher.description || '',
     voucherType: voucher.voucherType,
+    scopeType: voucher.scopeType || 'all',
+    categoryIds: (voucher.scopeCategories || []).map((c) => c.id),
+    productIds: (voucher.scopeProducts || []).map((p) => p.id),
     discountValue: voucher.voucherType === 'freeship' ? '0' : voucher.discountValue,
     maxDiscountVnd: voucher.voucherType === 'fixed_amount' ? '' : voucher.maxDiscountVnd || '',
     minOrderVnd: voucher.minOrderVnd || '0',
@@ -178,12 +209,32 @@ function VoucherFormDialog({
   onSubmit,
 }: VoucherFormDialogProps) {
   const [form, setForm] = useState<VoucherFormState>(() => buildInitialFormState(editingVoucher))
+  const [productSearch, setProductSearch] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ['admin', 'categories', 'voucher-scope'],
+    queryFn: () => getAdminCategories(),
+    enabled: open && form.scopeType === 'categories',
+  })
+
+  const { data: productsRes, isLoading: productsLoading } = useQuery({
+    queryKey: ['admin', 'products', 'voucher-scope', productSearch.trim()],
+    queryFn: () =>
+      getAdminProducts({
+        q: productSearch.trim() || undefined,
+        page: 1,
+        limit: 100,
+      }),
+    enabled: open && form.scopeType === 'products',
+  })
+  const products = productsRes?.data || []
 
   useEffect(() => {
     if (open) {
       setForm(buildInitialFormState(editingVoucher))
+      setProductSearch('')
       setFieldErrors({})
       setSubmitError(null)
     }
@@ -293,6 +344,13 @@ function VoucherFormDialog({
       errors.endsAt = 'Thời gian kết thúc phải sau thời gian bắt đầu'
     }
 
+    if (form.scopeType === 'categories' && form.categoryIds.length === 0) {
+      errors.categoryIds = 'Vui lòng chọn ít nhất một danh mục áp dụng'
+    }
+    if (form.scopeType === 'products' && form.productIds.length === 0) {
+      errors.productIds = 'Vui lòng chọn ít nhất một sản phẩm áp dụng'
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       return
@@ -305,6 +363,9 @@ function VoucherFormDialog({
         title: trimmedTitle,
         description: trimmedDescription,
         voucherType: form.voucherType,
+        scopeType: form.scopeType,
+        categoryIds: form.scopeType === 'categories' ? form.categoryIds : [],
+        productIds: form.scopeType === 'products' ? form.productIds : [],
         discountValue: discountTrimmed,
         maxDiscountVnd: form.voucherType === 'fixed_amount' ? null : maxDiscountVnd,
         minOrderVnd: minOrderTrimmed,
@@ -603,6 +664,126 @@ function VoucherFormDialog({
             </div>
           </div>
 
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+            <div className="space-y-1.5">
+              <Label htmlFor="voucher-scope-type">Phạm vi áp dụng</Label>
+              <Select
+                id="voucher-scope-type"
+                value={form.scopeType}
+                onChange={(e) => {
+                  const nextScope = e.target.value as VoucherScopeType
+                  setForm((prev) => ({
+                    ...prev,
+                    scopeType: nextScope,
+                    categoryIds: nextScope === 'categories' ? prev.categoryIds : [],
+                    productIds: nextScope === 'products' ? prev.productIds : [],
+                  }))
+                  setFieldErrors((prev) => ({ ...prev, scopeType: '', categoryIds: '', productIds: '' }))
+                }}
+              >
+                <option value="all">Toàn sàn (tất cả sản phẩm)</option>
+                <option value="categories">Chỉ áp dụng cho danh mục đã chọn</option>
+                <option value="products">Chỉ áp dụng cho sản phẩm đã chọn</option>
+              </Select>
+            </div>
+
+            {form.scopeType === 'categories' && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-xs text-slate-600">
+                  Đã chọn {form.categoryIds.length} danh mục
+                </p>
+                {categoriesLoading ? (
+                  <p className="text-xs text-slate-500">Đang tải danh mục...</p>
+                ) : categories.length === 0 ? (
+                  <p className="text-xs text-slate-500">Chưa có danh mục nào.</p>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1">
+                    {categories.map((cat) => {
+                      const checked = form.categoryIds.includes(cat.id)
+                      return (
+                        <label
+                          key={cat.id}
+                          className="flex items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setForm((prev) => ({
+                                ...prev,
+                                categoryIds: e.target.checked
+                                  ? [...prev.categoryIds, cat.id]
+                                  : prev.categoryIds.filter((id) => id !== cat.id),
+                              }))
+                              setFieldErrors((prev) => ({ ...prev, categoryIds: '' }))
+                            }}
+                          />
+                          <span>{cat.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+                {fieldErrors.categoryIds && (
+                  <p className="text-xs text-rose-600">{fieldErrors.categoryIds}</p>
+                )}
+              </div>
+            )}
+
+            {form.scopeType === 'products' && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-slate-600">
+                    Đã chọn {form.productIds.length} sản phẩm
+                  </p>
+                  <Input
+                    type="search"
+                    aria-label="Tìm sản phẩm áp dụng"
+                    placeholder="Tìm tên sản phẩm..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="h-8 max-w-xs text-xs"
+                  />
+                </div>
+                {productsLoading ? (
+                  <p className="text-xs text-slate-500">Đang tải sản phẩm...</p>
+                ) : products.length === 0 ? (
+                  <p className="text-xs text-slate-500">Không tìm thấy sản phẩm phù hợp.</p>
+                ) : (
+                  <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1">
+                    {products.map((prod) => {
+                      const checked = form.productIds.includes(prod.id)
+                      return (
+                        <label
+                          key={prod.id}
+                          className="flex items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setForm((prev) => ({
+                                ...prev,
+                                productIds: e.target.checked
+                                  ? [...prev.productIds, prod.id]
+                                  : prev.productIds.filter((id) => id !== prod.id),
+                              }))
+                              setFieldErrors((prev) => ({ ...prev, productIds: '' }))
+                            }}
+                          />
+                          <span className="truncate">{prod.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+                {fieldErrors.productIds && (
+                  <p className="text-xs text-rose-600">{fieldErrors.productIds}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="pt-1">
             <Switch
               checked={form.active}
@@ -702,6 +883,9 @@ export function VouchersPage() {
         title: voucher.title,
         description: voucher.description || '',
         voucherType: voucher.voucherType,
+        scopeType: voucher.scopeType || 'all',
+        categoryIds: (voucher.scopeCategories || []).map((c) => c.id),
+        productIds: (voucher.scopeProducts || []).map((p) => p.id),
         discountValue: voucher.voucherType === 'freeship' ? '0' : voucher.discountValue,
         maxDiscountVnd: voucher.voucherType === 'fixed_amount' ? null : voucher.maxDiscountVnd,
         minOrderVnd: voucher.minOrderVnd,
@@ -937,8 +1121,11 @@ export function VouchersPage() {
                           <span className="text-xs font-medium text-slate-800 block">
                             {VOUCHER_TYPE_LABELS[voucher.voucherType]}
                           </span>
-                          <span className="text-xs text-blue-700 font-semibold">
+                          <span className="text-xs text-blue-700 font-semibold block">
                             {formatDiscountSummary(voucher)}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            {formatScopeSummary(voucher)}
                           </span>
                         </div>
                       </TableCell>
