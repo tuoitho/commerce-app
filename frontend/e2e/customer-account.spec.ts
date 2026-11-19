@@ -411,6 +411,35 @@ async function setupAccountE2E(
     { method: 'GET', path: '/api/v1/products', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: '/api/v1/brands', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: '/api/v1/live/current', stub: { status: 200, body: envelope('OK', null) } },
+    { method: 'GET', path: '/api/v1/flash-sales/current', stub: { status: 200, body: envelope('OK', null) } },
+    { method: 'GET', path: '/api/v1/vouchers/available', stub: { status: 200, body: envelope('OK', []) } },
+    {
+      method: 'POST',
+      path: '/api/v1/checkout/quote',
+      stub: ({ body }) => {
+        const payload = (body ?? {}) as { deliveryMethod?: string }
+        const deliveryMethod = payload.deliveryMethod === 'express_2h' ? 'express_2h' : 'standard'
+        const subtotalVnd = state.cartItems.length > 0 ? '29990000' : '0'
+        const shippingFeeVnd = deliveryMethod === 'express_2h' ? '60000' : '0'
+        const totalVnd = (BigInt(subtotalVnd) + BigInt(shippingFeeVnd)).toString()
+        return {
+          status: 200,
+          body: envelope('OK', {
+            subtotalVnd,
+            deliveryMethod,
+            expressAvailable: true,
+            standardShippingFeeVnd: '0',
+            expressShippingFeeVnd: '60000',
+            freeShippingThresholdVnd: '5000000',
+            shippingFeeVnd,
+            voucherCode: null,
+            voucherType: null,
+            discountVnd: '0',
+            totalVnd,
+          }),
+        }
+      },
+    },
     {
       method: 'GET',
       path: '/api/v1/cart',

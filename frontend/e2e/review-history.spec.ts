@@ -165,6 +165,11 @@ function layoutRoutes(isAuthenticated: boolean): ContractRoute[] {
       path: '/api/v1/live/current',
       stub: { status: 200, body: envelope('Live session retrieved successfully', null) },
     },
+    {
+      method: 'GET',
+      path: '/api/v1/flash-sales/current',
+      stub: { status: 200, body: envelope('Lấy thông tin Flash Sale thành công', null) },
+    },
   ]
 }
 

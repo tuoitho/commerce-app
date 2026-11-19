@@ -7,7 +7,7 @@ import { test, expect, type Page, type WebSocketRoute } from '@playwright/test'
 import { loadContractSnapshots, mountContractRoutes, type ContractRoute } from './fixtures/contract'
 import { LiveShoppingPage } from './pages/LiveShoppingPage'
 
-const snapshots = loadContractSnapshots('livestream-shopping', { nullable: ['endedAt', 'pinnedProductId', 'media', 'quota', 'remaining', 'livePriceVnd', 'liveRemaining'] })
+const snapshots = loadContractSnapshots('livestream-shopping', { nullable: ['endedAt', 'pinnedProductId', 'media', 'quota', 'remaining', 'livePriceVnd', 'liveRemaining', 'flashSale'] })
 const IMGS_DIR = path.resolve(process.cwd(), '..', '.dream', 'specs', 'livestream-shopping', 'imgs')
 
 const SESSION_ID = '11111111-1111-1111-1111-111111111111'
@@ -141,6 +141,7 @@ async function setupLiveRoutes(page: Page, options: { authenticated: boolean }):
     },
     { method: 'GET', path: '/api/v1/categories', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: '/api/v1/products/featured', stub: { status: 200, body: envelope('OK', []) } },
+    { method: 'GET', path: '/api/v1/flash-sales/current', stub: { status: 200, body: envelope('OK', null) } },
     { method: 'GET', path: '/api/v1/cart', stub: { status: 200, body: snapshotBody('cart_live_200') } },
     { method: 'GET', path: '/api/v1/favorites', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: /^\/api\/v1\/chat\//, stub: { status: 200, body: envelope('OK', null) } },

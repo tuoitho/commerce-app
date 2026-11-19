@@ -152,6 +152,11 @@ export async function fulfillFromContractSnapshot(
     snapshots.nullable
   )
 
+  if (entry.status === 204) {
+    await route.fulfill({ status: 204 })
+    return
+  }
+
   await route.fulfill({
     status: entry.status,
     contentType: 'application/json',

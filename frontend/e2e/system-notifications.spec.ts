@@ -224,6 +224,7 @@ async function setupStorefrontNotificationsE2E(
     { method: 'GET', path: '/api/v1/products', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: '/api/v1/brands', stub: { status: 200, body: envelope('OK', []) } },
     { method: 'GET', path: '/api/v1/live/current', stub: { status: 200, body: envelope('OK', null) } },
+    { method: 'GET', path: '/api/v1/flash-sales/current', stub: { status: 200, body: envelope('OK', null) } },
     {
       method: 'GET',
       path: '/api/v1/cart',
