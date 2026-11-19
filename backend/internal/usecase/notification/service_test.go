@@ -289,3 +289,35 @@ func TestNotificationService_MomoNotifications(t *testing.T) {
 
 	require.Len(t, broadcaster.broadcasts, 2)
 }
+
+func TestNotificationService_OrderShippedIncludesCarrierAndTrackingCode(t *testing.T) {
+	ctx := context.Background()
+	custID := uuid.NewString()
+	orderID := "a1b2c3d4-0000-0000-0000-000000000088"
+	carrier := "Giao Hàng Nhanh"
+	trackingCode := "GHN-998877"
+
+	repo := &fakeNotificationRepo{}
+	broadcaster := &fakeBroadcaster{
+		onlineUsers: map[string]bool{custID: true},
+	}
+	svc := notifuc.NewService(repo, broadcaster, slog.Default())
+
+	svc.NotifyOrderTransition(ctx, &domain.Order{
+		ID:           orderID,
+		UserID:       custID,
+		Status:       domain.OrderStatusShipped,
+		TotalVND:     "25990000",
+		Carrier:      &carrier,
+		TrackingCode: &trackingCode,
+	}, domain.OrderAdminActionShip)
+
+	require.Len(t, repo.singleInputs, 1)
+	notif := repo.singleInputs[0]
+	assert.Equal(t, domain.NotificationTypeOrderShipped, notif.NotificationType)
+	assert.Equal(t, carrier, notif.Metadata["carrier"])
+	assert.Equal(t, trackingCode, notif.Metadata["trackingCode"])
+	assert.Contains(t, notif.Excerpt, carrier)
+	assert.Contains(t, notif.Excerpt, trackingCode)
+	assert.Contains(t, notif.Excerpt, "#A1B2C3D4")
+}

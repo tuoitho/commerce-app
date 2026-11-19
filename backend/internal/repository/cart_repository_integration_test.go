@@ -60,9 +60,12 @@ func TestCartRepositoryIntegration(t *testing.T) {
 	seedCatalog(t, ctx, conn, seedPath)
 	seedCatalog(t, ctx, conn, seedPath)
 	assertSchemaConstraints(t, ctx, conn)
-	// Cart queries read live prices; this schema predates them, so stand in an
-	// empty view meaning "no live session".
+	// Cart queries read live & flash sale prices; this schema predates them, so stand in
+	// empty views meaning "no live session / no flash sale".
 	if _, err := conn.Exec(ctx, `CREATE VIEW live_active_variant_prices AS SELECT NULL::uuid AS session_id, NULL::uuid AS product_id, NULL::uuid AS variant_id, NULL::numeric AS live_price_vnd, NULL::integer AS quota, NULL::integer AS sold_quantity WHERE false`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `CREATE VIEW flash_sale_active_variant_prices AS SELECT NULL::uuid AS flash_sale_id, NULL::text AS campaign_name, NULL::timestamptz AS starts_at, NULL::timestamptz AS ends_at, NULL::uuid AS product_id, NULL::uuid AS variant_id, NULL::numeric AS flash_price_vnd, NULL::integer AS quota, NULL::integer AS sold_quantity WHERE false`); err != nil {
 		t.Fatal(err)
 	}
 

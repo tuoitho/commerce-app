@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -32,6 +34,7 @@ type variantRow struct {
 	Active        bool
 	LivePriceVND  *domain.MoneyVND
 	LiveRemaining *int
+	FlashSale     *domain.VariantFlashSale
 }
 
 type CatalogRepository struct {
@@ -162,13 +165,15 @@ func (r *CatalogRepository) ListBrands(ctx context.Context) ([]string, error) {
 }
 
 func (r *CatalogRepository) ListProducts(ctx context.Context, f domain.ProductFilter) ([]domain.Product, error) {
-	if err := validateProductPriceFilter(f); err != nil {
+	if err := validateProductFilter(f); err != nil {
 		return nil, err
 	}
+	trimmedQ := strings.TrimSpace(f.Query)
 	params := sqlc.ListProductsParams{
-		Q:           pgtype.Text{String: f.Query, Valid: f.Query != ""},
+		Q:           pgtype.Text{String: trimmedQ, Valid: trimmedQ != ""},
 		MinPriceVnd: toNumeric(moneyString(f.MinPriceVND)),
 		MaxPriceVnd: toNumeric(moneyString(f.MaxPriceVND)),
+		Sort:        string(f.Sort),
 	}
 	categoryIDs := f.CategoryIDs
 	if len(categoryIDs) == 0 && f.CategoryID != "" {
@@ -183,6 +188,9 @@ func (r *CatalogRepository) ListProducts(ctx context.Context, f domain.ProductFi
 	}
 	if f.Featured != nil {
 		params.Featured = pgtype.Bool{Bool: *f.Featured, Valid: true}
+	}
+	if f.MinRating != nil {
+		params.MinRating = pgtype.Float8{Float64: *f.MinRating, Valid: true}
 	}
 
 	rows, err := r.q.ListProducts(ctx, params)
@@ -199,6 +207,9 @@ func (r *CatalogRepository) ListProducts(ctx context.Context, f domain.ProductFi
 		if err != nil {
 			return nil, err
 		}
+		p.AverageRating = row.AverageRating
+		p.ReviewCount = row.ReviewCount
+		p.SoldCount = row.SoldCount
 		out = append(out, p)
 	}
 	return out, nil
@@ -221,8 +232,19 @@ func (r *CatalogRepository) GetProductByID(ctx context.Context, id string) (*dom
 	if err != nil {
 		return nil, err
 	}
+	specs, err := parseSpecsJSON(row.Specs)
+	if err != nil {
+		return nil, err
+	}
 	p, err := r.mapProduct(ctx, row.ID, row.Name, row.Model, row.Brand, row.Description, row.CategoryID, row.CategoryName, row.Featured, row.Active, row.CreatedAt, row.UpdatedAt, images)
-	return &p, err
+	if err != nil {
+		return nil, err
+	}
+	p.Specs = specs
+	p.AverageRating = row.AverageRating
+	p.ReviewCount = row.ReviewCount
+	p.SoldCount = row.SoldCount
+	return &p, nil
 }
 
 func (r *CatalogRepository) GetCategoryByID(ctx context.Context, id string) (*domain.Category, error) {
@@ -237,7 +259,8 @@ func (r *CatalogRepository) GetCategoryByID(ctx context.Context, id string) (*do
 }
 
 func (r *CatalogRepository) ListAdminProducts(ctx context.Context, query string) ([]domain.Product, error) {
-	rows, err := r.q.ListAdminProducts(ctx, pgtype.Text{String: query, Valid: query != ""})
+	trimmedQ := strings.TrimSpace(query)
+	rows, err := r.q.ListAdminProducts(ctx, pgtype.Text{String: trimmedQ, Valid: trimmedQ != ""})
 	if err != nil {
 		return nil, err
 	}
@@ -251,6 +274,9 @@ func (r *CatalogRepository) ListAdminProducts(ctx context.Context, query string)
 		if err != nil {
 			return nil, err
 		}
+		p.AverageRating = row.AverageRating
+		p.ReviewCount = row.ReviewCount
+		p.SoldCount = row.SoldCount
 		out = append(out, p)
 	}
 	return out, nil
@@ -268,10 +294,18 @@ func (r *CatalogRepository) GetAdminProductByID(ctx context.Context, id string) 
 	if err != nil {
 		return nil, err
 	}
+	specs, err := parseSpecsJSON(row.Specs)
+	if err != nil {
+		return nil, err
+	}
 	p, err := r.mapAdminProductWithDefaults(ctx, row.ID, row.Name, row.Model, row.Brand, row.Description, row.CategoryID, row.CategoryName, row.Featured, row.Active, row.CreatedAt, row.UpdatedAt, images, row.Price, row.Currency, row.StockQuantity)
 	if err != nil {
 		return nil, err
 	}
+	p.Specs = specs
+	p.AverageRating = row.AverageRating
+	p.ReviewCount = row.ReviewCount
+	p.SoldCount = row.SoldCount
 	return &p, nil
 }
 
@@ -292,9 +326,14 @@ func (r *CatalogRepository) CreateProduct(ctx context.Context, input domain.Save
 		stockQuantity = totalStock
 	}
 
+	specsBytes, err := marshalSpecsJSON(input.Specs)
+	if err != nil {
+		return nil, err
+	}
+
 	var productID string
 
-	err := r.withTx(ctx, func(q *sqlc.Queries) error {
+	err = r.withTx(ctx, func(q *sqlc.Queries) error {
 		row, err := q.CreateProduct(ctx, sqlc.CreateProductParams{
 			CategoryID:    input.CategoryID,
 			Name:          input.Name,
@@ -305,6 +344,7 @@ func (r *CatalogRepository) CreateProduct(ctx context.Context, input domain.Save
 			Model:         input.Model,
 			Brand:         input.Brand,
 			Featured:      input.Featured,
+			Specs:         specsBytes,
 		})
 		if err != nil {
 			return err
@@ -416,7 +456,12 @@ func (r *CatalogRepository) UpdateProduct(ctx context.Context, id string, input 
 		stockQuantity = totalStock
 	}
 
-	err := r.withTx(ctx, func(q *sqlc.Queries) error {
+	specsBytes, err := marshalSpecsJSON(input.Specs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.withTx(ctx, func(q *sqlc.Queries) error {
 		_, err := q.UpdateProduct(ctx, sqlc.UpdateProductParams{
 			ID:            id,
 			CategoryID:    input.CategoryID,
@@ -428,6 +473,7 @@ func (r *CatalogRepository) UpdateProduct(ctx context.Context, id string, input 
 			Model:         input.Model,
 			Brand:         input.Brand,
 			Featured:      input.Featured,
+			Specs:         specsBytes,
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -646,6 +692,16 @@ func (r *CatalogRepository) mapProductWithDefaults(ctx context.Context, id, name
 				rows[i].LiveRemaining = &remaining
 			}
 		}
+		if v.HasFlashSale {
+			rows[i].FlashSale = &domain.VariantFlashSale{
+				FlashSaleID:   v.FlashSaleID,
+				CampaignName:  v.FlashSaleCampaignName,
+				FlashPriceVND: domain.MoneyVND(v.FlashSalePriceVnd),
+				Quota:         int(v.FlashSaleQuota),
+				SoldQuantity:  int(v.FlashSaleSoldQuantity),
+				EndsAt:        v.FlashSaleEndsAt,
+			}
+		}
 	}
 
 	return assembleProduct(id, name, model, brand, description, categoryID, categoryName, featured, active, createdAt, updatedAt, images, groups, values, rows, links, defaultPrice, defaultCurrency, defaultStock)
@@ -736,6 +792,7 @@ func assembleProduct(id, name, model, brand, description, categoryID, categoryNa
 			Active:         variant.Active,
 			LivePriceVND:   variant.LivePriceVND,
 			LiveRemaining:  variant.LiveRemaining,
+			FlashSale:      variant.FlashSale,
 		})
 	}
 
@@ -836,6 +893,52 @@ func moneyString(value *domain.MoneyVND) string {
 		return ""
 	}
 	return string(*value)
+}
+
+func validateProductFilter(f domain.ProductFilter) error {
+	if err := validateProductPriceFilter(f); err != nil {
+		return err
+	}
+	fields := map[string]string{}
+	switch f.Sort {
+	case domain.ProductSortDefault,
+		domain.ProductSortBestselling,
+		domain.ProductSortNewest,
+		domain.ProductSortPriceAsc,
+		domain.ProductSortPriceDesc,
+		domain.ProductSortRatingDesc:
+	default:
+		fields["sort"] = "must be one of bestselling, newest, price_asc, price_desc, rating_desc"
+	}
+	if f.MinRating != nil && (math.IsNaN(*f.MinRating) || math.IsInf(*f.MinRating, 0) || *f.MinRating < 1 || *f.MinRating > 5) {
+		fields["min_rating"] = "must be a number between 1 and 5"
+	}
+	if len(fields) > 0 {
+		return domain.NewFilterValidationError(fields)
+	}
+	return nil
+}
+
+func marshalSpecsJSON(specs []domain.SpecGroup) ([]byte, error) {
+	if len(specs) == 0 {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(specs)
+}
+
+func parseSpecsJSON(raw string) ([]domain.SpecGroup, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return []domain.SpecGroup{}, nil
+	}
+	var out []domain.SpecGroup
+	if err := json.Unmarshal([]byte(trimmed), &out); err != nil {
+		return nil, fmt.Errorf("parse product specs: %w", err)
+	}
+	if out == nil {
+		out = []domain.SpecGroup{}
+	}
+	return out, nil
 }
 
 func validateProductPriceFilter(f domain.ProductFilter) error {

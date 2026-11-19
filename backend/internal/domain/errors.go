@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -60,6 +61,25 @@ var (
 	ErrUserAlreadyLocked       = errors.New("user already locked")
 	ErrUserNotLocked           = errors.New("user not locked")
 	ErrAvatarNotFound          = errors.New("avatar not found")
+	ErrProductImageNotFound    = errors.New("product image not found")
+	ErrOTPRateLimited          = errors.New("otp rate limited")
+	ErrEmailDeliveryFailed     = errors.New("email delivery failed")
+	ErrInvalidOrExpiredOTP     = errors.New("invalid or expired otp")
+	ErrFlashSaleNotFound          = errors.New("flash sale not found")
+	ErrFlashSaleTimeOverlap       = errors.New("flash sale time overlap")
+	ErrFlashSaleHasOrders         = errors.New("flash sale has orders")
+	ErrVoucherCodeInUse           = errors.New("voucher code in use")
+	ErrVoucherInUse               = errors.New("voucher in use")
+	ErrVoucherImmutableFields     = errors.New("voucher immutable fields")
+	ErrVoucherUsageLimitTooLow    = errors.New("voucher usage limit too low")
+	ErrVoucherNotFound            = errors.New("voucher not found")
+	ErrVoucherInactive            = errors.New("voucher inactive")
+	ErrVoucherNotStarted          = errors.New("voucher not started")
+	ErrVoucherExpired             = errors.New("voucher expired")
+	ErrVoucherExhausted           = errors.New("voucher exhausted")
+	ErrVoucherUserLimitReached    = errors.New("voucher user limit reached")
+	ErrBuyAgainAllUnavailable     = errors.New("buy again all unavailable")
+	ErrExpressDeliveryUnavailable = errors.New("express delivery unavailable")
 )
 
 type ValidationError struct {
@@ -102,6 +122,59 @@ func (e *ProductChangedError) Error() string {
 
 func NewProductChangedError(products []string) *ProductChangedError {
 	return &ProductChangedError{Products: products}
+}
+
+// FormatVND formats a canonical integer VND string with dot thousands separators (e.g. "10000000" -> "10.000.000").
+func FormatVND(amount MoneyVND) string {
+	s := strings.TrimSpace(string(amount))
+	if s == "" {
+		return "0"
+	}
+	neg := false
+	if strings.HasPrefix(s, "-") {
+		neg = true
+		s = s[1:]
+	}
+	n := len(s)
+	if n <= 3 {
+		if neg {
+			return "-" + s
+		}
+		return s
+	}
+	var b strings.Builder
+	if neg {
+		b.WriteByte('-')
+	}
+	rem := n % 3
+	if rem == 0 {
+		rem = 3
+	}
+	b.WriteString(s[:rem])
+	for i := rem; i < n; i += 3 {
+		b.WriteByte('.')
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
+}
+
+// VoucherMinOrderError indicates an order subtotal does not meet a voucher's minOrderVnd.
+type VoucherMinOrderError struct {
+	MinOrderVND MoneyVND
+}
+
+func (e *VoucherMinOrderError) Error() string {
+	return fmt.Sprintf("Đơn hàng chưa đạt giá trị tối thiểu %s ₫ để áp dụng mã này", FormatVND(e.MinOrderVND))
+}
+
+// FlashSaleQuotaExceededError reports remaining Flash Sale units >= 1 but less than requested quantity.
+type FlashSaleQuotaExceededError struct {
+	ProductName string
+	Remaining   int64
+}
+
+func (e *FlashSaleQuotaExceededError) Error() string {
+	return fmt.Sprintf("Sản phẩm %s chỉ còn %d suất giá Flash Sale", e.ProductName, e.Remaining)
 }
 
 

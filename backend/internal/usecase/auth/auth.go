@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/mail"
 	"strings"
 	"time"
@@ -18,39 +19,60 @@ const (
 )
 
 type Repositories struct {
-	Users    domain.UserRepository
-	Sessions domain.SessionRepository
+	Users          domain.UserRepository
+	Sessions       domain.SessionRepository
+	PasswordResets domain.PasswordResetRepository
 }
 
 type UseCase struct {
 	repos                Repositories
 	jwt                  *jwt.Manager
+	mailer               domain.Mailer
 	accessTTL            time.Duration
 	refreshTTL           time.Duration
+	passwordResetOTPTTL  time.Duration
+	otpHMACSecret        string
 	hashPassword         func(string) (string, error)
 	checkPassword        func(string, string) bool
 	generateRefreshToken func() (security.RefreshTokenPair, error)
+	logger               *slog.Logger
 }
 
 type Dependencies struct {
 	Repos                Repositories
 	JWT                  *jwt.Manager
+	Mailer               domain.Mailer
 	AccessTTL            time.Duration
 	RefreshTTL           time.Duration
+	PasswordResetOTPTTL  time.Duration
+	OTPHMACSecret        string
 	HashPassword         func(string) (string, error)
 	CheckPassword        func(string, string) bool
 	GenerateRefreshToken func() (security.RefreshTokenPair, error)
+	Logger               *slog.Logger
 }
 
 func New(deps Dependencies) *UseCase {
+	otpTTL := deps.PasswordResetOTPTTL
+	if otpTTL <= 0 {
+		otpTTL = 10 * time.Minute
+	}
+	log := deps.Logger
+	if log == nil {
+		log = slog.Default()
+	}
 	return &UseCase{
 		repos:                deps.Repos,
 		jwt:                  deps.JWT,
+		mailer:               deps.Mailer,
 		accessTTL:            deps.AccessTTL,
 		refreshTTL:           deps.RefreshTTL,
+		passwordResetOTPTTL:  otpTTL,
+		otpHMACSecret:        deps.OTPHMACSecret,
 		hashPassword:         deps.HashPassword,
 		checkPassword:        deps.CheckPassword,
 		generateRefreshToken: deps.GenerateRefreshToken,
+		logger:               log,
 	}
 }
 

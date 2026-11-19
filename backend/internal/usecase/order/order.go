@@ -3,14 +3,18 @@ package order
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
 )
+
+var trackingCodePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{3,64}$`)
 
 type Dependencies struct {
 	Order               domain.OrderRepository
@@ -18,6 +22,7 @@ type Dependencies struct {
 	Review              domain.ReviewRepository
 	MomoGateway         domain.MomoGateway
 	ShippingFeeVND      domain.MoneyVND
+	Shipping            domain.ShippingConfig
 	OrderConfirmTimeout time.Duration
 	Now                 func() time.Time
 	// LiveQuota, when set, learns about orders that may change live-price quota.
@@ -32,6 +37,7 @@ type UseCase struct {
 	reviewRepo          domain.ReviewRepository
 	momo                domain.MomoGateway
 	shippingFeeVND      domain.MoneyVND
+	shipping            domain.ShippingConfig
 	orderConfirmTimeout time.Duration
 	now                 func() time.Time
 	liveQuota           domain.LiveQuotaObserver
@@ -57,6 +63,7 @@ func New(deps Dependencies) *UseCase {
 		reviewRepo:          deps.Review,
 		momo:                deps.MomoGateway,
 		shippingFeeVND:      shippingFee,
+		shipping:            deps.Shipping.WithDefaults(),
 		orderConfirmTimeout: timeout,
 		now:                 nowFn,
 		liveQuota:           deps.LiveQuota,
@@ -126,39 +133,109 @@ func (uc *UseCase) hydrateOrderReviewStates(ctx context.Context, orders ...*doma
 	}
 }
 
+type CreateCheckoutInput struct {
+	UserID         string
+	AddressID      string
+	Lines          []domain.OrderLineInput
+	PaymentMethod  string
+	DeliveryMethod domain.DeliveryMethod
+	VoucherCode    string
+}
+
+func (uc *UseCase) QuoteCheckout(
+	ctx context.Context,
+	userID, addressID string,
+	deliveryMethod domain.DeliveryMethod,
+	voucherCode string,
+) (*domain.CheckoutQuote, error) {
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+	trimmedAddr := strings.TrimSpace(addressID)
+	if _, err := uuid.Parse(trimmedAddr); err != nil {
+		return nil, domain.NewValidationError(map[string]string{"addressId": "Mã địa chỉ không hợp lệ"})
+	}
+	dm := domain.DeliveryMethod(strings.TrimSpace(string(deliveryMethod)))
+	if dm == "" {
+		dm = domain.DeliveryMethodStandard
+	}
+	if !dm.IsValid() {
+		return nil, domain.NewValidationError(map[string]string{"deliveryMethod": "Phương thức vận chuyển không hợp lệ"})
+	}
+	checkoutRepo, ok := uc.order.(domain.CheckoutOrderRepository)
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return checkoutRepo.QuoteCheckout(ctx, domain.CheckoutQuoteInput{
+		UserID:         userID,
+		AddressID:      trimmedAddr,
+		DeliveryMethod: dm,
+		VoucherCode:    strings.TrimSpace(voucherCode),
+		Shipping:       uc.shipping,
+	})
+}
+
 func (uc *UseCase) Create(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput) (*domain.Order, error) {
 	return uc.CreateWithMethod(ctx, userID, addressID, lines, domain.PaymentMethodCOD)
 }
 
-func (uc *UseCase) CreateWithMethod(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput, paymentMethod string) (*domain.Order, error) {
+func validateOrderCreateInputs(addressID string, lines []domain.OrderLineInput, paymentMethod string) (string, error) {
 	method := strings.TrimSpace(paymentMethod)
 	if method == "" {
 		method = domain.PaymentMethodCOD
 	}
 	if method != domain.PaymentMethodCOD && method != domain.PaymentMethodMomo {
-		return nil, domain.NewValidationError(map[string]string{"paymentMethod": "Phương thức thanh toán không hợp lệ"})
+		return "", domain.NewValidationError(map[string]string{"paymentMethod": "Phương thức thanh toán không hợp lệ"})
 	}
-
 	if len(lines) == 0 {
-		return nil, domain.ErrCartEmpty
+		return "", domain.ErrCartEmpty
 	}
-
 	if _, err := uuid.Parse(addressID); err != nil {
-		return nil, domain.NewValidationError(map[string]string{"address_id": "Mã địa chỉ không hợp lệ"})
+		return "", domain.NewValidationError(map[string]string{"address_id": "Mã địa chỉ không hợp lệ"})
 	}
-
 	for _, line := range lines {
 		if _, err := uuid.Parse(line.VariantID); err != nil {
-			return nil, domain.NewValidationError(map[string]string{"lines": "Mã phân loại sản phẩm không hợp lệ"})
+			return "", domain.NewValidationError(map[string]string{"lines": "Mã phân loại sản phẩm không hợp lệ"})
 		}
 		if line.Quantity <= 0 {
-			return nil, domain.NewValidationError(map[string]string{"lines": "Số lượng sản phẩm không hợp lệ"})
+			return "", domain.NewValidationError(map[string]string{"lines": "Số lượng sản phẩm không hợp lệ"})
 		}
+	}
+	return method, nil
+}
+
+func (uc *UseCase) finalizeCreatedOrder(ctx context.Context, order *domain.Order, method string) {
+	uc.notifyLiveQuota(ctx)
+	if order == nil {
+		return
+	}
+	if method == domain.PaymentMethodMomo {
+		payURL, gwErr := uc.requestMomoPayURL(ctx, order)
+		if gwErr != nil || payURL == "" {
+			if momoRepo, hasMomoRepo := uc.order.(domain.MomoOrderRepository); hasMomoRepo {
+				if setErr := momoRepo.SetPaymentFailed(ctx, order.ID); setErr == nil {
+					order.PaymentStatus = domain.PaymentStatusFailed
+				}
+			}
+		} else {
+			order.PayURL = payURL
+		}
+	}
+	uc.hydrateCancellableUntil(order)
+	uc.hydrateOrderReviewStates(ctx, order)
+	if uc.notifications != nil {
+		uc.notifications.NotifyOrderCreated(ctx, order)
+	}
+}
+
+func (uc *UseCase) CreateWithMethod(ctx context.Context, userID, addressID string, lines []domain.OrderLineInput, paymentMethod string) (*domain.Order, error) {
+	method, err := validateOrderCreateInputs(addressID, lines, paymentMethod)
+	if err != nil {
+		return nil, err
 	}
 
 	momoRepo, hasMomoRepo := uc.order.(domain.MomoOrderRepository)
 	var order *domain.Order
-	var err error
 	if hasMomoRepo {
 		order, err = momoRepo.CreateWithPaymentMethod(ctx, userID, addressID, lines, uc.shippingFeeVND, method)
 	} else if method == domain.PaymentMethodCOD {
@@ -169,29 +246,56 @@ func (uc *UseCase) CreateWithMethod(ctx context.Context, userID, addressID strin
 	if err != nil {
 		return nil, err
 	}
-	uc.notifyLiveQuota(ctx)
+	uc.finalizeCreatedOrder(ctx, order, method)
+	return order, nil
+}
 
-	if order != nil {
-		if method == domain.PaymentMethodMomo {
-			payURL, gwErr := uc.requestMomoPayURL(ctx, order)
-			if gwErr != nil || payURL == "" {
-				if hasMomoRepo {
-					if setErr := momoRepo.SetPaymentFailed(ctx, order.ID); setErr == nil {
-						order.PaymentStatus = domain.PaymentStatusFailed
-					}
-				}
-			} else {
-				order.PayURL = payURL
-			}
+func (uc *UseCase) CreateCheckout(ctx context.Context, in CreateCheckoutInput) (*domain.Order, error) {
+	trimmedAddr := strings.TrimSpace(in.AddressID)
+	method, err := validateOrderCreateInputs(trimmedAddr, in.Lines, in.PaymentMethod)
+	if err != nil {
+		return nil, err
+	}
+	dm := domain.DeliveryMethod(strings.TrimSpace(string(in.DeliveryMethod)))
+	if dm == "" {
+		dm = domain.DeliveryMethodStandard
+	}
+	if !dm.IsValid() {
+		return nil, domain.NewValidationError(map[string]string{"deliveryMethod": "Phương thức vận chuyển không hợp lệ"})
+	}
+	trimmedVoucher := strings.TrimSpace(in.VoucherCode)
+
+	var order *domain.Order
+	if checkoutRepo, hasCheckoutRepo := uc.order.(domain.CheckoutOrderRepository); hasCheckoutRepo {
+		order, err = checkoutRepo.CreateCheckoutOrder(ctx, domain.CreateCheckoutOrderInput{
+			UserID:         in.UserID,
+			AddressID:      trimmedAddr,
+			Lines:          in.Lines,
+			PaymentMethod:  method,
+			DeliveryMethod: dm,
+			VoucherCode:    trimmedVoucher,
+			Shipping:       uc.shipping,
+		})
+	} else {
+		if dm == domain.DeliveryMethodExpress2H {
+			return nil, domain.ErrExpressDeliveryUnavailable
 		}
-
-		uc.hydrateCancellableUntil(order)
-		uc.hydrateOrderReviewStates(ctx, order)
-		if uc.notifications != nil {
-			uc.notifications.NotifyOrderCreated(ctx, order)
+		if trimmedVoucher != "" {
+			return nil, domain.ErrVoucherNotFound
+		}
+		momoRepo, hasMomoRepo := uc.order.(domain.MomoOrderRepository)
+		if hasMomoRepo {
+			order, err = momoRepo.CreateWithPaymentMethod(ctx, in.UserID, trimmedAddr, in.Lines, uc.shippingFeeVND, method)
+		} else if method == domain.PaymentMethodCOD {
+			order, err = uc.order.Create(ctx, in.UserID, trimmedAddr, in.Lines, uc.shippingFeeVND)
+		} else {
+			return nil, domain.ErrMomoGateway
 		}
 	}
-
+	if err != nil {
+		return nil, err
+	}
+	uc.finalizeCreatedOrder(ctx, order, method)
 	return order, nil
 }
 
@@ -551,6 +655,78 @@ func (uc *UseCase) AdminTransition(ctx context.Context, orderID string, action d
 	}
 
 	return order, nil
+}
+
+func (uc *UseCase) AdminShip(ctx context.Context, orderID, carrier, trackingCode string) (*domain.Order, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+	trimmedCarrier := strings.TrimSpace(carrier)
+	trimmedCode := strings.TrimSpace(trackingCode)
+	fields := map[string]string{}
+	if n := utf8.RuneCountInString(trimmedCarrier); n < 1 || n > 80 {
+		fields["carrier"] = "Đơn vị vận chuyển phải từ 1 đến 80 ký tự"
+	}
+	if !trackingCodePattern.MatchString(trimmedCode) {
+		fields["trackingCode"] = "Mã vận đơn phải từ 3 đến 64 ký tự (chữ, số, -, _)"
+	}
+	if len(fields) > 0 {
+		return nil, domain.NewValidationError(fields)
+	}
+
+	fulfillRepo, ok := uc.order.(domain.FulfillmentOrderRepository)
+	if !ok {
+		return nil, domain.ErrOrderActionNotAllowed
+	}
+
+	order, err := fulfillRepo.ShipOrder(ctx, orderID, trimmedCarrier, trimmedCode)
+	if err != nil {
+		return nil, err
+	}
+	if order != nil {
+		uc.hydrateOrderReviewStates(ctx, order)
+		if uc.notifications != nil {
+			uc.notifications.NotifyOrderTransition(ctx, order, domain.OrderAdminActionShip)
+		}
+	}
+	return order, nil
+}
+
+func (uc *UseCase) BuyAgain(ctx context.Context, userID, orderID string) (*domain.BuyAgainResult, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, domain.ErrOrderNotFound
+	}
+
+	fulfillRepo, ok := uc.order.(domain.FulfillmentOrderRepository)
+	if !ok {
+		return nil, domain.ErrOrderActionNotAllowed
+	}
+
+	res, err := fulfillRepo.BuyAgain(ctx, userID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, domain.ErrBuyAgainAllUnavailable
+	}
+	if res.AdjustedItems == nil {
+		res.AdjustedItems = []domain.BuyAgainAdjustedItem{}
+	}
+	if res.SkippedItems == nil {
+		res.SkippedItems = []domain.BuyAgainSkippedItem{}
+	}
+	if res.Cart != nil {
+		if res.Cart.Items == nil {
+			res.Cart.Items = []domain.CartItem{}
+		}
+		if res.Cart.ShippingFeeVND == "" {
+			res.Cart.ShippingFeeVND = uc.shippingFeeVND
+		}
+	}
+	return res, nil
 }
 
 

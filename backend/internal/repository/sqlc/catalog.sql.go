@@ -50,13 +50,14 @@ INSERT INTO products (
     model,
     brand,
     featured,
+    specs,
     active,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, true, now(), now()
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, true, now(), now()
 )
-RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, active, created_at, updated_at
+RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, specs::text AS specs, active, created_at, updated_at
 `
 
 type CreateProductParams struct {
@@ -69,6 +70,7 @@ type CreateProductParams struct {
 	Model         string
 	Brand         string
 	Featured      bool
+	Specs         []byte
 }
 
 type CreateProductRow struct {
@@ -82,6 +84,7 @@ type CreateProductRow struct {
 	Model         string
 	Brand         string
 	Featured      bool
+	Specs         string
 	Active        bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -98,6 +101,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (C
 		arg.Model,
 		arg.Brand,
 		arg.Featured,
+		arg.Specs,
 	)
 	var i CreateProductRow
 	err := row.Scan(
@@ -111,6 +115,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (C
 		&i.Model,
 		&i.Brand,
 		&i.Featured,
+		&i.Specs,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -353,9 +358,29 @@ SELECT p.id,
        c.id AS category_id,
        c.name AS category_name,
        p.featured,
+       p.specs::text AS specs,
        p.active,
        p.created_at,
-       p.updated_at
+       p.updated_at,
+       COALESCE((
+           SELECT ROUND(AVG(pr.rating), 1)::double precision
+           FROM product_reviews pr
+           JOIN order_items oi ON oi.id = pr.order_item_id
+           WHERE oi.product_id = p.id
+       ), 0)::double precision AS average_rating,
+       COALESCE((
+           SELECT COUNT(pr.id)::bigint
+           FROM product_reviews pr
+           JOIN order_items oi ON oi.id = pr.order_item_id
+           WHERE oi.product_id = p.id
+       ), 0)::bigint AS review_count,
+       COALESCE((
+           SELECT SUM(oi.quantity)::bigint
+           FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = p.id
+             AND o.status IN ('delivered', 'partially_returned')
+       ), 0)::bigint AS sold_count
 FROM products p
 JOIN categories c ON c.id = p.category_id
 WHERE p.id = $1
@@ -374,9 +399,13 @@ type GetAdminProductByIDRow struct {
 	CategoryID    string
 	CategoryName  string
 	Featured      bool
+	Specs         string
 	Active        bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	AverageRating float64
+	ReviewCount   int64
+	SoldCount     int64
 }
 
 func (q *Queries) GetAdminProductByID(ctx context.Context, id string) (GetAdminProductByIDRow, error) {
@@ -394,9 +423,13 @@ func (q *Queries) GetAdminProductByID(ctx context.Context, id string) (GetAdminP
 		&i.CategoryID,
 		&i.CategoryName,
 		&i.Featured,
+		&i.Specs,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AverageRating,
+		&i.ReviewCount,
+		&i.SoldCount,
 	)
 	return i, err
 }
@@ -423,9 +456,29 @@ SELECT p.id,
        c.id AS category_id,
        c.name AS category_name,
        p.featured,
+       p.specs::text AS specs,
        p.active,
        p.created_at,
-       p.updated_at
+       p.updated_at,
+       COALESCE((
+           SELECT ROUND(AVG(pr.rating), 1)::double precision
+           FROM product_reviews pr
+           JOIN order_items oi ON oi.id = pr.order_item_id
+           WHERE oi.product_id = p.id
+       ), 0)::double precision AS average_rating,
+       COALESCE((
+           SELECT COUNT(pr.id)::bigint
+           FROM product_reviews pr
+           JOIN order_items oi ON oi.id = pr.order_item_id
+           WHERE oi.product_id = p.id
+       ), 0)::bigint AS review_count,
+       COALESCE((
+           SELECT SUM(oi.quantity)::bigint
+           FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = p.id
+             AND o.status IN ('delivered', 'partially_returned')
+       ), 0)::bigint AS sold_count
 FROM products p
 JOIN categories c ON c.id = p.category_id
 WHERE p.id = $1
@@ -434,17 +487,21 @@ WHERE p.id = $1
 `
 
 type GetProductByIDRow struct {
-	ID           string
-	Name         string
-	Model        string
-	Brand        string
-	Description  string
-	CategoryID   string
-	CategoryName string
-	Featured     bool
-	Active       bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            string
+	Name          string
+	Model         string
+	Brand         string
+	Description   string
+	CategoryID    string
+	CategoryName  string
+	Featured      bool
+	Specs         string
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	AverageRating float64
+	ReviewCount   int64
+	SoldCount     int64
 }
 
 func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByIDRow, error) {
@@ -459,9 +516,13 @@ func (q *Queries) GetProductByID(ctx context.Context, id string) (GetProductByID
 		&i.CategoryID,
 		&i.CategoryName,
 		&i.Featured,
+		&i.Specs,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AverageRating,
+		&i.ReviewCount,
+		&i.SoldCount,
 	)
 	return i, err
 }
@@ -471,22 +532,37 @@ SELECT v.id, v.price_vnd::text AS price_vnd, v.stock_quantity, v.active,
        (lap.variant_id IS NOT NULL)::boolean AS has_live_price,
        COALESCE(lap.live_price_vnd, 0)::text AS live_price_vnd,
        (lap.quota IS NOT NULL)::boolean AS has_live_quota,
-       COALESCE(lap.quota - lap.sold_quantity, 0)::integer AS live_remaining
+       COALESCE(lap.quota - lap.sold_quantity, 0)::integer AS live_remaining,
+       (fsrv.variant_id IS NOT NULL)::boolean AS has_flash_sale,
+       COALESCE(fsrv.flash_sale_id::text, '')::text AS flash_sale_id,
+       COALESCE(fsrv.campaign_name, '')::text AS flash_sale_campaign_name,
+       COALESCE(fsrv.flash_price_vnd, 0)::text AS flash_sale_price_vnd,
+       COALESCE(fsrv.quota, 0)::integer AS flash_sale_quota,
+       COALESCE(fsrv.sold_quantity, 0)::integer AS flash_sale_sold_quantity,
+       COALESCE(fsrv.ends_at, to_timestamp(0))::timestamptz AS flash_sale_ends_at
 FROM product_variants v
 LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
+LEFT JOIN flash_sale_running_variants fsrv ON fsrv.variant_id = v.id
 WHERE v.product_id = $1 AND v.active
 ORDER BY v.price_vnd ASC, v.id ASC
 `
 
 type ListActiveProductVariantsRow struct {
-	ID            string
-	PriceVnd      string
-	StockQuantity int64
-	Active        bool
-	HasLivePrice  bool
-	LivePriceVnd  string
-	HasLiveQuota  bool
-	LiveRemaining int32
+	ID                    string
+	PriceVnd              string
+	StockQuantity         int64
+	Active                bool
+	HasLivePrice          bool
+	LivePriceVnd          string
+	HasLiveQuota          bool
+	LiveRemaining         int32
+	HasFlashSale          bool
+	FlashSaleID           string
+	FlashSaleCampaignName string
+	FlashSalePriceVnd     string
+	FlashSaleQuota        int32
+	FlashSaleSoldQuantity int32
+	FlashSaleEndsAt       time.Time
 }
 
 func (q *Queries) ListActiveProductVariants(ctx context.Context, productID string) ([]ListActiveProductVariantsRow, error) {
@@ -507,6 +583,13 @@ func (q *Queries) ListActiveProductVariants(ctx context.Context, productID strin
 			&i.LivePriceVnd,
 			&i.HasLiveQuota,
 			&i.LiveRemaining,
+			&i.HasFlashSale,
+			&i.FlashSaleID,
+			&i.FlashSaleCampaignName,
+			&i.FlashSalePriceVnd,
+			&i.FlashSaleQuota,
+			&i.FlashSaleSoldQuantity,
+			&i.FlashSaleEndsAt,
 		); err != nil {
 			return nil, err
 		}
@@ -548,6 +631,22 @@ func (q *Queries) ListAdminCategories(ctx context.Context) ([]ListAdminCategorie
 }
 
 const listAdminProducts = `-- name: ListAdminProducts :many
+WITH review_stats AS (
+    SELECT oi.product_id,
+           COUNT(pr.id)::bigint AS review_count,
+           COALESCE(ROUND(AVG(pr.rating), 1), 0)::double precision AS average_rating
+    FROM product_reviews pr
+    JOIN order_items oi ON oi.id = pr.order_item_id
+    GROUP BY oi.product_id
+),
+sold_stats AS (
+    SELECT oi.product_id,
+           COALESCE(SUM(oi.quantity), 0)::bigint AS sold_count
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.status IN ('delivered', 'partially_returned')
+    GROUP BY oi.product_id
+)
 SELECT p.id,
        p.name,
        p.model,
@@ -566,14 +665,22 @@ SELECT p.id,
         FROM product_images pi
         WHERE pi.product_id = p.id
         ORDER BY pi.position ASC, pi.id ASC
-        LIMIT 1), '')::text AS primary_image_url
+        LIMIT 1), '')::text AS primary_image_url,
+       COALESCE(rs.average_rating, 0)::double precision AS average_rating,
+       COALESCE(rs.review_count, 0)::bigint AS review_count,
+       COALESCE(ss.sold_count, 0)::bigint AS sold_count
 FROM products p
 JOIN categories c ON c.id = p.category_id
+LEFT JOIN review_stats rs ON rs.product_id = p.id
+LEFT JOIN sold_stats ss ON ss.product_id = p.id
 WHERE p.active
-  AND ($1::text IS NULL OR lower(c.name) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.brand) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.name) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.model) LIKE '%' || lower($1::text) || '%')
+  AND ($1::text IS NULL
+       OR f_unaccent(c.name) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.brand) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.name) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.model) LIKE '%' || f_unaccent($1::text) || '%'
+       OR (char_length(f_unaccent($1::text)) >= 3
+           AND word_similarity(f_unaccent($1::text), f_unaccent(p.name || ' ' || p.brand || ' ' || p.model)) >= 0.35))
 ORDER BY p.name ASC, p.model ASC, p.id ASC
 `
 
@@ -593,6 +700,9 @@ type ListAdminProductsRow struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	PrimaryImageUrl string
+	AverageRating   float64
+	ReviewCount     int64
+	SoldCount       int64
 }
 
 func (q *Queries) ListAdminProducts(ctx context.Context, q_ pgtype.Text) ([]ListAdminProductsRow, error) {
@@ -620,6 +730,9 @@ func (q *Queries) ListAdminProducts(ctx context.Context, q_ pgtype.Text) ([]List
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.PrimaryImageUrl,
+			&i.AverageRating,
+			&i.ReviewCount,
+			&i.SoldCount,
 		); err != nil {
 			return nil, err
 		}
@@ -838,6 +951,29 @@ func (q *Queries) ListProductVariants(ctx context.Context, productID string) ([]
 }
 
 const listProducts = `-- name: ListProducts :many
+WITH review_stats AS (
+    SELECT oi.product_id,
+           COUNT(pr.id)::bigint AS review_count,
+           COALESCE(ROUND(AVG(pr.rating), 1), 0)::double precision AS average_rating
+    FROM product_reviews pr
+    JOIN order_items oi ON oi.id = pr.order_item_id
+    GROUP BY oi.product_id
+),
+sold_stats AS (
+    SELECT oi.product_id,
+           COALESCE(SUM(oi.quantity), 0)::bigint AS sold_count
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.status IN ('delivered', 'partially_returned')
+    GROUP BY oi.product_id
+),
+variant_price_stats AS (
+    SELECT v.product_id,
+           MIN(v.price_vnd) FILTER (WHERE v.active) AS min_active_price_vnd
+    FROM product_variants v
+    WHERE v.active
+    GROUP BY v.product_id
+)
 SELECT p.id,
        p.name,
        p.model,
@@ -853,15 +989,23 @@ SELECT p.id,
         FROM product_images pi
         WHERE pi.product_id = p.id
         ORDER BY pi.position ASC, pi.id ASC
-        LIMIT 1), '')::text AS primary_image_url
+        LIMIT 1), '')::text AS primary_image_url,
+       COALESCE(rs.average_rating, 0)::double precision AS average_rating,
+       COALESCE(rs.review_count, 0)::bigint AS review_count,
+       COALESCE(ss.sold_count, 0)::bigint AS sold_count
 FROM products p
 JOIN categories c ON c.id = p.category_id
+JOIN variant_price_stats vps ON vps.product_id = p.id
+LEFT JOIN review_stats rs ON rs.product_id = p.id
+LEFT JOIN sold_stats ss ON ss.product_id = p.id
 WHERE p.active
-  AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active)
-  AND ($1::text IS NULL OR lower(c.name) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.brand) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.name) LIKE '%' || lower($1::text) || '%'
-       OR lower(p.model) LIKE '%' || lower($1::text) || '%')
+  AND ($1::text IS NULL
+       OR f_unaccent(c.name) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.brand) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.name) LIKE '%' || f_unaccent($1::text) || '%'
+       OR f_unaccent(p.model) LIKE '%' || f_unaccent($1::text) || '%'
+       OR (char_length(f_unaccent($1::text)) >= 3
+           AND word_similarity(f_unaccent($1::text), f_unaccent(p.name || ' ' || p.brand || ' ' || p.model)) >= 0.35))
   AND ($2::uuid[] IS NULL
        OR NOT EXISTS (SELECT 1 FROM categories fc WHERE fc.id = ANY($2::uuid[]))
        OR p.category_id = ANY($2::uuid[]))
@@ -881,7 +1025,20 @@ WHERE p.active
            SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.active AND v.stock_quantity > 0
        )))
   AND ($7::boolean IS NULL OR p.featured = $7::boolean)
-ORDER BY p.name ASC, p.model ASC, p.id ASC
+  AND ($8::double precision IS NULL
+       OR (COALESCE(rs.review_count, 0) > 0 AND COALESCE(rs.average_rating, 0) >= $8::double precision))
+ORDER BY
+  CASE WHEN $9::text = 'bestselling' THEN COALESCE(ss.sold_count, 0) END DESC,
+  CASE WHEN $9::text = 'bestselling' THEN COALESCE(rs.average_rating, 0) END DESC,
+  CASE WHEN $9::text = 'newest' THEN p.created_at END DESC,
+  CASE WHEN $9::text = 'newest' THEN p.id END DESC,
+  CASE WHEN $9::text = 'price_asc' THEN vps.min_active_price_vnd END ASC,
+  CASE WHEN $9::text = 'price_desc' THEN vps.min_active_price_vnd END DESC,
+  CASE WHEN $9::text = 'rating_desc' THEN COALESCE(rs.average_rating, 0) END DESC,
+  CASE WHEN $9::text = 'rating_desc' THEN COALESCE(rs.review_count, 0) END DESC,
+  p.name ASC,
+  CASE WHEN $9::text = '' THEN p.model ELSE '' END ASC,
+  p.id ASC
 `
 
 type ListProductsParams struct {
@@ -892,6 +1049,8 @@ type ListProductsParams struct {
 	MaxPriceVnd pgtype.Numeric
 	InStock     pgtype.Bool
 	Featured    pgtype.Bool
+	MinRating   pgtype.Float8
+	Sort        string
 }
 
 type ListProductsRow struct {
@@ -907,6 +1066,9 @@ type ListProductsRow struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	PrimaryImageUrl string
+	AverageRating   float64
+	ReviewCount     int64
+	SoldCount       int64
 }
 
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]ListProductsRow, error) {
@@ -918,6 +1080,8 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 		arg.MaxPriceVnd,
 		arg.InStock,
 		arg.Featured,
+		arg.MinRating,
+		arg.Sort,
 	)
 	if err != nil {
 		return nil, err
@@ -939,6 +1103,9 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]L
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.PrimaryImageUrl,
+			&i.AverageRating,
+			&i.ReviewCount,
+			&i.SoldCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1050,23 +1217,23 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 
 const updateProduct = `-- name: UpdateProduct :one
 UPDATE products
-SET category_id = $2,
-    name = $3,
-    description = $4,
-    price = $5,
-    currency = $6,
-    stock_quantity = $7,
-    model = $8,
-    brand = $9,
-    featured = $10,
+SET category_id = $1,
+    name = $2,
+    description = $3,
+    price = $4,
+    currency = $5,
+    stock_quantity = $6,
+    model = $7,
+    brand = $8,
+    featured = $9,
+    specs = $10::jsonb,
     active = true,
     updated_at = now()
-WHERE id = $1 AND active
-RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, active, created_at, updated_at
+WHERE id = $11 AND active
+RETURNING id, category_id, name, description, price::text AS price, currency, stock_quantity, model, brand, featured, specs::text AS specs, active, created_at, updated_at
 `
 
 type UpdateProductParams struct {
-	ID            string
 	CategoryID    string
 	Name          string
 	Description   string
@@ -1076,6 +1243,8 @@ type UpdateProductParams struct {
 	Model         string
 	Brand         string
 	Featured      bool
+	Specs         []byte
+	ID            string
 }
 
 type UpdateProductRow struct {
@@ -1089,6 +1258,7 @@ type UpdateProductRow struct {
 	Model         string
 	Brand         string
 	Featured      bool
+	Specs         string
 	Active        bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -1096,7 +1266,6 @@ type UpdateProductRow struct {
 
 func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error) {
 	row := q.db.QueryRow(ctx, updateProduct,
-		arg.ID,
 		arg.CategoryID,
 		arg.Name,
 		arg.Description,
@@ -1106,6 +1275,8 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (U
 		arg.Model,
 		arg.Brand,
 		arg.Featured,
+		arg.Specs,
+		arg.ID,
 	)
 	var i UpdateProductRow
 	err := row.Scan(
@@ -1119,6 +1290,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (U
 		&i.Model,
 		&i.Brand,
 		&i.Featured,
+		&i.Specs,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,

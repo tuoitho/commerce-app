@@ -133,31 +133,40 @@ func toReturnRequestResponse(rr *domain.ReturnRequest, isAdmin bool) *returnRequ
 }
 
 type orderResponse struct {
-	ID                   string                     `json:"id"`
-	UserID               string                     `json:"userId"`
-	Status               string                     `json:"status"`
-	PaymentMethod        string                     `json:"paymentMethod"`
-	PaymentStatus        string                     `json:"paymentStatus"`
-	PaymentTransactionID *string                    `json:"paymentTransactionId,omitempty"`
-	PaidAt               *time.Time                 `json:"paidAt,omitempty"`
-	PayURL               string                     `json:"payUrl,omitempty"`
-	RecipientName        string                     `json:"recipientName"`
-	Phone                string                     `json:"phone"`
-	ProvinceName         string                     `json:"provinceName"`
-	WardName             string                     `json:"wardName"`
-	DetailAddress        string                     `json:"detailAddress"`
-	SubtotalVND          string                     `json:"subtotalVnd"`
-	ShippingFeeVND       string                     `json:"shippingFeeVnd"`
-	TotalVND             string                     `json:"totalVnd"`
-	Items                []orderItemResponse        `json:"items"`
-	CreatedAt            time.Time                  `json:"createdAt"`
-	UpdatedAt            time.Time                  `json:"updatedAt"`
-	ConfirmedAt          *time.Time                 `json:"confirmedAt,omitempty"`
-	CancelledAt          *time.Time                 `json:"cancelledAt,omitempty"`
-	DeliveredAt          *time.Time                 `json:"deliveredAt,omitempty"`
-	CancellableUntil     *time.Time                 `json:"cancellableUntil,omitempty"`
-	ReturnEligibility    *returnEligibilityResponse `json:"returnEligibility,omitempty"`
-	LatestReturnRequest  *returnRequestResponse     `json:"latestReturnRequest"`
+	ID                   string                      `json:"id"`
+	UserID               string                      `json:"userId"`
+	Status               string                      `json:"status"`
+	PaymentMethod        string                      `json:"paymentMethod"`
+	PaymentStatus        string                      `json:"paymentStatus"`
+	PaymentTransactionID *string                     `json:"paymentTransactionId,omitempty"`
+	PaidAt               *time.Time                  `json:"paidAt,omitempty"`
+	PayURL               string                      `json:"payUrl,omitempty"`
+	RecipientName        string                      `json:"recipientName"`
+	Phone                string                      `json:"phone"`
+	ProvinceName         string                      `json:"provinceName"`
+	WardName             string                      `json:"wardName"`
+	DetailAddress        string                      `json:"detailAddress"`
+	SubtotalVND          string                      `json:"subtotalVnd"`
+	ShippingFeeVND       string                      `json:"shippingFeeVnd"`
+	DiscountVND          string                      `json:"discountVnd"`
+	TotalVND             string                      `json:"totalVnd"`
+	VoucherCode          *string                     `json:"voucherCode,omitempty"`
+	VoucherType          *string                     `json:"voucherType,omitempty"`
+	DeliveryMethod       string                      `json:"deliveryMethod"`
+	Carrier              *string                     `json:"carrier,omitempty"`
+	TrackingCode         *string                     `json:"trackingCode,omitempty"`
+	Items                []orderItemResponse         `json:"items"`
+	Timeline             []domain.OrderTimelineEvent `json:"timeline"`
+	CreatedAt            time.Time                   `json:"createdAt"`
+	UpdatedAt            time.Time                   `json:"updatedAt"`
+	ConfirmedAt          *time.Time                  `json:"confirmedAt,omitempty"`
+	PreparingAt          *time.Time                  `json:"preparingAt,omitempty"`
+	ShippedAt            *time.Time                  `json:"shippedAt,omitempty"`
+	CancelledAt          *time.Time                  `json:"cancelledAt,omitempty"`
+	DeliveredAt          *time.Time                  `json:"deliveredAt,omitempty"`
+	CancellableUntil     *time.Time                  `json:"cancellableUntil,omitempty"`
+	ReturnEligibility    *returnEligibilityResponse  `json:"returnEligibility,omitempty"`
+	LatestReturnRequest  *returnRequestResponse      `json:"latestReturnRequest"`
 }
 
 func toOrderResponse(order domain.Order) orderResponse {
@@ -197,6 +206,27 @@ func toOrderResponse(order domain.Order) orderResponse {
 		paymentStatus = string(domain.PaymentStatusPending)
 	}
 
+	discountVND := string(order.DiscountVND)
+	if discountVND == "" {
+		discountVND = "0"
+	}
+
+	deliveryMethod := string(order.DeliveryMethod)
+	if deliveryMethod == "" {
+		deliveryMethod = string(domain.DeliveryMethodStandard)
+	}
+
+	var voucherType *string
+	if order.VoucherType != nil {
+		vt := string(*order.VoucherType)
+		voucherType = &vt
+	}
+
+	timeline := order.Timeline
+	if timeline == nil {
+		timeline = []domain.OrderTimelineEvent{}
+	}
+
 	return orderResponse{
 		ID:                   order.ID,
 		UserID:               order.UserID,
@@ -213,11 +243,20 @@ func toOrderResponse(order domain.Order) orderResponse {
 		DetailAddress:        order.ShippingInfo.DetailAddress,
 		SubtotalVND:          string(order.SubtotalVND),
 		ShippingFeeVND:       string(order.ShippingFeeVND),
+		DiscountVND:          discountVND,
 		TotalVND:             string(order.TotalVND),
+		VoucherCode:          order.VoucherCode,
+		VoucherType:          voucherType,
+		DeliveryMethod:       deliveryMethod,
+		Carrier:              order.Carrier,
+		TrackingCode:         order.TrackingCode,
 		Items:                items,
+		Timeline:             timeline,
 		CreatedAt:            order.CreatedAt,
 		UpdatedAt:            order.UpdatedAt,
 		ConfirmedAt:          order.ConfirmedAt,
+		PreparingAt:          order.PreparingAt,
+		ShippedAt:            order.ShippedAt,
 		CancelledAt:          order.CancelledAt,
 		DeliveredAt:          order.DeliveredAt,
 		CancellableUntil:     order.CancellableUntil,
@@ -234,9 +273,49 @@ type orderLineRequest struct {
 }
 
 type createOrderRequest struct {
-	AddressID     string             `json:"addressId"`
-	PaymentMethod string             `json:"paymentMethod"`
-	Lines         []orderLineRequest `json:"lines"`
+	AddressID      string             `json:"addressId"`
+	PaymentMethod  string             `json:"paymentMethod"`
+	DeliveryMethod string             `json:"deliveryMethod"`
+	VoucherCode    string             `json:"voucherCode"`
+	Lines          []orderLineRequest `json:"lines"`
+}
+
+type checkoutQuoteRequest struct {
+	AddressID      string `json:"addressId"`
+	DeliveryMethod string `json:"deliveryMethod"`
+	VoucherCode    string `json:"voucherCode"`
+}
+
+type buyAgainResponse struct {
+	Cart          cartResponse                  `json:"cart"`
+	AddedCount    int                           `json:"addedCount"`
+	AdjustedItems []domain.BuyAgainAdjustedItem `json:"adjustedItems"`
+	SkippedItems  []domain.BuyAgainSkippedItem  `json:"skippedItems"`
+}
+
+func (h *orderHandler) Quote(c *gin.Context) {
+	var req checkoutQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{"body": "Dữ liệu không hợp lệ"}))
+		return
+	}
+	if h.uc == nil {
+		writeError(c, domain.ErrNotFound)
+		return
+	}
+
+	quote, err := h.uc.QuoteCheckout(
+		c.Request.Context(),
+		callerUserID(c),
+		req.AddressID,
+		domain.DeliveryMethod(req.DeliveryMethod),
+		req.VoucherCode,
+	)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Báo giá đơn hàng thành công", quote)
 }
 
 func (h *orderHandler) Create(c *gin.Context) {
@@ -262,13 +341,55 @@ func (h *orderHandler) Create(c *gin.Context) {
 		}
 	}
 
-	order, err := h.uc.CreateWithMethod(c.Request.Context(), userID, req.AddressID, lines, req.PaymentMethod)
+	order, err := h.uc.CreateCheckout(c.Request.Context(), orderuc.CreateCheckoutInput{
+		UserID:         userID,
+		AddressID:      req.AddressID,
+		Lines:          lines,
+		PaymentMethod:  req.PaymentMethod,
+		DeliveryMethod: domain.DeliveryMethod(req.DeliveryMethod),
+		VoucherCode:    req.VoucherCode,
+	})
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 
 	writeSuccess(c, http.StatusCreated, "Tạo đơn hàng thành công", toOrderResponse(*order))
+}
+
+func (h *orderHandler) BuyAgain(c *gin.Context) {
+	if h.uc == nil {
+		writeError(c, domain.ErrNotFound)
+		return
+	}
+
+	res, err := h.uc.BuyAgain(c.Request.Context(), callerUserID(c), c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	var cartResp cartResponse
+	if res.Cart != nil {
+		cartResp = toCartResponse(res.Cart)
+	} else {
+		cartResp = cartResponse{Items: []cartItemResponse{}}
+	}
+	adjusted := res.AdjustedItems
+	if adjusted == nil {
+		adjusted = []domain.BuyAgainAdjustedItem{}
+	}
+	skipped := res.SkippedItems
+	if skipped == nil {
+		skipped = []domain.BuyAgainSkippedItem{}
+	}
+
+	writeSuccess(c, http.StatusOK, "Đã thêm sản phẩm vào giỏ hàng", buyAgainResponse{
+		Cart:          cartResp,
+		AddedCount:    res.AddedCount,
+		AdjustedItems: adjusted,
+		SkippedItems:  skipped,
+	})
 }
 
 type orderStatsResponse struct {

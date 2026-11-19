@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +28,7 @@ func clearEnv() func() {
 		"MINIO_ACCESS_KEY",
 		"MINIO_SECRET_KEY",
 		"MINIO_BUCKET",
+		"MINIO_CHAT_BUCKET",
 		"MINIO_USE_SSL",
 		"MEDIAMTX_API_URL",
 		"MEDIAMTX_WEBRTC_PUBLIC_URL",
@@ -41,6 +44,17 @@ func clearEnv() func() {
 		"MOMO_REQUEST_TYPE",
 		"MOMO_PARTNER_NAME",
 		"MOMO_STORE_ID",
+		"SMTP_HOST",
+		"SMTP_PORT",
+		"SMTP_USERNAME",
+		"SMTP_PASSWORD",
+		"SMTP_FROM",
+		"PASSWORD_RESET_OTP_TTL",
+		"SHIPPING_STANDARD_HN_HCM_VND",
+		"SHIPPING_STANDARD_MAJOR_CITY_VND",
+		"SHIPPING_STANDARD_OTHER_VND",
+		"SHIPPING_EXPRESS_2H_VND",
+		"FREE_SHIPPING_THRESHOLD_VND",
 	}
 
 	saved := make(map[string]string)
@@ -735,5 +749,185 @@ func TestConfig_MomoValidationFailures(t *testing.T) {
 				t.Fatalf("error = %v, want mention of %s", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestConfig_PlatformDefaults(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+	setRequiredLiveTestEnv()
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.SMTPHost != "localhost" {
+		t.Errorf("SMTPHost = %q, want localhost", cfg.SMTPHost)
+	}
+	if cfg.SMTPPort != 11025 {
+		t.Errorf("SMTPPort = %d, want 11025", cfg.SMTPPort)
+	}
+	if cfg.SMTPUsername != "" {
+		t.Errorf("SMTPUsername = %q, want empty", cfg.SMTPUsername)
+	}
+	if cfg.SMTPPassword != "" {
+		t.Errorf("SMTPPassword = %q, want empty", cfg.SMTPPassword)
+	}
+	if cfg.SMTPFrom != "noreply@auraphone.local" {
+		t.Errorf("SMTPFrom = %q, want noreply@auraphone.local", cfg.SMTPFrom)
+	}
+	if cfg.PasswordResetOTPTTL != 10*time.Minute {
+		t.Errorf("PasswordResetOTPTTL = %v, want 10m", cfg.PasswordResetOTPTTL)
+	}
+	if cfg.ShippingStandardHNHCMVND != "25000" {
+		t.Errorf("ShippingStandardHNHCMVND = %q, want 25000", cfg.ShippingStandardHNHCMVND)
+	}
+	if cfg.ShippingStandardMajorCityVND != "30000" {
+		t.Errorf("ShippingStandardMajorCityVND = %q, want 30000", cfg.ShippingStandardMajorCityVND)
+	}
+	if cfg.ShippingStandardOtherVND != "40000" {
+		t.Errorf("ShippingStandardOtherVND = %q, want 40000", cfg.ShippingStandardOtherVND)
+	}
+	if cfg.ShippingExpress2HVND != "60000" {
+		t.Errorf("ShippingExpress2HVND = %q, want 60000", cfg.ShippingExpress2HVND)
+	}
+	if cfg.FreeShippingThresholdVND != "5000000" {
+		t.Errorf("FreeShippingThresholdVND = %q, want 5000000", cfg.FreeShippingThresholdVND)
+	}
+}
+
+func TestConfig_PlatformDotEnvAndEnvPrecedence(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+
+	tempDir := t.TempDir()
+	envPath := filepath.Join(tempDir, ".env")
+	envContent := `
+DB_URL=postgres://localhost:5432/commerce
+JWT_ACCESS_SECRET=file-secret-key-that-is-at-least-32-chars-long
+MINIO_ENDPOINT=localhost:19000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=miniopassword
+SMTP_HOST=mailpit.internal
+SMTP_PORT=1025
+SMTP_USERNAME=file-user
+SMTP_PASSWORD=file-smtp-secret
+SMTP_FROM=support@auraphone.local
+PASSWORD_RESET_OTP_TTL=15m
+SHIPPING_STANDARD_HN_HCM_VND=20000
+SHIPPING_STANDARD_MAJOR_CITY_VND=28000
+SHIPPING_STANDARD_OTHER_VND=35000
+SHIPPING_EXPRESS_2H_VND=55000
+FREE_SHIPPING_THRESHOLD_VND=4000000
+`
+	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+		t.Fatalf("failed to write temp env: %v", err)
+	}
+
+	os.Setenv("SMTP_HOST", "  smtp.override.local  ")
+	os.Setenv("SMTP_PORT", "2525")
+	os.Setenv("SMTP_PASSWORD", "env-smtp-secret")
+	os.Setenv("PASSWORD_RESET_OTP_TTL", "20m")
+	os.Setenv("FREE_SHIPPING_THRESHOLD_VND", "6000000")
+
+	cfg, err := LoadWithFile(envPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.SMTPHost != "smtp.override.local" {
+		t.Errorf("SMTPHost = %q, want smtp.override.local", cfg.SMTPHost)
+	}
+	if cfg.SMTPPort != 2525 {
+		t.Errorf("SMTPPort = %d, want 2525", cfg.SMTPPort)
+	}
+	if cfg.SMTPUsername != "file-user" {
+		t.Errorf("SMTPUsername = %q, want file-user", cfg.SMTPUsername)
+	}
+	if cfg.SMTPPassword != "env-smtp-secret" {
+		t.Errorf("SMTPPassword = %q, want env-smtp-secret", cfg.SMTPPassword)
+	}
+	if cfg.SMTPFrom != "support@auraphone.local" {
+		t.Errorf("SMTPFrom = %q, want support@auraphone.local", cfg.SMTPFrom)
+	}
+	if cfg.PasswordResetOTPTTL != 20*time.Minute {
+		t.Errorf("PasswordResetOTPTTL = %v, want 20m", cfg.PasswordResetOTPTTL)
+	}
+	if cfg.ShippingStandardHNHCMVND != "20000" {
+		t.Errorf("ShippingStandardHNHCMVND = %q, want 20000", cfg.ShippingStandardHNHCMVND)
+	}
+	if cfg.ShippingStandardMajorCityVND != "28000" {
+		t.Errorf("ShippingStandardMajorCityVND = %q, want 28000", cfg.ShippingStandardMajorCityVND)
+	}
+	if cfg.ShippingStandardOtherVND != "35000" {
+		t.Errorf("ShippingStandardOtherVND = %q, want 35000", cfg.ShippingStandardOtherVND)
+	}
+	if cfg.ShippingExpress2HVND != "55000" {
+		t.Errorf("ShippingExpress2HVND = %q, want 55000", cfg.ShippingExpress2HVND)
+	}
+	if cfg.FreeShippingThresholdVND != "6000000" {
+		t.Errorf("FreeShippingThresholdVND = %q, want 6000000", cfg.FreeShippingThresholdVND)
+	}
+}
+
+func TestConfig_PlatformValidationFailures(t *testing.T) {
+	cases := []struct {
+		key, value, wantErr string
+	}{
+		{"SMTP_HOST", "   ", "SMTP_HOST"},
+		{"SMTP_PORT", "not-an-int", "SMTP_PORT"},
+		{"SMTP_PORT", "0", "SMTP_PORT"},
+		{"SMTP_PORT", "65536", "SMTP_PORT"},
+		{"SMTP_FROM", "not-an-email", "SMTP_FROM"},
+		{"SMTP_FROM", "   ", "SMTP_FROM"},
+		{"PASSWORD_RESET_OTP_TTL", "invalid", "PASSWORD_RESET_OTP_TTL"},
+		{"PASSWORD_RESET_OTP_TTL", "30s", "PASSWORD_RESET_OTP_TTL"},
+		{"PASSWORD_RESET_OTP_TTL", "61m", "PASSWORD_RESET_OTP_TTL"},
+		{"SHIPPING_STANDARD_HN_HCM_VND", "-1000", "SHIPPING_STANDARD_HN_HCM_VND"},
+		{"SHIPPING_STANDARD_MAJOR_CITY_VND", "30000.5", "SHIPPING_STANDARD_MAJOR_CITY_VND"},
+		{"SHIPPING_STANDARD_OTHER_VND", "040000", "SHIPPING_STANDARD_OTHER_VND"},
+		{"SHIPPING_EXPRESS_2H_VND", "abc", "SHIPPING_EXPRESS_2H_VND"},
+		{"FREE_SHIPPING_THRESHOLD_VND", "-1", "FREE_SHIPPING_THRESHOLD_VND"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
+			restore := clearEnv()
+			defer restore()
+			setRequiredLiveTestEnv()
+			os.Setenv(tc.key, tc.value)
+
+			_, err := LoadWithFile("")
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want mention of %s", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestConfig_LogValueRedactsSecrets(t *testing.T) {
+	restore := clearEnv()
+	defer restore()
+	setRequiredLiveTestEnv()
+	os.Setenv("SMTP_PASSWORD", "super-secret-smtp-password")
+
+	cfg, err := LoadWithFile("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var buf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log.Info("config loaded", "config", cfg)
+
+	out := buf.String()
+	for _, secret := range []string{
+		"super-secret-smtp-password",
+		"super-secret-key-that-is-at-least-32-chars-long",
+		"miniopassword",
+		"postgres://localhost:5432/commerce",
+	} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("secret %q leaked in slog output: %s", secret, out)
+		}
 	}
 }

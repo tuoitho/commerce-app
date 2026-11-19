@@ -1481,3 +1481,380 @@ func TestOrderHTTP_MomoContractAndFlows(t *testing.T) {
 	})
 }
 
+type fakeHTTPCheckoutFulfillmentRepo struct {
+	*fakeHTTPMomoOrderRepo
+	quoteRes        *domain.CheckoutQuote
+	quoteErr        error
+	lastQuoteIn     domain.CheckoutQuoteInput
+	checkoutRes     *domain.Order
+	checkoutErr     error
+	lastCheckoutIn  domain.CreateCheckoutOrderInput
+	buyAgainRes     *domain.BuyAgainResult
+	buyAgainErr     error
+	lastBuyOrderID  string
+}
+
+func (f *fakeHTTPCheckoutFulfillmentRepo) QuoteCheckout(_ context.Context, input domain.CheckoutQuoteInput) (*domain.CheckoutQuote, error) {
+	f.lastQuoteIn = input
+	if f.quoteErr != nil {
+		return nil, f.quoteErr
+	}
+	return f.quoteRes, nil
+}
+
+func (f *fakeHTTPCheckoutFulfillmentRepo) CreateCheckoutOrder(_ context.Context, input domain.CreateCheckoutOrderInput) (*domain.Order, error) {
+	f.lastCheckoutIn = input
+	if f.checkoutErr != nil {
+		return nil, f.checkoutErr
+	}
+	return f.checkoutRes, nil
+}
+
+func (f *fakeHTTPCheckoutFulfillmentRepo) ShipOrder(_ context.Context, _, _, _ string) (*domain.Order, error) {
+	return nil, nil
+}
+
+func (f *fakeHTTPCheckoutFulfillmentRepo) BuyAgain(_ context.Context, _, orderID string) (*domain.BuyAgainResult, error) {
+	f.lastBuyOrderID = orderID
+	if f.buyAgainErr != nil {
+		return nil, f.buyAgainErr
+	}
+	return f.buyAgainRes, nil
+}
+
+func newCheckoutFulfillmentRouter(repo *fakeHTTPCheckoutFulfillmentRepo) (*gin.Engine, string) {
+	gin.SetMode(gin.TestMode)
+	manager := jwt.NewManager(testSecret, "commerce-backend")
+	token, _ := manager.GenerateAccessToken(orderTestUser, domain.RoleCustomer, 15*time.Minute)
+	uc := orderuc.New(orderuc.Dependencies{
+		Order:               repo,
+		Return:              &fakeReturnUsecaseRepo{},
+		Review:              &fakeReviewRepoForHandler{},
+		ShippingFeeVND:      "0",
+		Shipping:            domain.DefaultShippingConfig(),
+		OrderConfirmTimeout: 30 * time.Minute,
+	})
+	router := gin.New()
+	NewRouter(router, Dependencies{
+		Order: uc,
+		JWT:   manager,
+	})
+	return router, token
+}
+
+func TestOrderHTTP_CheckoutQuoteCreateBuyAgainAndSnapshots(t *testing.T) {
+	const (
+		validOrderID = "44444444-4444-4444-4444-444444444444"
+		addrID       = "22222222-2222-2222-2222-222222222222"
+		variantID    = "33333333-3333-3333-3333-333333333333"
+		variantID2   = "33333333-3333-3333-3333-333333333334"
+		productID    = "66666666-6666-6666-6666-666666666666"
+		itemID1      = "77777777-7777-7777-7777-777777777771"
+	)
+	createdAt := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	confirmedAt := createdAt.Add(15 * time.Minute)
+	preparingAt := createdAt.Add(30 * time.Minute)
+	shippedAt := createdAt.Add(time.Hour)
+	voucherCode := "AURA10"
+	voucherType := domain.VoucherTypePercent
+	carrier := "Ahamove 2h"
+	trackingCode := "AHA-20261118"
+
+	// 1. Auth guards
+	t.Run("auth required for checkout/quote and buy-again", func(t *testing.T) {
+		repo := &fakeHTTPCheckoutFulfillmentRepo{fakeHTTPMomoOrderRepo: &fakeHTTPMomoOrderRepo{fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{}}}
+		router, _ := newCheckoutFulfillmentRouter(repo)
+
+		wQuote := execOrderRequest(router, "", http.MethodPost, "/api/v1/checkout/quote", `{"addressId":"`+addrID+`"}`)
+		if wQuote.Code != http.StatusUnauthorized {
+			t.Fatalf("POST /checkout/quote expected 401, got %d", wQuote.Code)
+		}
+		wBuy := execOrderRequest(router, "", http.MethodPost, "/api/v1/orders/"+validOrderID+"/buy-again", "")
+		if wBuy.Code != http.StatusUnauthorized {
+			t.Fatalf("POST /orders/:id/buy-again expected 401, got %d", wBuy.Code)
+		}
+	})
+
+	// 2. POST /api/v1/checkout/quote success (with voucher and without voucher) & errors
+	t.Run("checkout quote endpoints and error mappings", func(t *testing.T) {
+		repo := &fakeHTTPCheckoutFulfillmentRepo{
+			fakeHTTPMomoOrderRepo: &fakeHTTPMomoOrderRepo{fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{}},
+			quoteRes: &domain.CheckoutQuote{
+				SubtotalVND:              "28990000",
+				DeliveryMethod:           domain.DeliveryMethodExpress2H,
+				ExpressAvailable:         true,
+				StandardShippingFeeVND:   "0",
+				ExpressShippingFeeVND:    "60000",
+				FreeShippingThresholdVND: "5000000",
+				ShippingFeeVND:           "60000",
+				VoucherCode:              &voucherCode,
+				VoucherType:              &voucherType,
+				DiscountVND:              "1000000",
+				TotalVND:                 "28050000",
+			},
+		}
+		router, token := newCheckoutFulfillmentRouter(repo)
+
+		quoteReq := map[string]any{
+			"addressId":      addrID,
+			"deliveryMethod": "express_2h",
+			"voucherCode":    "AURA10",
+		}
+		quoteReqBytes, _ := json.Marshal(quoteReq)
+		w := execOrderRequest(router, token, http.MethodPost, "/api/v1/checkout/quote", string(quoteReqBytes))
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "checkout_quote_200", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/checkout/quote", quoteReq, w)
+
+		// Without voucher -> explicit null voucherCode & voucherType
+		repo.quoteRes = &domain.CheckoutQuote{
+			SubtotalVND:              "28990000",
+			DeliveryMethod:           domain.DeliveryMethodStandard,
+			ExpressAvailable:         true,
+			StandardShippingFeeVND:   "0",
+			ExpressShippingFeeVND:    "60000",
+			FreeShippingThresholdVND: "5000000",
+			ShippingFeeVND:           "0",
+			VoucherCode:              nil,
+			VoucherType:              nil,
+			DiscountVND:              "0",
+			TotalVND:                 "28990000",
+		}
+		noVoucherReq := map[string]any{
+			"addressId":      addrID,
+			"deliveryMethod": "standard",
+		}
+		noVoucherBytes, _ := json.Marshal(noVoucherReq)
+		wNoV := execOrderRequest(router, token, http.MethodPost, "/api/v1/checkout/quote", string(noVoucherBytes))
+		if wNoV.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wNoV.Code, wNoV.Body.String())
+		}
+		if !strings.Contains(wNoV.Body.String(), `"voucherCode":null`) || !strings.Contains(wNoV.Body.String(), `"voucherType":null`) {
+			t.Fatalf("expected explicit null voucherCode and voucherType, got %s", wNoV.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "checkout_quote_no_voucher_200", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/checkout/quote", noVoucherReq, wNoV)
+
+		// Error snapshots & all voucher/shipping/flashsale domain error mappings
+		errorCases := []struct {
+			name        string
+			err         error
+			status      int
+			code        string
+			snapshotKey string
+		}{
+			{"express_unavailable", domain.ErrExpressDeliveryUnavailable, http.StatusConflict, "express_delivery_unavailable", "checkout_quote_express_unavailable_409"},
+			{"voucher_min_order", &domain.VoucherMinOrderError{MinOrderVND: "10000000"}, http.StatusConflict, "voucher_min_order_not_met", "checkout_quote_voucher_min_order_409"},
+			{"voucher_expired", domain.ErrVoucherExpired, http.StatusConflict, "voucher_expired", "checkout_quote_voucher_expired_409"},
+			{"voucher_not_found", domain.ErrVoucherNotFound, http.StatusNotFound, "voucher_not_found", "checkout_quote_voucher_not_found_404"},
+			{"voucher_inactive", domain.ErrVoucherInactive, http.StatusConflict, "voucher_inactive", ""},
+			{"voucher_not_started", domain.ErrVoucherNotStarted, http.StatusConflict, "voucher_not_started", ""},
+			{"voucher_exhausted", domain.ErrVoucherExhausted, http.StatusConflict, "voucher_exhausted", ""},
+			{"voucher_user_limit", domain.ErrVoucherUserLimitReached, http.StatusConflict, "voucher_user_limit_reached", ""},
+			{"flash_sale_quota", &domain.FlashSaleQuotaExceededError{ProductName: "iPhone 16 Pro", Remaining: 2}, http.StatusConflict, "flash_sale_quota_exceeded", ""},
+		}
+		for _, tc := range errorCases {
+			repo.quoteErr = tc.err
+			wErr := execOrderRequest(router, token, http.MethodPost, "/api/v1/checkout/quote", string(quoteReqBytes))
+			assertErrorEnvelope(t, wErr, tc.status, tc.code, "")
+			if tc.snapshotKey != "" {
+				assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, tc.snapshotKey, "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/checkout/quote", quoteReq, wErr)
+			}
+		}
+	})
+
+	// 3. POST /api/v1/orders (with deliveryMethod & voucherCode) + GET /api/v1/orders/:id (with timeline & tracking)
+	t.Run("checkout order create and detail timeline snapshots", func(t *testing.T) {
+		checkoutOrder := domain.Order{
+			ID:             validOrderID,
+			UserID:         orderTestUser,
+			Status:         domain.OrderStatusPendingConfirmation,
+			PaymentMethod:  domain.PaymentMethodCOD,
+			PaymentStatus:  domain.PaymentStatusPending,
+			SubtotalVND:    "28990000",
+			ShippingFeeVND: "60000",
+			DiscountVND:    "1000000",
+			TotalVND:       "28050000",
+			VoucherCode:    &voucherCode,
+			VoucherType:    &voucherType,
+			DeliveryMethod: domain.DeliveryMethodExpress2H,
+			ShippingInfo: domain.ShippingInfo{
+				RecipientName: "Nguyen Van A",
+				Phone:         "0987654321",
+				ProvinceName:  "Thành phố Hà Nội",
+				WardName:      "Phường Phúc Xá",
+				DetailAddress: "123 Cầu Giấy",
+			},
+			Items: []domain.OrderItem{
+				{
+					ID:           itemID1,
+					OrderID:      validOrderID,
+					VariantID:    variantID,
+					ProductID:    productID,
+					BrandName:    "Apple",
+					ProductName:  "iPhone 16 Pro",
+					Model:        "A3294",
+					ImageURL:     "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+					Options:      []domain.CartOption{{GroupLabel: "Dung lượng", ValueLabel: "256GB"}},
+					UnitPriceVND: "28990000",
+					Quantity:     1,
+					LineTotalVND: "28990000",
+				},
+			},
+			Timeline: []domain.OrderTimelineEvent{
+				{
+					ID:        "evt-1",
+					Status:    domain.OrderStatusPendingConfirmation,
+					ActorType: domain.OrderActorCustomer,
+					Note:      "Đơn hàng được tạo",
+					CreatedAt: createdAt,
+				},
+			},
+			CreatedAt: createdAt,
+			UpdatedAt: createdAt,
+		}
+
+		detailedOrder := checkoutOrder
+		detailedOrder.Status = domain.OrderStatusShipped
+		detailedOrder.Carrier = &carrier
+		detailedOrder.TrackingCode = &trackingCode
+		detailedOrder.ConfirmedAt = &confirmedAt
+		detailedOrder.PreparingAt = &preparingAt
+		detailedOrder.ShippedAt = &shippedAt
+		detailedOrder.UpdatedAt = shippedAt
+		detailedOrder.Timeline = []domain.OrderTimelineEvent{
+			checkoutOrder.Timeline[0],
+			{
+				ID:        "evt-2",
+				Status:    domain.OrderStatusConfirmed,
+				ActorType: domain.OrderActorSystem,
+				Note:      "Đơn hàng đã được xác nhận",
+				CreatedAt: confirmedAt,
+			},
+			{
+				ID:        "evt-3",
+				Status:    domain.OrderStatusPreparing,
+				ActorType: domain.OrderActorAdmin,
+				Note:      "Đơn hàng đang được chuẩn bị",
+				CreatedAt: preparingAt,
+			},
+			{
+				ID:        "evt-4",
+				Status:    domain.OrderStatusShipped,
+				ActorType: domain.OrderActorAdmin,
+				Note:      "Đã bàn giao vận chuyển (Ahamove 2h - AHA-20261118)",
+				CreatedAt: shippedAt,
+			},
+		}
+
+		repo := &fakeHTTPCheckoutFulfillmentRepo{
+			fakeHTTPMomoOrderRepo: &fakeHTTPMomoOrderRepo{
+				fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{
+					getByIDOrder: &detailedOrder,
+				},
+			},
+			checkoutRes: &checkoutOrder,
+		}
+		router, token := newCheckoutFulfillmentRouter(repo)
+
+		createReq := map[string]any{
+			"addressId":      addrID,
+			"deliveryMethod": "express_2h",
+			"voucherCode":    "AURA10",
+			"paymentMethod":  "cod",
+			"lines": []map[string]any{
+				{
+					"variantId":    variantID,
+					"quantity":     1,
+					"productName":  "iPhone 16 Pro",
+					"unitPriceVnd": "28990000",
+				},
+			},
+		}
+		createReqBytes, _ := json.Marshal(createReq)
+		wCreate := execOrderRequest(router, token, http.MethodPost, "/api/v1/orders", string(createReqBytes))
+		if wCreate.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", wCreate.Code, wCreate.Body.String())
+		}
+		if repo.lastCheckoutIn.DeliveryMethod != domain.DeliveryMethodExpress2H || repo.lastCheckoutIn.VoucherCode != "AURA10" {
+			t.Fatalf("expected express_2h and AURA10 passed to repo, got %+v", repo.lastCheckoutIn)
+		}
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "checkout_order_create_201", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/orders", createReq, wCreate)
+
+		wDetail := execOrderRequest(router, token, http.MethodGet, "/api/v1/orders/"+validOrderID, "")
+		if wDetail.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wDetail.Code, wDetail.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "order_detail_timeline_200", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "GET /api/v1/orders/:id", nil, wDetail)
+	})
+
+	// 4. POST /api/v1/orders/:id/buy-again
+	t.Run("buy again 200 and 409 snapshots", func(t *testing.T) {
+		unitPrice := domain.MoneyVND("25990000")
+		lineTotal := domain.MoneyVND("51980000")
+		repo := &fakeHTTPCheckoutFulfillmentRepo{
+			fakeHTTPMomoOrderRepo: &fakeHTTPMomoOrderRepo{fakeOrderUsecaseRepo: &fakeOrderUsecaseRepo{}},
+			buyAgainRes: &domain.BuyAgainResult{
+				Cart: &domain.Cart{
+					Items: []domain.CartItem{
+						{
+							ID:               "cart-item-1",
+							VariantID:        variantID,
+							ProductID:        productID,
+							BrandName:        "Apple",
+							ProductName:      "iPhone 16 Pro",
+							Model:            "A3294",
+							ImageURL:         "/media/products/550e8400-e29b-41d4-a716-446655440000.webp",
+							Options:          []domain.CartOption{{GroupLabel: "Dung lượng", ValueLabel: "256GB"}},
+							UnitPriceVND:     &unitPrice,
+							LineTotalVND:     &lineTotal,
+							StockQuantity:    2,
+							Quantity:         2,
+							Selected:         true,
+							Availability:     domain.CartAvailable,
+							IsLivePrice:      false,
+							IsFlashSalePrice: true,
+						},
+					},
+					TotalUnits:        2,
+					SelectedLineCount: 1,
+					SelectedTotalVND:  "51980000",
+					ShippingFeeVND:    "0",
+				},
+				AddedCount: 1,
+				AdjustedItems: []domain.BuyAgainAdjustedItem{
+					{
+						VariantID:         variantID,
+						ProductName:       "iPhone 16 Pro",
+						RequestedQuantity: 3,
+						AddedQuantity:     2,
+					},
+				},
+				SkippedItems: []domain.BuyAgainSkippedItem{
+					{
+						VariantID:   variantID2,
+						ProductName: "Samsung Galaxy S25",
+						Reason:      domain.BuyAgainSkipOutOfStock,
+					},
+				},
+			},
+		}
+		router, token := newCheckoutFulfillmentRouter(repo)
+
+		wOK := execOrderRequest(router, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/buy-again", "")
+		if wOK.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", wOK.Code, wOK.Body.String())
+		}
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "order_buy_again_200", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/orders/:id/buy-again", nil, wOK)
+
+		repo.buyAgainErr = domain.ErrBuyAgainAllUnavailable
+		wAllUnavail := execOrderRequest(router, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/buy-again", "")
+		assertErrorEnvelope(t, wAllUnavail, http.StatusConflict, "buy_again_all_unavailable", "")
+		assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "order_buy_again_all_unavailable_409", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/orders/:id/buy-again", nil, wAllUnavail)
+
+		repo.buyAgainErr = domain.ErrOrderActionNotAllowed
+		wNotAllowed := execOrderRequest(router, token, http.MethodPost, "/api/v1/orders/"+validOrderID+"/buy-again", "")
+		assertErrorEnvelope(t, wNotAllowed, http.StatusConflict, "order_action_not_allowed", "")
+	})
+}
+

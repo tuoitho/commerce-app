@@ -20,6 +20,8 @@ func writeError(c *gin.Context, err error) {
 	var valErr *domain.ValidationError
 	var filterErr *domain.FilterValidationError
 	var prodChangedErr *domain.ProductChangedError
+	var voucherMinOrderErr *domain.VoucherMinOrderError
+	var flashSaleQuotaErr *domain.FlashSaleQuotaExceededError
 
 	if writeLiveError(c, err) {
 		return
@@ -32,6 +34,10 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 400, "invalid_filter", "Tiêu chí lọc sản phẩm không hợp lệ", filterErr.Fields)
 	case errors.As(err, &prodChangedErr):
 		respondError(c, 409, "product_changed", prodChangedErr.Error(), nil)
+	case errors.As(err, &voucherMinOrderErr):
+		respondError(c, 409, "voucher_min_order_not_met", voucherMinOrderErr.Error(), nil)
+	case errors.As(err, &flashSaleQuotaErr):
+		respondError(c, 409, "flash_sale_quota_exceeded", flashSaleQuotaErr.Error(), nil)
 	case errors.Is(err, domain.ErrInvalidCategoryID):
 		respondError(c, 400, "validation_error", "Mã danh mục không hợp lệ", map[string]string{"id": "Mã danh mục không hợp lệ"})
 	case errors.Is(err, domain.ErrCategoryNameInUse):
@@ -136,6 +142,44 @@ func writeError(c *gin.Context, err error) {
 		respondError(c, 404, "notification_not_found", "Không tìm thấy thông báo", nil)
 	case errors.Is(err, domain.ErrAvatarNotFound):
 		respondError(c, 404, "avatar_not_found", "Không tìm thấy ảnh đại diện", nil)
+	case errors.Is(err, domain.ErrProductImageNotFound):
+		respondError(c, 404, "product_image_not_found", "Không tìm thấy ảnh sản phẩm", nil)
+	case errors.Is(err, domain.ErrOTPRateLimited):
+		respondError(c, 429, "otp_rate_limited", "Bạn đã yêu cầu mã xác thực quá nhiều lần. Vui lòng thử lại sau 15 phút.", nil)
+	case errors.Is(err, domain.ErrEmailDeliveryFailed):
+		respondError(c, 502, "email_delivery_failed", "Không thể gửi email xác thực lúc này. Vui lòng thử lại sau.", nil)
+	case errors.Is(err, domain.ErrInvalidOrExpiredOTP):
+		respondError(c, 400, "invalid_or_expired_otp", "Mã xác thực không chính xác hoặc đã hết hạn", nil)
+	case errors.Is(err, domain.ErrFlashSaleTimeOverlap):
+		respondError(c, 409, "flash_sale_time_overlap", "Khung giờ chiến dịch bị trùng với một chiến dịch Flash Sale đang bật khác", nil)
+	case errors.Is(err, domain.ErrFlashSaleNotFound):
+		respondError(c, 404, "flash_sale_not_found", "Không tìm thấy chiến dịch Flash Sale", nil)
+	case errors.Is(err, domain.ErrFlashSaleHasOrders):
+		respondError(c, 409, "flash_sale_has_orders", "Không thể xóa chiến dịch Flash Sale đã phát sinh lượt mua", nil)
+	case errors.Is(err, domain.ErrVoucherCodeInUse):
+		respondError(c, 409, "voucher_code_in_use", "Mã giảm giá này đã tồn tại", nil)
+	case errors.Is(err, domain.ErrVoucherInUse):
+		respondError(c, 409, "voucher_in_use", "Không thể xóa mã giảm giá đã có đơn hàng sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherImmutableFields):
+		respondError(c, 409, "voucher_immutable_fields", "Không thể thay đổi mã hoặc loại giảm giá sau khi đã có lượt sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherUsageLimitTooLow):
+		respondError(c, 409, "voucher_usage_limit_too_low", "Giới hạn tổng lượt dùng không được nhỏ hơn số lượt đã sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherNotFound):
+		respondError(c, 404, "voucher_not_found", "Mã giảm giá không tồn tại", nil)
+	case errors.Is(err, domain.ErrVoucherInactive):
+		respondError(c, 409, "voucher_inactive", "Mã giảm giá hiện không hoạt động", nil)
+	case errors.Is(err, domain.ErrVoucherNotStarted):
+		respondError(c, 409, "voucher_not_started", "Mã giảm giá chưa đến thời gian áp dụng", nil)
+	case errors.Is(err, domain.ErrVoucherExpired):
+		respondError(c, 409, "voucher_expired", "Mã giảm giá đã hết hạn sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherExhausted):
+		respondError(c, 409, "voucher_exhausted", "Mã giảm giá đã hết lượt sử dụng", nil)
+	case errors.Is(err, domain.ErrVoucherUserLimitReached):
+		respondError(c, 409, "voucher_user_limit_reached", "Bạn đã sử dụng hết số lượt cho phép của mã giảm giá này", nil)
+	case errors.Is(err, domain.ErrBuyAgainAllUnavailable):
+		respondError(c, 409, "buy_again_all_unavailable", "Tất cả sản phẩm trong đơn hàng hiện đã hết hàng hoặc ngừng kinh doanh", nil)
+	case errors.Is(err, domain.ErrExpressDeliveryUnavailable):
+		respondError(c, 409, "express_delivery_unavailable", "Giao hàng hỏa tốc 2 giờ hiện chỉ áp dụng tại Hà Nội và TP. Hồ Chí Minh", nil)
 	default:
 		var l *slog.Logger
 		if val, ok := c.Get(contextLoggerKey); ok {

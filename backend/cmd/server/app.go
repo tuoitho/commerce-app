@@ -13,6 +13,7 @@ import (
 	"commerce-backend/internal/config"
 	delivery "commerce-backend/internal/delivery/http"
 	"commerce-backend/internal/domain"
+	"commerce-backend/internal/mail/smtp"
 	"commerce-backend/internal/payment/momo"
 	"commerce-backend/internal/repository"
 	"commerce-backend/internal/security"
@@ -25,6 +26,7 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	chatuc "commerce-backend/internal/usecase/chat"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
+	flashsaleuc "commerce-backend/internal/usecase/flashsale"
 	notifuc "commerce-backend/internal/usecase/notification"
 	orderuc "commerce-backend/internal/usecase/order"
 	postuc "commerce-backend/internal/usecase/post"
@@ -32,6 +34,7 @@ import (
 	reviewuc "commerce-backend/internal/usecase/review"
 	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	usermgmtuc "commerce-backend/internal/usecase/usermgmt"
+	voucheruc "commerce-backend/internal/usecase/voucher"
 	liveuc "commerce-backend/internal/usecase/live"
 	"commerce-backend/internal/media/mediamtx"
 	"commerce-backend/internal/delivery/livews"
@@ -173,6 +176,14 @@ func provideSessionRepository(pool *pgxpool.Pool) *repository.SessionRepository 
 	return repository.NewSessionRepository(pool)
 }
 
+func providePasswordResetRepository(pool *pgxpool.Pool) *repository.PasswordResetRepository {
+	return repository.NewPasswordResetRepository(pool)
+}
+
+func provideMailer(cfg *config.Config, log *slog.Logger) *smtp.Mailer {
+	return smtp.NewMailer(cfg, log)
+}
+
 func provideCatalogRepository(pool *pgxpool.Pool) *repository.CatalogRepository {
 	return repository.NewCatalogRepository(pool)
 }
@@ -213,20 +224,51 @@ func provideJWTManager(cfg *config.Config) *jwt.Manager {
 	return jwt.NewManager(cfg.JWTSecret, "commerce-backend")
 }
 
-func provideAuthUseCase(userRepo *repository.UserRepository, sessionRepo *repository.SessionRepository, jwtMgr *jwt.Manager, cfg *config.Config) *authuc.UseCase {
+func provideAuthUseCase(
+	userRepo *repository.UserRepository,
+	sessionRepo *repository.SessionRepository,
+	resetRepo *repository.PasswordResetRepository,
+	mailer *smtp.Mailer,
+	jwtMgr *jwt.Manager,
+	cfg *config.Config,
+	log *slog.Logger,
+) *authuc.UseCase {
+	var passwordResetRepo domain.PasswordResetRepository
+	if resetRepo != nil {
+		passwordResetRepo = resetRepo
+	}
+	var mailSender domain.Mailer
+	if mailer != nil {
+		mailSender = mailer
+	}
 	return authuc.New(authuc.Dependencies{
-		Repos:                authuc.Repositories{Users: userRepo, Sessions: sessionRepo},
+		Repos: authuc.Repositories{
+			Users:          userRepo,
+			Sessions:       sessionRepo,
+			PasswordResets: passwordResetRepo,
+		},
 		JWT:                  jwtMgr,
+		Mailer:               mailSender,
 		AccessTTL:            cfg.AccessTokenTTL,
 		RefreshTTL:           cfg.RefreshTokenTTL,
+		PasswordResetOTPTTL:  cfg.PasswordResetOTPTTL,
+		OTPHMACSecret:        cfg.JWTSecret,
 		HashPassword:         security.HashPassword,
 		CheckPassword:        security.CheckPassword,
 		GenerateRefreshToken: security.GenerateRefreshToken,
+		Logger:               log,
 	})
 }
 
-func provideCatalogUseCase(repo *repository.CatalogRepository) *cataloguc.UseCase {
-	return cataloguc.New(cataloguc.Dependencies{Catalog: repo})
+func provideCatalogUseCase(repo *repository.CatalogRepository, mediaStore *reviewmedia.Store) *cataloguc.UseCase {
+	var store domain.ReviewMediaStore
+	if mediaStore != nil {
+		store = mediaStore
+	}
+	return cataloguc.New(cataloguc.Dependencies{
+		Catalog:    repo,
+		MediaStore: store,
+	})
 }
 
 func provideCartUseCase(repo *repository.CartRepository, cfg *config.Config) *cartuc.UseCase {
@@ -283,11 +325,18 @@ func provideMomoClient(cfg *config.Config, log *slog.Logger) *momo.Client {
 
 func provideOrderUseCase(repo *repository.OrderRepository, returnRepo *repository.ReturnRepository, reviewRepo *repository.ReviewRepository, momoClient *momo.Client, liveUC *liveuc.UseCase, notifSvc *notifuc.Service, cfg *config.Config) *orderuc.UseCase {
 	return orderuc.New(orderuc.Dependencies{
-		Order:               repo,
-		Return:              returnRepo,
-		Review:              reviewRepo,
-		MomoGateway:         momoClient,
-		ShippingFeeVND:      cfg.ShippingFeeVND,
+		Order:          repo,
+		Return:         returnRepo,
+		Review:         reviewRepo,
+		MomoGateway:    momoClient,
+		ShippingFeeVND: cfg.ShippingFeeVND,
+		Shipping: domain.ShippingConfig{
+			StandardHNHCMVND:      cfg.ShippingStandardHNHCMVND,
+			StandardMajorCityVND:  cfg.ShippingStandardMajorCityVND,
+			StandardOtherVND:      cfg.ShippingStandardOtherVND,
+			Express2HVND:          cfg.ShippingExpress2HVND,
+			FreeShippingThreshold: cfg.FreeShippingThresholdVND,
+		},
 		OrderConfirmTimeout: cfg.OrderConfirmTimeout,
 		LiveQuota:           liveUC,
 		Notifications:       asNotificationPublisher(notifSvc),
@@ -362,6 +411,22 @@ func provideLiveRepository(pool *pgxpool.Pool) *repository.LiveRepository {
 	return repository.NewLiveRepository(pool)
 }
 
+func provideFlashSaleRepository(pool *pgxpool.Pool) *repository.FlashSaleRepository {
+	return repository.NewFlashSaleRepository(pool)
+}
+
+func provideFlashSaleUseCase(repo *repository.FlashSaleRepository) *flashsaleuc.UseCase {
+	return flashsaleuc.New(flashsaleuc.Dependencies{Repo: repo})
+}
+
+func provideVoucherRepository(pool *pgxpool.Pool) *repository.VoucherRepository {
+	return repository.NewVoucherRepository(pool)
+}
+
+func provideVoucherUseCase(repo *repository.VoucherRepository) *voucheruc.UseCase {
+	return voucheruc.New(voucheruc.Dependencies{Repo: repo})
+}
+
 func provideMediaServer(cfg *config.Config) *mediamtx.Client {
 	return mediamtx.New(cfg.MediaMTXAPIURL)
 }
@@ -402,6 +467,8 @@ func provideGinRouter(
 	dashboardUC *dashboarduc.UseCase,
 	userMgmtUC *usermgmtuc.UseCase,
 	liveUC *liveuc.UseCase,
+	flashSaleUC *flashsaleuc.UseCase,
+	voucherUC *voucheruc.UseCase,
 	liveHub *livews.Hub,
 	wsHub *ws.Hub,
 	jwtMgr *jwt.Manager,
@@ -428,6 +495,8 @@ func provideGinRouter(
 		Post:         postUC,
 		Notification: asNotificationUseCase(notifSvc),
 		Live:         liveUC,
+		FlashSale:    flashSaleUC,
+		Voucher:      voucherUC,
 		LiveHub:      liveHub,
 		WSHub:        wsHub,
 		JWT:          jwtMgr,

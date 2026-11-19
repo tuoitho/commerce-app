@@ -188,6 +188,7 @@ func mapCartRow(row sqlc.ListCartRowsRow, quantity, stock int64) (domain.CartIte
 	}
 	item.UnitPriceVND = domain.MoneyVNDPtr(domain.MoneyVND(row.PriceVnd))
 	item.IsLivePrice = row.IsLivePrice
+	item.IsFlashSalePrice = row.IsFlashSalePrice
 	line := domain.MoneyVND(new(big.Int).Mul(numericInt(row.PriceVnd), big.NewInt(row.Quantity)).String())
 	item.LineTotalVND = &line
 	return item, line, item.Availability == domain.CartAvailable, nil

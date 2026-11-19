@@ -46,6 +46,34 @@ func TestMapCartRowMapsStockAndAvailability(t *testing.T) {
 	}
 }
 
+func TestMapCartRow_MapsLiveAndFlashSaleFlags(t *testing.T) {
+	itemFS, _, _, err := mapCartRow(sqlc.ListCartRowsRow{
+		ID: "item", VariantID: "variant", ProductID: "product", Quantity: 1, StockQuantity: 5,
+		Selected: true, ProductActive: true, VariantActive: true,
+		PriceVnd: "25990000", IsLivePrice: false, IsFlashSalePrice: true,
+		BrandName: "Apple", ProductName: "iPhone 16 Pro", Model: "A3294", SnapshotOptions: "[]",
+	}, 1, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if itemFS.IsLivePrice || !itemFS.IsFlashSalePrice {
+		t.Fatalf("expected IsLivePrice=false IsFlashSalePrice=true, got live=%t flash=%t", itemFS.IsLivePrice, itemFS.IsFlashSalePrice)
+	}
+
+	itemLive, _, _, err := mapCartRow(sqlc.ListCartRowsRow{
+		ID: "item", VariantID: "variant", ProductID: "product", Quantity: 1, StockQuantity: 5,
+		Selected: true, ProductActive: true, VariantActive: true,
+		PriceVnd: "25990000", IsLivePrice: true, IsFlashSalePrice: false,
+		BrandName: "Apple", ProductName: "iPhone 16 Pro", Model: "A3294", SnapshotOptions: "[]",
+	}, 1, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !itemLive.IsLivePrice || itemLive.IsFlashSalePrice {
+		t.Fatalf("expected IsLivePrice=true IsFlashSalePrice=false, got live=%t flash=%t", itemLive.IsLivePrice, itemLive.IsFlashSalePrice)
+	}
+}
+
 func TestQuantityMutationRejectsUnavailableLinesButRecoversInsufficientLines(t *testing.T) {
 	cases := []struct {
 		name                  string

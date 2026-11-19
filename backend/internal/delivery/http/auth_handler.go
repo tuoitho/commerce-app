@@ -41,6 +41,24 @@ type sessionResponse struct {
 	AccessToken string            `json:"accessToken"`
 }
 
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type forgotPasswordResponse struct {
+	CooldownSeconds int `json:"cooldownSeconds"`
+}
+
+type resetPasswordRequest struct {
+	Email       string `json:"email"`
+	OTP         string `json:"otp"`
+	NewPassword string `json:"newPassword"`
+}
+
+type resetPasswordResponse struct {
+	Reset bool `json:"reset"`
+}
+
 func (h *authHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -100,6 +118,43 @@ func (h *authHandler) Me(c *gin.Context) {
 		return
 	}
 	writeSuccess(c, http.StatusOK, "", user)
+}
+
+func (h *authHandler) ForgotPassword(c *gin.Context) {
+	var req forgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{"body": "invalid JSON body"}))
+		return
+	}
+	res, err := h.uc.ForgotPassword(c.Request.Context(), req.Email)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusOK, "Nếu email tồn tại trong hệ thống, mã xác thực đặt lại mật khẩu đã được gửi.", forgotPasswordResponse{
+		CooldownSeconds: res.CooldownSeconds,
+	})
+}
+
+func (h *authHandler) ResetPassword(c *gin.Context) {
+	var req resetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{"body": "invalid JSON body"}))
+		return
+	}
+	err := h.uc.ResetPassword(c.Request.Context(), authuc.ResetPasswordInput{
+		Email:       req.Email,
+		OTP:         req.OTP,
+		NewPassword: req.NewPassword,
+	})
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	h.clearRefreshCookie(c)
+	writeSuccess(c, http.StatusOK, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.", resetPasswordResponse{
+		Reset: true,
+	})
 }
 
 func (h *authHandler) setRefreshCookie(c *gin.Context, token string) {

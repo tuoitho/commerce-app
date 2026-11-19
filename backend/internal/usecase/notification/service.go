@@ -232,13 +232,29 @@ func (s *Service) NotifyOrderTransition(ctx context.Context, order *domain.Order
 	var notifType domain.NotificationType
 	var excerpt string
 
+	var carrier string
+	if order.Carrier != nil {
+		carrier = strings.TrimSpace(*order.Carrier)
+	}
+	var trackingCode string
+	if order.TrackingCode != nil {
+		trackingCode = strings.TrimSpace(*order.TrackingCode)
+	}
+
 	switch action {
 	case domain.OrderAdminActionConfirmPreparing:
 		notifType = domain.NotificationTypeOrderPreparing
 		excerpt = fmt.Sprintf("Đơn hàng %s đang được cửa hàng chuẩn bị.", code)
 	case domain.OrderAdminActionShip:
 		notifType = domain.NotificationTypeOrderShipped
-		excerpt = fmt.Sprintf("Đơn hàng %s đã được bàn giao cho đơn vị vận chuyển.", code)
+		switch {
+		case carrier != "" && trackingCode != "":
+			excerpt = fmt.Sprintf("Đơn hàng %s đã được bàn giao cho %s (mã vận đơn: %s).", code, carrier, trackingCode)
+		case carrier != "":
+			excerpt = fmt.Sprintf("Đơn hàng %s đã được bàn giao cho %s.", code, carrier)
+		default:
+			excerpt = fmt.Sprintf("Đơn hàng %s đã được bàn giao cho đơn vị vận chuyển.", code)
+		}
 	case domain.OrderAdminActionDeliver:
 		notifType = domain.NotificationTypeOrderDelivered
 		excerpt = fmt.Sprintf("Đơn hàng %s đã giao thành công.", code)
@@ -260,6 +276,14 @@ func (s *Service) NotifyOrderTransition(ctx context.Context, order *domain.Order
 	}
 	if order.TotalVND != "" {
 		meta["totalVnd"] = string(order.TotalVND)
+	}
+	if action == domain.OrderAdminActionShip {
+		if carrier != "" {
+			meta["carrier"] = carrier
+		}
+		if trackingCode != "" {
+			meta["trackingCode"] = trackingCode
+		}
 	}
 
 	s.emitSingle(ctx, domain.CreateNotificationInput{

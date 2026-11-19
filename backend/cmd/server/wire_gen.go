@@ -22,8 +22,10 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	}
 	userRepository := provideUserRepository(pool)
 	sessionRepository := provideSessionRepository(pool)
+	passwordResetRepository := providePasswordResetRepository(pool)
+	mailer := provideMailer(cfg, log)
 	manager := provideJWTManager(cfg)
-	useCase := provideAuthUseCase(userRepository, sessionRepository, manager, cfg)
+	useCase := provideAuthUseCase(userRepository, sessionRepository, passwordResetRepository, mailer, manager, cfg, log)
 	accountRepository := provideAccountRepository(pool)
 	store, err := provideChatMediaStore(cfg)
 	if err != nil {
@@ -32,7 +34,12 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	}
 	accountUseCase := provideAccountUseCase(accountRepository, store, manager, cfg, log)
 	catalogRepository := provideCatalogRepository(pool)
-	catalogUseCase := provideCatalogUseCase(catalogRepository)
+	reviewmediaStore, err := provideReviewMediaStore(cfg)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	catalogUseCase := provideCatalogUseCase(catalogRepository, reviewmediaStore)
 	cartRepository := provideCartRepository(pool)
 	cartUseCase := provideCartUseCase(cartRepository, cfg)
 	areaRepository, err := provideAreaRepository()
@@ -57,11 +64,6 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	liveUseCase := provideLiveUseCase(liveRepository, mediamtxClient, hub, service, cfg, log)
 	orderUseCase := provideOrderUseCase(orderRepository, returnRepository, reviewRepository, client, liveUseCase, service, cfg)
 	returnsUseCase := provideReturnUseCase(returnRepository, service)
-	reviewmediaStore, err := provideReviewMediaStore(cfg)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
 	reviewUseCase := provideReviewUseCase(reviewRepository, reviewmediaStore, catalogRepository, service)
 	favoriteRepository := provideFavoriteRepository(pool)
 	favoriteUseCase := provideFavoriteUseCase(favoriteRepository)
@@ -72,7 +74,11 @@ func initializeApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*
 	dashboardUseCase := provideDashboardUseCase(dashboardRepository)
 	userAdminRepository := provideUserAdminRepository(pool)
 	usermgmtUseCase := provideUserMgmtUseCase(userAdminRepository)
-	engine := provideGinRouter(cfg, log, useCase, accountUseCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, service, dashboardUseCase, usermgmtUseCase, liveUseCase, hub, wsHub, manager)
+	flashSaleRepository := provideFlashSaleRepository(pool)
+	flashsaleUseCase := provideFlashSaleUseCase(flashSaleRepository)
+	voucherRepository := provideVoucherRepository(pool)
+	voucherUseCase := provideVoucherUseCase(voucherRepository)
+	engine := provideGinRouter(cfg, log, useCase, accountUseCase, catalogUseCase, cartUseCase, areaUseCase, addressUseCase, orderUseCase, returnsUseCase, reviewUseCase, favoriteUseCase, chatUseCase, postUseCase, service, dashboardUseCase, usermgmtUseCase, liveUseCase, flashsaleUseCase, voucherUseCase, hub, wsHub, manager)
 	server := provideHTTPServer(cfg, engine)
 	app := provideApp(cfg, log, pool, server, useCase, orderUseCase, postUseCase, reviewmediaStore, store, wsHub, hub, liveUseCase)
 	return app, func() {
@@ -87,6 +93,8 @@ var appProviderSet = wire.NewSet(
 	provideUserRepository,
 	provideAccountRepository,
 	provideSessionRepository,
+	providePasswordResetRepository,
+	provideMailer,
 	provideCatalogRepository,
 	provideCartRepository,
 	provideAreaRepository,
@@ -121,9 +129,13 @@ var appProviderSet = wire.NewSet(
 	provideUserAdminRepository,
 	provideUserMgmtUseCase,
 	provideLiveRepository,
+	provideFlashSaleRepository,
+	provideVoucherRepository,
 	provideMediaServer,
 	provideLiveHub,
 	provideLiveUseCase,
+	provideFlashSaleUseCase,
+	provideVoucherUseCase,
 	provideGinRouter,
 	provideHTTPServer,
 	provideApp,

@@ -306,3 +306,26 @@ func TestCartHTTP_IncludesShippingFeeVnd(t *testing.T) {
 	}
 }
 
+func TestCartHTTP_IncludesIsFlashSalePriceFlag(t *testing.T) {
+	router, token := newCartTestRouter(&httpCartRepo{})
+	w := cartRequest(router, token, http.MethodGet, "/api/v1/cart", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Data struct {
+			Items []map[string]any `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(body.Data.Items))
+	}
+	if _, ok := body.Data.Items[0]["isFlashSalePrice"]; !ok {
+		t.Fatalf("expected isFlashSalePrice field in cart item JSON, got %v", body.Data.Items[0])
+	}
+}
+
+

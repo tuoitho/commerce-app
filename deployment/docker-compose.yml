@@ -96,6 +96,13 @@ services:
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
 
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-11025}:1025"
+      - "${MAILPIT_UI_PORT:-18025}:8025"
+
   backend:
     build:
       context: ../backend
@@ -111,6 +118,8 @@ services:
       minio-init:
         condition: service_completed_successfully
       mediamtx:
+        condition: service_started
+      mailpit:
         condition: service_started
     ports:
       - "${BACKEND_PORT:-18080}:18080"
@@ -143,6 +152,17 @@ services:
       MOMO_REQUEST_TYPE: ${MOMO_REQUEST_TYPE:-payWithMethod}
       MOMO_PARTNER_NAME: ${MOMO_PARTNER_NAME:-Test}
       MOMO_STORE_ID: ${MOMO_STORE_ID:-MomoTestStore}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@auraphone.local}
+      PASSWORD_RESET_OTP_TTL: ${PASSWORD_RESET_OTP_TTL:-10m}
+      SHIPPING_STANDARD_HN_HCM_VND: ${SHIPPING_STANDARD_HN_HCM_VND:-25000}
+      SHIPPING_STANDARD_MAJOR_CITY_VND: ${SHIPPING_STANDARD_MAJOR_CITY_VND:-30000}
+      SHIPPING_STANDARD_OTHER_VND: ${SHIPPING_STANDARD_OTHER_VND:-40000}
+      SHIPPING_EXPRESS_2H_VND: ${SHIPPING_EXPRESS_2H_VND:-60000}
+      FREE_SHIPPING_THRESHOLD_VND: ${FREE_SHIPPING_THRESHOLD_VND:-5000000}
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:18080/api/v1/categories"]
       interval: 5s

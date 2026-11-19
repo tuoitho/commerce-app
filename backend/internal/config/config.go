@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -49,6 +51,32 @@ type Config struct {
 	MomoRequestType string
 	MomoPartnerName string
 	MomoStoreID     string
+
+	SMTPHost            string
+	SMTPPort            int
+	SMTPUsername        string
+	SMTPPassword        string
+	SMTPFrom            string
+	PasswordResetOTPTTL time.Duration
+
+	ShippingStandardHNHCMVND     domain.MoneyVND
+	ShippingStandardMajorCityVND domain.MoneyVND
+	ShippingStandardOtherVND     domain.MoneyVND
+	ShippingExpress2HVND         domain.MoneyVND
+	FreeShippingThresholdVND     domain.MoneyVND
+}
+
+// LogValue redacts credentials and secrets when Config is passed to slog.
+func (c Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("app_env", c.AppEnv),
+		slog.Int("http_port", c.HTTPPort),
+		slog.String("log_level", c.LogLevel),
+		slog.String("smtp_host", c.SMTPHost),
+		slog.Int("smtp_port", c.SMTPPort),
+		slog.String("smtp_from", c.SMTPFrom),
+		slog.Duration("password_reset_otp_ttl", c.PasswordResetOTPTTL),
+	)
 }
 
 const (
@@ -78,6 +106,19 @@ const (
 	defaultMomoRequestType = "payWithMethod"
 	defaultMomoPartnerName = "Test"
 	defaultMomoStoreID     = "MomoTestStore"
+
+	defaultSMTPHost            = "localhost"
+	defaultSMTPPort            = 11025
+	defaultSMTPFrom            = "noreply@auraphone.local"
+	defaultPasswordResetOTPTTL = 10 * time.Minute
+	minPasswordResetOTPTTL     = time.Minute
+	maxPasswordResetOTPTTL     = 60 * time.Minute
+
+	defaultShippingStandardHNHCMVND     = domain.MoneyVND("25000")
+	defaultShippingStandardMajorCityVND = domain.MoneyVND("30000")
+	defaultShippingStandardOtherVND     = domain.MoneyVND("40000")
+	defaultShippingExpress2HVND         = domain.MoneyVND("60000")
+	defaultFreeShippingThresholdVND     = domain.MoneyVND("5000000")
 )
 
 var allowedLogLevels = map[string]bool{
@@ -129,6 +170,17 @@ func LoadWithFile(envFile string) (*Config, error) {
 		"MOMO_REQUEST_TYPE",
 		"MOMO_PARTNER_NAME",
 		"MOMO_STORE_ID",
+		"SMTP_HOST",
+		"SMTP_PORT",
+		"SMTP_USERNAME",
+		"SMTP_PASSWORD",
+		"SMTP_FROM",
+		"PASSWORD_RESET_OTP_TTL",
+		"SHIPPING_STANDARD_HN_HCM_VND",
+		"SHIPPING_STANDARD_MAJOR_CITY_VND",
+		"SHIPPING_STANDARD_OTHER_VND",
+		"SHIPPING_EXPRESS_2H_VND",
+		"FREE_SHIPPING_THRESHOLD_VND",
 	}
 
 	for _, key := range keys {
@@ -384,7 +436,86 @@ func LoadWithFile(envFile string) (*Config, error) {
 	cfg.MomoPartnerName = stringSetting(v, "MOMO_PARTNER_NAME", defaultMomoPartnerName)
 	cfg.MomoStoreID = stringSetting(v, "MOMO_STORE_ID", defaultMomoStoreID)
 
+	// 22. SMTP & Password Reset OTP settings
+	if v.IsSet("SMTP_HOST") {
+		host := strings.TrimSpace(v.GetString("SMTP_HOST"))
+		if host == "" {
+			return nil, fmt.Errorf("config: SMTP_HOST must not be empty")
+		}
+		cfg.SMTPHost = host
+	} else {
+		cfg.SMTPHost = defaultSMTPHost
+	}
+
+	if v.IsSet("SMTP_PORT") {
+		rawPort := strings.TrimSpace(v.GetString("SMTP_PORT"))
+		if rawPort != "" {
+			port, err := strconv.Atoi(rawPort)
+			if err != nil || port < 1 || port > 65535 {
+				return nil, fmt.Errorf("config: SMTP_PORT must be an integer between 1 and 65535, got %q", rawPort)
+			}
+			cfg.SMTPPort = port
+		} else {
+			cfg.SMTPPort = defaultSMTPPort
+		}
+	} else {
+		cfg.SMTPPort = defaultSMTPPort
+	}
+
+	cfg.SMTPUsername = strings.TrimSpace(v.GetString("SMTP_USERNAME"))
+	cfg.SMTPPassword = strings.TrimSpace(v.GetString("SMTP_PASSWORD"))
+
+	if v.IsSet("SMTP_FROM") {
+		rawFrom := strings.TrimSpace(v.GetString("SMTP_FROM"))
+		addr, err := mail.ParseAddress(rawFrom)
+		if rawFrom == "" || err != nil || addr.Address == "" || !strings.Contains(addr.Address, "@") {
+			return nil, fmt.Errorf("config: SMTP_FROM must be a valid email address, got %q", rawFrom)
+		}
+		cfg.SMTPFrom = rawFrom
+	} else {
+		cfg.SMTPFrom = defaultSMTPFrom
+	}
+
+	if cfg.PasswordResetOTPTTL, err = durationSetting(v, "PASSWORD_RESET_OTP_TTL", defaultPasswordResetOTPTTL); err != nil {
+		return nil, err
+	}
+	if cfg.PasswordResetOTPTTL < minPasswordResetOTPTTL || cfg.PasswordResetOTPTTL > maxPasswordResetOTPTTL {
+		return nil, fmt.Errorf("config: PASSWORD_RESET_OTP_TTL must be between 1m and 60m, got %s", cfg.PasswordResetOTPTTL)
+	}
+
+	// 23. Regional shipping fees & free shipping threshold
+	if cfg.ShippingStandardHNHCMVND, err = moneyVNDSetting(v, "SHIPPING_STANDARD_HN_HCM_VND", defaultShippingStandardHNHCMVND); err != nil {
+		return nil, err
+	}
+	if cfg.ShippingStandardMajorCityVND, err = moneyVNDSetting(v, "SHIPPING_STANDARD_MAJOR_CITY_VND", defaultShippingStandardMajorCityVND); err != nil {
+		return nil, err
+	}
+	if cfg.ShippingStandardOtherVND, err = moneyVNDSetting(v, "SHIPPING_STANDARD_OTHER_VND", defaultShippingStandardOtherVND); err != nil {
+		return nil, err
+	}
+	if cfg.ShippingExpress2HVND, err = moneyVNDSetting(v, "SHIPPING_EXPRESS_2H_VND", defaultShippingExpress2HVND); err != nil {
+		return nil, err
+	}
+	if cfg.FreeShippingThresholdVND, err = moneyVNDSetting(v, "FREE_SHIPPING_THRESHOLD_VND", defaultFreeShippingThresholdVND); err != nil {
+		return nil, err
+	}
+
 	return cfg, nil
+}
+
+func moneyVNDSetting(v *viper.Viper, key string, fallback domain.MoneyVND) (domain.MoneyVND, error) {
+	if !v.IsSet(key) {
+		return fallback, nil
+	}
+	raw := strings.TrimSpace(v.GetString(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	amount := domain.MoneyVND(raw)
+	if !amount.IsCanonical() {
+		return "", fmt.Errorf("config: %s must be a valid canonical VND amount, got %q", key, raw)
+	}
+	return amount, nil
 }
 
 func stringSetting(v *viper.Viper, key, fallback string) string {

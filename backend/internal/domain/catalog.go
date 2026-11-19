@@ -2,7 +2,51 @@ package domain
 
 import (
 	"context"
+	"io"
+	"regexp"
 	"time"
+)
+
+const (
+	MaxProductSpecGroups        = 12
+	MaxProductSpecItemsPerGroup = 20
+	MaxProductSpecGroupLen      = 80
+	MaxProductSpecLabelLen      = 80
+	MaxProductSpecValueLen      = 300
+	MaxProductImageBytes        int64 = 10 * 1024 * 1024 // 10 MB
+	MaxProductImageRequestBytes int64 = 11 * 1024 * 1024 // 11 MB multipart ceiling
+)
+
+var ProductImageKeyRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$`)
+
+type SpecItem struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type SpecGroup struct {
+	Group string     `json:"group"`
+	Items []SpecItem `json:"items"`
+}
+
+type VariantFlashSale struct {
+	FlashSaleID   string    `json:"flashSaleId"`
+	CampaignName  string    `json:"campaignName"`
+	FlashPriceVND MoneyVND  `json:"flashPriceVnd"`
+	Quota         int       `json:"quota"`
+	SoldQuantity  int       `json:"soldQuantity"`
+	EndsAt        time.Time `json:"endsAt"`
+}
+
+type ProductSort string
+
+const (
+	ProductSortDefault     ProductSort = ""
+	ProductSortBestselling ProductSort = "bestselling"
+	ProductSortNewest      ProductSort = "newest"
+	ProductSortPriceAsc    ProductSort = "price_asc"
+	ProductSortPriceDesc   ProductSort = "price_desc"
+	ProductSortRatingDesc  ProductSort = "rating_desc"
 )
 
 type Category struct {
@@ -35,6 +79,8 @@ type ProductVariant struct {
 	LivePriceVND *MoneyVND
 	// LiveRemaining is the live-price quota left, nil when unlimited or no live price.
 	LiveRemaining *int
+	// FlashSale is the currently running Flash Sale campaign metadata for this variant, if any.
+	FlashSale *VariantFlashSale
 }
 
 type Product struct {
@@ -46,6 +92,7 @@ type Product struct {
 	Model         string
 	Featured      bool
 	Active        bool
+	Specs         []SpecGroup
 	OptionGroups  []OptionGroup
 	Variants      []ProductVariant
 	MinPriceVND   MoneyVND
@@ -54,6 +101,9 @@ type Product struct {
 	Currency      string
 	ImageURLs     []string
 	StockQuantity int64
+	AverageRating float64
+	ReviewCount   int64
+	SoldCount     int64
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -88,6 +138,8 @@ type ProductFilter struct {
 	MaxPrice    string
 	InStock     *bool
 	Featured    *bool
+	Sort        ProductSort
+	MinRating   *float64
 }
 
 type OptionValueInput struct {
@@ -122,9 +174,23 @@ type SaveProductInput struct {
 	StockQuantity int64
 	Featured      bool
 	ImageURLs     []string
+	Specs         []SpecGroup
 	HasVariants   bool
 	OptionGroups  []OptionGroupInput
 	Variants      []VariantInput
+}
+
+type UploadProductImageInput struct {
+	Reader              io.Reader
+	Size                int64
+	DeclaredContentType string
+}
+
+type UploadedProductImage struct {
+	Key       string `json:"key"`
+	URL       string `json:"url"`
+	MimeType  string `json:"mimeType"`
+	SizeBytes int64  `json:"sizeBytes"`
 }
 
 type CatalogRepository interface {

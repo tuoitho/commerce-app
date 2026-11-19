@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -52,8 +54,13 @@ func (f *Catalog) addProduct(p domain.Product, active *bool) {
 	} else if active != nil && isLegacyProductFields(p) {
 		p.Variants = []domain.ProductVariant{{ID: p.ID, StockQuantity: p.StockQuantity, Active: *active}}
 	}
-	p.CreatedAt = time.Now()
-	p.UpdatedAt = time.Now()
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = time.Now()
+	}
+	if p.UpdatedAt.IsZero() {
+		p.UpdatedAt = p.CreatedAt
+	}
+	p.Specs = cloneSpecs(p.Specs)
 	f.products = append(f.products, &p)
 }
 
@@ -173,7 +180,7 @@ func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) (
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	query := strings.ToLower(strings.TrimSpace(filt.Query))
+	query := strings.TrimSpace(filt.Query)
 	categoryIDs := filt.CategoryIDs
 	if len(categoryIDs) == 0 && filt.CategoryID != "" {
 		categoryIDs = []string{filt.CategoryID}
@@ -195,7 +202,7 @@ func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) (
 		if !publicEligible(p) {
 			continue
 		}
-		if query != "" && !strings.Contains(strings.ToLower(p.Name), query) && !strings.Contains(strings.ToLower(p.Model), query) && !strings.Contains(strings.ToLower(p.Brand), query) && !strings.Contains(strings.ToLower(p.Category.Name), query) {
+		if query != "" && !matchesCatalogQuery(p, query) {
 			continue
 		}
 		if len(categoryIDs) > 0 && !contains(categoryIDs, p.Category.ID) {
@@ -262,14 +269,12 @@ func (f *Catalog) ListProducts(ctx context.Context, filt domain.ProductFilter) (
 		if filt.InStock != nil && inStock != *filt.InStock {
 			continue
 		}
-		matches = append(matches, *p)
-	}
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].Name != matches[j].Name {
-			return matches[i].Name < matches[j].Name
+		if filt.MinRating != nil && (p.ReviewCount == 0 || p.AverageRating < *filt.MinRating) {
+			continue
 		}
-		return matches[i].ID < matches[j].ID
-	})
+		matches = append(matches, clonePublicProduct(*p))
+	}
+	sortProducts(matches, filt.Sort)
 	return matches, nil
 }
 
@@ -332,9 +337,10 @@ func (f *Catalog) ListFeaturedProducts(ctx context.Context) ([]domain.Product, e
 	out := make([]domain.Product, 0)
 	for _, p := range f.products {
 		if p.Featured && publicEligible(p) {
-			out = append(out, *p)
+			out = append(out, clonePublicProduct(*p))
 		}
 	}
+	sortProducts(out, domain.ProductSortDefault)
 	return out, nil
 }
 
@@ -355,6 +361,7 @@ func (f *Catalog) GetProductByID(ctx context.Context, id string) (*domain.Produc
 
 func clonePublicProduct(product domain.Product) domain.Product {
 	product.ImageURLs = append([]string(nil), product.ImageURLs...)
+	product.Specs = cloneSpecs(product.Specs)
 	activeVariants := make([]domain.ProductVariant, 0, len(product.Variants))
 	usedValues := make(map[string]bool)
 	for _, variant := range product.Variants {
@@ -367,6 +374,7 @@ func clonePublicProduct(product domain.Product) domain.Product {
 			usedValues[valueID] = true
 		}
 		variant.OptionValueIDs = optionIDs
+		variant.FlashSale = cloneFlashSale(variant.FlashSale)
 		activeVariants = append(activeVariants, variant)
 	}
 	product.Variants = activeVariants
@@ -425,26 +433,18 @@ func (f *Catalog) ListAdminProducts(ctx context.Context, query string) ([]domain
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	q := strings.ToLower(strings.TrimSpace(query))
+	q := strings.TrimSpace(query)
 	matches := make([]domain.Product, 0, len(f.products))
 	for _, p := range f.products {
 		if !p.Active {
 			continue
 		}
-		if q != "" && !strings.Contains(strings.ToLower(p.Name), q) &&
-			!strings.Contains(strings.ToLower(p.Model), q) &&
-			!strings.Contains(strings.ToLower(p.Brand), q) &&
-			!strings.Contains(strings.ToLower(p.Category.Name), q) {
+		if q != "" && !matchesCatalogQuery(p, q) {
 			continue
 		}
 		matches = append(matches, cloneAdminProduct(*p))
 	}
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].Name != matches[j].Name {
-			return matches[i].Name < matches[j].Name
-		}
-		return matches[i].ID < matches[j].ID
-	})
+	sortProducts(matches, domain.ProductSortDefault)
 	return matches, nil
 }
 
@@ -569,6 +569,7 @@ func (f *Catalog) CreateProduct(ctx context.Context, input domain.SaveProductInp
 		Featured:      input.Featured,
 		Active:        true,
 		ImageURLs:     append([]string(nil), input.ImageURLs...),
+		Specs:         cloneSpecs(input.Specs),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 		OptionGroups:  optionGroups,
@@ -696,6 +697,7 @@ func (f *Catalog) UpdateProduct(ctx context.Context, id string, input domain.Sav
 	target.StockQuantity = stockQuantity
 	target.Featured = input.Featured
 	target.ImageURLs = append([]string(nil), input.ImageURLs...)
+	target.Specs = cloneSpecs(input.Specs)
 	target.OptionGroups = optionGroups
 	target.Variants = variants
 	target.UpdatedAt = time.Now()
@@ -722,6 +724,7 @@ func (f *Catalog) DeleteProduct(ctx context.Context, id string) error {
 
 func cloneAdminProduct(product domain.Product) domain.Product {
 	product.ImageURLs = append([]string(nil), product.ImageURLs...)
+	product.Specs = cloneSpecs(product.Specs)
 	groups := make([]domain.OptionGroup, 0, len(product.OptionGroups))
 	for _, g := range product.OptionGroups {
 		vals := append([]domain.OptionValue(nil), g.Values...)
@@ -792,6 +795,203 @@ func cloneAdminProduct(product domain.Product) domain.Product {
 		product.MaxPriceVND = domain.MoneyVND(product.Price)
 	}
 	return product
+}
+
+func cloneSpecs(specs []domain.SpecGroup) []domain.SpecGroup {
+	if len(specs) == 0 {
+		return []domain.SpecGroup{}
+	}
+	out := make([]domain.SpecGroup, len(specs))
+	for i, g := range specs {
+		items := make([]domain.SpecItem, len(g.Items))
+		copy(items, g.Items)
+		out[i] = domain.SpecGroup{
+			Group: g.Group,
+			Items: items,
+		}
+	}
+	return out
+}
+
+func cloneFlashSale(fs *domain.VariantFlashSale) *domain.VariantFlashSale {
+	if fs == nil {
+		return nil
+	}
+	cp := *fs
+	return &cp
+}
+
+func sortProducts(items []domain.Product, mode domain.ProductSort) {
+	sort.Slice(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		switch mode {
+		case domain.ProductSortBestselling:
+			if a.SoldCount != b.SoldCount {
+				return a.SoldCount > b.SoldCount
+			}
+			if a.AverageRating != b.AverageRating {
+				return a.AverageRating > b.AverageRating
+			}
+		case domain.ProductSortNewest:
+			if !a.CreatedAt.Equal(b.CreatedAt) {
+				return a.CreatedAt.After(b.CreatedAt)
+			}
+			return a.ID > b.ID
+		case domain.ProductSortPriceAsc:
+			pa, pb := fakeMinActivePrice(a), fakeMinActivePrice(b)
+			if cmp := pa.Cmp(pb); cmp != 0 {
+				return cmp < 0
+			}
+		case domain.ProductSortPriceDesc:
+			pa, pb := fakeMinActivePrice(a), fakeMinActivePrice(b)
+			if cmp := pa.Cmp(pb); cmp != 0 {
+				return cmp > 0
+			}
+		case domain.ProductSortRatingDesc:
+			if a.AverageRating != b.AverageRating {
+				return a.AverageRating > b.AverageRating
+			}
+			if a.ReviewCount != b.ReviewCount {
+				return a.ReviewCount > b.ReviewCount
+			}
+		default:
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+			if a.Model != b.Model {
+				return a.Model < b.Model
+			}
+			return a.ID < b.ID
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.ID < b.ID
+	})
+}
+
+func fakeMinActivePrice(p domain.Product) *big.Int {
+	var min *big.Int
+	for _, v := range p.Variants {
+		if !v.Active {
+			continue
+		}
+		val, ok := new(big.Int).SetString(string(v.PriceVND), 10)
+		if !ok {
+			continue
+		}
+		if min == nil || val.Cmp(min) < 0 {
+			min = val
+		}
+	}
+	if min != nil {
+		return min
+	}
+	if p.MinPriceVND != "" {
+		if val, ok := new(big.Int).SetString(string(p.MinPriceVND), 10); ok {
+			return val
+		}
+	}
+	if p.Price != "" {
+		if val, ok := new(big.Int).SetString(p.Price, 10); ok {
+			return val
+		}
+	}
+	return big.NewInt(0)
+}
+
+func matchesCatalogQuery(p *domain.Product, q string) bool {
+	fq := foldVietnamese(q)
+	if fq == "" {
+		return true
+	}
+	if strings.Contains(foldVietnamese(p.Name), fq) ||
+		strings.Contains(foldVietnamese(p.Model), fq) ||
+		strings.Contains(foldVietnamese(p.Brand), fq) ||
+		strings.Contains(foldVietnamese(p.Category.Name), fq) {
+		return true
+	}
+	if utf8.RuneCountInString(fq) >= 3 {
+		combined := foldVietnamese(p.Name + " " + p.Brand + " " + p.Model)
+		if fakeWordSimilarity(fq, combined) >= 0.35 {
+			return true
+		}
+	}
+	return false
+}
+
+func fakeWordSimilarity(q, target string) float64 {
+	qGrams := makeTrigrams(q)
+	if len(qGrams) == 0 {
+		return 0
+	}
+	best := 0.0
+	for _, word := range strings.Fields(target) {
+		tGrams := makeTrigrams(word)
+		if len(tGrams) == 0 {
+			continue
+		}
+		common := 0
+		for g := range qGrams {
+			if tGrams[g] {
+				common++
+			}
+		}
+		union := len(qGrams) + len(tGrams) - common
+		if union > 0 {
+			sim := float64(common) / float64(union)
+			if sim > best {
+				best = sim
+			}
+		}
+	}
+	return best
+}
+
+func makeTrigrams(s string) map[string]bool {
+	padded := "  " + s + " "
+	runes := []rune(padded)
+	if len(runes) < 3 {
+		return nil
+	}
+	out := make(map[string]bool, len(runes)-2)
+	for i := 0; i <= len(runes)-3; i++ {
+		out[string(runes[i:i+3])] = true
+	}
+	return out
+}
+
+func foldVietnamese(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range strings.ToLower(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(foldVietnameseRune(r))
+	}
+	return b.String()
+}
+
+func foldVietnameseRune(r rune) rune {
+	switch r {
+	case 'à', 'á', 'ả', 'ã', 'ạ', 'ă', 'ằ', 'ắ', 'ẳ', 'ẵ', 'ặ', 'â', 'ầ', 'ấ', 'ẩ', 'ẫ', 'ậ':
+		return 'a'
+	case 'è', 'é', 'ẻ', 'ẽ', 'ẹ', 'ê', 'ề', 'ế', 'ể', 'ễ', 'ệ':
+		return 'e'
+	case 'ì', 'í', 'ỉ', 'ĩ', 'ị':
+		return 'i'
+	case 'ò', 'ó', 'ỏ', 'õ', 'ọ', 'ô', 'ồ', 'ố', 'ổ', 'ỗ', 'ộ', 'ơ', 'ờ', 'ớ', 'ở', 'ỡ', 'ợ':
+		return 'o'
+	case 'ù', 'ú', 'ủ', 'ũ', 'ụ', 'ư', 'ừ', 'ứ', 'ử', 'ữ', 'ự':
+		return 'u'
+	case 'ỳ', 'ý', 'ỷ', 'ỹ', 'ỵ':
+		return 'y'
+	case 'đ':
+		return 'd'
+	default:
+		return r
+	}
 }
 
 var _ domain.CatalogRepository = (*Catalog)(nil)

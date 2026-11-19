@@ -1868,6 +1868,305 @@ func TestOrderUseCase_MomoFlows(t *testing.T) {
 	})
 }
 
+type fakeCheckoutFulfillmentRepo struct {
+	*fakeMomoOrderRepo
+	lastQuoteIn      domain.CheckoutQuoteInput
+	quoteRes         *domain.CheckoutQuote
+	quoteErr         error
+	lastCheckoutIn   domain.CreateCheckoutOrderInput
+	checkoutRes      *domain.Order
+	checkoutErr      error
+	lastShipOrderID  string
+	lastShipCarrier  string
+	lastShipTracking string
+	shipRes          *domain.Order
+	shipErr          error
+	lastBuyUserID    string
+	lastBuyOrderID   string
+	buyAgainRes      *domain.BuyAgainResult
+	buyAgainErr      error
+}
+
+func (f *fakeCheckoutFulfillmentRepo) QuoteCheckout(_ context.Context, input domain.CheckoutQuoteInput) (*domain.CheckoutQuote, error) {
+	f.lastQuoteIn = input
+	if f.quoteErr != nil {
+		return nil, f.quoteErr
+	}
+	return f.quoteRes, nil
+}
+
+func (f *fakeCheckoutFulfillmentRepo) CreateCheckoutOrder(_ context.Context, input domain.CreateCheckoutOrderInput) (*domain.Order, error) {
+	f.lastCheckoutIn = input
+	if f.checkoutErr != nil {
+		return nil, f.checkoutErr
+	}
+	return f.checkoutRes, nil
+}
+
+func (f *fakeCheckoutFulfillmentRepo) ShipOrder(_ context.Context, orderID, carrier, trackingCode string) (*domain.Order, error) {
+	f.lastShipOrderID = orderID
+	f.lastShipCarrier = carrier
+	f.lastShipTracking = trackingCode
+	if f.shipErr != nil {
+		return nil, f.shipErr
+	}
+	return f.shipRes, nil
+}
+
+func (f *fakeCheckoutFulfillmentRepo) BuyAgain(_ context.Context, userID, orderID string) (*domain.BuyAgainResult, error) {
+	f.lastBuyUserID = userID
+	f.lastBuyOrderID = orderID
+	if f.buyAgainErr != nil {
+		return nil, f.buyAgainErr
+	}
+	return f.buyAgainRes, nil
+}
+
+type recordingMomoGateway struct {
+	payURL      string
+	lastInput   domain.MomoCreateInput
+	createCalls int
+}
+
+func (g *recordingMomoGateway) CreatePaymentURL(_ context.Context, input domain.MomoCreateInput) (string, error) {
+	g.createCalls++
+	g.lastInput = input
+	return g.payURL, nil
+}
+
+func (g *recordingMomoGateway) VerifyCallbackSignature(_ domain.MomoCallbackPayload) bool {
+	return true
+}
+
+func TestOrderUseCase_CheckoutQuoteAndCreateWithVoucherAndShipping(t *testing.T) {
+	ctx := context.Background()
+	userID := "11111111-1111-1111-1111-111111111111"
+	addrID := "22222222-2222-2222-2222-222222222222"
+	varID := "33333333-3333-3333-3333-333333333333"
+	orderID := "44444444-4444-4444-4444-444444444444"
+	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+
+	shippingCfg := domain.ShippingConfig{
+		StandardHNHCMVND:      "25000",
+		StandardMajorCityVND:  "30000",
+		StandardOtherVND:      "40000",
+		Express2HVND:          "60000",
+		FreeShippingThreshold: "5000000",
+	}
+
+	t.Run("QuoteCheckout validates addressId and deliveryMethod and passes shipping config", func(t *testing.T) {
+		repo := &fakeCheckoutFulfillmentRepo{
+			fakeMomoOrderRepo: &fakeMomoOrderRepo{
+				fakeReturningOrderRepo: &fakeReturningOrderRepo{fakeOrderRepo: &fakeOrderRepo{}},
+			},
+			quoteRes: &domain.CheckoutQuote{
+				SubtotalVND:              "50500000",
+				DeliveryMethod:           domain.DeliveryMethodExpress2H,
+				ExpressAvailable:         true,
+				StandardShippingFeeVND:   "0",
+				ExpressShippingFeeVND:    "60000",
+				FreeShippingThresholdVND: "5000000",
+				ShippingFeeVND:           "60000",
+				DiscountVND:              "560000",
+				TotalVND:                 "50000000",
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:    repo,
+			Shipping: shippingCfg,
+		})
+
+		_, err := uc.QuoteCheckout(ctx, userID, "bad-addr", "", "")
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["addressId"] == "" {
+			t.Fatalf("expected addressId validation error, got %v", err)
+		}
+
+		_, err = uc.QuoteCheckout(ctx, userID, addrID, domain.DeliveryMethod("drone"), "")
+		valErr = nil
+		if !errors.As(err, &valErr) || valErr.Fields["deliveryMethod"] == "" {
+			t.Fatalf("expected deliveryMethod validation error, got %v", err)
+		}
+
+		q, err := uc.QuoteCheckout(ctx, userID, addrID, domain.DeliveryMethodExpress2H, "  aura10 ")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.lastQuoteIn.Shipping != shippingCfg {
+			t.Fatalf("expected shipping config %+v, got %+v", shippingCfg, repo.lastQuoteIn.Shipping)
+		}
+		if repo.lastQuoteIn.VoucherCode != "aura10" {
+			t.Fatalf("expected trimmed voucherCode 'aura10', got %q", repo.lastQuoteIn.VoucherCode)
+		}
+		if q.TotalVND != "50000000" {
+			t.Fatalf("expected totalVnd 50000000, got %s", q.TotalVND)
+		}
+	})
+
+	t.Run("CreateCheckout enforces MoMo limits on final totalVnd after voucher and shipping", func(t *testing.T) {
+		gw := &recordingMomoGateway{payURL: "https://test-payment.momo.vn/pay/discount-50m"}
+		pub := &fakeOrderNotificationPublisher{}
+		voucherCode := "AURA560K"
+		voucherType := domain.VoucherTypeFixedAmount
+		repo := &fakeCheckoutFulfillmentRepo{
+			fakeMomoOrderRepo: &fakeMomoOrderRepo{
+				fakeReturningOrderRepo: &fakeReturningOrderRepo{fakeOrderRepo: &fakeOrderRepo{}},
+			},
+			checkoutRes: &domain.Order{
+				ID:             orderID,
+				UserID:         userID,
+				Status:         domain.OrderStatusPendingConfirmation,
+				PaymentMethod:  domain.PaymentMethodMomo,
+				PaymentStatus:  domain.PaymentStatusPending,
+				SubtotalVND:    "50500000",
+				ShippingFeeVND: "60000",
+				DiscountVND:    "560000",
+				TotalVND:       "50000000",
+				VoucherCode:    &voucherCode,
+				VoucherType:    &voucherType,
+				DeliveryMethod: domain.DeliveryMethodExpress2H,
+				CreatedAt:      now,
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:               repo,
+			MomoGateway:         gw,
+			Notifications:       pub,
+			Shipping:            shippingCfg,
+			OrderConfirmTimeout: 30 * time.Minute,
+		})
+
+		lines := []domain.OrderLineInput{{VariantID: varID, Quantity: 1, ProductName: "iPhone 16 Pro Max", UnitPriceVND: "50500000"}}
+		order, err := uc.CreateCheckout(ctx, orderuc.CreateCheckoutInput{
+			UserID:         userID,
+			AddressID:      addrID,
+			Lines:          lines,
+			PaymentMethod:  domain.PaymentMethodMomo,
+			DeliveryMethod: domain.DeliveryMethodExpress2H,
+			VoucherCode:    " aura560k ",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.lastCheckoutIn.DeliveryMethod != domain.DeliveryMethodExpress2H || repo.lastCheckoutIn.VoucherCode != "aura560k" {
+			t.Fatalf("expected express_2h and aura560k forwarded, got %+v", repo.lastCheckoutIn)
+		}
+		if gw.createCalls != 1 || gw.lastInput.AmountVND != 50000000 {
+			t.Fatalf("expected MoMo CreatePaymentURL called once with 50000000, got calls=%d amount=%d", gw.createCalls, gw.lastInput.AmountVND)
+		}
+		if order.PayURL != gw.payURL || len(pub.createdOrders) != 1 {
+			t.Fatalf("expected PayURL and notification published, got payUrl=%q notifs=%v", order.PayURL, pub.createdOrders)
+		}
+
+		// When repo rejects final totalVnd < 1000 or > 50M, MoMo gateway must not be called
+		repo.checkoutErr = domain.ErrMomoAmountOutOfRange
+		gw.createCalls = 0
+		_, err = uc.CreateCheckout(ctx, orderuc.CreateCheckoutInput{
+			UserID:         userID,
+			AddressID:      addrID,
+			Lines:          lines,
+			PaymentMethod:  domain.PaymentMethodMomo,
+			DeliveryMethod: domain.DeliveryMethodStandard,
+			VoucherCode:    "FREE100",
+		})
+		if !errors.Is(err, domain.ErrMomoAmountOutOfRange) || gw.createCalls != 0 {
+			t.Fatalf("expected ErrMomoAmountOutOfRange without MoMo call, got err=%v calls=%d", err, gw.createCalls)
+		}
+	})
+}
+
+func TestOrderUseCase_AdminShipAndBuyAgain(t *testing.T) {
+	ctx := context.Background()
+	userID := "11111111-1111-1111-1111-111111111111"
+	orderID := "44444444-4444-4444-4444-444444444444"
+	carrier := "Giao Hàng Nhanh"
+	tracking := "GHN-123456"
+
+	t.Run("AdminShip validates fields, delegates, and notifies with carrier & trackingCode", func(t *testing.T) {
+		pub := &fakeOrderNotificationPublisher{}
+		repo := &fakeCheckoutFulfillmentRepo{
+			fakeMomoOrderRepo: &fakeMomoOrderRepo{
+				fakeReturningOrderRepo: &fakeReturningOrderRepo{fakeOrderRepo: &fakeOrderRepo{}},
+			},
+			shipRes: &domain.Order{
+				ID:           orderID,
+				UserID:       userID,
+				Status:       domain.OrderStatusShipped,
+				Carrier:      &carrier,
+				TrackingCode: &tracking,
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:         repo,
+			Notifications: pub,
+		})
+
+		_, err := uc.AdminShip(ctx, "bad-id", carrier, tracking)
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+
+		_, err = uc.AdminShip(ctx, orderID, "  ", "ab")
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["carrier"] == "" || valErr.Fields["trackingCode"] == "" {
+			t.Fatalf("expected carrier & trackingCode validation errors, got %v", err)
+		}
+
+		res, err := uc.AdminShip(ctx, orderID, "  "+carrier+" ", " "+tracking+" ")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.lastShipCarrier != carrier || repo.lastShipTracking != tracking {
+			t.Fatalf("expected trimmed carrier/tracking, got %q / %q", repo.lastShipCarrier, repo.lastShipTracking)
+		}
+		if res.Status != domain.OrderStatusShipped || len(pub.adminTransitions) != 1 || pub.adminTransitions[0] != domain.OrderAdminActionShip {
+			t.Fatalf("expected shipped order and notification, got res=%+v transitions=%v", res, pub.adminTransitions)
+		}
+	})
+
+	t.Run("BuyAgain validates IDs, normalizes nil slices, and sets default shipping fee", func(t *testing.T) {
+		repo := &fakeCheckoutFulfillmentRepo{
+			fakeMomoOrderRepo: &fakeMomoOrderRepo{
+				fakeReturningOrderRepo: &fakeReturningOrderRepo{fakeOrderRepo: &fakeOrderRepo{}},
+			},
+			buyAgainRes: &domain.BuyAgainResult{
+				Cart: &domain.Cart{
+					TotalUnits:        2,
+					SelectedLineCount: 1,
+					SelectedTotalVND:  "25990000",
+				},
+				AddedCount: 1,
+			},
+		}
+		uc := orderuc.New(orderuc.Dependencies{
+			Order:          repo,
+			ShippingFeeVND: "0",
+		})
+
+		_, err := uc.BuyAgain(ctx, userID, "bad-id")
+		if !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+
+		res, err := uc.BuyAgain(ctx, userID, orderID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.AddedCount != 1 || res.AdjustedItems == nil || res.SkippedItems == nil || res.Cart.Items == nil {
+			t.Fatalf("expected non-nil slices and addedCount=1, got %+v", res)
+		}
+		if res.Cart.ShippingFeeVND != "0" {
+			t.Fatalf("expected shippingFeeVnd '0', got %q", res.Cart.ShippingFeeVND)
+		}
+
+		repo.buyAgainErr = domain.ErrBuyAgainAllUnavailable
+		_, err = uc.BuyAgain(ctx, userID, orderID)
+		if !errors.Is(err, domain.ErrBuyAgainAllUnavailable) {
+			t.Fatalf("expected ErrBuyAgainAllUnavailable, got %v", err)
+		}
+	})
+}
+
 
 
 

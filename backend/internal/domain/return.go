@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"math/big"
 	"time"
 )
 
@@ -188,4 +189,64 @@ type ReturnRepository interface {
 	// Item refunded predicate
 	IsOrderItemRefunded(ctx context.Context, orderItemID string) (bool, error)
 	ListRefundedOrderItemIDs(ctx context.Context, orderItemIDs []string) (map[string]bool, error)
+}
+
+// CalculateExpectedRefundVND computes expected refund according to PD-2:
+//   - Full order return: exact totalVnd paid by customer.
+//   - Partial return without voucher or with freeship voucher: itemsTotal capped at totalVnd.
+//   - Partial return with merchandise discount (percent / fixed_amount):
+//     trunc(itemsTotal * max(subtotalVnd - discountVnd, 0) / subtotalVnd), capped at totalVnd.
+func CalculateExpectedRefundVND(
+	subtotalVND MoneyVND,
+	shippingFeeVND MoneyVND,
+	discountVND MoneyVND,
+	totalVND MoneyVND,
+	voucherType *VoucherType,
+	selectedItemsTotalVND MoneyVND,
+	isFullOrderReturn bool,
+) (MoneyVND, error) {
+	_ = shippingFeeVND
+	totalInt, okTotal := parseBigIntMoney(totalVND)
+	if !okTotal {
+		return "", ErrInvalidMoneyVND
+	}
+	if isFullOrderReturn {
+		return totalVND, nil
+	}
+
+	itemsInt, okItems := parseBigIntMoney(selectedItemsTotalVND)
+	if !okItems {
+		return "", ErrInvalidMoneyVND
+	}
+	subInt, okSub := parseBigIntMoney(subtotalVND)
+	if !okSub {
+		return "", ErrInvalidMoneyVND
+	}
+	discInt, okDisc := parseBigIntMoney(discountVND)
+	if !okDisc {
+		return "", ErrInvalidMoneyVND
+	}
+
+	var expected *big.Int
+	if discInt.Sign() == 0 || (voucherType != nil && *voucherType == VoucherTypeFreeship) {
+		expected = new(big.Int).Set(itemsInt)
+	} else {
+		if subInt.Sign() <= 0 {
+			return "0", nil
+		}
+		paidSub := new(big.Int).Sub(subInt, discInt)
+		if paidSub.Sign() <= 0 {
+			return "0", nil
+		}
+		expected = new(big.Int).Mul(itemsInt, paidSub)
+		expected.Div(expected, subInt)
+	}
+
+	if expected.Sign() < 0 {
+		return "0", nil
+	}
+	if expected.Cmp(totalInt) > 0 {
+		expected.Set(totalInt)
+	}
+	return MoneyVND(expected.String()), nil
 }

@@ -2,8 +2,15 @@
 SELECT id FROM users WHERE id = $1 FOR UPDATE;
 
 -- name: LockVariant :one
-SELECT v.id, v.product_id, COALESCE(lap.live_price_vnd, v.price_vnd)::text AS price_vnd,
-       (lap.variant_id IS NOT NULL)::boolean AS is_live_price, v.stock_quantity, v.active,
+SELECT v.id, v.product_id,
+       CASE
+           WHEN lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd) THEN lap.live_price_vnd
+           WHEN fsap.variant_id IS NOT NULL THEN fsap.flash_price_vnd
+           ELSE v.price_vnd
+       END::text AS price_vnd,
+       (lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd))::boolean AS is_live_price,
+       (fsap.variant_id IS NOT NULL AND (lap.variant_id IS NULL OR fsap.flash_price_vnd < lap.live_price_vnd))::boolean AS is_flash_sale_price,
+       v.stock_quantity, v.active,
        p.active AS product_active, p.brand AS brand_name, p.name AS product_name, p.model,
        COALESCE((SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position, pi.id LIMIT 1), '')::text AS image_url,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('groupLabel', g.label, 'valueLabel', ov.label) ORDER BY g.position, g.id)
@@ -12,6 +19,7 @@ SELECT v.id, v.product_id, COALESCE(lap.live_price_vnd, v.price_vnd)::text AS pr
                  WHERE vov.variant_id = v.id), '[]'::jsonb)::text AS options
 FROM product_variants v JOIN products p ON p.id = v.product_id
 LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
+LEFT JOIN flash_sale_active_variant_prices fsap ON fsap.variant_id = v.id
 WHERE v.id = $1
 FOR UPDATE OF v, p;
 
@@ -35,10 +43,17 @@ WHERE ci.user_id = $1 AND ci.variant_id = v.id AND p.active AND v.active;
 SELECT ci.id, ci.variant_id, ci.quantity, ci.selected, ci.snapshot_brand_name, ci.snapshot_product_name,
        ci.snapshot_model, ci.snapshot_image_url, ci.snapshot_options::text AS snapshot_options,
        v.product_id, p.active AS product_active, v.active AS variant_active,
-       COALESCE(lap.live_price_vnd, v.price_vnd)::text AS price_vnd, (lap.variant_id IS NOT NULL)::boolean AS is_live_price,
+       CASE
+           WHEN lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd) THEN lap.live_price_vnd
+           WHEN fsap.variant_id IS NOT NULL THEN fsap.flash_price_vnd
+           ELSE v.price_vnd
+       END::text AS price_vnd,
+       (lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd))::boolean AS is_live_price,
+       (fsap.variant_id IS NOT NULL AND (lap.variant_id IS NULL OR fsap.flash_price_vnd < lap.live_price_vnd))::boolean AS is_flash_sale_price,
        v.stock_quantity, p.brand AS brand_name, p.name AS product_name, p.model
 FROM cart_items ci JOIN product_variants v ON v.id = ci.variant_id JOIN products p ON p.id = v.product_id
 LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
+LEFT JOIN flash_sale_active_variant_prices fsap ON fsap.variant_id = v.id
 WHERE ci.user_id = $1 ORDER BY ci.created_at, ci.id;
 
 -- name: InsertOrIncrementCart :one

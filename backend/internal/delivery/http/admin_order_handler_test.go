@@ -31,6 +31,12 @@ type fakeAdminOrderRepo struct {
 	transitionErr   error
 	lastTransID     string
 	lastTransAction domain.OrderAdminAction
+
+	shipOrder        *domain.Order
+	shipErr          error
+	lastShipID       string
+	lastShipCarrier  string
+	lastShipTracking string
 }
 
 func (f *fakeAdminOrderRepo) Create(_ context.Context, _ string, _ string, _ []domain.OrderLineInput, _ domain.MoneyVND) (*domain.Order, error) {
@@ -84,6 +90,20 @@ func (f *fakeAdminOrderRepo) AdminTransition(_ context.Context, orderID string, 
 		return nil, f.transitionErr
 	}
 	return f.transitionOrder, nil
+}
+
+func (f *fakeAdminOrderRepo) ShipOrder(_ context.Context, orderID, carrier, trackingCode string) (*domain.Order, error) {
+	f.lastShipID = orderID
+	f.lastShipCarrier = carrier
+	f.lastShipTracking = trackingCode
+	if f.shipErr != nil {
+		return nil, f.shipErr
+	}
+	return f.shipOrder, nil
+}
+
+func (f *fakeAdminOrderRepo) BuyAgain(_ context.Context, _, _ string) (*domain.BuyAgainResult, error) {
+	return nil, nil
 }
 
 func setupAdminOrderTestRouter(repo *fakeAdminOrderRepo) (*gin.Engine, *jwt.Manager, *orderuc.UseCase) {
@@ -481,13 +501,35 @@ func TestAdminOrder_Transitions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		shipBody := `{"carrier":"Giao Hàng Nhanh","trackingCode":"GHN-123456"}`
+		newTransitionReq := func(targetID string) *http.Request {
+			var bodyBytes []byte
+			if tt.expectedAction == domain.OrderAdminActionShip {
+				bodyBytes = []byte(shipBody)
+			}
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+targetID+tt.actionPath, bytes.NewBuffer(bodyBytes))
+			if tt.expectedAction == domain.OrderAdminActionShip {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			return req
+		}
+
 		t.Run(tt.name+"_Success", func(t *testing.T) {
 			resOrder := sampleAdminOrder(validOrderID, tt.resultingState, "buyer@example.com")
 			repo := &fakeAdminOrderRepo{transitionOrder: &resOrder}
+			if tt.expectedAction == domain.OrderAdminActionShip {
+				carrier := "Giao Hàng Nhanh"
+				tracking := "GHN-123456"
+				shippedAt := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+				resOrder.Carrier = &carrier
+				resOrder.TrackingCode = &tracking
+				resOrder.ShippedAt = &shippedAt
+				repo.shipOrder = &resOrder
+			}
 			router, manager, _ := setupAdminOrderTestRouter(repo)
 			token := adminBearerToken(t, manager)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+tt.actionPath, bytes.NewBuffer(nil))
+			req := newTransitionReq(validOrderID)
 			req.Header.Set("Authorization", token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -496,11 +538,17 @@ func TestAdminOrder_Transitions(t *testing.T) {
 				t.Fatalf("expected 200, got %d. Body: %s", w.Code, w.Body.String())
 			}
 
-			if repo.lastTransID != validOrderID {
-				t.Errorf("expected trans order ID %s, got %s", validOrderID, repo.lastTransID)
-			}
-			if repo.lastTransAction != tt.expectedAction {
-				t.Errorf("expected action %s, got %s", tt.expectedAction, repo.lastTransAction)
+			if tt.expectedAction == domain.OrderAdminActionShip {
+				if repo.lastShipID != validOrderID || repo.lastShipCarrier != "Giao Hàng Nhanh" || repo.lastShipTracking != "GHN-123456" {
+					t.Errorf("unexpected ship args: id=%s carrier=%q tracking=%q", repo.lastShipID, repo.lastShipCarrier, repo.lastShipTracking)
+				}
+			} else {
+				if repo.lastTransID != validOrderID {
+					t.Errorf("expected trans order ID %s, got %s", validOrderID, repo.lastTransID)
+				}
+				if repo.lastTransAction != tt.expectedAction {
+					t.Errorf("expected action %s, got %s", tt.expectedAction, repo.lastTransAction)
+				}
 			}
 
 			var env struct {
@@ -523,11 +571,14 @@ func TestAdminOrder_Transitions(t *testing.T) {
 		})
 
 		t.Run(tt.name+"_ActionNotAllowed_409", func(t *testing.T) {
-			repo := &fakeAdminOrderRepo{transitionErr: domain.ErrOrderActionNotAllowed}
+			repo := &fakeAdminOrderRepo{
+				transitionErr: domain.ErrOrderActionNotAllowed,
+				shipErr:       domain.ErrOrderActionNotAllowed,
+			}
 			router, manager, _ := setupAdminOrderTestRouter(repo)
 			token := adminBearerToken(t, manager)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+tt.actionPath, nil)
+			req := newTransitionReq(validOrderID)
 			req.Header.Set("Authorization", token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -549,11 +600,14 @@ func TestAdminOrder_Transitions(t *testing.T) {
 		})
 
 		t.Run(tt.name+"_NotFound_404", func(t *testing.T) {
-			repo := &fakeAdminOrderRepo{transitionErr: domain.ErrOrderNotFound}
+			repo := &fakeAdminOrderRepo{
+				transitionErr: domain.ErrOrderNotFound,
+				shipErr:       domain.ErrOrderNotFound,
+			}
 			router, manager, _ := setupAdminOrderTestRouter(repo)
 			token := adminBearerToken(t, manager)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+tt.actionPath, nil)
+			req := newTransitionReq(validOrderID)
 			req.Header.Set("Authorization", token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -579,7 +633,7 @@ func TestAdminOrder_Transitions(t *testing.T) {
 			router, manager, _ := setupAdminOrderTestRouter(repo)
 			token := adminBearerToken(t, manager)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/invalid-uuid"+tt.actionPath, nil)
+			req := newTransitionReq("invalid-uuid")
 			req.Header.Set("Authorization", token)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -589,6 +643,100 @@ func TestAdminOrder_Transitions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAdminOrder_ShipValidationAndSnapshots(t *testing.T) {
+	validOrderID := "22222222-2222-2222-2222-222222222222"
+	createdAt := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	confirmedAt := createdAt.Add(15 * time.Minute)
+	preparingAt := createdAt.Add(30 * time.Minute)
+	shippedAt := createdAt.Add(time.Hour)
+	carrier := "Giao Hàng Nhanh"
+	trackingCode := "GHN-123456"
+	voucherCode := "AURA500K"
+	voucherType := domain.VoucherTypeFixedAmount
+
+	shippedOrder := sampleAdminOrder(validOrderID, domain.OrderStatusShipped, "buyer@example.com")
+	shippedOrder.SubtotalVND = "28990000"
+	shippedOrder.ShippingFeeVND = "60000"
+	shippedOrder.DiscountVND = "500000"
+	shippedOrder.TotalVND = "28550000"
+	shippedOrder.VoucherCode = &voucherCode
+	shippedOrder.VoucherType = &voucherType
+	shippedOrder.DeliveryMethod = domain.DeliveryMethodExpress2H
+	shippedOrder.Carrier = &carrier
+	shippedOrder.TrackingCode = &trackingCode
+	shippedOrder.CreatedAt = createdAt
+	shippedOrder.UpdatedAt = shippedAt
+	shippedOrder.ConfirmedAt = &confirmedAt
+	shippedOrder.PreparingAt = &preparingAt
+	shippedOrder.ShippedAt = &shippedAt
+	shippedOrder.Timeline = []domain.OrderTimelineEvent{
+		{
+			ID:        "evt-1",
+			Status:    domain.OrderStatusPendingConfirmation,
+			ActorType: domain.OrderActorCustomer,
+			Note:      "Đơn hàng được tạo",
+			CreatedAt: createdAt,
+		},
+		{
+			ID:        "evt-2",
+			Status:    domain.OrderStatusPreparing,
+			ActorType: domain.OrderActorAdmin,
+			Note:      "Đơn hàng đang được chuẩn bị",
+			CreatedAt: preparingAt,
+		},
+		{
+			ID:        "evt-3",
+			Status:    domain.OrderStatusShipped,
+			ActorType: domain.OrderActorAdmin,
+			Note:      "Đã bàn giao vận chuyển (Giao Hàng Nhanh - GHN-123456)",
+			CreatedAt: shippedAt,
+		},
+	}
+
+	repo := &fakeAdminOrderRepo{shipOrder: &shippedOrder}
+	router, manager, _ := setupAdminOrderTestRouter(repo)
+	token := adminBearerToken(t, manager)
+
+	// Missing body -> 400 validation_error with fields.carrier & fields.trackingCode
+	reqEmpty := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+"/ship", nil)
+	reqEmpty.Header.Set("Authorization", token)
+	wEmpty := httptest.NewRecorder()
+	router.ServeHTTP(wEmpty, reqEmpty)
+	assertErrorEnvelope(t, wEmpty, http.StatusBadRequest, "validation_error", "carrier")
+	assertErrorEnvelope(t, wEmpty, http.StatusBadRequest, "validation_error", "trackingCode")
+
+	// Invalid trackingCode -> 400 validation_error
+	badShipPayload := map[string]any{
+		"carrier":      "   ",
+		"trackingCode": "BAD CODE!",
+	}
+	badShipRaw, _ := json.Marshal(badShipPayload)
+	reqBad := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+"/ship", bytes.NewReader(badShipRaw))
+	reqBad.Header.Set("Authorization", token)
+	reqBad.Header.Set("Content-Type", "application/json")
+	wBad := httptest.NewRecorder()
+	router.ServeHTTP(wBad, reqBad)
+	assertErrorEnvelope(t, wBad, http.StatusBadRequest, "validation_error", "carrier")
+	assertErrorEnvelope(t, wBad, http.StatusBadRequest, "validation_error", "trackingCode")
+	assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "admin_order_ship_validation_400", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/admin/orders/:id/ship", badShipPayload, wBad)
+
+	// Valid ship -> 200 OK
+	shipPayload := map[string]any{
+		"carrier":      carrier,
+		"trackingCode": trackingCode,
+	}
+	shipRaw, _ := json.Marshal(shipPayload)
+	reqShip := httptest.NewRequest(http.MethodPost, "/api/v1/admin/orders/"+validOrderID+"/ship", bytes.NewReader(shipRaw))
+	reqShip.Header.Set("Authorization", token)
+	reqShip.Header.Set("Content-Type", "application/json")
+	wShip := httptest.NewRecorder()
+	router.ServeHTTP(wShip, reqShip)
+	if wShip.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", wShip.Code, wShip.Body.String())
+	}
+	assertOrRecordContractSnapshot(t, enhancementSnapshotPath, enhancementFeature, "admin_order_ship_200", "API-VOUCHERS-CHECKOUT-FULFILLMENT@1", "POST /api/v1/admin/orders/:id/ship", shipPayload, wShip)
 }
 
 func TestAdminOrderHTTP_MomoPaymentFieldsAndSnapshots(t *testing.T) {

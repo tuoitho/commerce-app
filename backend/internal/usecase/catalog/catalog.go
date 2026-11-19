@@ -1,30 +1,45 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"math"
 	"math/big"
+	"mime"
+	"net/http"
+	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
 )
+
+const productImageObjectPrefix = "products/"
 
 var (
 	uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 )
 
 type Dependencies struct {
-	Catalog domain.CatalogRepository
+	Catalog    domain.CatalogRepository
+	MediaStore domain.ReviewMediaStore
 }
 
 type UseCase struct {
-	catalog domain.CatalogRepository
+	catalog    domain.CatalogRepository
+	mediaStore domain.ReviewMediaStore
 }
 
 func New(deps Dependencies) *UseCase {
-	return &UseCase{catalog: deps.Catalog}
+	return &UseCase{catalog: deps.Catalog, mediaStore: deps.MediaStore}
 }
 
 func (uc *UseCase) ListCategories(ctx context.Context) ([]domain.Category, error) {
@@ -133,6 +148,19 @@ func (uc *UseCase) validateFilter(f *domain.ProductFilter) error {
 			fields["min_price"] = "must be less than or equal to max_price"
 			fields["max_price"] = "must be greater than or equal to min_price"
 		}
+	}
+	switch f.Sort {
+	case domain.ProductSortDefault,
+		domain.ProductSortBestselling,
+		domain.ProductSortNewest,
+		domain.ProductSortPriceAsc,
+		domain.ProductSortPriceDesc,
+		domain.ProductSortRatingDesc:
+	default:
+		fields["sort"] = "must be one of bestselling, newest, price_asc, price_desc, rating_desc"
+	}
+	if f.MinRating != nil && (math.IsNaN(*f.MinRating) || math.IsInf(*f.MinRating, 0) || *f.MinRating < 1 || *f.MinRating > 5) {
+		fields["min_rating"] = "must be a number between 1 and 5"
 	}
 	if len(fields) > 0 {
 		return domain.NewFilterValidationError(fields)
@@ -292,10 +320,229 @@ func (uc *UseCase) validateSaveProductInput(input *domain.SaveProductInput) erro
 		}
 	}
 
+	if len(input.ImageURLs) > 0 {
+		cleaned := make([]string, len(input.ImageURLs))
+		for i, raw := range input.ImageURLs {
+			trimmed := strings.TrimSpace(raw)
+			cleaned[i] = trimmed
+			if !isValidProductImageURL(trimmed) {
+				fields[fmt.Sprintf("imageUrls[%d]", i)] = "Đường dẫn ảnh phải là URL http(s) hợp lệ hoặc /media/products/..."
+			}
+		}
+		input.ImageURLs = cleaned
+	}
+
+	if input.Specs == nil {
+		input.Specs = []domain.SpecGroup{}
+	} else if len(input.Specs) > domain.MaxProductSpecGroups {
+		fields["specs"] = "Tối đa 12 nhóm thông số kỹ thuật"
+	} else {
+		cleanedSpecs := make([]domain.SpecGroup, len(input.Specs))
+		seenGroups := make(map[string]bool, len(input.Specs))
+		for i, g := range input.Specs {
+			trimmedGroup := strings.TrimSpace(g.Group)
+			groupLen := utf8.RuneCountInString(trimmedGroup)
+			if groupLen == 0 || groupLen > domain.MaxProductSpecGroupLen {
+				fields[fmt.Sprintf("specs[%d].group", i)] = "Tên nhóm thông số phải dài từ 1 đến 80 ký tự"
+			} else {
+				lowerGroup := strings.ToLower(trimmedGroup)
+				if seenGroups[lowerGroup] {
+					fields[fmt.Sprintf("specs[%d].group", i)] = "Tên nhóm thông số không được trùng nhau"
+				}
+				seenGroups[lowerGroup] = true
+			}
+
+			var cleanedItems []domain.SpecItem
+			if len(g.Items) == 0 {
+				fields[fmt.Sprintf("specs[%d].items", i)] = "Mỗi nhóm thông số phải có ít nhất một dòng"
+			} else if len(g.Items) > domain.MaxProductSpecItemsPerGroup {
+				fields[fmt.Sprintf("specs[%d].items", i)] = "Mỗi nhóm tối đa 20 dòng thông số"
+			} else {
+				cleanedItems = make([]domain.SpecItem, len(g.Items))
+				for j, item := range g.Items {
+					trimmedLabel := strings.TrimSpace(item.Label)
+					trimmedValue := strings.TrimSpace(item.Value)
+					labelLen := utf8.RuneCountInString(trimmedLabel)
+					valueLen := utf8.RuneCountInString(trimmedValue)
+					if labelLen == 0 || labelLen > domain.MaxProductSpecLabelLen {
+						fields[fmt.Sprintf("specs[%d].items[%d].label", i, j)] = "Nhãn thông số phải dài từ 1 đến 80 ký tự"
+					}
+					if valueLen == 0 || valueLen > domain.MaxProductSpecValueLen {
+						fields[fmt.Sprintf("specs[%d].items[%d].value", i, j)] = "Giá trị thông số phải dài từ 1 đến 300 ký tự"
+					}
+					cleanedItems[j] = domain.SpecItem{Label: trimmedLabel, Value: trimmedValue}
+				}
+			}
+			cleanedSpecs[i] = domain.SpecGroup{Group: trimmedGroup, Items: cleanedItems}
+		}
+		input.Specs = cleanedSpecs
+	}
+
 	if len(fields) > 0 {
 		return domain.NewValidationError(fields)
 	}
 	return nil
+}
+
+func (uc *UseCase) UploadProductImage(ctx context.Context, input domain.UploadProductImageInput) (*domain.UploadedProductImage, error) {
+	if uc.mediaStore == nil {
+		return nil, errors.New("product media store is not configured")
+	}
+	if input.Reader == nil || input.Size <= 0 || input.Size > domain.MaxProductImageBytes {
+		return nil, domain.NewValidationError(map[string]string{
+			"file": "Ảnh sản phẩm phải có dung lượng từ 1 byte đến tối đa 10 MB",
+		})
+	}
+
+	data, err := io.ReadAll(io.LimitReader(input.Reader, domain.MaxProductImageBytes+1))
+	if err != nil {
+		return nil, domain.NewValidationError(map[string]string{
+			"file": "Không thể đọc tệp ảnh sản phẩm",
+		})
+	}
+	if len(data) == 0 || int64(len(data)) > domain.MaxProductImageBytes {
+		return nil, domain.NewValidationError(map[string]string{
+			"file": "Ảnh sản phẩm phải có dung lượng từ 1 byte đến tối đa 10 MB",
+		})
+	}
+
+	sniffLen := len(data)
+	if sniffLen > 512 {
+		sniffLen = 512
+	}
+	detectedMIME := normalizeImageMIME(http.DetectContentType(data[:sniffLen]))
+	ext, supported := productImageExtensionForMIME(detectedMIME)
+	if !supported {
+		return nil, domain.NewValidationError(map[string]string{
+			"file": "Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP",
+		})
+	}
+
+	if declared := normalizeDeclaredImageMIME(input.DeclaredContentType); declared != "" && declared != "application/octet-stream" && declared != detectedMIME {
+		return nil, domain.NewValidationError(map[string]string{
+			"file": "Định dạng ảnh thực tế không khớp với khai báo (chỉ hỗ trợ JPEG, PNG hoặc WebP)",
+		})
+	}
+
+	key := uuid.NewString() + "." + ext
+	objectKey := productImageObjectPrefix + key
+	if err := uc.mediaStore.PutObject(ctx, objectKey, bytes.NewReader(data), int64(len(data)), detectedMIME); err != nil {
+		return nil, err
+	}
+
+	return &domain.UploadedProductImage{
+		Key:       key,
+		URL:       "/media/products/" + key,
+		MimeType:  detectedMIME,
+		SizeBytes: int64(len(data)),
+	}, nil
+}
+
+func (uc *UseCase) StatProductImage(ctx context.Context, imageKey string) (*domain.ReviewObjectInfo, error) {
+	if !domain.ProductImageKeyRegex.MatchString(imageKey) || uc.mediaStore == nil {
+		return nil, domain.ErrProductImageNotFound
+	}
+	info, err := uc.mediaStore.StatObject(ctx, productImageObjectPrefix+imageKey)
+	if err != nil {
+		if isStorageNotFound(err) {
+			return nil, domain.ErrProductImageNotFound
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(info.ContentType) == "" {
+		info.ContentType = contentTypeForProductImageKey(imageKey)
+	}
+	return info, nil
+}
+
+func (uc *UseCase) OpenProductImage(ctx context.Context, imageKey string) (io.ReadCloser, *domain.ReviewObjectInfo, error) {
+	if !domain.ProductImageKeyRegex.MatchString(imageKey) || uc.mediaStore == nil {
+		return nil, nil, domain.ErrProductImageNotFound
+	}
+	info, err := uc.StatProductImage(ctx, imageKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	stream, err := uc.mediaStore.GetObject(ctx, productImageObjectPrefix+imageKey)
+	if err != nil {
+		if isStorageNotFound(err) {
+			return nil, nil, domain.ErrProductImageNotFound
+		}
+		return nil, nil, err
+	}
+	return stream, info, nil
+}
+
+func isValidProductImageURL(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	if strings.HasPrefix(raw, "/media/products/") {
+		key := strings.TrimPrefix(raw, "/media/products/")
+		return domain.ProductImageKeyRegex.MatchString(key)
+	}
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	return (scheme == "http" || scheme == "https") && parsed.Host != ""
+}
+
+func normalizeDeclaredImageMIME(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if parsed, _, err := mime.ParseMediaType(trimmed); err == nil && parsed != "" {
+		trimmed = parsed
+	}
+	return normalizeImageMIME(trimmed)
+}
+
+func normalizeImageMIME(v string) string {
+	lower := strings.ToLower(strings.TrimSpace(v))
+	if lower == "image/jpg" {
+		return "image/jpeg"
+	}
+	return lower
+}
+
+func productImageExtensionForMIME(mimeType string) (string, bool) {
+	switch mimeType {
+	case "image/jpeg":
+		return "jpg", true
+	case "image/png":
+		return "png", true
+	case "image/webp":
+		return "webp", true
+	default:
+		return "", false
+	}
+}
+
+func contentTypeForProductImageKey(imageKey string) string {
+	switch strings.ToLower(filepath.Ext(imageKey)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func isStorageNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "nosuchkey") ||
+		strings.Contains(lower, "not found") ||
+		strings.Contains(lower, "does not exist") ||
+		strings.Contains(lower, "404")
 }
 
 func validPriceInput(s string) bool {

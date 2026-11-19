@@ -1,11 +1,14 @@
 package http
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"commerce-backend/internal/domain"
 	orderuc "commerce-backend/internal/usecase/order"
@@ -24,28 +27,37 @@ func newAdminOrderHandler(orderUC *orderuc.UseCase) *AdminOrderHandler {
 }
 
 type adminOrderResponse struct {
-	ID                   string              `json:"id"`
-	UserID               string              `json:"userId"`
-	BuyerEmail           string              `json:"buyerEmail"`
-	Status               string              `json:"status"`
-	PaymentMethod        string              `json:"paymentMethod"`
-	PaymentStatus        string              `json:"paymentStatus"`
-	PaymentTransactionID *string             `json:"paymentTransactionId,omitempty"`
-	PaidAt               *time.Time          `json:"paidAt,omitempty"`
-	RecipientName        string              `json:"recipientName"`
-	Phone                string              `json:"phone"`
-	ProvinceName         string              `json:"provinceName"`
-	WardName             string              `json:"wardName"`
-	DetailAddress        string              `json:"detailAddress"`
-	SubtotalVND          string              `json:"subtotalVnd"`
-	ShippingFeeVND       string              `json:"shippingFeeVnd"`
-	TotalVND             string              `json:"totalVnd"`
-	Items                []orderItemResponse `json:"items"`
-	CreatedAt            time.Time           `json:"createdAt"`
-	UpdatedAt            time.Time           `json:"updatedAt"`
-	ConfirmedAt          *time.Time          `json:"confirmedAt,omitempty"`
-	CancelledAt          *time.Time          `json:"cancelledAt,omitempty"`
-	DeliveredAt          *time.Time          `json:"deliveredAt,omitempty"`
+	ID                   string                      `json:"id"`
+	UserID               string                      `json:"userId"`
+	BuyerEmail           string                      `json:"buyerEmail"`
+	Status               string                      `json:"status"`
+	PaymentMethod        string                      `json:"paymentMethod"`
+	PaymentStatus        string                      `json:"paymentStatus"`
+	PaymentTransactionID *string                     `json:"paymentTransactionId,omitempty"`
+	PaidAt               *time.Time                  `json:"paidAt,omitempty"`
+	RecipientName        string                      `json:"recipientName"`
+	Phone                string                      `json:"phone"`
+	ProvinceName         string                      `json:"provinceName"`
+	WardName             string                      `json:"wardName"`
+	DetailAddress        string                      `json:"detailAddress"`
+	SubtotalVND          string                      `json:"subtotalVnd"`
+	ShippingFeeVND       string                      `json:"shippingFeeVnd"`
+	DiscountVND          string                      `json:"discountVnd"`
+	TotalVND             string                      `json:"totalVnd"`
+	VoucherCode          *string                     `json:"voucherCode,omitempty"`
+	VoucherType          *string                     `json:"voucherType,omitempty"`
+	DeliveryMethod       string                      `json:"deliveryMethod"`
+	Carrier              *string                     `json:"carrier,omitempty"`
+	TrackingCode         *string                     `json:"trackingCode,omitempty"`
+	Items                []orderItemResponse         `json:"items"`
+	Timeline             []domain.OrderTimelineEvent `json:"timeline"`
+	CreatedAt            time.Time                   `json:"createdAt"`
+	UpdatedAt            time.Time                   `json:"updatedAt"`
+	ConfirmedAt          *time.Time                  `json:"confirmedAt,omitempty"`
+	PreparingAt          *time.Time                  `json:"preparingAt,omitempty"`
+	ShippedAt            *time.Time                  `json:"shippedAt,omitempty"`
+	CancelledAt          *time.Time                  `json:"cancelledAt,omitempty"`
+	DeliveredAt          *time.Time                  `json:"deliveredAt,omitempty"`
 }
 
 func toAdminOrderResponse(order domain.Order) adminOrderResponse {
@@ -66,11 +78,20 @@ func toAdminOrderResponse(order domain.Order) adminOrderResponse {
 		DetailAddress:        base.DetailAddress,
 		SubtotalVND:          base.SubtotalVND,
 		ShippingFeeVND:       base.ShippingFeeVND,
+		DiscountVND:          base.DiscountVND,
 		TotalVND:             base.TotalVND,
+		VoucherCode:          base.VoucherCode,
+		VoucherType:          base.VoucherType,
+		DeliveryMethod:       base.DeliveryMethod,
+		Carrier:              base.Carrier,
+		TrackingCode:         base.TrackingCode,
 		Items:                base.Items,
+		Timeline:             base.Timeline,
 		CreatedAt:            base.CreatedAt,
 		UpdatedAt:            base.UpdatedAt,
 		ConfirmedAt:          base.ConfirmedAt,
+		PreparingAt:          base.PreparingAt,
+		ShippedAt:            base.ShippedAt,
 		CancelledAt:          base.CancelledAt,
 		DeliveredAt:          base.DeliveredAt,
 	}
@@ -176,8 +197,27 @@ func (h *AdminOrderHandler) ConfirmPreparing(c *gin.Context) {
 	writeSuccess(c, http.StatusOK, "Thành công", toAdminOrderResponse(*order))
 }
 
+type shipOrderRequest struct {
+	Carrier      string `json:"carrier"`
+	TrackingCode string `json:"trackingCode"`
+}
+
 func (h *AdminOrderHandler) Ship(c *gin.Context) {
-	order, err := h.orderUC.AdminTransition(c.Request.Context(), c.Param("id"), domain.OrderAdminActionShip)
+	orderID := c.Param("id")
+	if _, err := uuid.Parse(orderID); err != nil {
+		writeError(c, domain.ErrOrderNotFound)
+		return
+	}
+
+	var req shipOrderRequest
+	if c.Request != nil && c.Request.Body != nil {
+		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+			writeError(c, domain.NewValidationError(map[string]string{"body": "Dữ liệu không hợp lệ"}))
+			return
+		}
+	}
+
+	order, err := h.orderUC.AdminShip(c.Request.Context(), orderID, req.Carrier, req.TrackingCode)
 	if err != nil {
 		writeError(c, err)
 		return

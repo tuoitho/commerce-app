@@ -135,17 +135,23 @@ func (r *ReturnRepository) CreateReturnRequest(ctx context.Context, input domain
 		}
 	}
 
-	// Calculate expected refund
-	expectedRefund := itemsTotal
-	if len(selectedItems) == len(orderItems) {
-		shippingFee := domain.MoneyVND(orderRow.ShippingFeeVnd)
-		if !shippingFee.IsCanonical() {
-			shippingFee = "0"
-		}
-		expectedRefund, err = domain.AddMoneyVND(expectedRefund, shippingFee)
-		if err != nil {
-			return nil, err
-		}
+	// Calculate expected refund per PD-2
+	var voucherType *domain.VoucherType
+	if orderRow.VoucherType.Valid {
+		vt := domain.VoucherType(orderRow.VoucherType.String)
+		voucherType = &vt
+	}
+	expectedRefund, err := domain.CalculateExpectedRefundVND(
+		domain.MoneyVND(orderRow.SubtotalVnd),
+		domain.MoneyVND(orderRow.ShippingFeeVnd),
+		domain.MoneyVND(orderRow.DiscountVnd),
+		domain.MoneyVND(orderRow.TotalVnd),
+		voucherType,
+		itemsTotal,
+		len(selectedItems) == len(orderItems),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Insert return request
@@ -937,6 +943,19 @@ func (r *ReturnRepository) RefundAdmin(ctx context.Context, returnID, adminUserI
 		ConfirmedAt: orderRow.ConfirmedAt,
 		CancelledAt: orderRow.CancelledAt,
 		DeliveredAt: orderRow.DeliveredAt,
+	}); err != nil {
+		return nil, err
+	}
+
+	returnNote := "Hoàn tiền trả hàng một phần"
+	if newOrderStatus == domain.OrderStatusReturned {
+		returnNote = "Hoàn tiền trả hàng toàn bộ đơn"
+	}
+	if err := q.InsertOrderStatusEvent(ctx, sqlc.InsertOrderStatusEventParams{
+		OrderID:   reqRow.OrderID,
+		Status:    string(newOrderStatus),
+		ActorType: string(domain.OrderActorAdmin),
+		Note:      returnNote,
 	}); err != nil {
 		return nil, err
 	}

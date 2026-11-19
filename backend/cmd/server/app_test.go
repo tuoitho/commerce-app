@@ -148,7 +148,29 @@ func TestApp_ProvidersUnit(t *testing.T) {
 
 	accountRepo := provideAccountRepository(nil)
 	accountUC := provideAccountUseCase(accountRepo, nil, jwtMgr, cfg, log)
-	router := provideGinRouter(cfg, log, nil, accountUC, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, notifSvc, dashboardUC, userMgmtUC, nil, nil, wsHub, jwtMgr)
+	resetRepo := providePasswordResetRepository(nil)
+	mailer := provideMailer(cfg, log)
+	authUC := provideAuthUseCase(provideUserRepository(nil), provideSessionRepository(nil), resetRepo, mailer, jwtMgr, cfg, log)
+	if authUC == nil {
+		t.Fatal("expected non-nil auth use case")
+	}
+	flashSaleRepo := provideFlashSaleRepository(nil)
+	if flashSaleRepo == nil {
+		t.Fatal("expected non-nil flash sale repository")
+	}
+	flashSaleUC := provideFlashSaleUseCase(flashSaleRepo)
+	if flashSaleUC == nil {
+		t.Fatal("expected non-nil flash sale usecase")
+	}
+	voucherRepo := provideVoucherRepository(nil)
+	if voucherRepo == nil {
+		t.Fatal("expected non-nil voucher repository")
+	}
+	voucherUC := provideVoucherUseCase(voucherRepo)
+	if voucherUC == nil {
+		t.Fatal("expected non-nil voucher usecase")
+	}
+	router := provideGinRouter(cfg, log, authUC, accountUC, nil, nil, areaUC, addrUC, orderUC, returnUC, reviewUC, favUC, chatUC, postUC, notifSvc, dashboardUC, userMgmtUC, nil, flashSaleUC, voucherUC, nil, wsHub, jwtMgr)
 	if router == nil {
 		t.Fatal("expected non-nil gin router")
 	}

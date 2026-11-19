@@ -666,6 +666,27 @@ func (q *Queries) RestoreLiveQuotaForOrder(ctx context.Context, orderID string) 
 	return err
 }
 
+const restoreLiveQuotaItem = `-- name: RestoreLiveQuotaItem :exec
+UPDATE live_variant_prices lvp
+SET sold_quantity = GREATEST(lvp.sold_quantity - $1::integer, 0)::integer
+FROM live_sessions s
+WHERE lvp.session_id = $2
+  AND lvp.variant_id = $3
+  AND s.id = lvp.session_id
+  AND s.status = 'live'
+`
+
+type RestoreLiveQuotaItemParams struct {
+	Quantity  int32
+	SessionID string
+	VariantID string
+}
+
+func (q *Queries) RestoreLiveQuotaItem(ctx context.Context, arg RestoreLiveQuotaItemParams) error {
+	_, err := q.db.Exec(ctx, restoreLiveQuotaItem, arg.Quantity, arg.SessionID, arg.VariantID)
+	return err
+}
+
 const setLivePinnedProduct = `-- name: SetLivePinnedProduct :exec
 UPDATE live_sessions
 SET pinned_product_id = $1::uuid,

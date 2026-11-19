@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -139,6 +140,17 @@ func TestLiveSchemaIntegration(t *testing.T) {
 
 	t.Run("down migration removes every livestream object", func(t *testing.T) {
 		reset(t)
+		var postLivestream []string
+		for _, name := range upMigrationNames(t) {
+			if name > "000021_create_livestream.up.sql" {
+				postLivestream = append(postLivestream, name)
+			}
+		}
+		for i := len(postLivestream) - 1; i >= 0; i-- {
+			downName := strings.TrimSuffix(postLivestream[i], ".up.sql") + ".down.sql"
+			applyMigration(t, ctx, conn, downName)
+		}
+
 		applyMigration(t, ctx, conn, "000021_create_livestream.down.sql")
 		var remaining int
 		require.NoError(t, conn.QueryRow(ctx, `SELECT count(*) FROM (VALUES
@@ -149,7 +161,20 @@ func TestLiveSchemaIntegration(t *testing.T) {
 		var hasColumn bool
 		require.NoError(t, conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'order_items' AND column_name = 'live_session_id')`).Scan(&hasColumn))
 		require.False(t, hasColumn)
+
 		applyMigration(t, ctx, conn, "000021_create_livestream.up.sql")
+		for _, upName := range postLivestream {
+			applyMigration(t, ctx, conn, upName)
+		}
+
+		var hasPromoConstraint bool
+		require.NoError(t, conn.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname = 'order_items_single_promo_source_check'
+			)
+		`).Scan(&hasPromoConstraint))
+		require.True(t, hasPromoConstraint, "000027 check constraint must be preserved after round-trip")
 	})
 }
 

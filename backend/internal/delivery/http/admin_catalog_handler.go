@@ -52,6 +52,7 @@ type saveProductRequest struct {
 	StockQuantity int64                 `json:"stockQuantity"`
 	Featured      bool                  `json:"featured"`
 	ImageURLs     []string              `json:"imageUrls"`
+	Specs         []specGroupDTO        `json:"specs"`
 	HasVariants   bool                  `json:"hasVariants"`
 	OptionGroups  []optionGroupInputDTO `json:"optionGroups"`
 	Variants      []variantInputDTO     `json:"variants"`
@@ -112,6 +113,21 @@ func (req saveProductRequest) toDomain() domain.SaveProductInput {
 		}
 	}
 
+	specs := make([]domain.SpecGroup, 0, len(req.Specs))
+	for _, g := range req.Specs {
+		items := make([]domain.SpecItem, 0, len(g.Items))
+		for _, item := range g.Items {
+			items = append(items, domain.SpecItem{
+				Label: item.Label,
+				Value: item.Value,
+			})
+		}
+		specs = append(specs, domain.SpecGroup{
+			Group: g.Group,
+			Items: items,
+		})
+	}
+
 	return domain.SaveProductInput{
 		Name:          req.Name,
 		Model:         req.Model,
@@ -123,6 +139,7 @@ func (req saveProductRequest) toDomain() domain.SaveProductInput {
 		StockQuantity: req.StockQuantity,
 		Featured:      req.Featured,
 		ImageURLs:     req.ImageURLs,
+		Specs:         specs,
 		HasVariants:   req.HasVariants,
 		OptionGroups:  optionGroups,
 		Variants:      variants,
@@ -318,4 +335,53 @@ func (h *adminCatalogHandler) DeleteProduct(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *adminCatalogHandler) UploadImage(c *gin.Context) {
+	if h.uc == nil {
+		writeError(c, domain.ErrNotFound)
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, domain.MaxProductImageRequestBytes)
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"file": "Ảnh sản phẩm không hợp lệ hoặc vượt quá 10 MB",
+		}))
+		return
+	}
+	files := form.File["file"]
+	if len(files) == 0 {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"file": "Vui lòng chọn tệp ảnh sản phẩm",
+		}))
+		return
+	}
+	fh := files[0]
+	if fh.Size <= 0 || fh.Size > domain.MaxProductImageBytes {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"file": "Ảnh sản phẩm phải có dung lượng từ 1 byte đến tối đa 10 MB",
+		}))
+		return
+	}
+	file, err := fh.Open()
+	if err != nil {
+		writeError(c, domain.NewValidationError(map[string]string{
+			"file": "Không thể đọc tệp ảnh sản phẩm",
+		}))
+		return
+	}
+	defer file.Close()
+
+	uploaded, err := h.uc.UploadProductImage(c.Request.Context(), domain.UploadProductImageInput{
+		Reader:              file,
+		Size:                fh.Size,
+		DeclaredContentType: fh.Header.Get("Content-Type"),
+	})
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	writeSuccess(c, http.StatusCreated, "Tải ảnh sản phẩm thành công", uploaded)
 }

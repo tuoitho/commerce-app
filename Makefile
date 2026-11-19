@@ -1,4 +1,4 @@
-.PHONY: backend frontend frontend-admin admin db-up seed minio-up minio-down mediamtx-up mediamtx-down run test build
+.PHONY: backend frontend frontend-admin admin db-up seed minio-up minio-down mediamtx-up mediamtx-down mailpit-up mailpit-down run test build
 
 ## Start MinIO object storage container and initialize private bucket.
 minio-up:
@@ -15,6 +15,14 @@ mediamtx-up:
 ## Stop the MediaMTX live video server.
 mediamtx-down:
 	docker compose -f compose.mediamtx.yml down
+
+## Start Mailpit SMTP trap and web UI (:11025 SMTP, :18025 Web).
+mailpit-up:
+	docker compose -f compose.mailpit.yml up -d
+
+## Stop Mailpit container.
+mailpit-down:
+	docker compose -f compose.mailpit.yml down
 
 ## Apply database migrations against the local backend DB.
 db-up:

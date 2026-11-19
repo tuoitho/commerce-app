@@ -1,0 +1,12 @@
+DROP VIEW IF EXISTS flash_sale_active_variant_prices;
+DROP VIEW IF EXISTS flash_sale_running_variants;
+DROP INDEX IF EXISTS flash_sale_items_variant_idx;
+DROP TABLE IF EXISTS flash_sale_items;
+DROP TABLE IF EXISTS flash_sales;
+DROP INDEX IF EXISTS products_search_trgm_idx;
+ALTER TABLE products DROP CONSTRAINT IF EXISTS products_specs_array_check;
+ALTER TABLE products DROP COLUMN IF EXISTS specs;
+DROP FUNCTION IF EXISTS f_unaccent(text);
+DROP EXTENSION IF EXISTS btree_gist;
+DROP EXTENSION IF EXISTS pg_trgm;
+DROP EXTENSION IF EXISTS unaccent;

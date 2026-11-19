@@ -203,3 +203,91 @@ func TestOrderRepository_MomoMethodGuards(t *testing.T) {
 	})
 }
 
+func TestOrderRepository_CheckoutAndFulfillmentGuards(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewOrderRepository(nil)
+	validUser := "11111111-1111-1111-1111-111111111111"
+	validAddr := "22222222-2222-2222-2222-222222222222"
+	validOrder := "33333333-3333-3333-3333-333333333333"
+
+	t.Run("QuoteCheckout validates UUIDs and deliveryMethod", func(t *testing.T) {
+		if _, err := repo.QuoteCheckout(ctx, domain.CheckoutQuoteInput{UserID: "bad", AddressID: validAddr}); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound, got %v", err)
+		}
+		if _, err := repo.QuoteCheckout(ctx, domain.CheckoutQuoteInput{UserID: validUser, AddressID: "bad"}); !errors.Is(err, domain.ErrAddressNotFound) {
+			t.Fatalf("expected ErrAddressNotFound, got %v", err)
+		}
+		_, err := repo.QuoteCheckout(ctx, domain.CheckoutQuoteInput{
+			UserID:         validUser,
+			AddressID:      validAddr,
+			DeliveryMethod: domain.DeliveryMethod("drone"),
+		})
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["deliveryMethod"] == "" {
+			t.Fatalf("expected ValidationError for deliveryMethod, got %v", err)
+		}
+	})
+
+	t.Run("CreateCheckoutOrder validates paymentMethod, deliveryMethod, and lines", func(t *testing.T) {
+		_, err := repo.CreateCheckoutOrder(ctx, domain.CreateCheckoutOrderInput{
+			UserID:        validUser,
+			AddressID:     validAddr,
+			PaymentMethod: "crypto",
+		})
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) || valErr.Fields["paymentMethod"] == "" {
+			t.Fatalf("expected ValidationError for paymentMethod, got %v", err)
+		}
+
+		_, err = repo.CreateCheckoutOrder(ctx, domain.CreateCheckoutOrderInput{
+			UserID:         validUser,
+			AddressID:      validAddr,
+			PaymentMethod:  domain.PaymentMethodCOD,
+			DeliveryMethod: domain.DeliveryMethod("drone"),
+		})
+		valErr = nil
+		if !errors.As(err, &valErr) || valErr.Fields["deliveryMethod"] == "" {
+			t.Fatalf("expected ValidationError for deliveryMethod, got %v", err)
+		}
+
+		_, err = repo.CreateCheckoutOrder(ctx, domain.CreateCheckoutOrderInput{
+			UserID:         validUser,
+			AddressID:      validAddr,
+			PaymentMethod:  domain.PaymentMethodCOD,
+			DeliveryMethod: domain.DeliveryMethodStandard,
+			Lines:          nil,
+		})
+		if !errors.Is(err, domain.ErrCartEmpty) {
+			t.Fatalf("expected ErrCartEmpty, got %v", err)
+		}
+	})
+
+	t.Run("ShipOrder validates UUID, carrier, and trackingCode", func(t *testing.T) {
+		if _, err := repo.ShipOrder(ctx, "bad", "GHN", "GHN123"); !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+		_, err := repo.ShipOrder(ctx, validOrder, "   ", "ab")
+		var valErr *domain.ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("expected ValidationError, got %v", err)
+		}
+		if valErr.Fields["carrier"] == "" || valErr.Fields["trackingCode"] == "" {
+			t.Fatalf("expected both carrier and trackingCode errors, got %+v", valErr.Fields)
+		}
+		_, err = repo.ShipOrder(ctx, validOrder, "GHN", "BAD CODE!")
+		valErr = nil
+		if !errors.As(err, &valErr) || valErr.Fields["trackingCode"] == "" {
+			t.Fatalf("expected trackingCode format error, got %v", err)
+		}
+	})
+
+	t.Run("BuyAgain validates UUIDs", func(t *testing.T) {
+		if _, err := repo.BuyAgain(ctx, "bad", validOrder); !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+		if _, err := repo.BuyAgain(ctx, validUser, "bad"); !errors.Is(err, domain.ErrOrderNotFound) {
+			t.Fatalf("expected ErrOrderNotFound, got %v", err)
+		}
+	})
+}
+

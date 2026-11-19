@@ -225,3 +225,141 @@ func TestCalculateReturnEligibility(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateExpectedRefundVND_PD2(t *testing.T) {
+	vtPercent := VoucherTypePercent
+	vtFixed := VoucherTypeFixedAmount
+	vtFreeship := VoucherTypeFreeship
+
+	tests := []struct {
+		name               string
+		subtotalVND        MoneyVND
+		shippingFeeVND     MoneyVND
+		discountVND        MoneyVND
+		totalVND           MoneyVND
+		voucherType        *VoucherType
+		selectedItemsTotal MoneyVND
+		isFullOrderReturn  bool
+		want               MoneyVND
+	}{
+		{
+			name:               "no voucher full return returns totalVnd",
+			subtotalVND:        "3000000",
+			shippingFeeVND:     "25000",
+			discountVND:        "0",
+			totalVND:           "3025000",
+			voucherType:        nil,
+			selectedItemsTotal: "3000000",
+			isFullOrderReturn:  true,
+			want:               "3025000",
+		},
+		{
+			name:               "no voucher partial return returns itemsTotal",
+			subtotalVND:        "3000000",
+			shippingFeeVND:     "25000",
+			discountVND:        "0",
+			totalVND:           "3025000",
+			voucherType:        nil,
+			selectedItemsTotal: "1000000",
+			isFullOrderReturn:  false,
+			want:               "1000000",
+		},
+		{
+			name:               "freeship full return returns totalVnd",
+			subtotalVND:        "3000000",
+			shippingFeeVND:     "60000",
+			discountVND:        "60000",
+			totalVND:           "3000000",
+			voucherType:        &vtFreeship,
+			selectedItemsTotal: "3000000",
+			isFullOrderReturn:  true,
+			want:               "3000000",
+		},
+		{
+			name:               "freeship partial return returns itemsTotal capped at totalVnd",
+			subtotalVND:        "3000000",
+			shippingFeeVND:     "60000",
+			discountVND:        "30000",
+			totalVND:           "3030000",
+			voucherType:        &vtFreeship,
+			selectedItemsTotal: "1000000",
+			isFullOrderReturn:  false,
+			want:               "1000000",
+		},
+		{
+			name:               "fixed_amount full return returns totalVnd",
+			subtotalVND:        "30000000",
+			shippingFeeVND:     "0",
+			discountVND:        "3000000",
+			totalVND:           "27000000",
+			voucherType:        &vtFixed,
+			selectedItemsTotal: "30000000",
+			isFullOrderReturn:  true,
+			want:               "27000000",
+		},
+		{
+			name:               "fixed_amount partial return allocates proportionally and truncates",
+			subtotalVND:        "3000000",
+			shippingFeeVND:     "25000",
+			discountVND:        "500000",
+			totalVND:           "2525000",
+			voucherType:        &vtFixed,
+			selectedItemsTotal: "1000000",
+			isFullOrderReturn:  false,
+			want:               "833333", // trunc(1000000 * 2500000 / 3000000)
+		},
+		{
+			name:               "percent partial return allocates proportionally",
+			subtotalVND:        "30000000",
+			shippingFeeVND:     "0",
+			discountVND:        "3000000",
+			totalVND:           "27000000",
+			voucherType:        &vtPercent,
+			selectedItemsTotal: "10000000",
+			isFullOrderReturn:  false,
+			want:               "9000000",
+		},
+		{
+			name:               "100% discount partial and full return yield 0",
+			subtotalVND:        "2000000",
+			shippingFeeVND:     "0",
+			discountVND:        "2000000",
+			totalVND:           "0",
+			voucherType:        &vtPercent,
+			selectedItemsTotal: "1000000",
+			isFullOrderReturn:  false,
+			want:               "0",
+		},
+		{
+			name:               "100% discount full return yield 0",
+			subtotalVND:        "2000000",
+			shippingFeeVND:     "0",
+			discountVND:        "2000000",
+			totalVND:           "0",
+			voucherType:        &vtPercent,
+			selectedItemsTotal: "2000000",
+			isFullOrderReturn:  true,
+			want:               "0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CalculateExpectedRefundVND(
+				tt.subtotalVND,
+				tt.shippingFeeVND,
+				tt.discountVND,
+				tt.totalVND,
+				tt.voucherType,
+				tt.selectedItemsTotal,
+				tt.isFullOrderReturn,
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("CalculateExpectedRefundVND() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

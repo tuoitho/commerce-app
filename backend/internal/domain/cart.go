@@ -36,6 +36,8 @@ type CartItem struct {
 	Availability  CartAvailability
 	// IsLivePrice reports that UnitPriceVND is a live-session price.
 	IsLivePrice bool
+	// IsFlashSalePrice reports that UnitPriceVND is a Flash Sale campaign price.
+	IsFlashSalePrice bool
 }
 
 type Cart struct {

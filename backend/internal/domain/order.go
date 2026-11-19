@@ -148,6 +148,22 @@ type OrderItem struct {
 	Review       *Review
 }
 
+type OrderActorType string
+
+const (
+	OrderActorCustomer OrderActorType = "customer"
+	OrderActorAdmin    OrderActorType = "admin"
+	OrderActorSystem   OrderActorType = "system"
+)
+
+type OrderTimelineEvent struct {
+	ID        string         `json:"id"`
+	Status    OrderStatus    `json:"status"`
+	ActorType OrderActorType `json:"actorType"`
+	Note      string         `json:"note"`
+	CreatedAt time.Time      `json:"createdAt"`
+}
+
 type Order struct {
 	ID                   string
 	UserID               string
@@ -160,12 +176,22 @@ type Order struct {
 	PayURL               string
 	SubtotalVND          MoneyVND
 	ShippingFeeVND       MoneyVND
+	DiscountVND          MoneyVND
 	TotalVND             MoneyVND
+	VoucherID            *string
+	VoucherCode          *string
+	VoucherType          *VoucherType
+	DeliveryMethod       DeliveryMethod
+	Carrier              *string
+	TrackingCode         *string
 	ShippingInfo         ShippingInfo
 	Items                []OrderItem
+	Timeline             []OrderTimelineEvent
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	ConfirmedAt          *time.Time
+	PreparingAt          *time.Time
+	ShippedAt            *time.Time
 	CancelledAt          *time.Time
 	DeliveredAt          *time.Time
 	CancellableUntil     *time.Time
@@ -277,4 +303,73 @@ type OrderRepository interface {
 	ListByAdmin(ctx context.Context, statuses []string) ([]Order, error)
 	GetByAdminID(ctx context.Context, orderID string) (*Order, error)
 	AdminTransition(ctx context.Context, orderID string, action OrderAdminAction) (*Order, error)
+}
+
+type CheckoutQuoteInput struct {
+	UserID         string
+	AddressID      string
+	DeliveryMethod DeliveryMethod
+	VoucherCode    string
+	Shipping       ShippingConfig
+}
+
+type CheckoutQuote struct {
+	SubtotalVND              MoneyVND       `json:"subtotalVnd"`
+	DeliveryMethod           DeliveryMethod `json:"deliveryMethod"`
+	ExpressAvailable         bool           `json:"expressAvailable"`
+	StandardShippingFeeVND   MoneyVND       `json:"standardShippingFeeVnd"`
+	ExpressShippingFeeVND    MoneyVND       `json:"expressShippingFeeVnd"`
+	FreeShippingThresholdVND MoneyVND       `json:"freeShippingThresholdVnd"`
+	ShippingFeeVND           MoneyVND       `json:"shippingFeeVnd"`
+	VoucherCode              *string        `json:"voucherCode"`
+	VoucherType              *VoucherType   `json:"voucherType"`
+	DiscountVND              MoneyVND       `json:"discountVnd"`
+	TotalVND                 MoneyVND       `json:"totalVnd"`
+}
+
+type CreateCheckoutOrderInput struct {
+	UserID         string
+	AddressID      string
+	Lines          []OrderLineInput
+	PaymentMethod  string
+	DeliveryMethod DeliveryMethod
+	VoucherCode    string
+	Shipping       ShippingConfig
+}
+
+type CheckoutOrderRepository interface {
+	QuoteCheckout(ctx context.Context, input CheckoutQuoteInput) (*CheckoutQuote, error)
+	CreateCheckoutOrder(ctx context.Context, input CreateCheckoutOrderInput) (*Order, error)
+}
+
+type BuyAgainSkipReason string
+
+const (
+	BuyAgainSkipOutOfStock  BuyAgainSkipReason = "out_of_stock"
+	BuyAgainSkipUnavailable BuyAgainSkipReason = "unavailable"
+)
+
+type BuyAgainAdjustedItem struct {
+	VariantID         string `json:"variantId"`
+	ProductName       string `json:"productName"`
+	RequestedQuantity int64  `json:"requestedQuantity"`
+	AddedQuantity     int64  `json:"addedQuantity"`
+}
+
+type BuyAgainSkippedItem struct {
+	VariantID   string             `json:"variantId"`
+	ProductName string             `json:"productName"`
+	Reason      BuyAgainSkipReason `json:"reason"`
+}
+
+type BuyAgainResult struct {
+	Cart          *Cart                  `json:"cart"`
+	AddedCount    int                    `json:"addedCount"`
+	AdjustedItems []BuyAgainAdjustedItem `json:"adjustedItems"`
+	SkippedItems  []BuyAgainSkippedItem  `json:"skippedItems"`
+}
+
+type FulfillmentOrderRepository interface {
+	ShipOrder(ctx context.Context, orderID, carrier, trackingCode string) (*Order, error)
+	BuyAgain(ctx context.Context, userID, orderID string) (*BuyAgainResult, error)
 }

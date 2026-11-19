@@ -78,6 +78,52 @@ type Conversation struct {
 	UpdatedAt          time.Time
 }
 
+type FlashSale struct {
+	ID        string
+	Name      string
+	StartsAt  time.Time
+	EndsAt    time.Time
+	Active    bool
+	CreatedBy pgtype.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type FlashSaleActiveVariantPrice struct {
+	FlashSaleID   string
+	CampaignName  string
+	StartsAt      time.Time
+	EndsAt        time.Time
+	ProductID     string
+	VariantID     string
+	FlashPriceVnd pgtype.Numeric
+	Quota         int32
+	SoldQuantity  int32
+}
+
+type FlashSaleItem struct {
+	FlashSaleID   string
+	ProductID     string
+	VariantID     string
+	FlashPriceVnd pgtype.Numeric
+	Quota         int32
+	SoldQuantity  int32
+	Position      int32
+}
+
+type FlashSaleRunningVariant struct {
+	FlashSaleID   string
+	CampaignName  string
+	StartsAt      time.Time
+	EndsAt        time.Time
+	ProductID     string
+	VariantID     string
+	FlashPriceVnd pgtype.Numeric
+	Quota         int32
+	SoldQuantity  int32
+	Position      int32
+}
+
 type LiveActiveVariantPrice struct {
 	SessionID    string
 	ProductID    string
@@ -166,6 +212,15 @@ type Order struct {
 	PaymentStatus        string
 	PaymentTransactionID pgtype.Text
 	PaidAt               pgtype.Timestamptz
+	VoucherID            pgtype.UUID
+	VoucherCode          pgtype.Text
+	VoucherType          pgtype.Text
+	DiscountVnd          pgtype.Numeric
+	DeliveryMethod       string
+	ShippingCarrier      pgtype.Text
+	TrackingCode         pgtype.Text
+	PreparingAt          pgtype.Timestamptz
+	ShippedAt            pgtype.Timestamptz
 }
 
 type OrderItem struct {
@@ -182,6 +237,27 @@ type OrderItem struct {
 	Quantity      int64
 	LineTotalVnd  pgtype.Numeric
 	LiveSessionID pgtype.UUID
+	FlashSaleID   pgtype.UUID
+}
+
+type OrderStatusEvent struct {
+	ID        string
+	OrderID   string
+	Status    string
+	ActorType string
+	Note      string
+	CreatedAt time.Time
+}
+
+type PasswordResetOtp struct {
+	ID         string
+	Email      string
+	UserID     pgtype.UUID
+	OtpHash    pgtype.Text
+	Attempts   int16
+	ExpiresAt  time.Time
+	ConsumedAt pgtype.Timestamptz
+	CreatedAt  time.Time
 }
 
 type Post struct {
@@ -254,6 +330,7 @@ type Product struct {
 	Featured      bool
 	Active        bool
 	Brand         string
+	Specs         []byte
 }
 
 type ProductFavorite struct {
@@ -392,4 +469,34 @@ type VariantOptionValue struct {
 	ProductID     string
 	GroupID       string
 	OptionValueID string
+}
+
+type Voucher struct {
+	ID             string
+	Code           string
+	Title          string
+	Description    string
+	VoucherType    string
+	DiscountValue  pgtype.Numeric
+	MaxDiscountVnd pgtype.Numeric
+	MinOrderVnd    pgtype.Numeric
+	UsageLimit     pgtype.Int4
+	UsedCount      int32
+	PerUserLimit   int32
+	StartsAt       time.Time
+	EndsAt         time.Time
+	Active         bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type VoucherUsage struct {
+	ID          string
+	VoucherID   string
+	UserID      string
+	OrderID     string
+	DiscountVnd pgtype.Numeric
+	Status      string
+	CreatedAt   time.Time
+	RestoredAt  pgtype.Timestamptz
 }

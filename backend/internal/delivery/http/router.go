@@ -18,11 +18,13 @@ import (
 	cataloguc "commerce-backend/internal/usecase/catalog"
 	dashboarduc "commerce-backend/internal/usecase/dashboard"
 	favoriteuc "commerce-backend/internal/usecase/favorite"
+	flashsaleuc "commerce-backend/internal/usecase/flashsale"
 	liveuc "commerce-backend/internal/usecase/live"
 	orderuc "commerce-backend/internal/usecase/order"
 	returnuc "commerce-backend/internal/usecase/returns"
 	reviewuc "commerce-backend/internal/usecase/review"
 	usermgmtuc "commerce-backend/internal/usecase/usermgmt"
+	voucheruc "commerce-backend/internal/usecase/voucher"
 )
 
 type Dependencies struct {
@@ -42,6 +44,8 @@ type Dependencies struct {
 	Post         domain.PostUseCase
 	Notification domain.NotificationUseCase
 	Live         *liveuc.UseCase
+	FlashSale    *flashsaleuc.UseCase
+	Voucher      *voucheruc.UseCase
 	LiveHub      *livews.Hub
 	WSHub        *ws.Hub
 	JWT          *jwt.Manager
@@ -71,6 +75,20 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		}
 		// Called by MediaMTX, not by browsers, so it lives outside /api/v1.
 		router.POST("/internal/mediamtx/auth", newMediaMTXAuthHandler(deps.Live, deps.JWT, deps.Logger).authorize)
+	}
+
+	if deps.FlashSale != nil {
+		flashSaleHandler := newFlashSaleHandler(deps.FlashSale)
+		api.GET("/flash-sales/current", flashSaleHandler.GetCurrent)
+	}
+
+	if deps.Voucher != nil {
+		voucherHandler := newVoucherHandler(deps.Voucher)
+		vouchers := api.Group("/vouchers")
+		vouchers.Use(guard.AuthRequired)
+		{
+			vouchers.GET("/available", voucherHandler.ListAvailable)
+		}
 	}
 
 	if deps.Post != nil {
@@ -116,6 +134,8 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.Refresh)
 		auth.POST("/logout", authHandler.Logout)
+		auth.POST("/forgot-password", authHandler.ForgotPassword)
+		auth.POST("/reset-password", authHandler.ResetPassword)
 		auth.GET("/me", guard.AuthRequired, authHandler.Me)
 	}
 
@@ -133,11 +153,14 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		}
 	}
 
+	catalogHandler := newCatalogHandler(deps.Catalog)
 	// Media binary routes outside /api/v1
 	router.GET("/media/reviews/:mediaId", reviewHandler.getMedia)
 	router.HEAD("/media/reviews/:mediaId", reviewHandler.getMedia)
 	router.GET("/media/avatars/:avatarKey", accountHandler.GetAvatarMedia)
 	router.HEAD("/media/avatars/:avatarKey", accountHandler.GetAvatarMedia)
+	router.GET("/media/products/:imageKey", catalogHandler.GetProductMedia)
+	router.HEAD("/media/products/:imageKey", catalogHandler.GetProductMedia)
 
 	if deps.Chat != nil {
 		chatMediaHandler := newChatMediaHandler(deps.Chat)
@@ -170,7 +193,6 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		reviewReplies.PUT("/:replyId/helpfulness", reviewHandler.setReplyHelpfulness)
 	}
 
-	catalogHandler := newCatalogHandler(deps.Catalog)
 	api.GET("/categories", catalogHandler.ListCategories)
 	api.GET("/brands", catalogHandler.ListBrands)
 	products := api.Group("/products")
@@ -220,6 +242,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 	orderHandler := newOrderHandler(deps.Order)
 	returnHandler := newReturnHandler(deps.Return)
 	paymentHandler := newPaymentHandler(deps.Order)
+	api.POST("/checkout/quote", guard.AuthRequired, orderHandler.Quote)
 	orders := api.Group("/orders")
 	orders.Use(guard.AuthRequired)
 	{
@@ -230,6 +253,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		orders.POST("/:id/momo/retry", orderHandler.RetryMomo)
 		orders.POST("/:id/cancel", orderHandler.Cancel)
 		orders.POST("/:id/cancel/undo", orderHandler.UndoCancel)
+		orders.POST("/:id/buy-again", orderHandler.BuyAgain)
 		orders.POST("/:id/returns", returnHandler.Create)
 		orders.POST("/:id/returns/:returnId/cancel", returnHandler.Cancel)
 		orders.POST("/:id/items/:itemId/review", reviewHandler.createReview)
@@ -277,6 +301,28 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 				adminUsers.POST("/:id/unlock", adminUserHandler.Unlock)
 			}
 		}
+		if deps.FlashSale != nil {
+			adminFlashSaleHandler := newAdminFlashSaleHandler(deps.FlashSale)
+			adminFlashSales := admin.Group("/flash-sales")
+			{
+				adminFlashSales.GET("", adminFlashSaleHandler.List)
+				adminFlashSales.GET("/:id", adminFlashSaleHandler.GetByID)
+				adminFlashSales.POST("", adminFlashSaleHandler.Create)
+				adminFlashSales.PUT("/:id", adminFlashSaleHandler.Update)
+				adminFlashSales.DELETE("/:id", adminFlashSaleHandler.Delete)
+			}
+		}
+		if deps.Voucher != nil {
+			adminVoucherHandler := newAdminVoucherHandler(deps.Voucher)
+			adminVouchers := admin.Group("/vouchers")
+			{
+				adminVouchers.GET("", adminVoucherHandler.List)
+				adminVouchers.GET("/:id", adminVoucherHandler.GetByID)
+				adminVouchers.POST("", adminVoucherHandler.Create)
+				adminVouchers.PUT("/:id", adminVoucherHandler.Update)
+				adminVouchers.DELETE("/:id", adminVoucherHandler.Delete)
+			}
+		}
 
 		adminCategories := admin.Group("/categories")
 		{
@@ -289,6 +335,7 @@ func NewRouter(router *gin.Engine, deps Dependencies) {
 		{
 			adminProducts.GET("", adminCatalogHandler.ListProducts)
 			adminProducts.GET("/:id", adminCatalogHandler.GetProduct)
+			adminProducts.POST("/images", adminCatalogHandler.UploadImage)
 			adminProducts.POST("", adminCatalogHandler.CreateProduct)
 			adminProducts.PUT("/:id", adminCatalogHandler.UpdateProduct)
 			adminProducts.DELETE("/:id", adminCatalogHandler.DeleteProduct)

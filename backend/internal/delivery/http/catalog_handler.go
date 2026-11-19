@@ -1,6 +1,8 @@
 package http
 
 import (
+	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,6 +26,16 @@ type categoryResponse struct {
 	Name string `json:"name"`
 }
 
+type specItemDTO struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type specGroupDTO struct {
+	Group string        `json:"group"`
+	Items []specItemDTO `json:"items"`
+}
+
 type productSummaryResponse struct {
 	ID              string           `json:"id"`
 	Name            string           `json:"name"`
@@ -36,6 +48,9 @@ type productSummaryResponse struct {
 	Currency        string           `json:"currency"`
 	PrimaryImageURL string           `json:"primaryImageUrl"`
 	InStock         bool             `json:"inStock"`
+	AverageRating   float64          `json:"averageRating"`
+	ReviewCount     int64            `json:"reviewCount"`
+	SoldCount       int64            `json:"soldCount"`
 }
 
 type productDetailResponse struct {
@@ -54,6 +69,7 @@ type productDetailResponse struct {
 	InStock       bool                  `json:"inStock"`
 	Featured      bool                  `json:"featured"`
 	Active        bool                  `json:"active"`
+	Specs         []specGroupDTO        `json:"specs"`
 	OptionGroups  []optionGroupResponse `json:"optionGroups"`
 	Variants      []variantResponse     `json:"variants"`
 	CreatedAt     time.Time             `json:"createdAt"`
@@ -80,31 +96,62 @@ type variantResponse struct {
 	Active         bool              `json:"active"`
 }
 
-// liveVariantResponse adds the live-session price in effect to a variant.
-// Only the storefront product detail exposes it; admin responses keep the
+type variantFlashSaleResponse struct {
+	FlashSaleID   string    `json:"flashSaleId"`
+	CampaignName  string    `json:"campaignName"`
+	FlashPriceVND string    `json:"flashPriceVnd"`
+	Quota         int       `json:"quota"`
+	SoldQuantity  int       `json:"soldQuantity"`
+	EndsAt        time.Time `json:"endsAt"`
+}
+
+// liveVariantResponse adds the live-session price and Flash Sale info in effect to a variant.
+// Only the storefront product detail exposes them; admin responses keep the
 // plain variantResponse.
 type liveVariantResponse struct {
 	variantResponse
-	LivePriceVND  *string `json:"livePriceVnd"`
-	LiveRemaining *int    `json:"liveRemaining"`
+	LivePriceVND  *string                   `json:"livePriceVnd"`
+	LiveRemaining *int                      `json:"liveRemaining"`
+	FlashSale     *variantFlashSaleResponse `json:"flashSale"`
 }
 
 type storefrontProductDetailResponse struct {
 	productDetailResponse
-	Variants []liveVariantResponse `json:"variants"`
+	AverageRating float64               `json:"averageRating"`
+	ReviewCount   int64                 `json:"reviewCount"`
+	SoldCount     int64                 `json:"soldCount"`
+	Variants      []liveVariantResponse `json:"variants"`
 }
 
 func toStorefrontDetailResponse(p domain.Product) storefrontProductDetailResponse {
 	base := toDetailResponse(p)
 	variants := make([]liveVariantResponse, len(base.Variants))
 	for i, v := range base.Variants {
+		var fsResp *variantFlashSaleResponse
+		if fs := p.Variants[i].FlashSale; fs != nil {
+			fsResp = &variantFlashSaleResponse{
+				FlashSaleID:   fs.FlashSaleID,
+				CampaignName:  fs.CampaignName,
+				FlashPriceVND: string(fs.FlashPriceVND),
+				Quota:         fs.Quota,
+				SoldQuantity:  fs.SoldQuantity,
+				EndsAt:        fs.EndsAt,
+			}
+		}
 		variants[i] = liveVariantResponse{
 			variantResponse: v,
 			LivePriceVND:    moneyPtr(p.Variants[i].LivePriceVND),
 			LiveRemaining:   p.Variants[i].LiveRemaining,
+			FlashSale:       fsResp,
 		}
 	}
-	return storefrontProductDetailResponse{productDetailResponse: base, Variants: variants}
+	return storefrontProductDetailResponse{
+		productDetailResponse: base,
+		AverageRating:         p.AverageRating,
+		ReviewCount:           p.ReviewCount,
+		SoldCount:             p.SoldCount,
+		Variants:              variants,
+	}
 }
 
 func (h *catalogHandler) ListCategories(c *gin.Context) {
@@ -137,6 +184,8 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 	maxPrice, maxPriceSet := c.GetQuery("max_price")
 	pageStr, pageSet := c.GetQuery("page")
 	limitStr, limitSet := c.GetQuery("limit")
+	minRatingStr, minRatingSet := c.GetQuery("min_rating")
+	sortStr := c.Query("sort")
 
 	fields := map[string]string{}
 	if minPriceSet && minPrice == "" {
@@ -144,6 +193,32 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 	}
 	if maxPriceSet && maxPrice == "" {
 		fields["max_price"] = "must not be empty"
+	}
+
+	var minRating *float64
+	if minRatingSet {
+		if minRatingStr == "" {
+			fields["min_rating"] = "must not be empty"
+		} else {
+			v, err := strconv.ParseFloat(minRatingStr, 64)
+			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < 1 || v > 5 {
+				fields["min_rating"] = "must be a number between 1 and 5"
+			} else {
+				minRating = &v
+			}
+		}
+	}
+
+	sortMode := domain.ProductSort(sortStr)
+	switch sortMode {
+	case domain.ProductSortDefault,
+		domain.ProductSortBestselling,
+		domain.ProductSortNewest,
+		domain.ProductSortPriceAsc,
+		domain.ProductSortPriceDesc,
+		domain.ProductSortRatingDesc:
+	default:
+		fields["sort"] = "must be one of bestselling, newest, price_asc, price_desc, rating_desc"
 	}
 
 	var page, limit int
@@ -184,6 +259,8 @@ func (h *catalogHandler) ListProducts(c *gin.Context) {
 		Brands:      c.QueryArray("brand"),
 		MinPriceVND: moneyQuery(minPrice),
 		MaxPriceVND: moneyQuery(maxPrice),
+		Sort:        sortMode,
+		MinRating:   minRating,
 	}
 	if raw, ok := c.GetQuery("in_stock"); ok {
 		var inStock bool
@@ -278,6 +355,43 @@ func (h *catalogHandler) GetProduct(c *gin.Context) {
 	writeSuccess(c, http.StatusOK, "", toStorefrontDetailResponse(*product))
 }
 
+func (h *catalogHandler) GetProductMedia(c *gin.Context) {
+	if h.uc == nil {
+		writeError(c, domain.ErrProductImageNotFound)
+		return
+	}
+	imageKey := c.Param("imageKey")
+	if c.Request.Method == http.MethodHead {
+		info, err := h.uc.StatProductImage(c.Request.Context(), imageKey)
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+		writeProductMediaHeaders(c, info)
+		c.Status(http.StatusOK)
+		return
+	}
+
+	stream, info, err := h.uc.OpenProductImage(c.Request.Context(), imageKey)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	defer stream.Close()
+
+	writeProductMediaHeaders(c, info)
+	c.Status(http.StatusOK)
+	_, _ = io.Copy(c.Writer, stream)
+}
+
+func writeProductMediaHeaders(c *gin.Context, info *domain.ReviewObjectInfo) {
+	c.Header("Content-Type", info.ContentType)
+	c.Header("Content-Length", strconv.FormatInt(info.Size, 10))
+	c.Header("Cache-Control", "public, max-age=86400")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Disposition", "inline")
+}
+
 func toSummaryResponse(p domain.Product) productSummaryResponse {
 	return productSummaryResponse{
 		ID:              p.ID,
@@ -291,6 +405,9 @@ func toSummaryResponse(p domain.Product) productSummaryResponse {
 		Currency:        p.Currency,
 		PrimaryImageURL: p.PrimaryImageURL(),
 		InStock:         p.InStock(),
+		AverageRating:   p.AverageRating,
+		ReviewCount:     p.ReviewCount,
+		SoldCount:       p.SoldCount,
 	}
 }
 
@@ -315,11 +432,30 @@ func toDetailResponse(p domain.Product) productDetailResponse {
 		InStock:       p.InStock(),
 		Featured:      p.Featured,
 		Active:        p.Active,
+		Specs:         toSpecGroupDTOs(p.Specs),
 		OptionGroups:  toOptionGroupResponses(p.OptionGroups),
 		Variants:      toVariantResponses(p.Variants),
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,
 	}
+}
+
+func toSpecGroupDTOs(specs []domain.SpecGroup) []specGroupDTO {
+	out := make([]specGroupDTO, 0, len(specs))
+	for _, g := range specs {
+		items := make([]specItemDTO, 0, len(g.Items))
+		for _, item := range g.Items {
+			items = append(items, specItemDTO{
+				Label: item.Label,
+				Value: item.Value,
+			})
+		}
+		out = append(out, specGroupDTO{
+			Group: g.Group,
+			Items: items,
+		})
+	}
+	return out
 }
 
 func toOptionGroupResponses(groups []domain.OptionGroup) []optionGroupResponse {

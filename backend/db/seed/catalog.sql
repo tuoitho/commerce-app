@@ -511,4 +511,198 @@ UPDATE products SET price = 17990000, stock_quantity = 62 WHERE id = '10000000-0
 UPDATE products SET price = 10990000, stock_quantity = 62 WHERE id = '10000000-0000-0001-0000-000000000018';
 UPDATE products SET price = 9890000, stock_quantity = 62 WHERE id = '10000000-0000-0001-0000-000000000019';
 UPDATE products SET price = 3190000, stock_quantity = 17 WHERE id = '10000000-0000-0001-0000-000000000020';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'specs'
+  ) THEN
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.3 inch, LTPO Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2622 x 1206 pixels"},{"label":"Tần số quét","value":"ProMotion 1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A18 Pro (3nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"iOS 18"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP Fusion + 48MP Ultra Wide + 12MP Tele 5x"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 120fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"3582 mAh (lên đến 27 giờ xem video)"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C PD, MagSafe 25W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G Sub-6GHz & mmWave, Dual eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C (USB 3 10Gb/s)"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Titanium cấp 5, kính Ceramic Shield"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"199 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000001';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.1 inch, Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2532 x 1170 pixels"},{"label":"Tần số quét","value":"60Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A18 (3nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"iOS 18"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP Fusion 2-in-1"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4005 mAh (lên đến 26 giờ xem video)"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C 20W, sạc không dây Qi 7.5W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G (Modem Apple C1), Dual eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Nhôm hàng không vũ trụ, Ceramic Shield"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"167 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000002';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.36 inch, CrystalRes AMOLED LTPO"},{"label":"Độ phân giải","value":"2670 x 1200 pixels (1.5K)"},{"label":"Tần số quét","value":"1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Qualcomm Snapdragon 8 Elite (3nm)"},{"label":"RAM","value":"12GB LPDDR5X"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS 2 (Android 15)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"Leica 50MP Light Fusion 900 + 50MP Tele 2.6x + 50MP Ultra Wide"},{"label":"Camera trước","value":"32MP"},{"label":"Quay video","value":"8K 30fps, 4K 60fps Dolby Vision"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5240 mAh Silicon-Carbon"},{"label":"Công nghệ sạc","value":"HyperCharge có dây 90W, không dây 50W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G Kép, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 6.0"},{"label":"Cổng kết nối","value":"USB-C (USB 3.2 Gen 1)"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Hợp kim nhôm cường lực, Xiaomi Shield Glass"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"191 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000003';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.67 inch, AMOLED"},{"label":"Độ phân giải","value":"2400 x 1080 pixels (Full HD+)"},{"label":"Tần số quét","value":"120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"MediaTek Helio G99-Ultra"},{"label":"RAM","value":"6GB / 8GB"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"108MP chính + 2MP xóa phông + 2MP macro"},{"label":"Camera trước","value":"20MP"},{"label":"Quay video","value":"1080p 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5500 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh Turbo 33W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"4G LTE, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 5, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C, jack tai nghe 3.5mm"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Khung nhựa cao cấp, kính Gorilla Glass 5"},{"label":"Kháng nước/bụi","value":"IP54"},{"label":"Trọng lượng","value":"196 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000004';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.9 inch, LTPO Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2868 x 1320 pixels"},{"label":"Tần số quét","value":"ProMotion 1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A18 Pro (3nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"iOS 18"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP Fusion + 48MP Ultra Wide + 12MP Tele Tetraprism 5x"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 120fps, ProRes Log"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4685 mAh (lên đến 33 giờ xem video)"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C PD, MagSafe 25W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C (USB 3 10Gb/s)"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Titanium cấp 5, kính Ceramic Shield"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"227 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000005';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.1 inch, Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2556 x 1179 pixels"},{"label":"Tần số quét","value":"60Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A18 (3nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"iOS 18"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP Fusion + 12MP Ultra Wide"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 60fps, Spatial Video"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"3561 mAh (lên đến 22 giờ xem video)"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C PD, MagSafe 25W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Nhôm hàng không vũ trụ, mặt lưng kính pha màu"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"170 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000006';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.7 inch, LTPO Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2796 x 1290 pixels"},{"label":"Tần số quét","value":"ProMotion 1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A17 Pro (3nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"iOS 17 (nâng cấp iOS 18)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP chính + 12MP Ultra Wide + 12MP Tele 5x"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K 60fps ProRes, ACES Log"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4422 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C 27W, MagSafe 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6E, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C (USB 3 10Gb/s)"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Titanium cấp 5, mặt kính nhám"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"221 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000007';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.1 inch, Super Retina XDR OLED Dynamic Island"},{"label":"Độ phân giải","value":"2556 x 1179 pixels"},{"label":"Tần số quét","value":"60Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A16 Bionic (4nm)"},{"label":"RAM","value":"6GB"},{"label":"Hệ điều hành","value":"iOS 17 (nâng cấp iOS 18)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"48MP chính + 12MP Ultra Wide"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"3349 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh USB-C 20W, MagSafe 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Nhôm chuẩn hàng không, kính pha màu"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"171 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000008';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.1 inch, Super Retina XDR OLED"},{"label":"Độ phân giải","value":"2532 x 1170 pixels"},{"label":"Tần số quét","value":"60Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Apple A15 Bionic (5nm)"},{"label":"RAM","value":"4GB"},{"label":"Hệ điều hành","value":"iOS 15 (nâng cấp iOS 18)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"12MP chính (OIS dịch chuyển cảm biến) + 12MP Ultra Wide"},{"label":"Camera trước","value":"12MP TrueDepth"},{"label":"Quay video","value":"4K Dolby Vision 60fps, Cinematic Mode"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"3227 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 20W, MagSafe 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.0"},{"label":"Cổng kết nối","value":"Lightning"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Khung nhôm, mặt kính Ceramic Shield"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"173 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000009';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.9 inch, Dynamic LTPO AMOLED 2X"},{"label":"Độ phân giải","value":"3120 x 1440 pixels (QHD+)"},{"label":"Tần số quét","value":"1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Snapdragon 8 Elite for Galaxy (3nm)"},{"label":"RAM","value":"12GB LPDDR5X"},{"label":"Hệ điều hành","value":"One UI 7 (Android 15) + Galaxy AI"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"200MP chính OIS + 50MP Ultra Wide + 50MP Tele 5x + 10MP Tele 3x"},{"label":"Camera trước","value":"12MP"},{"label":"Quay video","value":"8K 30fps, 4K 120fps HDR10+"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5000 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 45W, sạc không dây 25W Qi2"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM + eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C (USB 3.2 Gen 1), tích hợp S Pen"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Titanium Armor, kính Gorilla Armor 2"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"218 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000010';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.2 inch, Dynamic LTPO AMOLED 2X"},{"label":"Độ phân giải","value":"2340 x 1080 pixels (Full HD+)"},{"label":"Tần số quét","value":"1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Snapdragon 8 Elite for Galaxy (3nm)"},{"label":"RAM","value":"12GB"},{"label":"Hệ điều hành","value":"One UI 7 (Android 15) + Galaxy AI"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP chính OIS + 12MP Ultra Wide + 10MP Tele 3x"},{"label":"Camera trước","value":"12MP"},{"label":"Quay video","value":"8K 30fps, 4K 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4000 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 25W, sạc không dây 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM + eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Armor Aluminum, kính Gorilla Glass Victus 2"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"162 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000011';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"Chính 7.6 inch Dynamic AMOLED 2X + Phụ 6.3 inch"},{"label":"Độ phân giải","value":"2160 x 1856 pixels (màn hình chính)"},{"label":"Tần số quét","value":"1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Snapdragon 8 Gen 3 for Galaxy"},{"label":"RAM","value":"12GB"},{"label":"Hệ điều hành","value":"One UI 6.1.1 (Android 14) + Galaxy AI"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP OIS + 12MP Ultra Wide + 10MP Tele 3x"},{"label":"Camera trước","value":"10MP (ngoài) + 4MP UDC (trong)"},{"label":"Quay video","value":"8K 30fps, 4K 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4400 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 25W, không dây 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6E, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Armor Aluminum cải tiến, bản lề FlexHinge"},{"label":"Kháng nước/bụi","value":"IP48"},{"label":"Trọng lượng","value":"239 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000012';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"Chính 6.7 inch Dynamic AMOLED 2X + Flex Window 3.4 inch"},{"label":"Độ phân giải","value":"2640 x 1080 pixels"},{"label":"Tần số quét","value":"1–120Hz (màn hình chính)"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Snapdragon 8 Gen 3 for Galaxy"},{"label":"RAM","value":"12GB"},{"label":"Hệ điều hành","value":"One UI 6.1.1 (Android 14) + Galaxy AI"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP chính OIS + 12MP Ultra Wide"},{"label":"Camera trước","value":"10MP"},{"label":"Quay video","value":"4K 60fps, Auto Zoom FlexCam"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"4000 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 25W, không dây 15W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6E, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Armor Aluminum, kính Gorilla Glass Victus 2"},{"label":"Kháng nước/bụi","value":"IP48"},{"label":"Trọng lượng","value":"187 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000013';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.6 inch, Super AMOLED Vision Booster"},{"label":"Độ phân giải","value":"2340 x 1080 pixels (Full HD+)"},{"label":"Tần số quét","value":"120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Exynos 1480 (4nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"One UI 6.1 (Android 14)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP OIS + 12MP Ultra Wide + 5MP Macro"},{"label":"Camera trước","value":"32MP"},{"label":"Quay video","value":"4K 30fps Super HDR"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5000 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 25W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Khung kim loại phay xước, kính Victus+"},{"label":"Kháng nước/bụi","value":"IP67"},{"label":"Trọng lượng","value":"213 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000014';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.5 inch, Super AMOLED"},{"label":"Độ phân giải","value":"2340 x 1080 pixels (Full HD+)"},{"label":"Tần số quét","value":"90Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"MediaTek Helio G99 (6nm)"},{"label":"RAM","value":"8GB"},{"label":"Hệ điều hành","value":"One UI 6 (Android 14)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP chính + 5MP Ultra Wide + 2MP Macro"},{"label":"Camera trước","value":"13MP"},{"label":"Quay video","value":"1080p 30fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5000 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 25W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"4G LTE, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 5, Bluetooth 5.3"},{"label":"Cổng kết nối","value":"USB-C, jack tai nghe 3.5mm"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Khung viền Key Island nguyên khối"},{"label":"Kháng nước/bụi","value":"Không công bố IP"},{"label":"Trọng lượng","value":"200 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000015';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.73 inch, WQHD+ LTPO AMOLED"},{"label":"Độ phân giải","value":"3200 x 1440 pixels"},{"label":"Tần số quét","value":"1–120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Qualcomm Snapdragon 8 Elite (3nm)"},{"label":"RAM","value":"16GB LPDDR5X"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS 2 (Android 15)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"Leica 50MP cảm biến 1 inch + 200MP Periscope Tele + 50MP Tele + 50MP Ultra Wide"},{"label":"Camera trước","value":"32MP"},{"label":"Quay video","value":"8K 30fps, 4K 120fps Log"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5410 mAh Silicon-Carbon"},{"label":"Công nghệ sạc","value":"HyperCharge có dây 90W, không dây 80W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G Kép, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 6.0"},{"label":"Cổng kết nối","value":"USB-C (USB 3.2 Gen 2)"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Hợp kim nhôm CNC, lưng da/gốm cao cấp"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"226 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000016';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.67 inch, AMOLED 1.5K 4000 nits"},{"label":"Độ phân giải","value":"2712 x 1220 pixels"},{"label":"Tần số quét","value":"144Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"MediaTek Dimensity 9300+ (4nm)"},{"label":"RAM","value":"12GB LPDDR5X"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"Leica 50MP Light Fusion 900 + 50MP Tele 2.6x + 12MP Ultra Wide"},{"label":"Camera trước","value":"32MP"},{"label":"Quay video","value":"8K 30fps, 4K 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5000 mAh"},{"label":"Công nghệ sạc","value":"HyperCharge 120W, không dây 50W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM + eSIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 7, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Hợp kim nhôm Titan Gray 6M42"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"209 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000017';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.67 inch, CrystalRes AMOLED cong 1.5K"},{"label":"Độ phân giải","value":"2712 x 1220 pixels"},{"label":"Tần số quét","value":"120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"Qualcomm Snapdragon 7s Gen 3 (4nm)"},{"label":"RAM","value":"8GB / 12GB"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"200MP chính OIS + 8MP Ultra Wide + 2MP Macro"},{"label":"Camera trước","value":"20MP"},{"label":"Quay video","value":"4K 30fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5110 mAh"},{"label":"Công nghệ sạc","value":"HyperCharge 120W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Khung hợp kim, mặt kính Gorilla Glass Victus 2"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"210 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000018';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.67 inch, Flow AMOLED 1.5K"},{"label":"Độ phân giải","value":"2712 x 1220 pixels"},{"label":"Tần số quét","value":"120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"MediaTek Dimensity 8400-Ultra (4nm)"},{"label":"RAM","value":"12GB LPDDR5X"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS 2 (Android 15)"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP Sony IMX882 OIS + 8MP Ultra Wide"},{"label":"Camera trước","value":"20MP"},{"label":"Quay video","value":"4K 60fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"6000 mAh Silicon-Carbon"},{"label":"Công nghệ sạc","value":"HyperCharge 90W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"5G Kép, Dual SIM"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi 6, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Tản nhiệt buồng hơi LiquidCool 4.0"},{"label":"Kháng nước/bụi","value":"IP68"},{"label":"Trọng lượng","value":"195 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000019';
+
+UPDATE products SET specs = '[
+  {"group":"Màn hình","items":[{"label":"Kích thước & Tấm nền","value":"6.88 inch, IPS LCD"},{"label":"Độ phân giải","value":"1640 x 720 pixels (HD+)"},{"label":"Tần số quét","value":"120Hz"}]},
+  {"group":"Hiệu năng & Chipset","items":[{"label":"Chipset","value":"MediaTek Helio G81-Ultra"},{"label":"RAM","value":"4GB / 6GB"},{"label":"Hệ điều hành","value":"Xiaomi HyperOS"}]},
+  {"group":"Camera","items":[{"label":"Camera sau","value":"50MP chính AI"},{"label":"Camera trước","value":"13MP"},{"label":"Quay video","value":"1080p 30fps"}]},
+  {"group":"Pin & Sạc","items":[{"label":"Dung lượng pin","value":"5160 mAh"},{"label":"Công nghệ sạc","value":"Sạc nhanh 18W"}]},
+  {"group":"Kết nối","items":[{"label":"Mạng di động","value":"4G LTE, Dual SIM + khe thẻ nhớ"},{"label":"Wi-Fi & Bluetooth","value":"Wi-Fi băng tần kép, Bluetooth 5.4"},{"label":"Cổng kết nối","value":"USB-C, jack tai nghe 3.5mm"}]},
+  {"group":"Thiết kế & Độ bền","items":[{"label":"Chất liệu khung","value":"Mặt lưng kính/da thời trang"},{"label":"Kháng nước/bụi","value":"Chống tia nước nhẹ"},{"label":"Trọng lượng","value":"204 g"}]}
+]'::jsonb WHERE id = '10000000-0000-0001-0000-000000000020';
+
+  END IF;
+END $$;
+
 COMMIT;

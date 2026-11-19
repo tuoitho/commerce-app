@@ -36,7 +36,7 @@ func TestCatalogRepositorySQLIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, "SET LOCAL search_path TO pg_temp"); err != nil {
+	if _, err := tx.Exec(ctx, "SET LOCAL search_path TO pg_temp, public"); err != nil {
 		t.Fatal(err)
 	}
 	createIntegrationCatalog(t, ctx, tx)
@@ -291,14 +291,18 @@ func createIntegrationCatalog(t *testing.T, ctx context.Context, tx pgx.Tx) {
 	t.Helper()
 	for _, statement := range []string{
 		`CREATE TEMP TABLE categories (id uuid PRIMARY KEY, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`,
-		`CREATE TEMP TABLE products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), category_id uuid NOT NULL, name text NOT NULL, model text NOT NULL DEFAULT '', brand text NOT NULL DEFAULT '', description text NOT NULL DEFAULT '', price numeric NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'VND', stock_quantity numeric NOT NULL DEFAULT 0, featured boolean NOT NULL DEFAULT false, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TEMP TABLE products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), category_id uuid NOT NULL, name text NOT NULL, model text NOT NULL DEFAULT '', brand text NOT NULL DEFAULT '', description text NOT NULL DEFAULT '', price numeric NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'VND', stock_quantity numeric NOT NULL DEFAULT 0, featured boolean NOT NULL DEFAULT false, specs jsonb NOT NULL DEFAULT '[]'::jsonb, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TEMP TABLE product_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, url text NOT NULL, position integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TEMP TABLE product_option_groups (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, label text NOT NULL, position integer NOT NULL DEFAULT 0)`,
 		`CREATE TEMP TABLE product_option_values (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, group_id uuid NOT NULL, label text NOT NULL, position integer NOT NULL DEFAULT 0)`,
 		`CREATE TEMP TABLE product_variants (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), product_id uuid NOT NULL, price_vnd numeric NOT NULL, stock_quantity numeric NOT NULL DEFAULT 0, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TEMP TABLE variant_option_values (variant_id uuid NOT NULL, product_id uuid NOT NULL, group_id uuid NOT NULL, option_value_id uuid NOT NULL, PRIMARY KEY (variant_id, group_id))`,
-		// No live session exists in this fixture, so no live price is in effect.
+		`CREATE TEMP TABLE orders (id uuid PRIMARY KEY, status text NOT NULL)`,
+		`CREATE TEMP TABLE order_items (id uuid PRIMARY KEY, order_id uuid NOT NULL, product_id uuid NOT NULL, quantity numeric NOT NULL)`,
+		`CREATE TEMP TABLE product_reviews (id uuid PRIMARY KEY, order_item_id uuid NOT NULL, rating smallint NOT NULL)`,
+		// No live session or flash sale exists in this fixture.
 		`CREATE TEMP VIEW live_active_variant_prices AS SELECT NULL::uuid AS session_id, NULL::uuid AS product_id, NULL::uuid AS variant_id, NULL::numeric AS live_price_vnd, NULL::integer AS quota, NULL::integer AS sold_quantity WHERE false`,
+		`CREATE TEMP VIEW flash_sale_running_variants AS SELECT NULL::uuid AS flash_sale_id, NULL::text AS campaign_name, NULL::timestamptz AS starts_at, NULL::timestamptz AS ends_at, NULL::uuid AS product_id, NULL::uuid AS variant_id, NULL::numeric AS flash_price_vnd, NULL::integer AS quota, NULL::integer AS sold_quantity, NULL::integer AS position WHERE false`,
 	} {
 		if _, err := tx.Exec(ctx, statement); err != nil {
 			t.Fatal(err)

@@ -205,3 +205,12 @@ JOIN live_sessions s ON s.id = oi.live_session_id AND s.status = 'live'
 WHERE oi.order_id = @order_id
   AND lvp.session_id = oi.live_session_id
   AND lvp.variant_id = oi.variant_id;
+
+-- name: RestoreLiveQuotaItem :exec
+UPDATE live_variant_prices lvp
+SET sold_quantity = GREATEST(lvp.sold_quantity - @quantity::integer, 0)::integer
+FROM live_sessions s
+WHERE lvp.session_id = @session_id
+  AND lvp.variant_id = @variant_id
+  AND s.id = lvp.session_id
+  AND s.status = 'live';

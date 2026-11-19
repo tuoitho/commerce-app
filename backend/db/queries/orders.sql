@@ -3,8 +3,19 @@ SELECT ci.id, ci.user_id, ci.variant_id, ci.quantity, ci.selected,
        ci.snapshot_brand_name, ci.snapshot_product_name, ci.snapshot_model,
        ci.snapshot_image_url, ci.snapshot_options::text AS snapshot_options,
        v.product_id, p.active AS product_active, v.active AS variant_active,
-       COALESCE(lap.live_price_vnd, v.price_vnd)::text AS price_vnd,
-       COALESCE(lap.session_id::text, '')::text AS live_session_id,
+       CASE
+           WHEN lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd) THEN lap.live_price_vnd
+           WHEN fsap.variant_id IS NOT NULL THEN fsap.flash_price_vnd
+           ELSE v.price_vnd
+       END::text AS price_vnd,
+       CASE
+           WHEN lap.variant_id IS NOT NULL AND (fsap.variant_id IS NULL OR lap.live_price_vnd <= fsap.flash_price_vnd) THEN lap.session_id::text
+           ELSE ''
+       END::text AS live_session_id,
+       CASE
+           WHEN fsap.variant_id IS NOT NULL AND (lap.variant_id IS NULL OR fsap.flash_price_vnd < lap.live_price_vnd) THEN fsap.flash_sale_id::text
+           ELSE ''
+       END::text AS flash_sale_id,
        v.stock_quantity,
        p.brand AS brand_name, p.name AS product_name, p.model,
        COALESCE((SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position, pi.id LIMIT 1), '')::text AS image_url,
@@ -16,8 +27,9 @@ FROM cart_items ci
 JOIN product_variants v ON v.id = ci.variant_id
 JOIN products p ON p.id = v.product_id
 LEFT JOIN live_active_variant_prices lap ON lap.variant_id = v.id
+LEFT JOIN flash_sale_active_variant_prices fsap ON fsap.variant_id = v.id
 WHERE ci.user_id = @user_id AND v.id = ANY(@variant_ids::uuid[])
-ORDER BY ci.created_at, ci.id
+ORDER BY v.id ASC, ci.id ASC
 FOR UPDATE OF ci, v;
 
 -- name: DecrementVariantStock :one
@@ -36,31 +48,36 @@ WHERE id = @id;
 -- name: InsertOrder :one
 INSERT INTO orders (
     user_id, status, payment_method, payment_status,
-    subtotal_vnd, shipping_fee_vnd, total_vnd,
+    subtotal_vnd, shipping_fee_vnd, discount_vnd, total_vnd,
+    voucher_id, voucher_code, voucher_type, delivery_method,
     recipient_name, phone, province_name, ward_name, detail_address
 )
 VALUES (
     @user_id, @status, @payment_method, @payment_status,
-    @subtotal_vnd::numeric, @shipping_fee_vnd::numeric, @total_vnd::numeric,
+    @subtotal_vnd::numeric, @shipping_fee_vnd::numeric, @discount_vnd::numeric, @total_vnd::numeric,
+    sqlc.narg(voucher_id)::uuid, sqlc.narg(voucher_code)::text, sqlc.narg(voucher_type)::text, @delivery_method,
     @recipient_name, @phone, @province_name, @ward_name, @detail_address
 )
 RETURNING id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
           subtotal_vnd::text AS subtotal_vnd,
           shipping_fee_vnd::text AS shipping_fee_vnd,
+          discount_vnd::text AS discount_vnd,
           total_vnd::text AS total_vnd,
+          voucher_id, voucher_code, voucher_type, delivery_method, shipping_carrier, tracking_code,
           recipient_name, phone, province_name, ward_name, detail_address,
-          created_at, updated_at, confirmed_at, cancelled_at, delivered_at;
+          created_at, updated_at, confirmed_at, preparing_at, shipped_at, cancelled_at, delivered_at;
 
 -- name: InsertOrderItem :exec
 INSERT INTO order_items (
     order_id, variant_id, product_id,
     brand_name, product_name, model, image_url, options,
-    unit_price_vnd, quantity, line_total_vnd, live_session_id
+    unit_price_vnd, quantity, line_total_vnd, live_session_id, flash_sale_id
 )
 VALUES (
     @order_id, @variant_id, @product_id,
     @brand_name, @product_name, @model, @image_url, @options::jsonb,
-    @unit_price_vnd::numeric, @quantity::bigint, @line_total_vnd::numeric, sqlc.narg(live_session_id)::uuid
+    @unit_price_vnd::numeric, @quantity::bigint, @line_total_vnd::numeric,
+    sqlc.narg(live_session_id)::uuid, sqlc.narg(flash_sale_id)::uuid
 );
 
 -- name: RemoveSelectedCartItems :exec
@@ -71,9 +88,11 @@ WHERE user_id = $1 AND selected = true;
 SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
+       discount_vnd::text AS discount_vnd,
        total_vnd::text AS total_vnd,
+       voucher_id, voucher_code, voucher_type, delivery_method, shipping_carrier, tracking_code,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
+       created_at, updated_at, confirmed_at, preparing_at, shipped_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2;
 
@@ -103,9 +122,11 @@ ORDER BY order_id, id ASC;
 SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
+       discount_vnd::text AS discount_vnd,
        total_vnd::text AS total_vnd,
+       voucher_id, voucher_code, voucher_type, delivery_method, shipping_carrier, tracking_code,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
+       created_at, updated_at, confirmed_at, preparing_at, shipped_at, cancelled_at, delivered_at
 FROM orders
 WHERE user_id = @user_id
   AND (COALESCE(cardinality(@statuses::text[]), 0) = 0 OR status = ANY(@statuses::text[]))
@@ -121,9 +142,11 @@ GROUP BY status;
 SELECT id, user_id, status, payment_method, payment_status, payment_transaction_id, paid_at,
        subtotal_vnd::text AS subtotal_vnd,
        shipping_fee_vnd::text AS shipping_fee_vnd,
+       discount_vnd::text AS discount_vnd,
        total_vnd::text AS total_vnd,
+       voucher_id, voucher_code, voucher_type, delivery_method, shipping_carrier, tracking_code,
        recipient_name, phone, province_name, ward_name, detail_address,
-       created_at, updated_at, confirmed_at, cancelled_at, delivered_at
+       created_at, updated_at, confirmed_at, preparing_at, shipped_at, cancelled_at, delivered_at
 FROM orders
 WHERE id = $1 AND user_id = $2
 FOR UPDATE;
@@ -136,6 +159,29 @@ SET status = $2,
     delivered_at = $5,
     updated_at = now()
 WHERE id = $1;
+
+-- name: SetOrderPreparing :exec
+UPDATE orders
+SET status = 'preparing',
+    preparing_at = COALESCE(preparing_at, @preparing_at::timestamptz),
+    updated_at = now()
+WHERE id = @id;
+
+-- name: SetOrderShipped :exec
+UPDATE orders
+SET status = 'shipped',
+    shipped_at = COALESCE(shipped_at, @shipped_at::timestamptz),
+    updated_at = now()
+WHERE id = @id;
+
+-- name: SetOrderShippedWithTracking :exec
+UPDATE orders
+SET status = 'shipped',
+    shipping_carrier = @shipping_carrier,
+    tracking_code = @tracking_code,
+    shipped_at = COALESCE(shipped_at, @shipped_at::timestamptz),
+    updated_at = now()
+WHERE id = @id;
 
 -- name: SetOrderPaymentFailed :exec
 UPDATE orders
@@ -176,23 +222,38 @@ SET status = 'confirmed',
 WHERE id = @id;
 
 -- name: AutoConfirmDueOrders :exec
-UPDATE orders
-SET status = 'confirmed',
-    confirmed_at = now(),
-    updated_at = now()
-WHERE status = 'pending_confirmation'
-  AND payment_method = 'cod'
-  AND created_at <= $1;
+WITH confirmed AS (
+    UPDATE orders o
+    SET status = 'confirmed',
+        confirmed_at = now(),
+        updated_at = now()
+    WHERE o.status = 'pending_confirmation'
+      AND o.payment_method = 'cod'
+      AND o.created_at <= $1
+    RETURNING o.id
+)
+INSERT INTO order_status_events (order_id, status, actor_type, note)
+SELECT id, 'confirmed', 'system', 'Hệ thống tự động xác nhận đơn hàng COD'
+FROM confirmed;
 
 -- name: AutoConfirmDueOrdersReturning :many
-UPDATE orders
-SET status = 'confirmed',
-    confirmed_at = now(),
-    updated_at = now()
-WHERE status = 'pending_confirmation'
-  AND payment_method = 'cod'
-  AND created_at <= $1
-RETURNING id, user_id, total_vnd::text AS total_vnd;
+WITH confirmed AS (
+    UPDATE orders o
+    SET status = 'confirmed',
+        confirmed_at = now(),
+        updated_at = now()
+    WHERE o.status = 'pending_confirmation'
+      AND o.payment_method = 'cod'
+      AND o.created_at <= $1
+    RETURNING o.id, o.user_id, o.total_vnd
+),
+events AS (
+    INSERT INTO order_status_events (order_id, status, actor_type, note)
+    SELECT id, 'confirmed', 'system', 'Hệ thống tự động xác nhận đơn hàng COD'
+    FROM confirmed
+)
+SELECT id, user_id, total_vnd::text AS total_vnd
+FROM confirmed;
 
 -- name: LockExpiredMomoOrders :many
 SELECT id, user_id, total_vnd::text AS total_vnd
@@ -216,9 +277,11 @@ WHERE id = @id;
 SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.discount_vnd::text AS discount_vnd,
        o.total_vnd::text AS total_vnd,
+       o.voucher_id, o.voucher_code, o.voucher_type, o.delivery_method, o.shipping_carrier, o.tracking_code,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.preparing_at, o.shipped_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -229,9 +292,11 @@ ORDER BY o.created_at DESC, o.id DESC;
 SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.discount_vnd::text AS discount_vnd,
        o.total_vnd::text AS total_vnd,
+       o.voucher_id, o.voucher_code, o.voucher_type, o.delivery_method, o.shipping_carrier, o.tracking_code,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.preparing_at, o.shipped_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -241,9 +306,11 @@ WHERE o.id = $1;
 SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.discount_vnd::text AS discount_vnd,
        o.total_vnd::text AS total_vnd,
+       o.voucher_id, o.voucher_code, o.voucher_type, o.delivery_method, o.shipping_carrier, o.tracking_code,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at,
+       o.created_at, o.updated_at, o.confirmed_at, o.preparing_at, o.shipped_at, o.cancelled_at, o.delivered_at,
        u.email AS buyer_email
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -254,9 +321,11 @@ FOR UPDATE OF o;
 SELECT o.id, o.user_id, o.status, o.payment_method, o.payment_status, o.payment_transaction_id, o.paid_at,
        o.subtotal_vnd::text AS subtotal_vnd,
        o.shipping_fee_vnd::text AS shipping_fee_vnd,
+       o.discount_vnd::text AS discount_vnd,
        o.total_vnd::text AS total_vnd,
+       o.voucher_id, o.voucher_code, o.voucher_type, o.delivery_method, o.shipping_carrier, o.tracking_code,
        o.recipient_name, o.phone, o.province_name, o.ward_name, o.detail_address,
-       o.created_at, o.updated_at, o.confirmed_at, o.cancelled_at, o.delivered_at
+       o.created_at, o.updated_at, o.confirmed_at, o.preparing_at, o.shipped_at, o.cancelled_at, o.delivered_at
 FROM orders o
 WHERE o.user_id = @user_id
   AND o.status IN ('delivered', 'partially_returned')
@@ -302,3 +371,122 @@ WHERE o.user_id = $1
         )
   );
 
+-- name: InsertOrderStatusEvent :exec
+INSERT INTO order_status_events (order_id, status, actor_type, note, created_at)
+VALUES (@order_id, @status, @actor_type, @note, clock_timestamp());
+
+-- name: ListOrderStatusEventsByOrderID :many
+SELECT id, order_id, status, actor_type, note, created_at
+FROM order_status_events
+WHERE order_id = @order_id
+ORDER BY created_at ASC,
+         CASE status
+             WHEN 'pending_confirmation' THEN 1
+             WHEN 'confirmed' THEN 2
+             WHEN 'preparing' THEN 3
+             WHEN 'cancel_requested' THEN 4
+             WHEN 'shipped' THEN 5
+             WHEN 'delivered' THEN 6
+             WHEN 'cancelled' THEN 7
+             WHEN 'partially_returned' THEN 8
+             WHEN 'returned' THEN 9
+             ELSE 99
+         END ASC,
+         id ASC;
+
+-- name: ListOrderStatusEventsByOrderIDs :many
+SELECT id, order_id, status, actor_type, note, created_at
+FROM order_status_events
+WHERE order_id = ANY(@order_ids::uuid[])
+ORDER BY order_id,
+         created_at ASC,
+         CASE status
+             WHEN 'pending_confirmation' THEN 1
+             WHEN 'confirmed' THEN 2
+             WHEN 'preparing' THEN 3
+             WHEN 'cancel_requested' THEN 4
+             WHEN 'shipped' THEN 5
+             WHEN 'delivered' THEN 6
+             WHEN 'cancelled' THEN 7
+             WHEN 'partially_returned' THEN 8
+             WHEN 'returned' THEN 9
+             ELSE 99
+         END ASC,
+         id ASC;
+
+-- name: ConsumeFlashSaleQuota :one
+UPDATE flash_sale_items fsi
+SET sold_quantity = fsi.sold_quantity + @quantity::integer
+FROM flash_sales fs
+WHERE fsi.flash_sale_id = fs.id
+  AND fsi.flash_sale_id = @flash_sale_id
+  AND fsi.variant_id = @variant_id
+  AND fs.active = true
+  AND fs.starts_at <= now()
+  AND now() < fs.ends_at
+  AND fsi.sold_quantity + @quantity::integer <= fsi.quota
+RETURNING fsi.sold_quantity;
+
+-- name: GetFlashSaleQuotaRemaining :one
+SELECT GREATEST(fsi.quota - fsi.sold_quantity, 0)::integer AS remaining
+FROM flash_sale_items fsi
+JOIN flash_sales fs ON fs.id = fsi.flash_sale_id
+WHERE fsi.flash_sale_id = @flash_sale_id
+  AND fsi.variant_id = @variant_id
+  AND fs.active = true
+  AND fs.starts_at <= now()
+  AND now() < fs.ends_at;
+
+-- name: RestoreFlashSaleQuotaForOrder :exec
+UPDATE flash_sale_items fsi
+SET sold_quantity = GREATEST(fsi.sold_quantity - restored.qty, 0)::integer
+FROM (
+    SELECT oi.flash_sale_id, oi.variant_id, SUM(oi.quantity) AS qty
+    FROM order_items oi
+    WHERE oi.order_id = @order_id
+      AND oi.flash_sale_id IS NOT NULL
+    GROUP BY oi.flash_sale_id, oi.variant_id
+) restored
+WHERE fsi.flash_sale_id = restored.flash_sale_id
+  AND fsi.variant_id = restored.variant_id;
+
+-- name: RestoreFlashSaleQuotaItem :exec
+UPDATE flash_sale_items
+SET sold_quantity = GREATEST(sold_quantity - @quantity::integer, 0)::integer
+WHERE flash_sale_id = @flash_sale_id
+  AND variant_id = @variant_id;
+
+-- name: ListOrderItemRestoreTargetsByOrderIDs :many
+SELECT oi.order_id,
+       oi.variant_id,
+       oi.quantity,
+       COALESCE(oi.live_session_id::text, '')::text AS live_session_id,
+       COALESCE(oi.flash_sale_id::text, '')::text AS flash_sale_id
+FROM order_items oi
+WHERE oi.order_id = ANY(@order_ids::uuid[])
+ORDER BY oi.variant_id ASC, oi.id ASC;
+
+-- name: ListCartItemQuantitiesForUpdate :many
+SELECT variant_id, quantity
+FROM cart_items
+WHERE user_id = @user_id
+FOR UPDATE;
+
+-- name: UpsertCartItemWithQuantity :exec
+INSERT INTO cart_items (
+    user_id, variant_id, quantity, selected,
+    snapshot_brand_name, snapshot_product_name, snapshot_model, snapshot_image_url, snapshot_options
+)
+VALUES (
+    @user_id, @variant_id, @quantity::bigint, true,
+    @snapshot_brand_name, @snapshot_product_name, @snapshot_model, @snapshot_image_url, @snapshot_options::jsonb
+)
+ON CONFLICT (user_id, variant_id) DO UPDATE
+SET quantity = EXCLUDED.quantity,
+    selected = true,
+    snapshot_brand_name = EXCLUDED.snapshot_brand_name,
+    snapshot_product_name = EXCLUDED.snapshot_product_name,
+    snapshot_model = EXCLUDED.snapshot_model,
+    snapshot_image_url = EXCLUDED.snapshot_image_url,
+    snapshot_options = EXCLUDED.snapshot_options,
+    updated_at = now();
